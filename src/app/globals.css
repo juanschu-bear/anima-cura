@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-praxis-900 font-body antialiased;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply bg-white rounded-card shadow-card p-5 border border-surface-200
+           hover:shadow-card-hover transition-shadow duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-praxis-600 text-white px-4 py-2 rounded-lg font-medium text-sm
+           hover:bg-praxis-700 active:bg-praxis-800 transition-colors
+           focus:outline-none focus:ring-2 focus:ring-praxis-500 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-100 text-praxis-700 px-4 py-2 rounded-lg font-medium text-sm
+           hover:bg-surface-200 active:bg-surface-300 transition-colors
+           focus:outline-none focus:ring-2 focus:ring-praxis-500 focus:ring-offset-2;
+  }
+
+  .btn-danger {
+    @apply bg-accent-coral/10 text-accent-coral px-4 py-2 rounded-lg font-medium text-sm
+           hover:bg-accent-coral/20 transition-colors;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success { @apply bg-accent-emerald/15 text-accent-emerald; }
+  .badge-warning { @apply bg-accent-amber/15 text-accent-amber; }
+  .badge-danger  { @apply bg-accent-coral/15 text-accent-coral; }
+  .badge-info    { @apply bg-accent-blue/15 text-accent-blue; }
+  .badge-neutral { @apply bg-surface-200 text-praxis-600; }
+
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-surface-300 text-sm
+           focus:outline-none focus:ring-2 focus:ring-praxis-500 focus:border-praxis-500
+           placeholder:text-praxis-400/60;
+  }
+
+  .table-header {
+    @apply text-xs font-semibold text-praxis-500 uppercase tracking-wider px-4 py-3 text-left;
+  }
+
+  .table-cell {
+    @apply px-4 py-3 text-sm border-t border-surface-100;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+           text-praxis-500 hover:bg-praxis-50 hover:text-praxis-700 transition-colors;
+  }
+
+  .sidebar-link-active {
+    @apply bg-praxis-600 text-white hover:bg-praxis-700 hover:text-white;
+  }
+}
