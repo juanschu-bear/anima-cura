@@ -112,7 +112,7 @@ export default function PatientenPage() {
       </div>
 
       <div className="rounded-card border border-surface-200 bg-white shadow-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible">
         <table className="w-full">
           <thead>
             <tr className="bg-surface-50">
@@ -167,7 +167,7 @@ export default function PatientenPage() {
                   </td>
                   <td className="table-cell text-right text-[20px] font-bold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
                   <td className="table-cell text-right text-[20px] font-bold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell">
+                  <td className="table-cell relative overflow-visible">
                     {renderStatusBadge({
                       status,
                       patientId: p.id,
@@ -267,7 +267,7 @@ function renderStatusBadge({
   const dueLabel = dueDate ? dueDate.toLocaleDateString("de-DE") : "—";
 
   return (
-    <div className="group relative inline-flex">
+    <div className="group relative inline-flex flex-col items-start gap-1">
       <button
         type="button"
         className="cursor-pointer"
@@ -278,7 +278,17 @@ function renderStatusBadge({
       >
         <StatusBadge status={status} />
       </button>
-      <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden min-w-[220px] -translate-x-1/2 rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated group-hover:block">
+      <button
+        type="button"
+        className="text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/mahnwesen?patient=${patientId}`);
+        }}
+      >
+        Mahnwesen öffnen
+      </button>
+      <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden min-w-[230px] rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated group-hover:block group-focus-within:block">
         <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
         <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
         <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
