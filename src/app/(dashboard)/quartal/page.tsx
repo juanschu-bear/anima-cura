@@ -56,9 +56,9 @@ export default function QuartalPage() {
   const maxRevenue = Math.max(...treatmentRevenue.map((t) => t.revenue));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
+        <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
         <p className="mt-1 text-sm text-praxis-400">
           {isGerman ? "Kennzahlen, Vergleich und Umsatztreiber im Überblick" : "KPIs, comparison and revenue drivers at a glance"}
         </p>
@@ -90,7 +90,7 @@ export default function QuartalPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-lg font-semibold text-praxis-700">{isGerman ? "Quartalsvergleich - Zahlungseingang" : "Quarter comparison - incoming payments"}</h3>
+        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Quartalsvergleich - Zahlungseingang" : "Quarter comparison - incoming payments"}</h3>
         <div className="grid grid-cols-6 gap-4">
           {quarterRevenue.map((row, idx) => {
             const max = Math.max(...quarterRevenue.map((q) => q.value));
@@ -114,7 +114,7 @@ export default function QuartalPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="stat-card">
-          <h3 className="mb-4 text-lg font-semibold text-praxis-700">{isGerman ? "Patienten nach Kassenart" : "Patients by insurance type"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Patienten nach Kassenart" : "Patients by insurance type"}</h3>
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <div className="h-[220px] w-full md:w-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -142,7 +142,7 @@ export default function QuartalPage() {
         </div>
 
         <div className="stat-card">
-          <h3 className="mb-4 text-lg font-semibold text-praxis-700">{isGerman ? "Umsatz nach Behandlungsart" : "Revenue by treatment"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Umsatz nach Behandlungsart" : "Revenue by treatment"}</h3>
           <div className="space-y-4">
             {treatmentRevenue.map((row) => {
               const width = Math.max(10, Math.round((row.revenue / maxRevenue) * 100));

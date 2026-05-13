@@ -109,9 +109,9 @@ export default function MahnwesenPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-praxis-800">Mahnwesen</h1>
+        <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Mahnwesen</h1>
         <p className="text-sm text-praxis-400 mt-1">Pipeline, offene Volumen und Eskalationen im Blick</p>
       </div>
 
@@ -123,7 +123,7 @@ export default function MahnwesenPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-lg font-semibold text-praxis-700">Mahnpipeline</h3>
+        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Mahnpipeline</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {columns.map((col) => (
             <div key={col.key} className="rounded-xl border border-surface-200 bg-surface-50 p-3">

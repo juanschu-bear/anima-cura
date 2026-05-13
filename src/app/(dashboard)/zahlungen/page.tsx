@@ -94,10 +94,10 @@ export default function ZahlungenPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
+          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
             {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
@@ -121,11 +121,7 @@ export default function ZahlungenPage() {
           <button
             key={f.key}
             onClick={() => setStatusFilter(f.key)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-              statusFilter === f.key
-                ? "border-[#7469ff] bg-[#7469ff]/10 text-[#4b42d6]"
-                : "border-surface-200 bg-white text-praxis-600 hover:bg-surface-50"
-            }`}
+            className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
           >
             {f.label}
           </button>
@@ -278,7 +274,7 @@ function MetricCard({
   return (
     <div className="stat-card">
       <p className="text-sm text-praxis-400 font-medium">{label}</p>
-      <p className={`mt-1 text-4 font-bold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
+      <p className={`mt-1 text-[42px] leading-none tracking-tight font-extrabold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
       {sub ? <p className="mt-1 text-xs text-praxis-400">{sub}</p> : null}
     </div>
   );

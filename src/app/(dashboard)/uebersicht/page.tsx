@@ -50,9 +50,9 @@ export default function UebersichtPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-praxis-800">Übersicht</h1>
+        <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Übersicht</h1>
         <p className="text-sm text-praxis-400 mt-1">
           {isGerman
             ? "Willkommen zurück, Maria. Hier ist dein Tages-Briefing."
@@ -99,7 +99,7 @@ export default function UebersichtPage() {
 
       <div className="stat-card">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-praxis-700">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
+          <h3 className="text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
           <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}</span>
         </div>
         <div className="space-y-2">
@@ -120,18 +120,18 @@ export default function UebersichtPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="stat-card lg:col-span-2">
-          <h3 className="mb-3 text-lg font-semibold text-praxis-700">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
+          <h3 className="mb-3 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
           <ZahlungsverlaufChart data={zahlungsverlauf} />
         </div>
         <div className="stat-card">
-          <h3 className="mb-3 text-lg font-semibold text-praxis-700">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
+          <h3 className="mb-3 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
           <RatenstatusChart data={ratenStatus} />
         </div>
       </div>
 
       <div className="stat-card">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-praxis-700">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
+          <h3 className="text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
           <Link href="/zahlungen" className="text-xs text-praxis-500 hover:text-praxis-700">{isGerman ? "Alle anzeigen" : "View all"} →</Link>
         </div>
         <div className="overflow-x-auto">
