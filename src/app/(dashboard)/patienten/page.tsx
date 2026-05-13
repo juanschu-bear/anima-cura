@@ -92,7 +92,7 @@ export default function PatientenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
+          <h1 className="text-[28px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
           <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
         <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
@@ -111,7 +111,8 @@ export default function PatientenPage() {
         />
       </div>
 
-      <div className="overflow-hidden rounded-card border border-surface-200 bg-white shadow-card">
+      <div className="rounded-card border border-surface-200 bg-white shadow-card">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="bg-surface-50">
@@ -152,7 +153,7 @@ export default function PatientenPage() {
                         {p.vorname?.[0]}
                         {p.nachname?.[0]}
                       </div>
-                      <span className="text-[18px] leading-tight font-bold text-praxis-800">
+                      <span className="text-[16px] leading-tight font-bold text-praxis-800">
                         {p.nachname}, {p.vorname}
                       </span>
                     </Link>
@@ -164,8 +165,8 @@ export default function PatientenPage() {
                       <span className="text-sm font-medium text-praxis-400">{bezahlt}/{total}</span>
                     </div>
                   </td>
-                  <td className="table-cell text-right text-[24px] font-extrabold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell text-right text-[24px] font-extrabold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[20px] font-bold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[20px] font-bold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
                   <td className="table-cell">
                     {renderStatusBadge({
                       status,
@@ -180,6 +181,7 @@ export default function PatientenPage() {
             })}
           </tbody>
         </table>
+        </div>
 
         {patienten.length === 0 && !loading && (
           <EmptyState
@@ -262,25 +264,27 @@ function renderStatusBadge({
   const first = ueberfaellig[0];
   const dueDate = first?.faellig_am ? new Date(first.faellig_am) : null;
   const daysLate = dueDate ? Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-  const tooltip = [
-    `Restschuld: ${restschuld.toLocaleString("de-DE")}€`,
-    `Fällig seit: ${dueDate ? dueDate.toLocaleDateString("de-DE") : "—"}`,
-    `Verzugstage: ${daysLate}`,
-    "Klick öffnet Mahnwesen",
-  ].join(" | ");
+  const dueLabel = dueDate ? dueDate.toLocaleDateString("de-DE") : "—";
 
   return (
-    <button
-      type="button"
-      title={tooltip}
-      className="cursor-pointer"
-      onClick={(e) => {
-        e.stopPropagation();
-        router.push(`/mahnwesen?patient=${patientId}`);
-      }}
-    >
-      <StatusBadge status={status} />
-    </button>
+    <div className="group relative inline-flex">
+      <button
+        type="button"
+        className="cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/mahnwesen?patient=${patientId}`);
+        }}
+      >
+        <StatusBadge status={status} />
+      </button>
+      <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden min-w-[220px] -translate-x-1/2 rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated group-hover:block">
+        <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
+        <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
+        <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
+        <p className="mt-1 text-praxis-400">Klick: Mahnwesen öffnen</p>
+      </div>
+    </div>
   );
 }
 

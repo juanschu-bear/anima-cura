@@ -60,7 +60,7 @@ export default function PatientDetailPage() {
             {patient.nachname?.[0]}
           </div>
           <div className="flex-1">
-            <h1 className="text-[32px] font-extrabold tracking-tight text-praxis-800">
+            <h1 className="text-[28px] font-extrabold tracking-tight text-praxis-800">
               {patient.nachname}, {patient.vorname}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-base text-praxis-500">
@@ -156,7 +156,7 @@ function Info({ label, value, mono }: { label: string; value: string; mono?: boo
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-praxis-400">{label}</p>
-      <p className={`mt-1 text-[22px] font-extrabold tracking-tight text-praxis-800 ${mono ? "font-mono text-base" : ""}`}>
+      <p className={`mt-1 text-[18px] font-bold tracking-tight text-praxis-800 ${mono ? "font-mono text-sm" : ""}`}>
         {value}
       </p>
     </div>
@@ -177,7 +177,7 @@ function MetricCard({
   return (
     <div className="stat-card">
       <p className="text-sm font-medium text-praxis-400">{label}</p>
-      <p className={`mt-1 text-[34px] font-extrabold leading-none tracking-tight ${accent ? "text-accent-coral" : "text-praxis-800"}`}>
+      <p className={`mt-1 text-[28px] font-extrabold leading-none tracking-tight ${accent ? "text-accent-coral" : "text-praxis-800"}`}>
         {value}
       </p>
       {sub ? <p className="mt-1 text-sm text-praxis-400">{sub}</p> : null}
