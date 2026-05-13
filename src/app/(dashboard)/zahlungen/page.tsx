@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTransaktionen, usePatienten } from "@/hooks/useData";
 import { StatusBadge, Dropdown, Modal, EmptyState } from "@/components/ui";
 import { MatchingChart } from "@/components/charts";
@@ -13,6 +13,14 @@ export default function ZahlungenPage() {
   const [matchModal, setMatchModal] = useState<any>(null);
   const [patSearch, setPatSearch] = useState("");
   const { patienten } = usePatienten(patSearch);
+  const [syncing, setSyncing] = useState(false);
+  const [syncHint, setSyncHint] = useState("");
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const status = url.searchParams.get("status");
+    if (status) setStatusFilter(status);
+  }, []);
 
   // Matching-Statistik
   const matchStats = [
@@ -41,6 +49,27 @@ export default function ZahlungenPage() {
     refetch();
   }
 
+  async function handleBankSync() {
+    setSyncing(true);
+    setSyncHint("");
+    try {
+      const res = await fetch("/api/finapi/transactions", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        setSyncHint("Bank-Sync fehlgeschlagen.");
+      } else {
+        const imported = payload.bankSync?.newTransactions ?? 0;
+        const auto = payload.matching?.auto ?? 0;
+        setSyncHint(`${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.`);
+      }
+      refetch();
+    } catch {
+      setSyncHint("Bank-Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -50,12 +79,16 @@ export default function ZahlungenPage() {
             {transaktionen.length} Transaktionen · {transaktionen.filter((t) => t.matching_status === "unklar").length} offen
           </p>
         </div>
-        <button className="btn-primary" onClick={() => {
-          fetch("/api/finapi/transactions", { method: "POST" }).then(() => refetch());
-        }}>
-          Bank-Sync starten
+        <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
+          {syncing ? "Synchronisiere..." : "Bank-Sync starten"}
         </button>
       </div>
+
+      {syncHint && (
+        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+          {syncHint}
+        </div>
+      )}
 
       {/* Matching-Übersicht */}
       <div className="stat-card">

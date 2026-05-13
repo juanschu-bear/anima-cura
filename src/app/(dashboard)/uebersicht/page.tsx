@@ -8,7 +8,7 @@ import Link from "next/link";
 
 export default function UebersichtPage() {
   const { stats, loading } = useDashboardStats();
-  const { alerts } = useAlerts();
+  const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "unklar" });
 
   // Demo-Daten für Charts (werden durch echte Daten ersetzt)
@@ -112,6 +112,14 @@ export default function UebersichtPage() {
                   <p className="text-sm font-medium text-praxis-700 truncate">{alert.titel}</p>
                   <p className="text-xs text-praxis-400 mt-0.5 line-clamp-2">{alert.beschreibung}</p>
                 </div>
+                {!alert.gelesen && (
+                  <button
+                    className="text-xs text-praxis-500 hover:text-praxis-700"
+                    onClick={() => markRead(alert.id)}
+                  >
+                    gelesen
+                  </button>
+                )}
               </div>
             ))}
           </div>

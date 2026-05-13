@@ -30,11 +30,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const now = new Date().toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  });
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="ac-shell flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-surface-200 flex flex-col">
+      <aside className="ac-sidebar w-64 bg-white border-r border-surface-200 flex flex-col">
         {/* Logo */}
         <div className="p-5 border-b border-surface-200">
           <h1 className="text-lg font-bold text-praxis-800 leading-tight">
@@ -81,11 +86,15 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="ac-main flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
         <header className="h-14 bg-white border-b border-surface-200 flex items-center justify-between px-6">
-          <div />
+          <div className="text-xs text-praxis-400 tracking-wide">{now}</div>
           <div className="flex items-center gap-3">
+            <span className="hidden md:inline-flex items-center gap-2 text-xs text-praxis-400">
+              <span className="w-2 h-2 rounded-full bg-accent-emerald" />
+              System aktiv
+            </span>
             <button className="relative p-2 text-praxis-400 hover:text-praxis-600 transition-colors rounded-lg hover:bg-surface-50">
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent-coral" />
@@ -94,7 +103,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-surface-50">
+        <div className="ac-content flex-1 overflow-y-auto p-6 bg-surface-50">
           {children}
         </div>
       </main>
