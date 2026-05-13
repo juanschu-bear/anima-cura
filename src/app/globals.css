@@ -161,9 +161,38 @@ select.input {
   color: #1f3f5f;
 }
 
-@media (max-width: 1024px) {
-  .ac-sidebar {
-    width: 235px;
+.ac-top-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ac-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 54px;
+  padding: 0 18px;
+  color: #5f748f;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+  transition: color 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.ac-tab:hover {
+  color: #2f4d6e;
+}
+
+.ac-tab-active {
+  color: #5148d8;
+  border-bottom-color: #5148d8;
+}
+
+@media (max-width: 960px) {
+  .ac-tab {
+    height: 48px;
+    padding: 0 14px;
+    font-size: 0.92rem;
   }
 }
 
@@ -184,10 +213,6 @@ select.input {
 
 :root[data-theme="dark"] body {
   color: #d9e7f6;
-}
-
-:root[data-theme="dark"] .ac-main > header {
-  background: rgba(12, 22, 34, 0.72);
 }
 
 :root[data-theme="dark"] .text-praxis-800 { color: #e5effb !important; }
@@ -211,6 +236,19 @@ select.input {
 :root[data-theme="dark"] .ac-chip:hover {
   background: rgba(28, 46, 66, 0.95);
   color: #e2effe;
+}
+
+:root[data-theme="dark"] .ac-tab {
+  color: #8ea7c5;
+}
+
+:root[data-theme="dark"] .ac-tab:hover {
+  color: #d0def0;
+}
+
+:root[data-theme="dark"] .ac-tab-active {
+  color: #a89eff;
+  border-bottom-color: #a89eff;
 }
 
 :root[data-theme="dark"] .input,

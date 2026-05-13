@@ -85,6 +85,11 @@ export function StatusBadge({ status }: { status: string }) {
     connected:   { variant: "success", label: "Verbunden" },
     disconnected:{ variant: "danger",  label: "Getrennt" },
     update_required: { variant: "warning", label: "Update nötig" },
+    pünktlich:   { variant: "success", label: "Pünktlich" },
+    verzug:      { variant: "danger", label: "Verzug" },
+    karenz:      { variant: "warning", label: "Karenz" },
+    stufe1:      { variant: "warning", label: "Stufe 1" },
+    eskalation:  { variant: "danger", label: "Eskalation" },
   };
 
   const c = config[status] || { variant: "neutral" as const, label: status };

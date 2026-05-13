@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePatienten } from "@/hooks/useData";
 import { StatusBadge, EmptyState, Modal } from "@/components/ui";
 import { Users, Search, Plus } from "lucide-react";
@@ -62,24 +62,23 @@ export default function PatientenPage() {
     refetch();
   }
 
+  const totalActive = useMemo(
+    () => patienten.filter((p) => (p.raten || []).length > 0).length,
+    [patienten]
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-praxis-800">Patienten</h1>
-          <p className="text-sm text-praxis-400 mt-1">
-            {patienten.length} Patienten
-          </p>
+          <p className="text-sm text-praxis-400 mt-1">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
-        <button
-          className="btn-primary flex items-center gap-2"
-          onClick={() => setCreateOpen(true)}
-        >
+        <button className="btn-primary flex items-center gap-2" onClick={() => setCreateOpen(true)}>
           <Plus size={16} /> Neuer Patient
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
         <input
@@ -91,62 +90,99 @@ export default function PatientenPage() {
         />
       </div>
 
-      {/* Patienten Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {patienten.map((p) => {
-          const offeneRaten = (p.raten || []).filter((r: any) => r.status === "offen" || r.status === "überfällig");
-          const offenBetrag = offeneRaten.reduce((s: number, r: any) => s + r.betrag, 0);
-          const hatMahnung = (p.raten || []).some((r: any) => r.mahnstufe > 0);
+      <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-surface-50">
+              <th className="table-header">Patient</th>
+              <th className="table-header">Behandlung</th>
+              <th className="table-header">Fortschritt</th>
+              <th className="table-header text-right">Rate/Monat</th>
+              <th className="table-header text-right">Restschuld</th>
+              <th className="table-header">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {patienten.map((p) => {
+              const raten = p.raten || [];
+              const total = Math.max(raten.length, 1);
+              const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
+              const hasOverdue = raten.some((r: any) => r.status === "überfällig");
+              const maxMahn = raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
+              const offene = raten.filter((r: any) => r.status !== "bezahlt");
+              const rest = offene.reduce((s: number, r: any) => s + (r.betrag || 0), 0);
+              const rateMonat = raten[0]?.betrag || 0;
 
-          return (
-            <Link
-              key={p.id}
-              href={`/patienten/${p.id}`}
-              className="stat-card hover:shadow-card-hover transition-all group"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-praxis-100 flex items-center justify-center text-sm font-semibold text-praxis-600 group-hover:bg-praxis-200 transition-colors">
-                  {p.vorname[0]}{p.nachname[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-praxis-800 group-hover:text-praxis-600 transition-colors">
-                    {p.nachname}, {p.vorname}
-                  </p>
-                  <p className="text-xs text-praxis-400 mt-0.5">{p.behandlung}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <StatusBadge status={p.behandlung_status} />
-                    {hatMahnung && <StatusBadge status="überfällig" />}
-                  </div>
-                </div>
-              </div>
+              let status: string = "pünktlich";
+              if (maxMahn >= 3) status = "eskalation";
+              else if (maxMahn === 2) status = "verzug";
+              else if (maxMahn === 1) status = "stufe1";
+              else if (hasOverdue) status = "abweichung";
 
-              {offeneRaten.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-surface-100 flex items-center justify-between">
-                  <span className="text-xs text-praxis-400">
-                    {offeneRaten.length} offene Rate{offeneRaten.length !== 1 ? "n" : ""}
-                  </span>
-                  <span className="text-sm font-semibold text-praxis-700">
-                    {offenBetrag.toLocaleString("de-DE")} €
-                  </span>
-                </div>
-              )}
-            </Link>
-          );
-        })}
+              return (
+                <tr key={p.id} className="hover:bg-surface-50/50 transition-colors">
+                  <td className="table-cell">
+                    <Link href={`/patienten/${p.id}`} className="flex items-center gap-3 group">
+                      <div className="w-9 h-9 rounded-full bg-praxis-100 text-praxis-600 flex items-center justify-center text-xs font-semibold">
+                        {p.vorname?.[0]}{p.nachname?.[0]}
+                      </div>
+                      <span className="text-sm font-semibold text-praxis-800 group-hover:text-praxis-600">
+                        {p.nachname}, {p.vorname}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "KFO"}</td>
+                  <td className="table-cell">
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-1 max-w-[340px]">
+                        {Array.from({ length: Math.min(total, 36) }).map((_, idx) => {
+                          const isDone = idx < bezahlt;
+                          const isLateMarker = idx === bezahlt && hasOverdue;
+                          return (
+                            <span
+                              key={`${p.id}-d-${idx}`}
+                              className={`h-3 w-3 rounded-[4px] border ${
+                                isDone
+                                  ? "bg-[#4ca43f] border-[#4ca43f]"
+                                  : isLateMarker
+                                  ? "bg-accent-coral border-accent-coral"
+                                  : "bg-transparent border-surface-200"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs text-praxis-400">{bezahlt}/{total}</span>
+                    </div>
+                  </td>
+                  <td className="table-cell text-right text-sm font-semibold text-praxis-700">
+                    {rateMonat.toLocaleString("de-DE")}€
+                  </td>
+                  <td className="table-cell text-right text-sm font-semibold text-accent-coral">
+                    {rest.toLocaleString("de-DE")}€
+                  </td>
+                  <td className="table-cell">
+                    <StatusBadge status={status} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {patienten.length === 0 && !loading && (
+          <EmptyState
+            icon={<Users size={24} />}
+            title="Keine Patienten gefunden"
+            description={search ? "Versuche einen anderen Suchbegriff." : "Noch keine Patienten angelegt."}
+            action={
+              <button className="btn-primary" onClick={() => setCreateOpen(true)}>
+                Ersten Patienten anlegen
+              </button>
+            }
+          />
+        )}
       </div>
-
-      {patienten.length === 0 && !loading && (
-        <EmptyState
-          icon={<Users size={24} />}
-          title="Keine Patienten gefunden"
-          description={search ? "Versuche einen anderen Suchbegriff." : "Noch keine Patienten angelegt."}
-          action={
-            <button className="btn-primary" onClick={() => setCreateOpen(true)}>
-              Ersten Patienten anlegen
-            </button>
-          }
-        />
-      )}
 
       <Modal
         open={createOpen}
@@ -215,22 +251,12 @@ export default function PatientenPage() {
               onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))}
             />
           </div>
-          {errorMsg && (
-            <p className="text-sm text-accent-coral">{errorMsg}</p>
-          )}
+          {errorMsg && <p className="text-sm text-accent-coral">{errorMsg}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <button
-              className="btn-secondary"
-              onClick={() => setCreateOpen(false)}
-              disabled={saving}
-            >
+            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>
               Abbrechen
             </button>
-            <button
-              className="btn-primary"
-              onClick={handleCreatePatient}
-              disabled={saving}
-            >
+            <button className="btn-primary" onClick={handleCreatePatient} disabled={saving}>
               {saving ? "Speichere..." : "Patient anlegen"}
             </button>
           </div>
@@ -252,11 +278,7 @@ function FormField({
   return (
     <label className="block">
       <span className="block text-xs font-medium text-praxis-500 mb-1">{label}</span>
-      <input
-        className="input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input className="input" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }
@@ -273,12 +295,7 @@ function DateField({
   return (
     <label className="block">
       <span className="block text-xs font-medium text-praxis-500 mb-1">{label}</span>
-      <input
-        type="date"
-        className="input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input type="date" className="input" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }

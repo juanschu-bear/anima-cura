@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
-import { StatusBadge, EmptyState, Modal } from "@/components/ui";
-import { MonatseinnahmenChart } from "@/components/charts";
-import { CalendarRange, Plus } from "lucide-react";
-import Link from "next/link";
-import { DEMO_TREATMENT_TYPES, demoPlaene, demoPatients } from "@/lib/mock-data";
+import { Modal, StatusBadge } from "@/components/ui";
+import { Plus } from "lucide-react";
+import { DEMO_TREATMENT_TYPES, demoPlaene, demoPatients, demoRaten } from "@/lib/mock-data";
 
 export default function RatenplanPage() {
   const [plaene, setPlaene] = useState<any[]>([]);
   const [patienten, setPatienten] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ratenByPlan, setRatenByPlan] = useState<Record<string, any[]>>({});
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hint, setHint] = useState("");
@@ -26,25 +25,42 @@ export default function RatenplanPage() {
   async function fetchData() {
     const supabase = createBrowserClient();
     try {
-      const [{ data: plans }, { data: pats }] = await Promise.all([
+      const [{ data: plans }, { data: pats }, { data: rates }] = await Promise.all([
         supabase
           .from("ratenplaene")
-          .select("*, patients:patient_id(vorname, nachname, behandlung), raten(id, status, betrag, bezahlt_betrag)")
-          .order("start_datum", { ascending: false }),
-        supabase
-          .from("patients")
-          .select("id, vorname, nachname")
-          .order("nachname", { ascending: true }),
+          .select("*, patients:patient_id(vorname, nachname, behandlung)")
+          .order("start_datum", { ascending: true }),
+        supabase.from("patients").select("id, vorname, nachname").order("nachname", { ascending: true }),
+        supabase.from("raten").select("*").order("rate_nummer", { ascending: true }),
       ]);
-      const fallbackPlans = plans && plans.length > 0 ? plans : demoPlaene;
-      const fallbackPatients = pats && pats.length > 0 ? pats : demoPatients;
-      setPlaene(fallbackPlans || []);
-      setPatienten(fallbackPatients || []);
+
+      const finalPlans = plans && plans.length > 0 ? plans : demoPlaene;
+      const finalPatients = pats && pats.length > 0 ? pats : demoPatients;
+      const finalRates = rates && rates.length > 0 ? rates : demoRaten;
+
+      const grouped: Record<string, any[]> = {};
+      finalRates.forEach((rate: any) => {
+        if (!grouped[rate.ratenplan_id]) grouped[rate.ratenplan_id] = [];
+        grouped[rate.ratenplan_id].push(rate);
+      });
+
+      setPlaene(finalPlans);
+      setPatienten(finalPatients);
+      setRatenByPlan(grouped);
+      if (finalPlans.length > 0) {
+        setSelectedPlanId((prev) => prev || finalPlans[0].id);
+      }
     } catch {
+      const grouped: Record<string, any[]> = {};
+      demoRaten.forEach((rate: any) => {
+        if (!grouped[rate.ratenplan_id]) grouped[rate.ratenplan_id] = [];
+        grouped[rate.ratenplan_id].push(rate);
+      });
       setPlaene(demoPlaene);
       setPatienten(demoPatients);
+      setRatenByPlan(grouped);
+      setSelectedPlanId((prev) => prev || demoPlaene[0]?.id || "");
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -56,6 +72,7 @@ export default function RatenplanPage() {
       setHint("Bitte Patient, Gesamtbetrag und Anzahl Raten korrekt ausfuellen.");
       return;
     }
+
     setSaving(true);
     setHint("");
     const supabase = createBrowserClient();
@@ -83,11 +100,7 @@ export default function RatenplanPage() {
     const start = new Date(form.start_datum);
     const rates = Array.from({ length: form.anzahl_raten }).map((_, index) => {
       const due = new Date(start);
-      if (form.rhythmus === "monatlich") {
-        due.setMonth(due.getMonth() + index);
-      } else {
-        due.setMonth(due.getMonth() + index * 3);
-      }
+      due.setMonth(due.getMonth() + (form.rhythmus === "monatlich" ? index : index * 3));
       return {
         ratenplan_id: plan.id,
         patient_id: form.patient_id,
@@ -116,148 +129,92 @@ export default function RatenplanPage() {
     fetchData();
   }
 
-  // Demo-Daten für Monatseinnahmen-Chart
-  const einnahmen = [
-    { monat: "Jan", privat: 14200, kasse: 4300 },
-    { monat: "Feb", privat: 16800, kasse: 4500 },
-    { monat: "Mär", privat: 15100, kasse: 4700 },
-    { monat: "Apr", privat: 18200, kasse: 5200 },
-    { monat: "Mai", privat: 17400, kasse: 4700 },
-    { monat: "Jun", privat: 19800, kasse: 5000 },
-  ];
+  const selectedPlan = plaene.find((p) => p.id === selectedPlanId);
+  const selectedRates = (ratenByPlan[selectedPlanId] || []).sort(
+    (a: any, b: any) => a.rate_nummer - b.rate_nummer
+  );
+  const done = selectedRates.filter((r: any) => r.status === "bezahlt").length;
+  const rest = selectedRates
+    .filter((r: any) => r.status !== "bezahlt")
+    .reduce((sum: number, r: any) => sum + (r.betrag || 0), 0);
+  const status = useMemo(() => {
+    if (!selectedRates.length) return "pünktlich";
+    const maxMahn = selectedRates.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
+    if (maxMahn >= 3) return "eskalation";
+    if (maxMahn === 2) return "verzug";
+    if (maxMahn === 1) return "stufe1";
+    if (selectedRates.some((r: any) => r.status === "überfällig")) return "abweichung";
+    return "pünktlich";
+  }, [selectedRates]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-praxis-800">Ratenpläne</h1>
-          <p className="text-sm text-praxis-400 mt-1">
-            {plaene.length} Ratenpläne · {plaene.filter((p) => p.status === "aktiv").length} aktiv
-          </p>
+          <h1 className="text-2xl font-bold text-praxis-800">Ratenplan</h1>
+          <p className="text-sm text-praxis-400 mt-1">{plaene.length} aktive Pläne</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setCreateOpen(true)}>
+        <button className="btn-primary inline-flex items-center gap-2" onClick={() => setCreateOpen(true)}>
           <Plus size={16} /> Neuer Ratenplan
         </button>
       </div>
 
-      {hint && (
-        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
-          {hint}
-        </div>
+      {hint && <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">{hint}</div>}
+
+      <div className="flex flex-wrap gap-2">
+        {plaene.map((plan) => (
+          <button
+            key={plan.id}
+            onClick={() => setSelectedPlanId(plan.id)}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              selectedPlanId === plan.id
+                ? "border-[#7469ff] bg-[#7469ff]/10 text-[#4b42d6]"
+                : "border-surface-200 bg-white text-praxis-600 hover:bg-surface-50"
+            }`}
+          >
+            {plan.patients?.nachname}, {plan.patients?.vorname}
+          </button>
+        ))}
+      </div>
+
+      {selectedPlan && (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <Metric label="Monatliche Rate" value={`${Number(selectedPlan.rate_betrag || 0).toLocaleString("de-DE")}€`} />
+            <Metric label="Bezahlt" value={`${done} / ${Math.max(selectedPlan.anzahl_raten || 0, 1)}`} sub={`${Math.round((done / Math.max(selectedPlan.anzahl_raten || 1, 1)) * 100)}% abgeschlossen`} />
+            <Metric label="Restschuld" value={`${rest.toLocaleString("de-DE")}€`} accent />
+            <Metric label="Status" value={<StatusBadge status={status} />} />
+          </div>
+
+          <div className="stat-card">
+            <h3 className="text-xl font-semibold text-praxis-700 mb-4">Alle Raten</h3>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+              {selectedRates.map((rate: any) => (
+                <div
+                  key={rate.id}
+                  className={`rounded-xl border p-3 ${
+                    rate.status === "bezahlt"
+                      ? "border-[#93d58f] bg-[#eaf7e8]"
+                      : rate.status === "überfällig"
+                      ? "border-accent-coral/40 bg-accent-coral/10"
+                      : "border-surface-200 bg-white"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-praxis-700">Rate {rate.rate_nummer}</p>
+                  <p className="mt-1 text-2xl font-bold text-praxis-800">{Number(rate.betrag || 0).toLocaleString("de-DE")}€</p>
+                  <p className="mt-1 text-xs text-praxis-400">{new Date(rate.faellig_am).toLocaleDateString("de-DE", { month: "short", year: "2-digit" })}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Einnahmen-Chart */}
-      <div className="stat-card">
-        <h3 className="text-sm font-semibold text-praxis-700 mb-4">Monatliche Einnahmen nach Kassenart</h3>
-        <MonatseinnahmenChart data={einnahmen} />
-      </div>
-
-      {/* Ratenpläne-Tabelle */}
-      <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-surface-50">
-              <th className="table-header">Patient</th>
-              <th className="table-header">Behandlung</th>
-              <th className="table-header">Fortschritt</th>
-              <th className="table-header text-right">Rate/Monat</th>
-              <th className="table-header text-right">Restschuld</th>
-              <th className="table-header">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plaene.map((plan) => {
-              const raten = plan.raten || [];
-              const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-              const restschuld = Math.max(plan.gesamtbetrag - bezahlt * plan.rate_betrag, 0);
-              const hasOverdue = raten.some((r: any) => r.status === "überfällig");
-              const hasWarning = raten.some((r: any) => r.status === "offen");
-              const statusLabel = hasOverdue ? "überfällig" : hasWarning ? "abweichung" : "bezahlt";
-
-              return (
-                <tr key={plan.id} className="hover:bg-surface-50/50 transition-colors">
-                  <td className="table-cell">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-praxis-100 text-praxis-600 flex items-center justify-center text-xs font-semibold">
-                        {plan.patients?.vorname?.[0]}
-                        {plan.patients?.nachname?.[0]}
-                      </div>
-                      <Link
-                        href={`/patienten/${plan.patient_id}`}
-                        className="text-sm font-medium text-praxis-700 hover:text-praxis-500 transition-colors"
-                      >
-                        {plan.patients?.nachname}, {plan.patients?.vorname}
-                      </Link>
-                    </div>
-                  </td>
-                  <td className="table-cell text-sm text-praxis-600">
-                    {plan.patients?.behandlung || "KFO-Plan"}
-                  </td>
-                  <td className="table-cell">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap gap-1">
-                        {Array.from({ length: plan.anzahl_raten }).map((_, idx) => {
-                          const isDone = idx < bezahlt;
-                          const isCritical = idx === bezahlt && hasOverdue;
-                          const isWarn = idx === bezahlt && !hasOverdue && hasWarning;
-                          return (
-                            <span
-                              key={`${plan.id}-cell-${idx}`}
-                              className={`inline-block w-3 h-3 rounded-[4px] border ${
-                                isDone
-                                  ? "bg-accent-emerald border-accent-emerald"
-                                  : isCritical
-                                  ? "bg-accent-coral border-accent-coral"
-                                  : isWarn
-                                  ? "bg-accent-amber border-accent-amber"
-                                  : "bg-transparent border-surface-200"
-                              }`}
-                            />
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-praxis-500">
-                        {bezahlt}/{plan.anzahl_raten}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="table-cell text-sm text-right text-praxis-600">
-                    {plan.rate_betrag?.toLocaleString("de-DE")} €
-                  </td>
-                  <td className="table-cell text-right text-sm font-semibold text-accent-coral">
-                    {restschuld.toLocaleString("de-DE")} €
-                  </td>
-                  <td className="table-cell">
-                    <StatusBadge status={statusLabel} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {plaene.length === 0 && !loading && (
-          <EmptyState
-            icon={<CalendarRange size={24} />}
-            title="Keine Ratenpläne"
-            description="Erstelle den ersten Ratenplan für einen Patienten."
-          />
-        )}
-      </div>
-
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Neuen Ratenplan anlegen"
-      >
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Neuen Ratenplan anlegen">
         <div className="space-y-3">
           <label className="block">
             <span className="block text-xs font-medium text-praxis-500 mb-1">Patient *</span>
-            <select
-              className="input"
-              value={form.patient_id}
-              onChange={(e) => setForm((prev) => ({ ...prev, patient_id: e.target.value }))}
-            >
+            <select className="input" value={form.patient_id} onChange={(e) => setForm((prev) => ({ ...prev, patient_id: e.target.value }))}>
               <option value="">Bitte wählen</option>
               {patienten.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -269,38 +226,19 @@ export default function RatenplanPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="block">
               <span className="block text-xs font-medium text-praxis-500 mb-1">Gesamtbetrag (€) *</span>
-              <input
-                type="number"
-                className="input"
-                value={form.gesamtbetrag}
-                onChange={(e) => setForm((prev) => ({ ...prev, gesamtbetrag: Number(e.target.value) }))}
-              />
+              <input type="number" className="input" value={form.gesamtbetrag} onChange={(e) => setForm((prev) => ({ ...prev, gesamtbetrag: Number(e.target.value) }))} />
             </label>
             <label className="block">
               <span className="block text-xs font-medium text-praxis-500 mb-1">Anzahl Raten *</span>
-              <input
-                type="number"
-                className="input"
-                value={form.anzahl_raten}
-                onChange={(e) => setForm((prev) => ({ ...prev, anzahl_raten: Number(e.target.value) }))}
-              />
+              <input type="number" className="input" value={form.anzahl_raten} onChange={(e) => setForm((prev) => ({ ...prev, anzahl_raten: Number(e.target.value) }))} />
             </label>
             <label className="block">
               <span className="block text-xs font-medium text-praxis-500 mb-1">Startdatum *</span>
-              <input
-                type="date"
-                className="input"
-                value={form.start_datum}
-                onChange={(e) => setForm((prev) => ({ ...prev, start_datum: e.target.value }))}
-              />
+              <input type="date" className="input" value={form.start_datum} onChange={(e) => setForm((prev) => ({ ...prev, start_datum: e.target.value }))} />
             </label>
             <label className="block">
               <span className="block text-xs font-medium text-praxis-500 mb-1">Rhythmus</span>
-              <select
-                className="input"
-                value={form.rhythmus}
-                onChange={(e) => setForm((prev) => ({ ...prev, rhythmus: e.target.value }))}
-              >
+              <select className="input" value={form.rhythmus} onChange={(e) => setForm((prev) => ({ ...prev, rhythmus: e.target.value }))}>
                 <option value="monatlich">Monatlich</option>
                 <option value="quartalsweise">Quartalsweise</option>
               </select>
@@ -314,19 +252,33 @@ export default function RatenplanPage() {
               </select>
             </label>
           </div>
-          <p className="text-xs text-praxis-400">
-            Geplante Rate: {form.anzahl_raten > 0 ? (form.gesamtbetrag / form.anzahl_raten).toFixed(2) : "0.00"} €
-          </p>
+          <p className="text-xs text-praxis-400">Geplante Rate: {form.anzahl_raten > 0 ? (form.gesamtbetrag / form.anzahl_raten).toFixed(2) : "0.00"} €</p>
           <div className="flex justify-end gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>
-              Abbrechen
-            </button>
-            <button className="btn-primary" onClick={createRatenplan} disabled={saving}>
-              {saving ? "Speichere..." : "Ratenplan erstellen"}
-            </button>
+            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Abbrechen</button>
+            <button className="btn-primary" onClick={createRatenplan} disabled={saving}>{saving ? "Speichere..." : "Ratenplan erstellen"}</button>
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="stat-card">
+      <p className="text-sm font-medium text-praxis-400">{label}</p>
+      <p className={`mt-1 text-3xl font-bold ${accent ? "text-accent-coral" : "text-praxis-800"}`}>{value}</p>
+      {sub ? <p className="mt-1 text-xs text-praxis-400">{sub}</p> : null}
     </div>
   );
 }
