@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, Phone, Mail, Shield } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { AlertTriangle, Mail, Phone, Shield } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { demoPatientDetail, demoRaten } from "@/lib/mock-data";
 
@@ -15,168 +15,159 @@ interface MahnPipeline {
 
 export default function MahnwesenPage() {
   const [pipeline, setPipeline] = useState<MahnPipeline>({ karenz: [], stufe1: [], stufe2: [], stufe3: [] });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetch() {
-      const p: MahnPipeline = { karenz: [], stufe1: [], stufe2: [], stufe3: [] };
+    async function fetchData() {
+      const next: MahnPipeline = { karenz: [], stufe1: [], stufe2: [], stufe3: [] };
       try {
         const supabase = createBrowserClient();
         const { data: raten } = await supabase
           .from("raten")
-          .select("*, patients:patient_id(id, vorname, nachname, email, telefon), ratenplaene:ratenplan_id(rate_betrag)")
+          .select("*, patients:patient_id(id, vorname, nachname, email, telefon)")
           .in("status", ["überfällig", "offen"])
           .lt("faellig_am", new Date().toISOString().split("T")[0])
           .order("faellig_am", { ascending: true });
 
-        const source = raten && raten.length > 0
+        const source = raten?.length
           ? raten
           : demoRaten
               .filter((r) => r.status === "überfällig" || r.status === "offen")
-              .map((r) => ({
-                ...r,
-                patients: demoPatientDetail(r.patient_id),
-              }));
+              .map((r) => ({ ...r, patients: demoPatientDetail(r.patient_id) }));
 
         source.forEach((r: any) => {
-          if (r.mahnstufe === 0) p.karenz.push(r);
-          else if (r.mahnstufe === 1) p.stufe1.push(r);
-          else if (r.mahnstufe === 2) p.stufe2.push(r);
-          else p.stufe3.push(r);
+          if (r.mahnstufe === 0) next.karenz.push(r);
+          else if (r.mahnstufe === 1) next.stufe1.push(r);
+          else if (r.mahnstufe === 2) next.stufe2.push(r);
+          else next.stufe3.push(r);
         });
       } catch {
         demoRaten
           .filter((r) => r.status === "überfällig" || r.status === "offen")
           .forEach((r: any) => {
-            const entry = {
-              ...r,
-              patients: demoPatientDetail(r.patient_id),
-            };
-            if (entry.mahnstufe === 0) p.karenz.push(entry);
-            else if (entry.mahnstufe === 1) p.stufe1.push(entry);
-            else if (entry.mahnstufe === 2) p.stufe2.push(entry);
-            else p.stufe3.push(entry);
+            const entry = { ...r, patients: demoPatientDetail(r.patient_id) };
+            if (entry.mahnstufe === 0) next.karenz.push(entry);
+            else if (entry.mahnstufe === 1) next.stufe1.push(entry);
+            else if (entry.mahnstufe === 2) next.stufe2.push(entry);
+            else next.stufe3.push(entry);
           });
       }
-      setPipeline(p);
-      setLoading(false);
+      setPipeline(next);
     }
-    fetch();
+
+    fetchData();
   }, []);
+
+  const allItems = [...pipeline.karenz, ...pipeline.stufe1, ...pipeline.stufe2, ...pipeline.stufe3];
+  const totalAmount = allItems.reduce((sum: number, r: any) => sum + Number(r.betrag || 0), 0);
+  const avgDelay = allItems.length
+    ? Math.round(
+        allItems.reduce((sum: number, r: any) => {
+          const days = Math.max(0, Math.floor((Date.now() - new Date(r.faellig_am).getTime()) / (1000 * 60 * 60 * 24)));
+          return sum + days;
+        }, 0) / allItems.length
+      )
+    : 0;
+  const stage1Success = useMemo(() => {
+    const base = pipeline.stufe1.length + pipeline.stufe2.length + pipeline.stufe3.length;
+    if (!base) return 0;
+    return Math.max(0, Math.min(100, Math.round((pipeline.stufe1.length / base) * 100)));
+  }, [pipeline]);
 
   const columns = [
     {
       key: "karenz",
-      title: "Karenzzeit",
-      subtitle: "5 Tage Schonfrist",
+      title: "Karenz (1–5 Tage)",
       icon: <Shield size={16} />,
-      color: "bg-accent-blue/10 text-accent-blue border-accent-blue/30",
+      className: "border-l-4 border-l-surface-300",
+      count: pipeline.karenz.length,
       items: pipeline.karenz,
     },
     {
       key: "stufe1",
-      title: "Stufe 1",
-      subtitle: "Freundliche Erinnerung",
+      title: "Stufe 1 (6–20 Tage)",
       icon: <Mail size={16} />,
-      color: "bg-accent-amber/10 text-accent-amber border-accent-amber/30",
+      className: "border-l-4 border-l-accent-amber",
+      count: pipeline.stufe1.length,
       items: pipeline.stufe1,
     },
     {
       key: "stufe2",
-      title: "Stufe 2",
-      subtitle: "1. Mahnung + Anruf",
+      title: "Stufe 2 (21–42 Tage)",
       icon: <Phone size={16} />,
-      color: "bg-accent-coral/10 text-accent-coral border-accent-coral/30",
+      className: "border-l-4 border-l-accent-coral",
+      count: pipeline.stufe2.length,
       items: pipeline.stufe2,
     },
     {
       key: "stufe3",
-      title: "Stufe 3",
-      subtitle: "Eskalation an Maria",
+      title: "Eskalation (42+)",
       icon: <AlertTriangle size={16} />,
-      color: "bg-red-100 text-red-700 border-red-300",
+      className: "border-l-4 border-l-red-800",
+      count: pipeline.stufe3.length,
       items: pipeline.stufe3,
     },
   ];
-
-  const totalOverdue = Object.values(pipeline).reduce((s, arr) => s + arr.length, 0);
-  const totalAmount = Object.values(pipeline)
-    .flat()
-    .reduce((s: number, r: any) => s + r.betrag, 0);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-praxis-800">Mahnwesen</h1>
-        <p className="text-sm text-praxis-400 mt-1">
-          {totalOverdue} überfällige Raten · {totalAmount.toLocaleString("de-DE")} € ausstehend
-        </p>
+        <p className="text-sm text-praxis-400 mt-1">Pipeline, offene Volumen und Eskalationen im Blick</p>
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {columns.map((col) => (
-          <div key={col.key} className="flex flex-col">
-            {/* Column Header */}
-            <div className={`rounded-t-card px-4 py-3 border ${col.color} flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                {col.icon}
-                <div>
-                  <p className="text-sm font-semibold">{col.title}</p>
-                  <p className="text-xs opacity-70">{col.subtitle}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Kpi title="Im Mahnverfahren" value={String(allItems.length)} />
+        <Kpi title="Offenes Volumen" value={`${totalAmount.toLocaleString("de-DE")}€`} accent />
+        <Kpi title="Ø Verzugstage" value={String(avgDelay)} />
+        <Kpi title="Erfolgsquote Stufe 1" value={`${stage1Success}%`} success />
+      </div>
+
+      <div className="stat-card">
+        <h3 className="mb-4 text-lg font-semibold text-praxis-700">Mahnpipeline</h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {columns.map((col) => (
+            <div key={col.key} className="rounded-xl border border-surface-200 bg-surface-50 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold text-praxis-700">
+                  {col.icon}
+                  {col.title}
                 </div>
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-2 text-xs font-semibold text-praxis-600">
+                  {col.count}
+                </span>
               </div>
-              <span className="text-lg font-bold">{col.items.length}</span>
+
+              <div className="space-y-2">
+                {col.items.map((rate: any) => {
+                  const patient = rate.patients;
+                  const days = Math.max(0, Math.floor((Date.now() - new Date(rate.faellig_am).getTime()) / (1000 * 60 * 60 * 24)));
+                  return (
+                    <Link
+                      key={rate.id}
+                      href={`/patienten/${patient?.id}`}
+                      className={`block rounded-lg border border-surface-200 bg-white p-3 hover:shadow-card ${col.className}`}
+                    >
+                      <p className="text-sm font-semibold text-praxis-800">{patient?.nachname}, {patient?.vorname}</p>
+                      <p className="mt-1 text-sm text-praxis-600">Rate {rate.rate_nummer}/{Math.max(rate.rate_nummer, 24)} · {Number(rate.betrag || 0).toLocaleString("de-DE")}€</p>
+                      <p className="text-sm text-praxis-500">Tag {days} · fällig {new Date(rate.faellig_am).toLocaleDateString("de-DE")}</p>
+                    </Link>
+                  );
+                })}
+                {col.items.length === 0 && <p className="rounded-lg bg-white p-3 text-sm text-praxis-400">Keine Fälle</p>}
+              </div>
             </div>
-
-            {/* Column Body */}
-            <div className="flex-1 bg-surface-50 border border-t-0 border-surface-200 rounded-b-card p-2 space-y-2 min-h-[200px]">
-              {col.items.map((rate: any) => {
-                const patient = rate.patients;
-                const tageUeber = Math.floor(
-                  (Date.now() - new Date(rate.faellig_am).getTime()) / (1000 * 60 * 60 * 24)
-                );
-
-                return (
-                  <Link
-                    key={rate.id}
-                    href={`/patienten/${patient?.id}`}
-                    className="block bg-white rounded-lg p-3 shadow-sm border border-surface-200 hover:shadow-card transition-shadow"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-praxis-700">
-                        {patient?.nachname}, {patient?.vorname}
-                      </p>
-                      <span className="text-xs font-mono text-accent-coral">
-                        +{tageUeber}d
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-praxis-400">
-                        Rate {rate.rate_nummer}
-                      </span>
-                      <span className="text-sm font-semibold text-praxis-800">
-                        {rate.betrag.toLocaleString("de-DE")} €
-                      </span>
-                    </div>
-                    {patient?.email && col.key !== "karenz" && (
-                      <div className="mt-2 pt-2 border-t border-surface-100 flex items-center gap-1 text-xs text-praxis-400">
-                        <Mail size={10} /> {patient.email}
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
-
-              {col.items.length === 0 && (
-                <div className="text-center py-8 text-xs text-praxis-300">
-                  Keine Fälle
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function Kpi({ title, value, accent, success }: { title: string; value: string; accent?: boolean; success?: boolean }) {
+  return (
+    <div className="stat-card">
+      <p className="text-sm font-medium text-praxis-400">{title}</p>
+      <p className={`mt-1 text-3xl font-bold ${accent ? "text-accent-coral" : success ? "text-[#4ca43f]" : "text-praxis-800"}`}>{value}</p>
     </div>
   );
 }

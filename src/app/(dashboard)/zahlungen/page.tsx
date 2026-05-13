@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTransaktionen, usePatienten } from "@/hooks/useData";
-import { StatusBadge, Dropdown, Modal, EmptyState } from "@/components/ui";
-import { MatchingChart } from "@/components/charts";
-import { CreditCard, Search, Check, X, ArrowRight } from "lucide-react";
-import { createBrowserClient } from "@/lib/db/supabase";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePatienten, useTransaktionen } from "@/hooks/useData";
+import { EmptyState, Modal, StatusBadge } from "@/components/ui";
+import { ArrowRight, Check, CreditCard, Search, X } from "lucide-react";
+import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 
 export default function ZahlungenPage() {
   const router = useRouter();
   const { locale } = useAppStore();
   const isGerman = locale === "de";
+
   const [statusFilter, setStatusFilter] = useState("alle");
-  const { transaktionen, loading, refetch } = useTransaktionen({ status: statusFilter });
+  const { transaktionen, refetch } = useTransaktionen({ status: statusFilter });
   const [matchModal, setMatchModal] = useState<any>(null);
   const [patSearch, setPatSearch] = useState("");
   const { patienten } = usePatienten(patSearch);
@@ -27,30 +27,37 @@ export default function ZahlungenPage() {
     if (status) setStatusFilter(status);
   }, []);
 
-  // Matching-Statistik
-  const matchStats = [
-    { status: "Auto-Match", count: transaktionen.filter((t) => t.matching_status === "auto").length, color: "#2dd4a8" },
-    { status: "Abweichung", count: transaktionen.filter((t) => t.matching_status === "abweichung").length, color: "#f59e0b" },
-    { status: "Unklar", count: transaktionen.filter((t) => t.matching_status === "unklar").length, color: "#f97066" },
-    { status: "Manuell", count: transaktionen.filter((t) => t.matching_status === "manuell").length, color: "#3b82f6" },
-  ];
+  const metrics = useMemo(() => {
+    const total = transaktionen.length;
+    const auto = transaktionen.filter((t) => t.matching_status === "auto").length;
+    const unclear = transaktionen.filter((t) => t.matching_status === "unklar" || t.matching_status === "abweichung").length;
+    const today = new Date().toISOString().slice(0, 10);
+    const incomingToday = transaktionen
+      .filter((t) => t.datum?.slice?.(0, 10) === today)
+      .reduce((sum, t) => sum + Number(t.betrag || 0), 0);
+
+    return {
+      total,
+      auto,
+      unclear,
+      incomingToday,
+      autoRate: total > 0 ? Math.round((auto / total) * 100) : 0,
+    };
+  }, [transaktionen]);
 
   async function handleManualMatch(txId: string, patientId: string) {
     const supabase = createBrowserClient();
-    await supabase.from("transaktionen").update({
-      matching_status: "manuell",
-      matched_patient_id: patientId,
-      matching_score: 100,
-    }).eq("id", txId);
+    await supabase
+      .from("transaktionen")
+      .update({ matching_status: "manuell", matched_patient_id: patientId, matching_score: 100 })
+      .eq("id", txId);
     setMatchModal(null);
     refetch();
   }
 
   async function handleIgnore(txId: string) {
     const supabase = createBrowserClient();
-    await supabase.from("transaktionen").update({
-      matching_status: "ignoriert",
-    }).eq("id", txId);
+    await supabase.from("transaktionen").update({ matching_status: "ignoriert" }).eq("id", txId);
     refetch();
   }
 
@@ -65,11 +72,10 @@ export default function ZahlungenPage() {
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
         const auto = payload.matching?.auto ?? 0;
-        const errors = payload.bankSync?.errors?.length ? ` (${payload.bankSync.errors.length} Hinweis/e)` : "";
         setSyncHint(
           isGerman
-            ? `${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.${errors}`
-            : `${imported} new bookings imported, ${auto} auto-matched.${errors}`
+            ? `${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.`
+            : `${imported} new transactions imported, ${auto} auto-assigned.`
         );
       }
       refetch();
@@ -80,14 +86,20 @@ export default function ZahlungenPage() {
     }
   }
 
+  const filters = [
+    { key: "alle", label: isGerman ? "Alle" : "All" },
+    { key: "auto", label: isGerman ? "Automatisch" : "Automatic" },
+    { key: "abweichung", label: isGerman ? "Abweichung" : "Deviation" },
+    { key: "unklar", label: isGerman ? "Unklar" : "Unclear" },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-praxis-800">Zahlungseingänge</h1>
+          <h1 className="text-2xl font-bold text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
-            {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} ·{" "}
-            {transaktionen.filter((t) => t.matching_status === "unklar").length} {isGerman ? "offen" : "open"}
+            {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
@@ -95,46 +107,41 @@ export default function ZahlungenPage() {
         </button>
       </div>
 
-      {syncHint && (
-        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
-          {syncHint}
-        </div>
-      )}
+      {syncHint && <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">{syncHint}</div>}
 
-      {/* Matching-Übersicht */}
-      <div className="stat-card">
-        <h3 className="text-sm font-semibold text-praxis-700 mb-4">Matching-Qualität</h3>
-        <MatchingChart data={matchStats} />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <MetricCard label={isGerman ? "Eingänge heute" : "Incoming today"} value={`${metrics.incomingToday.toLocaleString("de-DE")}€`} green />
+        <MetricCard label={isGerman ? "Auto-zugeordnet" : "Auto-assigned"} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${isGerman ? "Trefferquote" : "match rate"}`} />
+        <MetricCard label={isGerman ? "Manuell prüfen" : "Needs review"} value={String(metrics.unclear)} amber />
+        <MetricCard label={isGerman ? "Transaktionen gesamt" : "Total transactions"} value={String(metrics.total)} sub={isGerman ? "Letzte 5 Tage" : "Last 5 days"} />
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-4">
-        <Dropdown
-          label={isGerman ? "Status" : "Status"}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: "alle", label: isGerman ? "Alle" : "All" },
-            { value: "auto", label: "Auto-Match" },
-            { value: "abweichung", label: isGerman ? "Abweichung" : "Deviation" },
-            { value: "unklar", label: isGerman ? "Unklar" : "Unclear" },
-            { value: "manuell", label: isGerman ? "Manuell" : "Manual" },
-            { value: "ignoriert", label: isGerman ? "Ignoriert" : "Ignored" },
-          ]}
-        />
+      <div className="flex flex-wrap gap-2">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setStatusFilter(f.key)}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              statusFilter === f.key
+                ? "border-[#7469ff] bg-[#7469ff]/10 text-[#4b42d6]"
+                : "border-surface-200 bg-white text-praxis-600 hover:bg-surface-50"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
-      {/* Transaktionsliste */}
       <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-surface-50">
               <th className="table-header">Datum</th>
               <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
-              <th className="table-header">{isGerman ? "Verwendungszweck" : "Reference"}</th>
-              <th className="table-header text-right">Betrag</th>
+              <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
+              <th className="table-header">{isGerman ? "Verwendungszweck" : "Purpose"}</th>
+              <th className="table-header">Status</th>
               <th className="table-header">{isGerman ? "Zuordnung" : "Assignment"}</th>
-              <th className="table-header text-center">Score</th>
               <th className="table-header">{isGerman ? "Aktionen" : "Actions"}</th>
             </tr>
           </thead>
@@ -145,44 +152,17 @@ export default function ZahlungenPage() {
                 className={`hover:bg-surface-50/50 transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
                 onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
               >
-                <td className="table-cell text-sm font-mono text-praxis-600">
-                  {new Date(tx.datum).toLocaleDateString("de-DE")}
-                </td>
-                <td className="table-cell">
-                  <p className="text-sm font-medium text-praxis-700">{tx.absender_name}</p>
-                  {tx.absender_iban && (
-                    <p className="text-xs text-praxis-400 font-mono">{tx.absender_iban}</p>
-                  )}
-                </td>
-                <td className="table-cell text-sm text-praxis-600 max-w-[200px] truncate">
-                  {tx.verwendungszweck}
-                </td>
-                <td className="table-cell text-sm font-semibold text-praxis-800 text-right">
-                  {tx.betrag?.toLocaleString("de-DE")} €
-                </td>
-                <td className="table-cell">
-                  {tx.patients ? (
-                    <span className="text-sm text-praxis-600">
-                      {tx.patients.nachname}, {tx.patients.vorname}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-praxis-400 italic">{isGerman ? "Nicht zugeordnet" : "Unassigned"}</span>
-                  )}
-                </td>
-                <td className="table-cell text-center">
-                  {tx.matching_score !== null && (
-                    <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded ${
-                      tx.matching_score >= 90 ? "bg-accent-emerald/15 text-accent-emerald" :
-                      tx.matching_score >= 70 ? "bg-accent-amber/15 text-accent-amber" :
-                      "bg-accent-coral/15 text-accent-coral"
-                    }`}>
-                      {tx.matching_score}%
-                    </span>
-                  )}
+                <td className="table-cell text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                <td className="table-cell text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
+                <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
+                <td className="table-cell text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
+                <td className="table-cell"><StatusBadge status={tx.matching_status} /></td>
+                <td className="table-cell text-sm text-praxis-600">
+                  {tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : "—"}
                 </td>
                 <td className="table-cell">
                   <div className="flex items-center gap-1">
-                    {tx.matching_status === "unklar" || tx.matching_status === "abweichung" ? (
+                    {(tx.matching_status === "unklar" || tx.matching_status === "abweichung") && (
                       <>
                         <button
                           onClick={(e) => {
@@ -191,7 +171,7 @@ export default function ZahlungenPage() {
                           }}
                           type="button"
                           className="p-1.5 text-accent-blue hover:bg-accent-blue/10 rounded-lg transition-colors"
-                          title="Manuell zuordnen"
+                          title={isGerman ? "Manuell zuordnen" : "Manual assign"}
                         >
                           <ArrowRight size={14} />
                         </button>
@@ -202,7 +182,7 @@ export default function ZahlungenPage() {
                           }}
                           type="button"
                           className="p-1.5 text-praxis-400 hover:bg-surface-100 rounded-lg transition-colors"
-                          title="Ignorieren"
+                          title={isGerman ? "Ignorieren" : "Ignore"}
                         >
                           <X size={14} />
                         </button>
@@ -214,14 +194,12 @@ export default function ZahlungenPage() {
                             }}
                             type="button"
                             className="p-1.5 text-accent-emerald hover:bg-accent-emerald/10 rounded-lg transition-colors"
-                            title="Vorschlag bestätigen"
+                            title={isGerman ? "Vorschlag bestätigen" : "Confirm suggestion"}
                           >
                             <Check size={14} />
                           </button>
                         )}
                       </>
-                    ) : (
-                      <StatusBadge status={tx.matching_status} />
                     )}
                   </div>
                 </td>
@@ -233,34 +211,26 @@ export default function ZahlungenPage() {
         {transaktionen.length === 0 && (
           <EmptyState
             icon={<CreditCard size={24} />}
-            title="Keine Transaktionen"
-            description={isGerman ? "Es wurden noch keine Bankbuchungen importiert." : "No bank transactions have been imported yet."}
+            title={isGerman ? "Keine Transaktionen" : "No transactions"}
+            description={isGerman ? "Es wurden noch keine Bankbuchungen importiert." : "No bank transactions imported yet."}
           />
         )}
       </div>
 
-      {/* Manual Match Modal */}
-      <Modal
-        open={!!matchModal}
-        onClose={() => setMatchModal(null)}
-        title="Transaktion manuell zuordnen"
-        size="lg"
-      >
+      <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={isGerman ? "Transaktion manuell zuordnen" : "Assign transaction manually"} size="lg">
         {matchModal && (
           <div className="space-y-4">
             <div className="bg-surface-50 rounded-lg p-4">
               <p className="text-sm font-medium text-praxis-700">{matchModal.absender_name}</p>
               <p className="text-xs text-praxis-400">{matchModal.verwendungszweck}</p>
-              <p className="text-lg font-bold text-praxis-800 mt-1">
-                {matchModal.betrag?.toLocaleString("de-DE")} €
-              </p>
+              <p className="text-lg font-bold text-praxis-800 mt-1">{matchModal.betrag?.toLocaleString("de-DE")} €</p>
             </div>
 
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
               <input
                 type="text"
-                placeholder="Patient suchen..."
+                placeholder={isGerman ? "Patient suchen..." : "Search patient..."}
                 className="input pl-9"
                 value={patSearch}
                 onChange={(e) => setPatSearch(e.target.value)}
@@ -279,9 +249,7 @@ export default function ZahlungenPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-praxis-700">{p.nachname}, {p.vorname}</p>
-                    <p className="text-xs text-praxis-400">
-                      {(p.raten || []).filter((r: any) => r.status === "offen").length} offene Raten
-                    </p>
+                    <p className="text-xs text-praxis-400">{(p.raten || []).filter((r: any) => r.status === "offen").length} {isGerman ? "offene Raten" : "open rates"}</p>
                   </div>
                   <ArrowRight size={14} className="text-praxis-400" />
                 </button>
@@ -290,6 +258,28 @@ export default function ZahlungenPage() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  green,
+  amber,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  green?: boolean;
+  amber?: boolean;
+}) {
+  return (
+    <div className="stat-card">
+      <p className="text-sm text-praxis-400 font-medium">{label}</p>
+      <p className={`mt-1 text-4 font-bold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
+      {sub ? <p className="mt-1 text-xs text-praxis-400">{sub}</p> : null}
     </div>
   );
 }

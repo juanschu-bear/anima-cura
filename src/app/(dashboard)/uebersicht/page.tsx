@@ -1,11 +1,11 @@
 "use client";
 
-import { useDashboardStats, useAlerts, useTransaktionen } from "@/hooks/useData";
-import { StatCard, StatusBadge, CardSkeleton } from "@/components/ui";
-import { ZahlungsverlaufChart, RatenstatusChart } from "@/components/charts";
-import { Euro, AlertTriangle, TrendingUp, CreditCard, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAlerts, useDashboardStats, useTransaktionen } from "@/hooks/useData";
+import { CardSkeleton, StatCard, StatusBadge } from "@/components/ui";
+import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
+import { AlertTriangle, Clock, CreditCard, Euro, TrendingUp } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
@@ -14,16 +14,15 @@ export default function UebersichtPage() {
   const isGerman = locale === "de";
   const { stats, loading } = useDashboardStats();
   const { alerts, markRead } = useAlerts();
-  const { transaktionen } = useTransaktionen({ status: "unklar" });
+  const { transaktionen } = useTransaktionen({ status: "alle" });
 
-  // Demo-Daten für Charts (werden durch echte Daten ersetzt)
   const zahlungsverlauf = [
-    { monat: "Jan", eingänge: 18500, forderungen: 4200 },
-    { monat: "Feb", eingänge: 21300, forderungen: 3800 },
-    { monat: "Mär", eingänge: 19800, forderungen: 5100 },
-    { monat: "Apr", eingänge: 23400, forderungen: 3200 },
-    { monat: "Mai", eingänge: 22100, forderungen: 4600 },
-    { monat: "Jun", eingänge: 24800, forderungen: 2900 },
+    { monat: "Dez", eingänge: 36800, forderungen: 38000 },
+    { monat: "Jan", eingänge: 39200, forderungen: 39000 },
+    { monat: "Feb", eingänge: 38200, forderungen: 39800 },
+    { monat: "Mär", eingänge: 41500, forderungen: 42000 },
+    { monat: "Apr", eingänge: 44100, forderungen: 43100 },
+    { monat: "Mai", eingänge: 48000, forderungen: 47800 },
   ];
 
   const ratenStatus = [
@@ -39,23 +38,19 @@ export default function UebersichtPage() {
       router.push(alert.action_url);
       return;
     }
-
     if (alert.typ === "mahnung") {
       router.push("/mahnwesen");
       return;
     }
-
     if (alert.typ === "matching") {
       router.push("/zahlungen?status=abweichung");
       return;
     }
-
     router.push("/zahlungen");
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-praxis-800">Übersicht</h1>
         <p className="text-sm text-praxis-400 mt-1">
@@ -65,36 +60,35 @@ export default function UebersichtPage() {
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
             <StatCard
-              label="Offene Forderungen"
+              label={isGerman ? "Offene Forderungen" : "Open claims"}
               value={stats?.offene_forderungen?.toLocaleString("de-DE") || "0"}
               suffix="€"
               icon={<Euro size={20} />}
-              variant="default"
+              variant="danger"
             />
             <StatCard
-              label="Eingang diesen Monat"
+              label={isGerman ? "Zahlungseingang Mai" : "Incoming this month"}
               value={stats?.eingang_monat?.toLocaleString("de-DE") || "0"}
               suffix="€"
-              trend={{ value: 12, label: "vs. Vormonat" }}
+              trend={{ value: 8, label: isGerman ? "vs. April" : "vs. April" }}
               icon={<TrendingUp size={20} />}
               variant="success"
             />
             <StatCard
-              label="Pünktlichkeitsquote"
+              label={isGerman ? "Pünktlichkeitsquote" : "On-time rate"}
               value={Math.round(stats?.puenktlichkeit || 0)}
               suffix="%"
               icon={<Clock size={20} />}
               variant={stats?.puenktlichkeit >= 85 ? "success" : "warning"}
             />
             <StatCard
-              label="Im Mahnverfahren"
+              label={isGerman ? "Im Mahnverfahren" : "In dunning"}
               value={stats?.im_mahnverfahren || 0}
               icon={<AlertTriangle size={20} />}
               variant={stats?.im_mahnverfahren > 5 ? "danger" : "default"}
@@ -103,83 +97,74 @@ export default function UebersichtPage() {
         )}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 stat-card">
-          <h3 className="text-sm font-semibold text-praxis-700 mb-4">Zahlungsverlauf</h3>
+      <div className="stat-card">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-praxis-700">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
+          <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}</span>
+        </div>
+        <div className="space-y-2">
+          {alerts.slice(0, 6).map((alert) => (
+            <button
+              key={alert.id}
+              onClick={() => openAlert(alert)}
+              className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                alert.gelesen ? "border-surface-200 bg-surface-50" : "border-accent-amber/20 bg-accent-amber/5"
+              } hover:bg-surface-100/70`}
+            >
+              <p className="text-sm font-semibold text-praxis-700">{alert.titel}</p>
+              <p className="mt-0.5 text-sm text-praxis-500">{alert.beschreibung}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="stat-card lg:col-span-2">
+          <h3 className="mb-3 text-lg font-semibold text-praxis-700">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
           <ZahlungsverlaufChart data={zahlungsverlauf} />
         </div>
         <div className="stat-card">
-          <h3 className="text-sm font-semibold text-praxis-700 mb-4">Ratenstatus</h3>
+          <h3 className="mb-3 text-lg font-semibold text-praxis-700">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
           <RatenstatusChart data={ratenStatus} />
         </div>
       </div>
 
-      {/* Bottom Row: Alerts + Unmatched */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Alerts */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-praxis-700">Aktuelle Hinweise</h3>
-            <span className="badge badge-danger">
-              {alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {alerts.slice(0, 5).map((alert) => (
-              <div
-                key={alert.id}
-                onClick={() => openAlert(alert)}
-                className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  alert.gelesen ? "bg-surface-50" : "bg-accent-amber/5 border border-accent-amber/20"
-                } hover:bg-surface-100/70`}
-              >
-                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                  alert.schweregrad === "kritisch" ? "bg-accent-coral" :
-                  alert.schweregrad === "warnung" ? "bg-accent-amber" : "bg-accent-blue"
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-praxis-700 truncate">{alert.titel}</p>
-                  <p className="text-xs text-praxis-400 mt-0.5 line-clamp-2">{alert.beschreibung}</p>
-                </div>
-                <ChevronRight size={14} className="mt-1 text-praxis-300 flex-shrink-0" />
-              </div>
-            ))}
-          </div>
+      <div className="stat-card">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-praxis-700">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
+          <Link href="/zahlungen" className="text-xs text-praxis-500 hover:text-praxis-700">{isGerman ? "Alle anzeigen" : "View all"} →</Link>
         </div>
-
-        {/* Unzugeordnete Transaktionen */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-praxis-700">Offene Zuordnungen</h3>
-            <Link href="/zahlungen?status=unklar" className="text-xs text-praxis-500 hover:text-praxis-700">
-              {isGerman ? "Alle anzeigen" : "View all"} →
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {transaktionen.slice(0, 5).map((tx) => (
-              <button
-                key={tx.id}
-                type="button"
-                onClick={() =>
-                  router.push(tx.matched_patient_id ? `/patienten/${tx.matched_patient_id}` : "/zahlungen?status=unklar")
-                }
-                className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-surface-50 hover:bg-surface-100/70 transition-colors"
-              >
-                <CreditCard size={16} className="text-praxis-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-praxis-700 truncate">
-                    {tx.absender_name}
-                  </p>
-                  <p className="text-xs text-praxis-400">{tx.datum} · {tx.verwendungszweck?.substring(0, 40)}</p>
-                </div>
-                <span className="text-sm font-semibold text-praxis-800">
-                  {tx.betrag?.toLocaleString("de-DE")} €
-                </span>
-                <StatusBadge status={tx.matching_status} />
-              </button>
-            ))}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-surface-50">
+                <th className="table-header">Datum</th>
+                <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
+                <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
+                <th className="table-header">{isGerman ? "Verwendungszweck" : "Purpose"}</th>
+                <th className="table-header">Status</th>
+                <th className="table-header">{isGerman ? "Zuordnung" : "Assignment"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transaktionen.slice(0, 8).map((tx) => (
+                <tr
+                  key={tx.id}
+                  className="cursor-pointer hover:bg-surface-50/60"
+                  onClick={() => router.push(tx.matched_patient_id ? `/patienten/${tx.matched_patient_id}` : "/zahlungen")}
+                >
+                  <td className="table-cell text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                  <td className="table-cell text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
+                  <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
+                  <td className="table-cell"><StatusBadge status={tx.matching_status} /></td>
+                  <td className="table-cell text-sm text-praxis-600">
+                    {tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
