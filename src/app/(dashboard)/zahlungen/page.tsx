@@ -7,9 +7,12 @@ import { MatchingChart } from "@/components/charts";
 import { CreditCard, Search, Check, X, ArrowRight } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useRouter } from "next/navigation";
+import { useAppStore } from "@/hooks/useAppStore";
 
 export default function ZahlungenPage() {
   const router = useRouter();
+  const { locale } = useAppStore();
+  const isGerman = locale === "de";
   const [statusFilter, setStatusFilter] = useState("alle");
   const { transaktionen, loading, refetch } = useTransaktionen({ status: statusFilter });
   const [matchModal, setMatchModal] = useState<any>(null);
@@ -58,16 +61,20 @@ export default function ZahlungenPage() {
       const res = await fetch("/api/finapi/transactions", { method: "POST" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
-        setSyncHint("Bank-Sync fehlgeschlagen.");
+        setSyncHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
         const auto = payload.matching?.auto ?? 0;
         const errors = payload.bankSync?.errors?.length ? ` (${payload.bankSync.errors.length} Hinweis/e)` : "";
-        setSyncHint(`${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.${errors}`);
+        setSyncHint(
+          isGerman
+            ? `${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.${errors}`
+            : `${imported} new bookings imported, ${auto} auto-matched.${errors}`
+        );
       }
       refetch();
     } catch {
-      setSyncHint("Bank-Sync fehlgeschlagen.");
+      setSyncHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
     } finally {
       setSyncing(false);
     }
@@ -79,11 +86,12 @@ export default function ZahlungenPage() {
         <div>
           <h1 className="text-2xl font-bold text-praxis-800">Zahlungseingänge</h1>
           <p className="text-sm text-praxis-400 mt-1">
-            {transaktionen.length} Transaktionen · {transaktionen.filter((t) => t.matching_status === "unklar").length} offen
+            {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} ·{" "}
+            {transaktionen.filter((t) => t.matching_status === "unklar").length} {isGerman ? "offen" : "open"}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
-          {syncing ? "Synchronisiere..." : "Bank-Sync starten"}
+          {syncing ? (isGerman ? "Synchronisiere..." : "Syncing...") : isGerman ? "Bank-Sync starten" : "Start bank sync"}
         </button>
       </div>
 
@@ -102,16 +110,16 @@ export default function ZahlungenPage() {
       {/* Filter */}
       <div className="flex items-center gap-4">
         <Dropdown
-          label="Status"
+          label={isGerman ? "Status" : "Status"}
           value={statusFilter}
           onChange={setStatusFilter}
           options={[
-            { value: "alle", label: "Alle" },
+            { value: "alle", label: isGerman ? "Alle" : "All" },
             { value: "auto", label: "Auto-Match" },
-            { value: "abweichung", label: "Abweichung" },
-            { value: "unklar", label: "Unklar" },
-            { value: "manuell", label: "Manuell" },
-            { value: "ignoriert", label: "Ignoriert" },
+            { value: "abweichung", label: isGerman ? "Abweichung" : "Deviation" },
+            { value: "unklar", label: isGerman ? "Unklar" : "Unclear" },
+            { value: "manuell", label: isGerman ? "Manuell" : "Manual" },
+            { value: "ignoriert", label: isGerman ? "Ignoriert" : "Ignored" },
           ]}
         />
       </div>
@@ -122,12 +130,12 @@ export default function ZahlungenPage() {
           <thead>
             <tr className="bg-surface-50">
               <th className="table-header">Datum</th>
-              <th className="table-header">Absender</th>
-              <th className="table-header">Verwendungszweck</th>
+              <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
+              <th className="table-header">{isGerman ? "Verwendungszweck" : "Reference"}</th>
               <th className="table-header text-right">Betrag</th>
-              <th className="table-header">Zuordnung</th>
+              <th className="table-header">{isGerman ? "Zuordnung" : "Assignment"}</th>
               <th className="table-header text-center">Score</th>
-              <th className="table-header">Aktionen</th>
+              <th className="table-header">{isGerman ? "Aktionen" : "Actions"}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,7 +166,7 @@ export default function ZahlungenPage() {
                       {tx.patients.nachname}, {tx.patients.vorname}
                     </span>
                   ) : (
-                    <span className="text-sm text-praxis-400 italic">Nicht zugeordnet</span>
+                    <span className="text-sm text-praxis-400 italic">{isGerman ? "Nicht zugeordnet" : "Unassigned"}</span>
                   )}
                 </td>
                 <td className="table-cell text-center">
@@ -226,7 +234,7 @@ export default function ZahlungenPage() {
           <EmptyState
             icon={<CreditCard size={24} />}
             title="Keine Transaktionen"
-            description="Es wurden noch keine Bankbuchungen importiert."
+            description={isGerman ? "Es wurden noch keine Bankbuchungen importiert." : "No bank transactions have been imported yet."}
           />
         )}
       </div>

@@ -6,9 +6,12 @@ import { ZahlungsverlaufChart, RatenstatusChart } from "@/components/charts";
 import { Euro, AlertTriangle, TrendingUp, CreditCard, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
   const router = useRouter();
+  const { locale } = useAppStore();
+  const isGerman = locale === "de";
   const { stats, loading } = useDashboardStats();
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "unklar" });
@@ -56,7 +59,9 @@ export default function UebersichtPage() {
       <div>
         <h1 className="text-2xl font-bold text-praxis-800">Übersicht</h1>
         <p className="text-sm text-praxis-400 mt-1">
-          Willkommen zurück, Maria. Hier ist dein Tages-Briefing.
+          {isGerman
+            ? "Willkommen zurück, Maria. Hier ist dein Tages-Briefing."
+            : "Welcome back, Maria. Here is your daily briefing."}
         </p>
       </div>
 
@@ -116,7 +121,9 @@ export default function UebersichtPage() {
         <div className="stat-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-praxis-700">Aktuelle Hinweise</h3>
-            <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} neu</span>
+            <span className="badge badge-danger">
+              {alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}
+            </span>
           </div>
           <div className="space-y-2">
             {alerts.slice(0, 5).map((alert) => (
@@ -146,7 +153,7 @@ export default function UebersichtPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-praxis-700">Offene Zuordnungen</h3>
             <Link href="/zahlungen?status=unklar" className="text-xs text-praxis-500 hover:text-praxis-700">
-              Alle anzeigen →
+              {isGerman ? "Alle anzeigen" : "View all"} →
             </Link>
           </div>
           <div className="space-y-2">

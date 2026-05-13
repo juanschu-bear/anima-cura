@@ -15,6 +15,11 @@ interface AppState {
   // UI
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  theme: "light" | "dark";
+  setTheme: (theme: "light" | "dark") => void;
+  toggleTheme: () => void;
+  locale: "de" | "en";
+  setLocale: (locale: "de" | "en") => void;
 
   // Search
   searchQuery: string;
@@ -41,6 +46,12 @@ export const useAppStore = create<AppState>((set) => ({
 
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  theme: "light",
+  setTheme: (theme) => set({ theme }),
+  toggleTheme: () =>
+    set((state) => ({ theme: state.theme === "light" ? "dark" : "light" })),
+  locale: "de",
+  setLocale: (locale) => set({ locale }),
 
   searchQuery: "",
   setSearchQuery: (q) => set({ searchQuery: q }),

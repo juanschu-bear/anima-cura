@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { useBankConnections, useEinstellungen } from "@/hooks/useData";
 import { Save, Settings, Landmark, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { useAppStore } from "@/hooks/useAppStore";
 
 type JsonRecord = Record<string, any>;
 
 export default function EinstellungenPage() {
+  const { locale } = useAppStore();
+  const isGerman = locale === "de";
   const { settings, loading, updateSetting } = useEinstellungen();
   const { connections, refetch: refetchConnections } = useBankConnections();
   const [saving, setSaving] = useState<string | null>(null);
@@ -41,14 +44,18 @@ export default function EinstellungenPage() {
       const res = await fetch("/api/finapi/transactions", { method: "POST" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
-        setHint("Bank-Sync fehlgeschlagen.");
+        setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
-        setHint(`Bank-Sync erfolgreich: ${imported} neue Buchungen importiert.`);
+        setHint(
+          isGerman
+            ? `Bank-Sync erfolgreich: ${imported} neue Buchungen importiert.`
+            : `Bank sync successful: ${imported} new bookings imported.`
+        );
       }
       refetchConnections();
     } catch {
-      setHint("Bank-Sync fehlgeschlagen.");
+      setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
     } finally {
       setSyncing(false);
     }
@@ -63,7 +70,9 @@ export default function EinstellungenPage() {
       <div>
         <h1 className="text-2xl font-bold text-praxis-800">Einstellungen</h1>
         <p className="text-sm text-praxis-400 mt-1">
-          Regeln fuer Matching, Mahnungen und Benachrichtigungen.
+          {isGerman
+            ? "Regeln fuer Matching, Mahnungen und Benachrichtigungen."
+            : "Rules for matching, reminders, and notifications."}
         </p>
       </div>
 
@@ -76,7 +85,7 @@ export default function EinstellungenPage() {
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2 text-praxis-700">
           <Landmark size={16} />
-          <h2 className="text-sm font-semibold">Bankverbindungen</h2>
+          <h2 className="text-sm font-semibold">{isGerman ? "Bankverbindungen" : "Bank connections"}</h2>
         </div>
         <div className="space-y-3">
           {connections.map((conn) => (
@@ -87,28 +96,30 @@ export default function EinstellungenPage() {
               <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold text-praxis-700">{conn.bank_name}</p>
                 <span className={`badge ${conn.status === "connected" ? "badge-success" : "badge-warning"}`}>
-                  {conn.status === "connected" ? "Verbunden" : "Update nötig"}
+                  {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}
                 </span>
               </div>
               <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-praxis-500">
                 <p>IBAN: <span className="font-mono">{conn.iban || "—"}</span></p>
-                <p>Letzter Sync: {conn.last_sync ? new Date(conn.last_sync).toLocaleString("de-DE") : "—"}</p>
-                <p>TAN-Erneuerung: {conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString("de-DE") : "—"}</p>
-                <p>Anbieter: {conn.provider || "finAPI Access"}</p>
+                <p>{isGerman ? "Letzter Sync" : "Last sync"}: {conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                <p>{isGerman ? "TAN-Erneuerung" : "TAN renewal"}: {conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                <p>{isGerman ? "Anbieter" : "Provider"}: {conn.provider || "finAPI Access"}</p>
               </div>
             </div>
           ))}
           {connections.length === 0 && (
-            <p className="text-sm text-praxis-400">Noch keine Bankverbindung hinterlegt.</p>
+            <p className="text-sm text-praxis-400">
+              {isGerman ? "Noch keine Bankverbindung hinterlegt." : "No bank connection configured yet."}
+            </p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary inline-flex items-center gap-2" onClick={runBankSync} disabled={syncing}>
             <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Synchronisiere…" : "Bank-Sync starten"}
+            {syncing ? (isGerman ? "Synchronisiere…" : "Syncing…") : isGerman ? "Bank-Sync starten" : "Start bank sync"}
           </button>
           <Link href="/zahlungen" className="btn-secondary inline-flex items-center gap-2">
-            Zu Zahlungseingängen
+            {isGerman ? "Zu Zahlungseingängen" : "Open payments"}
           </Link>
         </div>
       </section>
