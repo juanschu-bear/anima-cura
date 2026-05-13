@@ -92,7 +92,7 @@ export default function PatientenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
           <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
         <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
@@ -152,7 +152,7 @@ export default function PatientenPage() {
                         {p.vorname?.[0]}
                         {p.nachname?.[0]}
                       </div>
-                      <span className="text-[22px] leading-tight font-extrabold text-praxis-800">
+                      <span className="text-[18px] leading-tight font-bold text-praxis-800">
                         {p.nachname}, {p.vorname}
                       </span>
                     </Link>
@@ -164,10 +164,16 @@ export default function PatientenPage() {
                       <span className="text-sm font-medium text-praxis-400">{bezahlt}/{total}</span>
                     </div>
                   </td>
-                  <td className="table-cell text-right text-[34px] font-extrabold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell text-right text-[34px] font-extrabold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[24px] font-extrabold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[24px] font-extrabold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
                   <td className="table-cell">
-                    <StatusBadge status={status} />
+                    {renderStatusBadge({
+                      status,
+                      patientId: p.id,
+                      restschuld: rest,
+                      raten,
+                      router,
+                    })}
                   </td>
                 </tr>
               );
@@ -231,6 +237,50 @@ export default function PatientenPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function renderStatusBadge({
+  status,
+  patientId,
+  restschuld,
+  raten,
+  router,
+}: {
+  status: string;
+  patientId: string;
+  restschuld: number;
+  raten: any[];
+  router: ReturnType<typeof useRouter>;
+}) {
+  const mahnrelevant = ["stufe1", "verzug", "eskalation", "abweichung"].includes(status);
+  if (!mahnrelevant) return <StatusBadge status={status} />;
+
+  const ueberfaellig = raten
+    .filter((r) => r.status === "überfällig")
+    .sort((a, b) => new Date(a.faellig_am).getTime() - new Date(b.faellig_am).getTime());
+  const first = ueberfaellig[0];
+  const dueDate = first?.faellig_am ? new Date(first.faellig_am) : null;
+  const daysLate = dueDate ? Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+  const tooltip = [
+    `Restschuld: ${restschuld.toLocaleString("de-DE")}€`,
+    `Fällig seit: ${dueDate ? dueDate.toLocaleDateString("de-DE") : "—"}`,
+    `Verzugstage: ${daysLate}`,
+    "Klick öffnet Mahnwesen",
+  ].join(" | ");
+
+  return (
+    <button
+      type="button"
+      title={tooltip}
+      className="cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        router.push(`/mahnwesen?patient=${patientId}`);
+      }}
+    >
+      <StatusBadge status={status} />
+    </button>
   );
 }
 

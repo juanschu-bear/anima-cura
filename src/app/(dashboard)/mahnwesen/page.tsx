@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Mail, Phone, Shield } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { demoPatientDetail, demoRaten } from "@/lib/mock-data";
@@ -14,6 +15,8 @@ interface MahnPipeline {
 }
 
 export default function MahnwesenPage() {
+  const searchParams = useSearchParams();
+  const patientFilter = searchParams.get("patient");
   const [pipeline, setPipeline] = useState<MahnPipeline>({ karenz: [], stufe1: [], stufe2: [], stufe3: [] });
 
   useEffect(() => {
@@ -108,12 +111,26 @@ export default function MahnwesenPage() {
     },
   ];
 
+  const visibleColumns = columns.map((col) => ({
+    ...col,
+    items: patientFilter ? col.items.filter((item: any) => item.patient_id === patientFilter) : col.items,
+  }));
+
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Mahnwesen</h1>
         <p className="text-sm text-praxis-400 mt-1">Pipeline, offene Volumen und Eskalationen im Blick</p>
       </div>
+
+      {patientFilter && (
+        <div className="rounded-lg border border-accent-violet/20 bg-accent-violet/5 px-4 py-3 text-sm text-praxis-700">
+          Patientenfilter aktiv.{" "}
+          <Link href="/mahnwesen" className="font-semibold text-[#4b42d6] hover:text-[#3b32bf]">
+            Filter zurücksetzen
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Kpi title="Im Mahnverfahren" value={String(allItems.length)} />
@@ -125,7 +142,7 @@ export default function MahnwesenPage() {
       <div className="stat-card">
         <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Mahnpipeline</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {columns.map((col) => (
+          {visibleColumns.map((col) => (
             <div key={col.key} className="rounded-xl border border-surface-200 bg-surface-50 p-3">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-praxis-700">

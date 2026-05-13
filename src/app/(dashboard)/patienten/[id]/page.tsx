@@ -60,7 +60,7 @@ export default function PatientDetailPage() {
             {patient.nachname?.[0]}
           </div>
           <div className="flex-1">
-            <h1 className="text-[40px] font-extrabold tracking-tight text-praxis-800">
+            <h1 className="text-[32px] font-extrabold tracking-tight text-praxis-800">
               {patient.nachname}, {patient.vorname}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-base text-praxis-500">
@@ -87,7 +87,7 @@ export default function PatientDetailPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Ratenplan</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Ratenplan</h3>
         <div className="flex max-w-[760px] flex-wrap gap-1.5">
           {Array.from({ length: totalRaten }).map((_, idx) => {
             const rate = raten[idx];
@@ -115,7 +115,7 @@ export default function PatientDetailPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Zahlungshistorie</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Zahlungshistorie</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -129,7 +129,7 @@ export default function PatientDetailPage() {
               {history.map((h: any) => (
                 <tr key={h.id} className="hover:bg-surface-50/70">
                   <td className="table-cell text-base text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am)}</td>
-                  <td className="table-cell text-right text-[34px] font-extrabold text-[#4ca43f]">
+                  <td className="table-cell text-right text-[24px] font-extrabold text-[#4ca43f]">
                     {(h.bezahlt_betrag || h.betrag || 0).toLocaleString("de-DE")}€
                   </td>
                   <td className="table-cell">
@@ -156,7 +156,7 @@ function Info({ label, value, mono }: { label: string; value: string; mono?: boo
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-praxis-400">{label}</p>
-      <p className={`mt-1 text-[28px] font-extrabold tracking-tight text-praxis-800 ${mono ? "font-mono text-base" : ""}`}>
+      <p className={`mt-1 text-[22px] font-extrabold tracking-tight text-praxis-800 ${mono ? "font-mono text-base" : ""}`}>
         {value}
       </p>
     </div>
@@ -177,7 +177,7 @@ function MetricCard({
   return (
     <div className="stat-card">
       <p className="text-sm font-medium text-praxis-400">{label}</p>
-      <p className={`mt-1 text-[42px] font-extrabold leading-none tracking-tight ${accent ? "text-accent-coral" : "text-praxis-800"}`}>
+      <p className={`mt-1 text-[34px] font-extrabold leading-none tracking-tight ${accent ? "text-accent-coral" : "text-praxis-800"}`}>
         {value}
       </p>
       {sub ? <p className="mt-1 text-sm text-praxis-400">{sub}</p> : null}
