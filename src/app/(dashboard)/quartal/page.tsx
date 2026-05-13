@@ -58,7 +58,7 @@ export default function QuartalPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
+        <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
         <p className="mt-1 text-sm text-praxis-400">
           {isGerman ? "Kennzahlen, Vergleich und Umsatztreiber im Überblick" : "KPIs, comparison and revenue drivers at a glance"}
         </p>

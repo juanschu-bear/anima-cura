@@ -97,7 +97,7 @@ export default function ZahlungenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
+          <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
             {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
@@ -274,7 +274,7 @@ function MetricCard({
   return (
     <div className="stat-card">
       <p className="text-sm text-praxis-400 font-medium">{label}</p>
-      <p className={`mt-1 text-[42px] leading-none tracking-tight font-extrabold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
+      <p className={`mt-1 text-[34px] leading-none tracking-tight font-extrabold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
       {sub ? <p className="mt-1 text-xs text-praxis-400">{sub}</p> : null}
     </div>
   );

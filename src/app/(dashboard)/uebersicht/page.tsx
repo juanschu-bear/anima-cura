@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAlerts, useDashboardStats, useTransaktionen } from "@/hooks/useData";
 import { CardSkeleton, StatCard, StatusBadge } from "@/components/ui";
 import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
-import { AlertTriangle, Clock, CreditCard, Euro, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Clock, Euro, TrendingUp } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
@@ -99,7 +99,7 @@ export default function UebersichtPage() {
 
       <div className="stat-card">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
+          <h3 className="text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
           <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}</span>
         </div>
         <div className="space-y-2">
@@ -107,12 +107,20 @@ export default function UebersichtPage() {
             <button
               key={alert.id}
               onClick={() => openAlert(alert)}
-              className={`w-full rounded-xl border p-4 text-left transition-colors ${
+              className={`w-full rounded-xl border p-4 text-left transition-all ${
                 alert.gelesen ? "border-surface-200 bg-surface-50" : "border-accent-amber/20 bg-accent-amber/5"
-              } hover:bg-surface-100/70`}
+              } hover:-translate-y-[1px] hover:bg-surface-100/70`}
             >
-              <p className="text-sm font-semibold text-praxis-700">{alert.titel}</p>
-              <p className="mt-0.5 text-sm text-praxis-500">{alert.beschreibung}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-praxis-700">{alert.titel}</p>
+                  <p className="mt-0.5 text-sm text-praxis-500">{alert.beschreibung}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 text-xs text-praxis-400">
+                  {alert.created_at ? new Date(alert.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                  <ArrowUpRight size={14} />
+                </div>
+              </div>
             </button>
           ))}
         </div>
@@ -120,18 +128,18 @@ export default function UebersichtPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="stat-card lg:col-span-2">
-          <h3 className="mb-3 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
+          <h3 className="mb-3 text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
           <ZahlungsverlaufChart data={zahlungsverlauf} />
         </div>
         <div className="stat-card">
-          <h3 className="mb-3 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
+          <h3 className="mb-3 text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
           <RatenstatusChart data={ratenStatus} />
         </div>
       </div>
 
       <div className="stat-card">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
+          <h3 className="text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
           <Link href="/zahlungen" className="text-xs text-praxis-500 hover:text-praxis-700">{isGerman ? "Alle anzeigen" : "View all"} →</Link>
         </div>
         <div className="overflow-x-auto">
