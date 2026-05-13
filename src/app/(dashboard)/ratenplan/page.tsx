@@ -6,6 +6,7 @@ import { StatusBadge, EmptyState, Modal } from "@/components/ui";
 import { MonatseinnahmenChart } from "@/components/charts";
 import { CalendarRange, Plus } from "lucide-react";
 import Link from "next/link";
+import { DEMO_TREATMENT_TYPES, demoPlaene, demoPatients } from "@/lib/mock-data";
 
 export default function RatenplanPage() {
   const [plaene, setPlaene] = useState<any[]>([]);
@@ -24,18 +25,25 @@ export default function RatenplanPage() {
 
   async function fetchData() {
     const supabase = createBrowserClient();
-    const [{ data: plans }, { data: pats }] = await Promise.all([
-      supabase
-        .from("ratenplaene")
-        .select("*, patients:patient_id(vorname, nachname), raten(id, status, betrag, bezahlt_betrag)")
-        .order("start_datum", { ascending: false }),
-      supabase
-        .from("patients")
-        .select("id, vorname, nachname")
-        .order("nachname", { ascending: true }),
-    ]);
-    setPlaene(plans || []);
-    setPatienten(pats || []);
+    try {
+      const [{ data: plans }, { data: pats }] = await Promise.all([
+        supabase
+          .from("ratenplaene")
+          .select("*, patients:patient_id(vorname, nachname, behandlung), raten(id, status, betrag, bezahlt_betrag)")
+          .order("start_datum", { ascending: false }),
+        supabase
+          .from("patients")
+          .select("id, vorname, nachname")
+          .order("nachname", { ascending: true }),
+      ]);
+      const fallbackPlans = plans && plans.length > 0 ? plans : demoPlaene;
+      const fallbackPatients = pats && pats.length > 0 ? pats : demoPatients;
+      setPlaene(fallbackPlans || []);
+      setPatienten(fallbackPatients || []);
+    } catch {
+      setPlaene(demoPlaene);
+      setPatienten(demoPatients);
+    }
     setLoading(false);
   }
 
@@ -150,55 +158,77 @@ export default function RatenplanPage() {
           <thead>
             <tr className="bg-surface-50">
               <th className="table-header">Patient</th>
-              <th className="table-header text-right">Gesamt</th>
-              <th className="table-header text-center">Raten</th>
-              <th className="table-header text-right">Rate/Monat</th>
+              <th className="table-header">Behandlung</th>
               <th className="table-header">Fortschritt</th>
+              <th className="table-header text-right">Rate/Monat</th>
+              <th className="table-header text-right">Restschuld</th>
               <th className="table-header">Status</th>
-              <th className="table-header">Start</th>
             </tr>
           </thead>
           <tbody>
             {plaene.map((plan) => {
               const raten = plan.raten || [];
               const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-              const prozent = raten.length > 0 ? Math.round((bezahlt / raten.length) * 100) : 0;
+              const restschuld = Math.max(plan.gesamtbetrag - bezahlt * plan.rate_betrag, 0);
+              const hasOverdue = raten.some((r: any) => r.status === "überfällig");
+              const hasWarning = raten.some((r: any) => r.status === "offen");
+              const statusLabel = hasOverdue ? "überfällig" : hasWarning ? "abweichung" : "bezahlt";
 
               return (
                 <tr key={plan.id} className="hover:bg-surface-50/50 transition-colors">
                   <td className="table-cell">
-                    <Link
-                      href={`/patienten/${plan.patient_id}`}
-                      className="text-sm font-medium text-praxis-700 hover:text-praxis-500 transition-colors"
-                    >
-                      {plan.patients?.nachname}, {plan.patients?.vorname}
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-praxis-100 text-praxis-600 flex items-center justify-center text-xs font-semibold">
+                        {plan.patients?.vorname?.[0]}
+                        {plan.patients?.nachname?.[0]}
+                      </div>
+                      <Link
+                        href={`/patienten/${plan.patient_id}`}
+                        className="text-sm font-medium text-praxis-700 hover:text-praxis-500 transition-colors"
+                      >
+                        {plan.patients?.nachname}, {plan.patients?.vorname}
+                      </Link>
+                    </div>
                   </td>
-                  <td className="table-cell text-sm font-semibold text-praxis-800 text-right">
-                    {plan.gesamtbetrag?.toLocaleString("de-DE")} €
+                  <td className="table-cell text-sm text-praxis-600">
+                    {plan.patients?.behandlung || "KFO-Plan"}
                   </td>
-                  <td className="table-cell text-sm text-center text-praxis-600">
-                    {bezahlt}/{plan.anzahl_raten}
+                  <td className="table-cell">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap gap-1">
+                        {Array.from({ length: plan.anzahl_raten }).map((_, idx) => {
+                          const isDone = idx < bezahlt;
+                          const isCritical = idx === bezahlt && hasOverdue;
+                          const isWarn = idx === bezahlt && !hasOverdue && hasWarning;
+                          return (
+                            <span
+                              key={`${plan.id}-cell-${idx}`}
+                              className={`inline-block w-3 h-3 rounded-[4px] border ${
+                                isDone
+                                  ? "bg-accent-emerald border-accent-emerald"
+                                  : isCritical
+                                  ? "bg-accent-coral border-accent-coral"
+                                  : isWarn
+                                  ? "bg-accent-amber border-accent-amber"
+                                  : "bg-transparent border-surface-200"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-praxis-500">
+                        {bezahlt}/{plan.anzahl_raten}
+                      </p>
+                    </div>
                   </td>
                   <td className="table-cell text-sm text-right text-praxis-600">
                     {plan.rate_betrag?.toLocaleString("de-DE")} €
                   </td>
-                  <td className="table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-surface-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-accent-emerald rounded-full transition-all"
-                          style={{ width: `${prozent}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono text-praxis-500 w-8">{prozent}%</span>
-                    </div>
+                  <td className="table-cell text-right text-sm font-semibold text-accent-coral">
+                    {restschuld.toLocaleString("de-DE")} €
                   </td>
                   <td className="table-cell">
-                    <StatusBadge status={plan.status} />
-                  </td>
-                  <td className="table-cell text-sm text-praxis-500">
-                    {new Date(plan.start_datum).toLocaleDateString("de-DE")}
+                    <StatusBadge status={statusLabel} />
                   </td>
                 </tr>
               );
@@ -273,6 +303,14 @@ export default function RatenplanPage() {
               >
                 <option value="monatlich">Monatlich</option>
                 <option value="quartalsweise">Quartalsweise</option>
+              </select>
+            </label>
+            <label className="block md:col-span-2">
+              <span className="block text-xs font-medium text-praxis-500 mb-1">Behandlungstyp (Info)</span>
+              <select className="input" disabled>
+                {DEMO_TREATMENT_TYPES.map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
               </select>
             </label>
           </div>

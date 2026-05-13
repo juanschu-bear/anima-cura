@@ -6,6 +6,7 @@ import { StatusBadge, EmptyState, Modal } from "@/components/ui";
 import { Users, Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { DEMO_TREATMENT_TYPES } from "@/lib/mock-data";
 
 export default function PatientenPage() {
   const [search, setSearch] = useState("");
@@ -183,11 +184,21 @@ export default function PatientenPage() {
                 <option value="gesetzlich">Gesetzlich</option>
               </select>
             </label>
-            <FormField
-              label="Behandlung *"
-              value={form.behandlung}
-              onChange={(value) => setForm((prev) => ({ ...prev, behandlung: value }))}
-            />
+            <label className="block">
+              <span className="block text-xs font-medium text-praxis-500 mb-1">Behandlung *</span>
+              <select
+                className="input"
+                value={form.behandlung}
+                onChange={(e) => setForm((prev) => ({ ...prev, behandlung: e.target.value }))}
+              >
+                <option value="">Bitte wählen</option>
+                {DEMO_TREATMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
             <DateField
               label="Behandlung Start *"
               value={form.behandlung_start}
