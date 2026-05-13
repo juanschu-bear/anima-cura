@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { usePatient } from "@/hooks/useData";
-import { StatusBadge, Skeleton } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
+import { usePatient } from "@/hooks/useData";
+import { Skeleton, StatusBadge } from "@/components/ui";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -24,8 +24,9 @@ export default function PatientDetailPage() {
   const raten = (patient.raten || []).sort((a: any, b: any) => a.rate_nummer - b.rate_nummer);
   const totalRaten = Math.max(raten.length, 1);
   const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-  const offen = raten.filter((r: any) => r.status !== "bezahlt");
-  const restschuld = offen.reduce((s: number, r: any) => s + (r.betrag || 0), 0);
+  const restschuld = raten
+    .filter((r: any) => r.status !== "bezahlt")
+    .reduce((s: number, r: any) => s + (r.betrag || 0), 0);
   const monatlicheRate = raten[0]?.betrag || 0;
   const progressPct = Math.round((bezahlt / totalRaten) * 100);
 
@@ -47,26 +48,29 @@ export default function PatientDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/patienten" className="inline-flex items-center gap-2 text-sm font-medium text-praxis-500 hover:text-praxis-700">
+      <Link href="/patienten" className="inline-flex items-center gap-2 text-sm font-semibold text-[#5d4fd8] hover:text-[#4c40be]">
         <ArrowLeft size={15} />
         Zurück zur Liste
       </Link>
 
       <div className="stat-card">
         <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-praxis-100 text-xl font-bold text-praxis-600">
-            {patient.vorname?.[0]}{patient.nachname?.[0]}
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#edeaff] text-2xl font-extrabold text-[#5d4fd8]">
+            {patient.vorname?.[0]}
+            {patient.nachname?.[0]}
           </div>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-praxis-800">{patient.nachname}, {patient.vorname}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-praxis-500">
+            <h1 className="text-[40px] font-extrabold tracking-tight text-praxis-800">
+              {patient.nachname}, {patient.vorname}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-base text-praxis-500">
               <span>{patient.behandlung}</span>
               <StatusBadge status={status} />
             </div>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-5 text-sm md:grid-cols-3">
           <Info label="Geburtsdatum" value={formatDate(patient.geburtsdatum)} />
           <Info label="Kassenart" value={patient.kasse === "privat" ? "Privat" : "Gesetzlich"} />
           <Info label="Behandlungsbeginn" value={formatDate(patient.behandlung_start)} />
@@ -83,8 +87,8 @@ export default function PatientDetailPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="text-xl font-semibold text-praxis-700 mb-4">Ratenplan</h3>
-        <div className="flex flex-wrap gap-1.5">
+        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Ratenplan</h3>
+        <div className="flex max-w-[760px] flex-wrap gap-1.5">
           {Array.from({ length: totalRaten }).map((_, idx) => {
             const rate = raten[idx];
             const isPaid = rate?.status === "bezahlt";
@@ -92,12 +96,12 @@ export default function PatientDetailPage() {
             return (
               <span
                 key={`rp-${idx}`}
-                className={`h-4 w-4 rounded-[5px] border ${
+                className={`h-5 w-5 rounded-[5px] border ${
                   isPaid
-                    ? "bg-[#4ca43f] border-[#4ca43f]"
+                    ? "border-[#4ca43f] bg-[#4ca43f]"
                     : isLate
-                    ? "bg-accent-coral border-accent-coral"
-                    : "bg-transparent border-surface-200"
+                    ? "border-accent-coral bg-accent-coral"
+                    : "border-surface-200 bg-white"
                 }`}
               />
             );
@@ -106,12 +110,12 @@ export default function PatientDetailPage() {
         <div className="mt-3 flex flex-wrap gap-5 text-sm text-praxis-500">
           <Legend color="bg-[#4ca43f]" label="Bezahlt" />
           <Legend color="bg-accent-coral" label="Überfällig" />
-          <Legend color="bg-transparent border border-surface-200" label="Ausstehend" />
+          <Legend color="bg-white border border-surface-200" label="Ausstehend" />
         </div>
       </div>
 
       <div className="stat-card">
-        <h3 className="text-xl font-semibold text-praxis-700 mb-4">Zahlungshistorie</h3>
+        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Zahlungshistorie</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -123,9 +127,9 @@ export default function PatientDetailPage() {
             </thead>
             <tbody>
               {history.map((h: any) => (
-                <tr key={h.id} className="hover:bg-surface-50/50">
-                  <td className="table-cell text-sm text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am)}</td>
-                  <td className="table-cell text-right text-lg font-semibold text-[#4ca43f]">
+                <tr key={h.id} className="hover:bg-surface-50/70">
+                  <td className="table-cell text-base text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am)}</td>
+                  <td className="table-cell text-right text-[34px] font-extrabold text-[#4ca43f]">
                     {(h.bezahlt_betrag || h.betrag || 0).toLocaleString("de-DE")}€
                   </td>
                   <td className="table-cell">
@@ -151,8 +155,10 @@ export default function PatientDetailPage() {
 function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-praxis-400">{label}</p>
-      <p className={`mt-1 text-lg font-semibold text-praxis-800 ${mono ? "font-mono text-sm" : ""}`}>{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-praxis-400">{label}</p>
+      <p className={`mt-1 text-[28px] font-extrabold tracking-tight text-praxis-800 ${mono ? "font-mono text-base" : ""}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -171,7 +177,9 @@ function MetricCard({
   return (
     <div className="stat-card">
       <p className="text-sm font-medium text-praxis-400">{label}</p>
-      <p className={`mt-1 text-3xl font-bold ${accent ? "text-accent-coral" : "text-praxis-800"}`}>{value}</p>
+      <p className={`mt-1 text-[42px] font-extrabold leading-none tracking-tight ${accent ? "text-accent-coral" : "text-praxis-800"}`}>
+        {value}
+      </p>
       {sub ? <p className="mt-1 text-sm text-praxis-400">{sub}</p> : null}
     </div>
   );

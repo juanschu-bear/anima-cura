@@ -16,6 +16,7 @@ import {
   Moon,
   Sun,
   Languages,
+  Search,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 
@@ -64,18 +65,13 @@ export default function DashboardLayout({
   }, [locale]);
 
   return (
-    <div className="ac-shell flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <aside className="ac-sidebar w-64 bg-white border-r border-surface-200 flex flex-col">
-        {/* Logo */}
-        <div className="p-5 border-b border-surface-200">
-          <h1 className="text-lg font-bold text-praxis-800 leading-tight">
-            Anima Curo
-          </h1>
-          <p className="text-xs text-praxis-400 mt-0.5">Intelligent Practice Finance</p>
+    <div className="ac-shell">
+      <aside className="ac-sidebar flex w-64 flex-col">
+        <div className="border-b border-surface-200 p-5">
+          <h1 className="text-[30px] font-extrabold leading-none text-praxis-800">Anima Curo</h1>
+          <p className="mt-1 text-xs font-medium text-praxis-400">Intelligent Practice Finance</p>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const isActive =
@@ -95,7 +91,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* User */}
         <div className="p-3 border-t border-surface-200">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-praxis-100 flex items-center justify-center text-sm font-semibold text-praxis-600">
@@ -112,43 +107,46 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="ac-main flex-1 flex flex-col overflow-hidden">
-        {/* Top Bar */}
-        <header className="h-14 bg-white border-b border-surface-200 flex items-center justify-between px-6">
-          <div className="text-xs text-praxis-400 tracking-wide">{now}</div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="ac-chip"
-              onClick={() => setLocale(isGerman ? "en" : "de")}
-              title={isGerman ? "Auf Englisch wechseln" : "Switch to German"}
-            >
-              <Languages size={13} />
-              {isGerman ? "DE" : "EN"}
-            </button>
-            <button
-              type="button"
-              className="ac-chip"
-              onClick={toggleTheme}
-              title={theme === "light" ? "Dark Mode" : "Light Mode"}
-            >
-              {theme === "light" ? <Moon size={13} /> : <Sun size={13} />}
-              {theme === "light" ? "Dark" : "Light"}
-            </button>
-            <span className="hidden md:inline-flex items-center gap-2 text-xs text-praxis-400">
-              <span className="w-2 h-2 rounded-full bg-accent-emerald" />
-              {isGerman ? "System aktiv" : "System active"}
-            </span>
-            <button className="relative p-2 text-praxis-400 hover:text-praxis-600 transition-colors rounded-lg hover:bg-surface-50">
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent-coral" />
-            </button>
+        <header className="h-14 border-b border-surface-200 px-6">
+          <div className="flex h-full items-center justify-between gap-4">
+            <div className="hidden md:block text-xs text-praxis-400 tracking-wide">{now}</div>
+            <div className="relative hidden lg:block w-full max-w-sm">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
+              <input className="input pl-9" placeholder={isGerman ? "Patient suchen..." : "Search patient..."} />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="ac-chip"
+                onClick={() => setLocale(isGerman ? "en" : "de")}
+                title={isGerman ? "Auf Englisch wechseln" : "Switch to German"}
+              >
+                <Languages size={13} />
+                {isGerman ? "DE" : "EN"}
+              </button>
+              <button
+                type="button"
+                className="ac-chip"
+                onClick={toggleTheme}
+                title={theme === "light" ? "Dark Mode" : "Light Mode"}
+              >
+                {theme === "light" ? <Moon size={13} /> : <Sun size={13} />}
+                {theme === "light" ? "Dark" : "Light"}
+              </button>
+              <span className="hidden md:inline-flex items-center gap-2 text-xs text-praxis-400">
+                <span className="h-2 w-2 rounded-full bg-accent-emerald" />
+                {isGerman ? "System aktiv" : "System active"}
+              </span>
+              <button className="relative rounded-lg p-2 text-praxis-400 transition-colors hover:bg-surface-50 hover:text-praxis-600">
+                <Bell size={18} />
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-coral" />
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="ac-content flex-1 overflow-y-auto p-6 bg-surface-50">
+        <div className="ac-content flex-1 overflow-y-auto p-6">
           {children}
         </div>
       </main>

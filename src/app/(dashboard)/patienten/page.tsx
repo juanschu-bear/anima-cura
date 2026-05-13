@@ -1,14 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePatienten } from "@/hooks/useData";
-import { StatusBadge, EmptyState, Modal } from "@/components/ui";
-import { Users, Search, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Plus, Search, Users } from "lucide-react";
+import { usePatienten } from "@/hooks/useData";
+import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { DEMO_TREATMENT_TYPES } from "@/lib/mock-data";
 
+function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
+  const max = Math.min(Math.max(total, 1), 36);
+  return Array.from({ length: max }).map((_, idx) => {
+    const isDone = idx < paid;
+    const isLateMarker = idx === paid && hasOverdue;
+    return (
+      <span
+        key={`pb-${idx}`}
+        className={`h-4 w-4 rounded-[4px] border ${
+          isDone
+            ? "border-[#4ca43f] bg-[#4ca43f]"
+            : isLateMarker
+            ? "border-accent-coral bg-accent-coral"
+            : "border-surface-200 bg-white"
+        }`}
+      />
+    );
+  });
+}
+
 export default function PatientenPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const { patienten, loading, refetch } = usePatienten(search);
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,11 +65,13 @@ export default function PatientenPage() {
       email: form.email.trim() || null,
       telefon: form.telefon.trim() || null,
     });
+
     setSaving(false);
     if (error) {
       setErrorMsg(error.message || "Patient konnte nicht erstellt werden.");
       return;
     }
+
     setCreateOpen(false);
     setForm({
       vorname: "",
@@ -62,25 +86,22 @@ export default function PatientenPage() {
     refetch();
   }
 
-  const totalActive = useMemo(
-    () => patienten.filter((p) => (p.raten || []).length > 0).length,
-    [patienten]
-  );
+  const totalActive = useMemo(() => patienten.filter((p) => (p.raten || []).length > 0).length, [patienten]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-praxis-800">Patienten</h1>
-          <p className="text-sm text-praxis-400 mt-1">Patienten mit aktiven Ratenplänen ({totalActive})</p>
+          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
+          <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setCreateOpen(true)}>
+        <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
           <Plus size={16} /> Neuer Patient
         </button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
+      <div className="relative max-w-[420px]">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
         <input
           type="text"
           placeholder="Patient suchen (Name)..."
@@ -90,7 +111,7 @@ export default function PatientenPage() {
         />
       </div>
 
-      <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
+      <div className="overflow-hidden rounded-card border border-surface-200 bg-white shadow-card">
         <table className="w-full">
           <thead>
             <tr className="bg-surface-50">
@@ -120,47 +141,31 @@ export default function PatientenPage() {
               else if (hasOverdue) status = "abweichung";
 
               return (
-                <tr key={p.id} className="hover:bg-surface-50/50 transition-colors">
+                <tr
+                  key={p.id}
+                  className="cursor-pointer transition-colors hover:bg-surface-50/80"
+                  onClick={() => router.push(`/patienten/${p.id}`)}
+                >
                   <td className="table-cell">
-                    <Link href={`/patienten/${p.id}`} className="flex items-center gap-3 group">
-                      <div className="w-9 h-9 rounded-full bg-praxis-100 text-praxis-600 flex items-center justify-center text-xs font-semibold">
-                        {p.vorname?.[0]}{p.nachname?.[0]}
+                    <Link href={`/patienten/${p.id}`} className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-praxis-100 text-sm font-bold text-praxis-600">
+                        {p.vorname?.[0]}
+                        {p.nachname?.[0]}
                       </div>
-                      <span className="text-sm font-semibold text-praxis-800 group-hover:text-praxis-600">
+                      <span className="text-[22px] leading-tight font-extrabold text-praxis-800">
                         {p.nachname}, {p.vorname}
                       </span>
                     </Link>
                   </td>
-                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "KFO"}</td>
+                  <td className="table-cell text-base text-praxis-600">{p.behandlung || "KFO"}</td>
                   <td className="table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-wrap gap-1 max-w-[340px]">
-                        {Array.from({ length: Math.min(total, 36) }).map((_, idx) => {
-                          const isDone = idx < bezahlt;
-                          const isLateMarker = idx === bezahlt && hasOverdue;
-                          return (
-                            <span
-                              key={`${p.id}-d-${idx}`}
-                              className={`h-3 w-3 rounded-[4px] border ${
-                                isDone
-                                  ? "bg-[#4ca43f] border-[#4ca43f]"
-                                  : isLateMarker
-                                  ? "bg-accent-coral border-accent-coral"
-                                  : "bg-transparent border-surface-200"
-                              }`}
-                            />
-                          );
-                        })}
-                      </div>
-                      <span className="text-xs text-praxis-400">{bezahlt}/{total}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex max-w-[360px] flex-wrap gap-1">{progressBlocks(total, bezahlt, hasOverdue)}</div>
+                      <span className="text-sm font-medium text-praxis-400">{bezahlt}/{total}</span>
                     </div>
                   </td>
-                  <td className="table-cell text-right text-sm font-semibold text-praxis-700">
-                    {rateMonat.toLocaleString("de-DE")}€
-                  </td>
-                  <td className="table-cell text-right text-sm font-semibold text-accent-coral">
-                    {rest.toLocaleString("de-DE")}€
-                  </td>
+                  <td className="table-cell text-right text-[34px] font-extrabold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[34px] font-extrabold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
                   <td className="table-cell">
                     <StatusBadge status={status} />
                   </td>
@@ -175,11 +180,7 @@ export default function PatientenPage() {
             icon={<Users size={24} />}
             title="Keine Patienten gefunden"
             description={search ? "Versuche einen anderen Suchbegriff." : "Noch keine Patienten angelegt."}
-            action={
-              <button className="btn-primary" onClick={() => setCreateOpen(true)}>
-                Ersten Patienten anlegen
-              </button>
-            }
+            action={<button className="btn-primary" onClick={() => setCreateOpen(true)}>Ersten Patienten anlegen</button>}
           />
         )}
       </div>
@@ -193,72 +194,39 @@ export default function PatientenPage() {
         title="Neuen Patienten anlegen"
       >
         <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <FormField
-              label="Vorname *"
-              value={form.vorname}
-              onChange={(value) => setForm((prev) => ({ ...prev, vorname: value }))}
-            />
-            <FormField
-              label="Nachname *"
-              value={form.nachname}
-              onChange={(value) => setForm((prev) => ({ ...prev, nachname: value }))}
-            />
-            <DateField
-              label="Geburtsdatum *"
-              value={form.geburtsdatum}
-              onChange={(value) => setForm((prev) => ({ ...prev, geburtsdatum: value }))}
-            />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <FormField label="Vorname *" value={form.vorname} onChange={(value) => setForm((prev) => ({ ...prev, vorname: value }))} />
+            <FormField label="Nachname *" value={form.nachname} onChange={(value) => setForm((prev) => ({ ...prev, nachname: value }))} />
+            <DateField label="Geburtsdatum *" value={form.geburtsdatum} onChange={(value) => setForm((prev) => ({ ...prev, geburtsdatum: value }))} />
+
             <label className="block">
-              <span className="block text-xs font-medium text-praxis-500 mb-1">Kasse *</span>
-              <select
-                className="input"
-                value={form.kasse}
-                onChange={(e) => setForm((prev) => ({ ...prev, kasse: e.target.value }))}
-              >
+              <span className="mb-1 block text-xs font-medium text-praxis-500">Kasse *</span>
+              <select className="input" value={form.kasse} onChange={(e) => setForm((prev) => ({ ...prev, kasse: e.target.value }))}>
                 <option value="privat">Privat</option>
                 <option value="gesetzlich">Gesetzlich</option>
               </select>
             </label>
+
             <label className="block">
-              <span className="block text-xs font-medium text-praxis-500 mb-1">Behandlung *</span>
-              <select
-                className="input"
-                value={form.behandlung}
-                onChange={(e) => setForm((prev) => ({ ...prev, behandlung: e.target.value }))}
-              >
+              <span className="mb-1 block text-xs font-medium text-praxis-500">Behandlung *</span>
+              <select className="input" value={form.behandlung} onChange={(e) => setForm((prev) => ({ ...prev, behandlung: e.target.value }))}>
                 <option value="">Bitte wählen</option>
                 {DEMO_TREATMENT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
+                  <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </label>
-            <DateField
-              label="Behandlung Start *"
-              value={form.behandlung_start}
-              onChange={(value) => setForm((prev) => ({ ...prev, behandlung_start: value }))}
-            />
-            <FormField
-              label="E-Mail"
-              value={form.email}
-              onChange={(value) => setForm((prev) => ({ ...prev, email: value }))}
-            />
-            <FormField
-              label="Telefon"
-              value={form.telefon}
-              onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))}
-            />
+
+            <DateField label="Behandlung Start *" value={form.behandlung_start} onChange={(value) => setForm((prev) => ({ ...prev, behandlung_start: value }))} />
+            <FormField label="E-Mail" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
+            <FormField label="Telefon" value={form.telefon} onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))} />
           </div>
+
           {errorMsg && <p className="text-sm text-accent-coral">{errorMsg}</p>}
+
           <div className="flex justify-end gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>
-              Abbrechen
-            </button>
-            <button className="btn-primary" onClick={handleCreatePatient} disabled={saving}>
-              {saving ? "Speichere..." : "Patient anlegen"}
-            </button>
+            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Abbrechen</button>
+            <button className="btn-primary" onClick={handleCreatePatient} disabled={saving}>{saving ? "Speichere..." : "Patient anlegen"}</button>
           </div>
         </div>
       </Modal>
@@ -277,7 +245,7 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-praxis-500 mb-1">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-praxis-500">{label}</span>
       <input className="input" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
@@ -294,7 +262,7 @@ function DateField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-praxis-500 mb-1">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-praxis-500">{label}</span>
       <input type="date" className="input" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
