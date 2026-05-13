@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Mail, Phone, Shield } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { demoPatientDetail, demoRaten } from "@/lib/mock-data";
@@ -15,11 +14,13 @@ interface MahnPipeline {
 }
 
 export default function MahnwesenPage() {
-  const searchParams = useSearchParams();
-  const patientFilter = searchParams.get("patient");
+  const [patientFilter, setPatientFilter] = useState<string | null>(null);
   const [pipeline, setPipeline] = useState<MahnPipeline>({ karenz: [], stufe1: [], stufe2: [], stufe3: [] });
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setPatientFilter(params.get("patient"));
+
     async function fetchData() {
       const next: MahnPipeline = { karenz: [], stufe1: [], stufe2: [], stufe3: [] };
       try {
