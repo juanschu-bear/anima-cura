@@ -6,8 +6,10 @@ import { StatusBadge, Dropdown, Modal, EmptyState } from "@/components/ui";
 import { MatchingChart } from "@/components/charts";
 import { CreditCard, Search, Check, X, ArrowRight } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { useRouter } from "next/navigation";
 
 export default function ZahlungenPage() {
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("alle");
   const { transaktionen, loading, refetch } = useTransaktionen({ status: statusFilter });
   const [matchModal, setMatchModal] = useState<any>(null);
@@ -60,7 +62,8 @@ export default function ZahlungenPage() {
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
         const auto = payload.matching?.auto ?? 0;
-        setSyncHint(`${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.`);
+        const errors = payload.bankSync?.errors?.length ? ` (${payload.bankSync.errors.length} Hinweis/e)` : "";
+        setSyncHint(`${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.${errors}`);
       }
       refetch();
     } catch {
@@ -129,7 +132,11 @@ export default function ZahlungenPage() {
           </thead>
           <tbody>
             {transaktionen.map((tx) => (
-              <tr key={tx.id} className="hover:bg-surface-50/50 transition-colors">
+              <tr
+                key={tx.id}
+                className={`hover:bg-surface-50/50 transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
+                onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
+              >
                 <td className="table-cell text-sm font-mono text-praxis-600">
                   {new Date(tx.datum).toLocaleDateString("de-DE")}
                 </td>
@@ -170,14 +177,22 @@ export default function ZahlungenPage() {
                     {tx.matching_status === "unklar" || tx.matching_status === "abweichung" ? (
                       <>
                         <button
-                          onClick={() => setMatchModal(tx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMatchModal(tx);
+                          }}
+                          type="button"
                           className="p-1.5 text-accent-blue hover:bg-accent-blue/10 rounded-lg transition-colors"
                           title="Manuell zuordnen"
                         >
                           <ArrowRight size={14} />
                         </button>
                         <button
-                          onClick={() => handleIgnore(tx.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleIgnore(tx.id);
+                          }}
+                          type="button"
                           className="p-1.5 text-praxis-400 hover:bg-surface-100 rounded-lg transition-colors"
                           title="Ignorieren"
                         >
@@ -185,7 +200,11 @@ export default function ZahlungenPage() {
                         </button>
                         {tx.matching_status === "abweichung" && tx.matched_patient_id && (
                           <button
-                            onClick={() => handleManualMatch(tx.id, tx.matched_patient_id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleManualMatch(tx.id, tx.matched_patient_id);
+                            }}
+                            type="button"
                             className="p-1.5 text-accent-emerald hover:bg-accent-emerald/10 rounded-lg transition-colors"
                             title="Vorschlag bestätigen"
                           >

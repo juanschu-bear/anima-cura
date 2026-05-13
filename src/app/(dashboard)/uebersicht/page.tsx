@@ -3,10 +3,12 @@
 import { useDashboardStats, useAlerts, useTransaktionen } from "@/hooks/useData";
 import { StatCard, StatusBadge, CardSkeleton } from "@/components/ui";
 import { ZahlungsverlaufChart, RatenstatusChart } from "@/components/charts";
-import { Euro, Users, AlertTriangle, TrendingUp, CreditCard, Clock } from "lucide-react";
+import { Euro, AlertTriangle, TrendingUp, CreditCard, Clock, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function UebersichtPage() {
+  const router = useRouter();
   const { stats, loading } = useDashboardStats();
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "unklar" });
@@ -27,6 +29,26 @@ export default function UebersichtPage() {
     { name: "Überfällig", value: 7, color: "#f97066" },
     { name: "Teilbezahlt", value: 4, color: "#f59e0b" },
   ];
+
+  function openAlert(alert: any) {
+    markRead(alert.id);
+    if (alert.action_url) {
+      router.push(alert.action_url);
+      return;
+    }
+
+    if (alert.typ === "mahnung") {
+      router.push("/mahnwesen");
+      return;
+    }
+
+    if (alert.typ === "matching") {
+      router.push("/zahlungen?status=abweichung");
+      return;
+    }
+
+    router.push("/zahlungen");
+  }
 
   return (
     <div className="space-y-6">
@@ -100,9 +122,10 @@ export default function UebersichtPage() {
             {alerts.slice(0, 5).map((alert) => (
               <div
                 key={alert.id}
-                className={`flex items-start gap-3 p-3 rounded-lg ${
+                onClick={() => openAlert(alert)}
+                className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                   alert.gelesen ? "bg-surface-50" : "bg-accent-amber/5 border border-accent-amber/20"
-                }`}
+                } hover:bg-surface-100/70`}
               >
                 <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
                   alert.schweregrad === "kritisch" ? "bg-accent-coral" :
@@ -112,14 +135,7 @@ export default function UebersichtPage() {
                   <p className="text-sm font-medium text-praxis-700 truncate">{alert.titel}</p>
                   <p className="text-xs text-praxis-400 mt-0.5 line-clamp-2">{alert.beschreibung}</p>
                 </div>
-                {!alert.gelesen && (
-                  <button
-                    className="text-xs text-praxis-500 hover:text-praxis-700"
-                    onClick={() => markRead(alert.id)}
-                  >
-                    gelesen
-                  </button>
-                )}
+                <ChevronRight size={14} className="mt-1 text-praxis-300 flex-shrink-0" />
               </div>
             ))}
           </div>
@@ -135,7 +151,14 @@ export default function UebersichtPage() {
           </div>
           <div className="space-y-2">
             {transaktionen.slice(0, 5).map((tx) => (
-              <div key={tx.id} className="flex items-center gap-3 p-3 rounded-lg bg-surface-50">
+              <button
+                key={tx.id}
+                type="button"
+                onClick={() =>
+                  router.push(tx.matched_patient_id ? `/patienten/${tx.matched_patient_id}` : "/zahlungen?status=unklar")
+                }
+                className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-surface-50 hover:bg-surface-100/70 transition-colors"
+              >
                 <CreditCard size={16} className="text-praxis-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-praxis-700 truncate">
@@ -147,7 +170,7 @@ export default function UebersichtPage() {
                   {tx.betrag?.toLocaleString("de-DE")} €
                 </span>
                 <StatusBadge status={tx.matching_status} />
-              </div>
+              </button>
             ))}
           </div>
         </div>

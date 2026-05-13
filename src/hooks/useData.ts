@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import {
   demoAlerts,
+  demoBankConnections,
   demoDashboardStats,
   demoPatientDetail,
   demoPatientenForList,
@@ -253,4 +254,30 @@ export function useEinstellungen() {
   };
 
   return { settings, loading, updateSetting };
+}
+
+// ─── Bankverbindungen ──────────────────────────────────────
+export function useBankConnections() {
+  const [connections, setConnections] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("bank_connections")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setConnections((data && data.length > 0 ? data : demoBankConnections) || []);
+    } catch {
+      setConnections(demoBankConnections);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { connections, loading, refetch: fetch };
 }

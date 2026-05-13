@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useEinstellungen } from "@/hooks/useData";
-import { Save, Settings } from "lucide-react";
+import { useBankConnections, useEinstellungen } from "@/hooks/useData";
+import { Save, Settings, Landmark, RefreshCw } from "lucide-react";
+import Link from "next/link";
 
 type JsonRecord = Record<string, any>;
 
 export default function EinstellungenPage() {
   const { settings, loading, updateSetting } = useEinstellungen();
+  const { connections, refetch: refetchConnections } = useBankConnections();
   const [saving, setSaving] = useState<string | null>(null);
   const [hint, setHint] = useState<string>("");
+  const [syncing, setSyncing] = useState(false);
 
   const mahnfristen = useMemo<JsonRecord>(() => settings.mahnfristen || {}, [settings.mahnfristen]);
   const benachrichtigungen = useMemo<JsonRecord>(
@@ -31,6 +34,26 @@ export default function EinstellungenPage() {
     }
   }
 
+  async function runBankSync() {
+    setSyncing(true);
+    setHint("");
+    try {
+      const res = await fetch("/api/finapi/transactions", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        setHint("Bank-Sync fehlgeschlagen.");
+      } else {
+        const imported = payload.bankSync?.newTransactions ?? 0;
+        setHint(`Bank-Sync erfolgreich: ${imported} neue Buchungen importiert.`);
+      }
+      refetchConnections();
+    } catch {
+      setHint("Bank-Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-praxis-400">Einstellungen werden geladen…</p>;
   }
@@ -49,6 +72,46 @@ export default function EinstellungenPage() {
           {hint}
         </div>
       )}
+
+      <section className="stat-card space-y-4">
+        <div className="flex items-center gap-2 text-praxis-700">
+          <Landmark size={16} />
+          <h2 className="text-sm font-semibold">Bankverbindungen</h2>
+        </div>
+        <div className="space-y-3">
+          {connections.map((conn) => (
+            <div
+              key={conn.id}
+              className="rounded-lg border border-surface-200 bg-white p-3 text-sm text-praxis-600"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-praxis-700">{conn.bank_name}</p>
+                <span className={`badge ${conn.status === "connected" ? "badge-success" : "badge-warning"}`}>
+                  {conn.status === "connected" ? "Verbunden" : "Update nötig"}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-praxis-500">
+                <p>IBAN: <span className="font-mono">{conn.iban || "—"}</span></p>
+                <p>Letzter Sync: {conn.last_sync ? new Date(conn.last_sync).toLocaleString("de-DE") : "—"}</p>
+                <p>TAN-Erneuerung: {conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString("de-DE") : "—"}</p>
+                <p>Anbieter: {conn.provider || "finAPI Access"}</p>
+              </div>
+            </div>
+          ))}
+          {connections.length === 0 && (
+            <p className="text-sm text-praxis-400">Noch keine Bankverbindung hinterlegt.</p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary inline-flex items-center gap-2" onClick={runBankSync} disabled={syncing}>
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Synchronisiere…" : "Bank-Sync starten"}
+          </button>
+          <Link href="/zahlungen" className="btn-secondary inline-flex items-center gap-2">
+            Zu Zahlungseingängen
+          </Link>
+        </div>
+      </section>
 
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2 text-praxis-700">

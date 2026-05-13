@@ -1,11 +1,10 @@
 "use client";
 
-import { useMahnungen } from "@/hooks/useData";
-import { StatusBadge, EmptyState } from "@/components/ui";
-import { AlertTriangle, Phone, Mail, FileText, Shield } from "lucide-react";
+import { AlertTriangle, Phone, Mail, Shield } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { demoPatientDetail, demoRaten } from "@/lib/mock-data";
 
 interface MahnPipeline {
   karenz: any[];
@@ -20,21 +19,45 @@ export default function MahnwesenPage() {
 
   useEffect(() => {
     async function fetch() {
-      const supabase = createBrowserClient();
-      const { data: raten } = await supabase
-        .from("raten")
-        .select("*, patients:patient_id(id, vorname, nachname, email, telefon), ratenplaene:ratenplan_id(rate_betrag)")
-        .in("status", ["überfällig", "offen"])
-        .lt("faellig_am", new Date().toISOString().split("T")[0])
-        .order("faellig_am", { ascending: true });
-
       const p: MahnPipeline = { karenz: [], stufe1: [], stufe2: [], stufe3: [] };
-      (raten || []).forEach((r: any) => {
-        if (r.mahnstufe === 0) p.karenz.push(r);
-        else if (r.mahnstufe === 1) p.stufe1.push(r);
-        else if (r.mahnstufe === 2) p.stufe2.push(r);
-        else p.stufe3.push(r);
-      });
+      try {
+        const supabase = createBrowserClient();
+        const { data: raten } = await supabase
+          .from("raten")
+          .select("*, patients:patient_id(id, vorname, nachname, email, telefon), ratenplaene:ratenplan_id(rate_betrag)")
+          .in("status", ["überfällig", "offen"])
+          .lt("faellig_am", new Date().toISOString().split("T")[0])
+          .order("faellig_am", { ascending: true });
+
+        const source = raten && raten.length > 0
+          ? raten
+          : demoRaten
+              .filter((r) => r.status === "überfällig" || r.status === "offen")
+              .map((r) => ({
+                ...r,
+                patients: demoPatientDetail(r.patient_id),
+              }));
+
+        source.forEach((r: any) => {
+          if (r.mahnstufe === 0) p.karenz.push(r);
+          else if (r.mahnstufe === 1) p.stufe1.push(r);
+          else if (r.mahnstufe === 2) p.stufe2.push(r);
+          else p.stufe3.push(r);
+        });
+      } catch {
+        demoRaten
+          .filter((r) => r.status === "überfällig" || r.status === "offen")
+          .forEach((r: any) => {
+            const entry = {
+              ...r,
+              patients: demoPatientDetail(r.patient_id),
+            };
+            if (entry.mahnstufe === 0) p.karenz.push(entry);
+            else if (entry.mahnstufe === 1) p.stufe1.push(entry);
+            else if (entry.mahnstufe === 2) p.stufe2.push(entry);
+            else p.stufe3.push(entry);
+          });
+      }
       setPipeline(p);
       setLoading(false);
     }

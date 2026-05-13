@@ -145,3 +145,54 @@ select.input {
     width: 235px;
   }
 }
+
+/* ---- Runtime theme (light/dark) ---- */
+:root[data-theme="dark"] {
+  --ac-bg-a: #0d1420;
+  --ac-bg-b: #121d2c;
+  --ac-bg-c: #162638;
+  --ac-panel: rgba(19, 31, 47, 0.88);
+  --ac-panel-strong: rgba(18, 29, 44, 0.96);
+  --ac-border: rgba(165, 190, 220, 0.16);
+  --ac-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+  --ac-sidebar-start: #091119;
+  --ac-sidebar-end: #0c1621;
+  --ac-sidebar-text: #c8d6ea;
+  --ac-sidebar-muted: #8099ba;
+}
+
+:root[data-theme="dark"] body {
+  color: #d9e7f6;
+}
+
+:root[data-theme="dark"] .ac-main > header {
+  background: rgba(12, 22, 34, 0.72);
+}
+
+:root[data-theme="dark"] .text-praxis-800 { color: #e5effb !important; }
+:root[data-theme="dark"] .text-praxis-700 { color: #ccdbec !important; }
+:root[data-theme="dark"] .text-praxis-600 { color: #b3c7df !important; }
+:root[data-theme="dark"] .text-praxis-500 { color: #9bb4d2 !important; }
+:root[data-theme="dark"] .text-praxis-400 { color: #88a3c4 !important; }
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-surface-50,
+:root[data-theme="dark"] .bg-surface-100 {
+  background-color: rgba(18, 29, 44, 0.75) !important;
+}
+
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] select.input {
+  background: rgba(12, 22, 34, 0.82) !important;
+  border-color: rgba(151, 178, 210, 0.28) !important;
+  color: #d9e7f6;
+}
+
+:root[data-theme="dark"] .btn-secondary {
+  background: rgba(21, 35, 51, 0.9);
+  color: #c9dbf1;
+}
+
+:root[data-theme="dark"] .table-cell,
+:root[data-theme="dark"] .table-header {
+  border-color: rgba(140, 163, 191, 0.18) !important;
+}

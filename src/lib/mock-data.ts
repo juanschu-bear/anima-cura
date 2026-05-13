@@ -133,9 +133,36 @@ export const demoTransaktionen = [
 }));
 
 export const demoAlerts = [
-  { id: "a-1", titel: "2 ungeklärte Zahlungseingänge", beschreibung: "Bitte manuelle Zuordnung prüfen.", schweregrad: "warnung", gelesen: false, created_at: "2026-05-13T08:00:00Z" },
-  { id: "a-2", titel: "Mahnstufe 1 erforderlich", beschreibung: "Patient Becker, Rate 18 ist überfällig.", schweregrad: "kritisch", gelesen: false, created_at: "2026-05-12T14:00:00Z" },
-  { id: "a-3", titel: "Bank-Sync erfolgreich", beschreibung: "4 neue Buchungen importiert.", schweregrad: "info", gelesen: true, created_at: "2026-05-12T06:02:00Z" },
+  {
+    id: "a-1",
+    titel: "Betragsabweichung: Schmidt, Thomas",
+    beschreibung: "Erwartete Rate 180€ · eingegangen 160€ · Differenz -20€.",
+    schweregrad: "warnung",
+    typ: "matching",
+    gelesen: false,
+    action_url: "/patienten/p-schmidt-thomas",
+    created_at: "2026-05-13T08:00:00Z",
+  },
+  {
+    id: "a-2",
+    titel: "Zahlungsverzug: Becker, Lisa (Stufe 2)",
+    beschreibung: "Rate 18 seit 21 Tagen überfällig. 1. Mahnung ohne Reaktion.",
+    schweregrad: "kritisch",
+    typ: "mahnung",
+    gelesen: false,
+    action_url: "/mahnwesen",
+    created_at: "2026-05-12T14:00:00Z",
+  },
+  {
+    id: "a-3",
+    titel: "Bank-Sync erfolgreich",
+    beschreibung: "4 neue Buchungen importiert und 3 automatisch zugeordnet.",
+    schweregrad: "info",
+    typ: "system",
+    gelesen: true,
+    action_url: "/zahlungen",
+    created_at: "2026-05-12T06:02:00Z",
+  },
 ];
 
 export const demoSettings = {
@@ -143,6 +170,19 @@ export const demoSettings = {
   benachrichtigungen: { auto_email: true, auto_brief: true, sabine_briefing: true, maria_eskalation: true },
   matching: { min_score: 70, auto_approve_score: 90, fuzzy_threshold: 0.7 },
 };
+
+export const demoBankConnections = [
+  {
+    id: "bc-1",
+    bank_name: "Sparkasse Leipzig",
+    iban: "DE89 3704 0044 0532 0130 00",
+    bic: "COBADEFFXXX",
+    status: "connected",
+    last_sync: "2026-05-13T06:00:00Z",
+    tan_renewal_date: "2026-08-09",
+    provider: "finAPI Access",
+  },
+];
 
 export const demoDashboardStats = {
   offene_forderungen: demoRaten
