@@ -82,7 +82,7 @@ samp {
     border-right: 1px solid var(--ac-sidebar-border);
   }
 
-.ac-main > header {
+  .ac-main > header {
     background: color-mix(in srgb, var(--ac-surface) 94%, transparent);
     border-bottom: 1px solid var(--ac-border);
     backdrop-filter: blur(6px);
@@ -239,6 +239,10 @@ samp {
 :root[data-theme="dark"] .ac-main > header {
   background: color-mix(in srgb, var(--ac-surface) 82%, transparent);
 }
+:root[data-theme="dark"] .ac-page-title { color: #f0f4ff; }
+:root[data-theme="dark"] .ac-section-title { color: #e4ebf8; }
+:root[data-theme="dark"] .table-header { color: #9fb0c8; }
+:root[data-theme="dark"] .table-cell { color: #c4d1e3; border-color: #243047; }
 :root[data-theme="dark"] .sidebar-link { color: #a8b2c6; }
 :root[data-theme="dark"] .sidebar-link:hover { background: #1b2230; color: #eef2fb; }
 :root[data-theme="dark"] .sidebar-link-active,

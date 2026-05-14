@@ -10,8 +10,9 @@ import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
   const router = useRouter();
-  const { locale } = useAppStore();
+  const { locale, theme } = useAppStore();
   const isGerman = locale === "de";
+  const isDark = theme === "dark";
   const { stats, loading } = useDashboardStats();
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
@@ -50,8 +51,8 @@ export default function UebersichtPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="ac-page-title">Übersicht</h1>
-        <p className="text-sm text-praxis-400 mt-1">
+        <h1 className={`ac-page-title ${isDark ? "text-white" : ""}`}>Übersicht</h1>
+        <p className={`mt-1 text-sm ${isDark ? "text-[#b6c2d6]" : "text-praxis-400"}`}>
           {isGerman
             ? "Willkommen zurück, Maria. Hier ist dein Tages-Briefing."
             : "Welcome back, Maria. Here is your daily briefing."}
@@ -68,6 +69,7 @@ export default function UebersichtPage() {
               value={`${(stats?.offene_forderungen || 0).toLocaleString("de-DE")}€`}
               sub={`${Math.max(1, Math.round((stats?.offene_forderungen || 0) / 3900))} Patienten`}
               valueClass="text-[#cb4a55]"
+              dark={isDark}
             />
             <KpiCard
               label="Zahlungseingang Mai"
@@ -75,18 +77,21 @@ export default function UebersichtPage() {
               sub="↑ +8% vs. April"
               valueClass="text-[#5a8d3a]"
               subClass="text-[#5a8d3a]"
+              dark={isDark}
             />
             <KpiCard
               label="Pünktlichkeitsquote"
               value={`${Math.round(stats?.puenktlichkeit || 0)}%`}
               sub="↑ +2,4% vs. Q4"
               subClass="text-[#5a8d3a]"
+              dark={isDark}
             />
             <KpiCard
               label="Im Mahnverfahren"
               value={String(stats?.im_mahnverfahren || 0)}
               sub="2 Stufe 1 · 2 Stufe 2 · 1 Eskalation"
               valueClass="text-[#c79a3b]"
+              dark={isDark}
             />
           </>
         )}
@@ -105,7 +110,11 @@ export default function UebersichtPage() {
             <button
               key={alert.id}
               onClick={() => openAlert(alert)}
-              className="w-full rounded-xl border border-surface-200 bg-white p-4 text-left transition-all hover:-translate-y-[1px] hover:bg-surface-100/70"
+              className={`w-full rounded-xl border p-4 text-left transition-all hover:-translate-y-[1px] ${
+                isDark
+                  ? "border-white/10 bg-[#0f1520] hover:bg-[#131b29]"
+                  : "border-surface-200 bg-white hover:bg-surface-100/70"
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex items-start gap-3">
@@ -117,11 +126,11 @@ export default function UebersichtPage() {
                     {alert.typ === "mahnung" ? <TriangleAlert size={16} /> : alert.schweregrad === "warnung" ? <AlertTriangle size={16} /> : alert.typ === "system" ? <ArrowUp size={16} /> : <Check size={16} />}
                   </div>
                   <div>
-                  <p className="truncate text-sm font-semibold text-praxis-700">{alert.titel}</p>
-                  <p className="mt-0.5 text-sm text-praxis-500">{alert.beschreibung}</p>
+                  <p className={`truncate text-sm font-semibold ${isDark ? "text-[#e9eef8]" : "text-praxis-700"}`}>{alert.titel}</p>
+                  <p className={`mt-0.5 text-sm ${isDark ? "text-[#b4c0d4]" : "text-praxis-500"}`}>{alert.beschreibung}</p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 text-xs text-praxis-400">
+                <div className={`flex shrink-0 items-center gap-2 text-xs ${isDark ? "text-[#98a9c2]" : "text-praxis-400"}`}>
                   {alert.created_at ? new Date(alert.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "—"}
                 </div>
               </div>
@@ -144,12 +153,17 @@ export default function UebersichtPage() {
             <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
             {isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}
           </h3>
-          <Link href="/zahlungen" className="text-xs text-praxis-500 hover:text-praxis-700">{isGerman ? "Alle anzeigen" : "View all"} →</Link>
+          <Link
+            href="/zahlungen"
+            className={`text-xs ${isDark ? "text-[#9db0cc] hover:text-[#dbe6f8]" : "text-praxis-500 hover:text-praxis-700"}`}
+          >
+            {isGerman ? "Alle anzeigen" : "View all"} →
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-surface-50">
+              <tr className={isDark ? "bg-white/5" : "bg-surface-50"}>
                 <th className="table-header">Datum</th>
                 <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
                 <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
@@ -194,18 +208,20 @@ function KpiCard({
   sub,
   valueClass,
   subClass,
+  dark,
 }: {
   label: string;
   value: string;
   sub?: string;
   valueClass?: string;
   subClass?: string;
+  dark?: boolean;
 }) {
   return (
-    <div className="rounded-[16px] border border-surface-200 bg-white px-6 py-5 shadow-card">
-      <p className="text-[14px] font-semibold text-[#8797ac]">{label}</p>
-      <p className={`mt-2 text-[62px] leading-none font-bold tracking-tight text-[#1f2f43] ${valueClass || ""}`}>{value}</p>
-      {sub ? <p className={`mt-2 text-sm text-[#7f8ea2] ${subClass || ""}`}>{sub}</p> : null}
+    <div className={`rounded-[16px] border px-6 py-5 shadow-card ${dark ? "border-white/12 bg-[#111824]" : "border-surface-200 bg-white"}`}>
+      <p className={`text-[14px] font-semibold ${dark ? "text-[#9fb2cd]" : "text-[#8797ac]"}`}>{label}</p>
+      <p className={`mt-2 text-[48px] leading-none font-bold tracking-tight ${dark ? "text-[#f2f6ff]" : "text-[#1f2f43]"} ${valueClass || ""}`}>{value}</p>
+      {sub ? <p className={`mt-2 text-sm ${dark ? "text-[#a7b8cf]" : "text-[#7f8ea2]"} ${subClass || ""}`}>{sub}</p> : null}
     </div>
   );
 }
