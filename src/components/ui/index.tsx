@@ -72,7 +72,7 @@ export function StatusBadge({ status }: { status: string }) {
     überfällig:  { variant: "danger",  label: "Überfällig" },
     teilbezahlt: { variant: "warning", label: "Teilbezahlt" },
     storniert:   { variant: "neutral", label: "Storniert" },
-    auto:        { variant: "success", label: "auto" },
+    auto:        { variant: "success", label: "automatisch" },
     manuell:     { variant: "info",    label: "manuell" },
     abweichung:  { variant: "warning", label: "abweichung" },
     unklar:      { variant: "neutral",  label: "unklar" },

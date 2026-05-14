@@ -163,6 +163,29 @@ export default function ZahlungenPage() {
   ];
   const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
 
+  function getExpectedAmount(tx: any) {
+    const matchedPatient = patienten.find((p) => p.id === tx.matched_patient_id);
+    if (!matchedPatient) return null;
+    const monthlyRate =
+      (matchedPatient.raten || []).find((r: any) => typeof r?.betrag === "number")?.betrag ?? null;
+    return typeof monthlyRate === "number" ? monthlyRate : null;
+  }
+
+  function getDeviationText(tx: any) {
+    if (tx.matching_status !== "abweichung") return null;
+    const expected = getExpectedAmount(tx);
+    if (expected === null) {
+      return isGerman
+        ? "Abweichung bei Betrag oder Verwendungszweck"
+        : "Deviation in amount or purpose";
+    }
+    const diff = Number(tx.betrag || 0) - expected;
+    const sign = diff > 0 ? "+" : "";
+    return isGerman
+      ? `Erwartet ${expected.toLocaleString("de-DE")}€ · Differenz ${sign}${diff.toLocaleString("de-DE")}€`
+      : `Expected ${expected.toLocaleString("de-DE")}€ · Delta ${sign}${diff.toLocaleString("de-DE")}€`;
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -219,7 +242,7 @@ export default function ZahlungenPage() {
       >
         <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Status erklärt" : "Status explained"}</p>
         <p>
-          <span className="font-semibold">{isGerman ? "auto" : "auto"}:</span> {isGerman ? "System hat Zahlung eindeutig zugeordnet." : "System matched transaction with high confidence."}
+          <span className="font-semibold">{isGerman ? "automatisch" : "automatic"}:</span> {isGerman ? "System hat Zahlung eindeutig zugeordnet." : "System matched transaction with high confidence."}
           {" · "}
           <span className="font-semibold">{isGerman ? "abweichung" : "deviation"}:</span> {isGerman ? "Patient passt, Betrag/Zweck weicht ab." : "Patient likely matches, amount/purpose deviates."}
           {" · "}
@@ -278,16 +301,23 @@ export default function ZahlungenPage() {
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>{tx.verwendungszweck || "—"}</td>
                 <td className="table-cell py-3">
-                  <button
-                    type="button"
-                    className="cursor-help"
-                    onMouseEnter={(e) => openStatusHelp(tx.id, e.currentTarget)}
-                    onFocus={(e) => openStatusHelp(tx.id, e.currentTarget)}
-                    onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
-                    onBlur={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
-                  >
-                    <StatusBadge status={tx.matching_status} />
-                  </button>
+                  <div className="flex flex-col items-start gap-1">
+                    <button
+                      type="button"
+                      className="cursor-help"
+                      onMouseEnter={(e) => openStatusHelp(tx.id, e.currentTarget)}
+                      onFocus={(e) => openStatusHelp(tx.id, e.currentTarget)}
+                      onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+                      onBlur={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+                    >
+                      <StatusBadge status={tx.matching_status} />
+                    </button>
+                    {tx.matching_status === "abweichung" && (
+                      <span className="text-[11px] font-semibold" style={{ color: theme === "dark" ? "#f0bf7e" : "#a16b15" }}>
+                        {getDeviationText(tx)}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
                   {tx.patients && tx.matched_patient_id ? (
@@ -306,47 +336,50 @@ export default function ZahlungenPage() {
                 </td>
                 <td className="table-cell py-3">
                   <div className="flex items-center gap-1">
-                    {(tx.matching_status === "unklar" || tx.matching_status === "abweichung") && (
-                      <>
-                        <button
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMatchModal(tx);
+                        setSyncHint(isGerman ? "Bitte Patient für Zuordnung auswählen." : "Select a patient for assignment.");
+                      }}
+                      type="button"
+                      className="rounded-lg p-1.5 text-accent-blue transition-colors hover:bg-accent-blue/10"
+                      title={isGerman ? "Manuell zuordnen" : "Manual assign"}
+                    >
+                      <ArrowRight size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleIgnore(tx.id);
+                      }}
+                      type="button"
+                      className="rounded-lg p-1.5 text-praxis-400 transition-colors hover:bg-surface-100"
+                      style={{ color: theme === "dark" ? "#8fa2bf" : undefined }}
+                      title={isGerman ? "Ignorieren" : "Ignore"}
+                    >
+                      <X size={14} />
+                    </button>
+                    <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setMatchModal(tx);
-                            setSyncHint(isGerman ? "Bitte Patient für Zuordnung auswählen." : "Select a patient for assignment.");
-                          }}
-                          type="button"
-                          className="p-1.5 text-accent-blue hover:bg-accent-blue/10 rounded-lg transition-colors"
-                          title={isGerman ? "Manuell zuordnen" : "Manual assign"}
-                        >
-                          <ArrowRight size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleIgnore(tx.id);
-                          }}
-                          type="button"
-                          className="p-1.5 text-praxis-400 hover:bg-surface-100 rounded-lg transition-colors"
-                          style={{ color: theme === "dark" ? "#8fa2bf" : undefined }}
-                          title={isGerman ? "Ignorieren" : "Ignore"}
-                        >
-                          <X size={14} />
-                        </button>
-                        {tx.matching_status === "abweichung" && tx.matched_patient_id && (
-                          <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfirmSuggestion(tx);
-                            }}
-                            type="button"
-                            className="p-1.5 text-accent-emerald hover:bg-accent-emerald/10 rounded-lg transition-colors"
-                            title={isGerman ? "Vorschlag bestätigen" : "Confirm suggestion"}
-                          >
-                            <Check size={14} />
-                          </button>
-                        )}
-                      </>
-                    )}
+                        if (tx.matched_patient_id) {
+                          handleConfirmSuggestion(tx);
+                        } else {
+                          setSyncHint(
+                            isGerman
+                              ? "Bitte zuerst über → einem Patienten zuordnen."
+                              : "Please assign to a patient first using →."
+                          );
+                          setMatchModal(tx);
+                        }
+                      }}
+                      type="button"
+                      className="rounded-lg p-1.5 text-accent-emerald transition-colors hover:bg-accent-emerald/10"
+                      title={isGerman ? "Vorschlag bestätigen / als automatisch markieren" : "Confirm suggestion / mark as automatic"}
+                    >
+                      <Check size={14} />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -367,6 +400,12 @@ export default function ZahlungenPage() {
         const tx = visibleTransactions.find((item) => item.id === statusHelpFor) || clientTx.find((item) => item.id === statusHelpFor);
         if (!tx) return null;
         const score = tx.matching_score ? `${Math.round(Number(tx.matching_score))}%` : "—";
+        const expected = getExpectedAmount(tx);
+        const delta = expected === null ? null : Number(tx.betrag || 0) - expected;
+        const deltaLabel =
+          delta === null
+            ? null
+            : `${delta > 0 ? "+" : ""}${delta.toLocaleString("de-DE")}€`;
         const statusText: Record<string, string> = {
           auto: isGerman ? "Automatisch zugeordnet (hohe Sicherheit)." : "Auto-assigned (high confidence).",
           abweichung: isGerman ? "Zuordnung wahrscheinlich, aber Abweichung bei Betrag oder Verwendungszweck." : "Likely match but amount/purpose deviation.",
@@ -391,10 +430,28 @@ export default function ZahlungenPage() {
             <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Matching-Status" : "Matching status"}</p>
             <p>{statusText[tx.matching_status] || tx.matching_status}</p>
             <p className="mt-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-              {isGerman ? "Match-Score" : "Match score"}: {score}
+              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Match-Score" : "Match score"}:</span> {score}
             </p>
             <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-              {isGerman ? "Aktionen: → manuell zuordnen, × ignorieren, ✓ Vorschlag bestätigen" : "Actions: → assign manually, × ignore, ✓ confirm suggestion"}
+              {isGerman
+                ? "Aussage: Vertrauenswert von 0-100 für die automatische Zuordnung (Name, Betrag und Verwendungszweck)."
+                : "Meaning: confidence value from 0-100 for automatic assignment (name, amount, and payment purpose)."}
+            </p>
+            {tx.matching_status === "abweichung" && (
+              <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
+                <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Abweichung" : "Deviation"}:</span>{" "}
+                {expected === null
+                  ? isGerman
+                    ? "Betrag oder Zweck weicht vom erwarteten Ratenmuster ab."
+                    : "Amount or purpose deviates from expected installment pattern."
+                  : isGerman
+                  ? `Erwartet ${expected.toLocaleString("de-DE")}€, eingegangen ${Number(tx.betrag || 0).toLocaleString("de-DE")}€ (${deltaLabel}).`
+                  : `Expected ${expected.toLocaleString("de-DE")}€, received ${Number(tx.betrag || 0).toLocaleString("de-DE")}€ (${deltaLabel}).`}
+              </p>
+            )}
+            <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
+              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
+              {isGerman ? "→ manuell zuordnen, × ignorieren, ✓ Vorschlag bestätigen" : "→ assign manually, × ignore, ✓ confirm suggestion"}
             </p>
           </div>
         );

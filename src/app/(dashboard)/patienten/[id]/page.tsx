@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
+import { useAppStore } from "@/hooks/useAppStore";
 
 export default function PatientDetailPage() {
   const params = useParams();
+  const { theme } = useAppStore();
   const { patient, loading } = usePatient(params.id as string);
 
   if (loading) {
@@ -38,6 +40,39 @@ export default function PatientDetailPage() {
   else if (maxMahn === 1) status = "stufe1";
   else if (hasOverdue) status = "abweichung";
 
+  const mahnStageMeta: Record<string, { label: string; border: string; glow: string; badgeBg: string; badgeText: string }> = {
+    stufe1: {
+      label: "Im Mahnsystem: Stufe 1",
+      border: "#d8a33a",
+      glow: theme === "dark" ? "0 0 0 1px rgba(216, 163, 58, 0.6), 0 0 24px rgba(216, 163, 58, 0.2)" : "0 0 0 1px rgba(216, 163, 58, 0.42), 0 0 16px rgba(216, 163, 58, 0.12)",
+      badgeBg: theme === "dark" ? "rgba(216, 163, 58, 0.18)" : "#fdf4df",
+      badgeText: "#b57f1f",
+    },
+    verzug: {
+      label: "Im Mahnsystem: Stufe 2 (Verzug)",
+      border: "#c16f2a",
+      glow: theme === "dark" ? "0 0 0 1px rgba(193, 111, 42, 0.64), 0 0 24px rgba(193, 111, 42, 0.24)" : "0 0 0 1px rgba(193, 111, 42, 0.4), 0 0 16px rgba(193, 111, 42, 0.12)",
+      badgeBg: theme === "dark" ? "rgba(193, 111, 42, 0.18)" : "#fdeedc",
+      badgeText: "#b6662a",
+    },
+    eskalation: {
+      label: "Im Mahnsystem: Eskalation",
+      border: "#cb4f56",
+      glow: theme === "dark" ? "0 0 0 1px rgba(203, 79, 86, 0.68), 0 0 28px rgba(203, 79, 86, 0.28)" : "0 0 0 1px rgba(203, 79, 86, 0.44), 0 0 18px rgba(203, 79, 86, 0.14)",
+      badgeBg: theme === "dark" ? "rgba(203, 79, 86, 0.2)" : "#fde9ed",
+      badgeText: "#bc4558",
+    },
+    abweichung: {
+      label: "Im Mahnsystem: Abweichung erkannt",
+      border: "#c8942d",
+      glow: theme === "dark" ? "0 0 0 1px rgba(200, 148, 45, 0.62), 0 0 22px rgba(200, 148, 45, 0.22)" : "0 0 0 1px rgba(200, 148, 45, 0.38), 0 0 14px rgba(200, 148, 45, 0.12)",
+      badgeBg: theme === "dark" ? "rgba(200, 148, 45, 0.2)" : "#fdf4df",
+      badgeText: "#a87316",
+    },
+  };
+
+  const mahnHighlight = mahnStageMeta[status];
+
   const history = raten
     .filter((r: any) => r.status === "bezahlt" || r.bezahlt_betrag)
     .sort((a: any, b: any) => {
@@ -53,7 +88,25 @@ export default function PatientDetailPage() {
         Zurück zur Liste
       </Link>
 
-      <div className="stat-card">
+      <div
+        className="stat-card"
+        style={
+          mahnHighlight
+            ? {
+                borderColor: mahnHighlight.border,
+                boxShadow: mahnHighlight.glow,
+              }
+            : undefined
+        }
+      >
+        {mahnHighlight && (
+          <div
+            className="mb-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold tracking-wide"
+            style={{ background: mahnHighlight.badgeBg, color: mahnHighlight.badgeText }}
+          >
+            {mahnHighlight.label}
+          </div>
+        )}
         <div className="flex items-start gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#edeaff] text-2xl font-extrabold text-[#5d4fd8]">
             {patient.vorname?.[0]}
@@ -78,6 +131,23 @@ export default function PatientDetailPage() {
           <Info label="E-Mail" value={patient.email || "—"} />
           <Info label="IBAN" value={patient.iban || "—"} mono />
         </div>
+        {mahnHighlight && (
+          <div
+            className="mt-5 rounded-xl border px-4 py-3 text-sm"
+            style={{
+              borderColor: mahnHighlight.border,
+              background: theme === "dark" ? "rgba(255,255,255,0.02)" : "#fff",
+              color: "var(--ac-text-soft)",
+            }}
+          >
+            <span className="font-bold" style={{ color: "var(--ac-text)" }}>Mahnstatus aktiv.</span>{" "}
+            Dieser Patient befindet sich aktuell im Mahnsystem. Prüfe den Fall im Bereich{" "}
+            <Link href={`/mahnwesen?patient=${patient.id}`} className="font-bold text-[#5d4fd8] hover:text-[#4c40be]">
+              Mahnwesen
+            </Link>
+            .
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
