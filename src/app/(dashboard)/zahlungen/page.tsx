@@ -95,6 +95,32 @@ export default function ZahlungenPage() {
     refetch();
   }
 
+  async function handleConfirmSuggestion(tx: any) {
+    if (!tx?.matched_patient_id) return;
+    const supabase = createBrowserClient();
+    const { error } = await supabase
+      .from("transaktionen")
+      .update({ matching_status: "auto", matching_score: Math.max(Number(tx.matching_score || 0), 90) })
+      .eq("id", tx.id);
+    if (error) {
+      setSyncHint(isGerman ? "Backend nicht erreichbar - Vorschlag lokal bestätigt." : "Backend not reachable - suggestion confirmed locally.");
+    } else {
+      setSyncHint(isGerman ? "Vorschlag bestätigt und automatisch übernommen." : "Suggestion confirmed and auto-assigned.");
+    }
+    setClientTx((prev) =>
+      prev.map((row) =>
+        row.id === tx.id
+          ? {
+              ...row,
+              matching_status: "auto",
+              matching_score: Math.max(Number(row.matching_score || 0), 90),
+            }
+          : row
+      )
+    );
+    refetch();
+  }
+
   function openStatusHelp(id: string, el: HTMLElement) {
     const rect = el.getBoundingClientRect();
     const width = 340;
@@ -141,7 +167,7 @@ export default function ZahlungenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
+          <h1 className="text-[28px] font-bold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
             {visibleTransactions.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
@@ -182,6 +208,12 @@ export default function ZahlungenPage() {
           <span className="font-semibold">{isGerman ? "unklar" : "unclear"}:</span> {isGerman ? "Keine sichere Zuordnung möglich." : "No safe assignment possible."}
         </p>
       </div>
+      <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-xs text-praxis-500">
+        <span className="font-semibold text-praxis-700">{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
+        {isGerman
+          ? "→ öffnet manuelle Zuordnung, × markiert als ignoriert, ✓ bestätigt den bestehenden Vorschlag."
+          : "→ opens manual assignment, × marks as ignored, ✓ confirms existing suggestion."}
+      </div>
 
       <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
         <table className="w-full">
@@ -203,11 +235,11 @@ export default function ZahlungenPage() {
                 className={`hover:bg-surface-50/50 transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
                 onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
               >
-                <td className="table-cell text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
-                <td className="table-cell text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
-                <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
-                <td className="table-cell text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
-                <td className="table-cell">
+                <td className="table-cell py-3 text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                <td className="table-cell py-3 text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
+                <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
+                <td className="table-cell py-3 text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
+                <td className="table-cell py-3">
                   <button
                     type="button"
                     className="cursor-help"
@@ -219,7 +251,7 @@ export default function ZahlungenPage() {
                     <StatusBadge status={tx.matching_status} />
                   </button>
                 </td>
-                <td className="table-cell text-sm text-praxis-600">
+                <td className="table-cell py-3 text-sm text-praxis-600">
                   {tx.patients && tx.matched_patient_id ? (
                     <button
                       type="button"
@@ -233,7 +265,7 @@ export default function ZahlungenPage() {
                     </button>
                   ) : "—"}
                 </td>
-                <td className="table-cell">
+                <td className="table-cell py-3">
                   <div className="flex items-center gap-1">
                     {(tx.matching_status === "unklar" || tx.matching_status === "abweichung") && (
                       <>
@@ -264,7 +296,7 @@ export default function ZahlungenPage() {
                           <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleManualMatch(tx.id, tx.matched_patient_id);
+                            handleConfirmSuggestion(tx);
                             }}
                             type="button"
                             className="p-1.5 text-accent-emerald hover:bg-accent-emerald/10 rounded-lg transition-colors"

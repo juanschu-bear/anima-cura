@@ -95,7 +95,7 @@ export default function PatientenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[28px] font-extrabold tracking-tight text-praxis-800">Patienten</h1>
+          <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">Patienten</h1>
           <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
         <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
@@ -156,20 +156,20 @@ export default function PatientenPage() {
                         {p.vorname?.[0]}
                         {p.nachname?.[0]}
                       </div>
-                      <span className="text-[16px] leading-tight font-bold text-praxis-800">
+                      <span className="text-[15px] leading-tight font-semibold text-praxis-800">
                         {p.nachname}, {p.vorname}
                       </span>
                     </Link>
                   </td>
-                  <td className="table-cell text-base text-praxis-600">{p.behandlung || "KFO"}</td>
+                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "KFO"}</td>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
                       <div className="flex max-w-[360px] flex-wrap gap-1">{progressBlocks(total, bezahlt, hasOverdue)}</div>
                       <span className="text-sm font-medium text-praxis-400">{bezahlt}/{total}</span>
                     </div>
                   </td>
-                  <td className="table-cell text-right text-[20px] font-bold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell text-right text-[20px] font-bold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[18px] font-semibold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
+                  <td className="table-cell text-right text-[18px] font-semibold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
                   <td className="table-cell relative overflow-visible">
                     {renderStatusBadge({
                       status,
