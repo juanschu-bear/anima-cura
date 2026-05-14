@@ -68,11 +68,11 @@ export default function DashboardLayout({
     <div className="ac-shell">
       <aside className="ac-sidebar flex w-[17.5rem] flex-col">
         <div className="border-b border-surface-200 p-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-praxis-400">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80">
             Praxis Companion
           </div>
-          <h1 className="mt-3 text-[28px] font-bold leading-none text-praxis-800">Anima Curo</h1>
-          <p className="mt-1 text-xs font-medium text-praxis-400">Intelligent Practice Finance</p>
+          <h1 className="mt-3 text-[28px] font-bold leading-none text-white">Anima Curo</h1>
+          <p className="mt-1 text-xs font-medium text-white/70">Intelligent Practice Finance</p>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -94,16 +94,16 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="p-3 border-t border-surface-200">
+        <div className="p-3 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-praxis-100 flex items-center justify-center text-sm font-semibold text-praxis-600">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-sm font-semibold text-white">
               MS
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-praxis-800 truncate">Maria Schubert</p>
-              <p className="text-xs text-praxis-400">{isGerman ? "Admin" : "Admin"}</p>
+              <p className="text-sm font-medium text-white truncate">Maria Schubert</p>
+              <p className="text-xs text-white/65">{isGerman ? "Admin" : "Admin"}</p>
             </div>
-            <button className="text-praxis-400 hover:text-praxis-600 transition-colors">
+            <button className="text-white/70 hover:text-white transition-colors">
               <LogOut size={16} />
             </button>
           </div>
@@ -119,6 +119,9 @@ export default function DashboardLayout({
               <input className="input pl-9" placeholder={isGerman ? "Patient suchen..." : "Search patient..."} />
             </div>
             <div className="flex items-center gap-2">
+              <span className="hidden xl:inline-flex rounded-full border border-surface-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-praxis-500">
+                UI 2026-05-14 · 978ef7a
+              </span>
               <button
                 type="button"
                 className="ac-chip"

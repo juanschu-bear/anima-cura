@@ -5,23 +5,23 @@
 @tailwind utilities;
 
 :root {
-  --ac-bg: #f3f5f9;
+  --ac-bg: #edf2fb;
   --ac-surface: #ffffff;
-  --ac-surface-muted: #f8fafc;
-  --ac-border: #e4e9f1;
-  --ac-border-strong: #d5dce8;
+  --ac-surface-muted: #f3f7ff;
+  --ac-border: #d8e1f2;
+  --ac-border-strong: #bccae2;
   --ac-text: #1f2f43;
-  --ac-text-soft: #5f748f;
-  --ac-text-mute: #8da0b9;
-  --ac-primary: #4b42d6;
-  --ac-primary-ink: #392fb8;
+  --ac-text-soft: #566f91;
+  --ac-text-mute: #7d95b4;
+  --ac-primary: #3f5efb;
+  --ac-primary-ink: #2e48cf;
   --ac-success: #4ca43f;
   --ac-warning: #d59a2d;
   --ac-danger: #b94d61;
 
-  --ac-sidebar-bg: #f8fafc;
-  --ac-sidebar-border: #e5eaf2;
-  --ac-sidebar-active-bg: #2f5178;
+  --ac-sidebar-bg: #13253f;
+  --ac-sidebar-border: #233856;
+  --ac-sidebar-active-bg: #3f5efb;
   --ac-sidebar-active-ink: #ffffff;
 
   --ac-radius-card: 14px;
@@ -54,8 +54,8 @@ body {
   font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--ac-bg);
   background-image:
-    radial-gradient(circle at 6% 6%, rgba(75, 66, 214, 0.08), transparent 28%),
-    radial-gradient(circle at 92% 12%, rgba(52, 85, 124, 0.1), transparent 34%);
+    radial-gradient(circle at 6% 6%, rgba(63, 94, 251, 0.18), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(64, 123, 255, 0.13), transparent 36%);
   color: var(--ac-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -74,7 +74,9 @@ samp {
   }
 
   .ac-sidebar {
-    background: var(--ac-sidebar-bg);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 34%),
+      var(--ac-sidebar-bg);
     border-right: 1px solid var(--ac-sidebar-border);
   }
 
@@ -103,11 +105,11 @@ samp {
 
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors;
-    background: #34557c;
+    background: linear-gradient(135deg, #3f5efb 0%, #2e48cf 100%);
   }
 
   .btn-primary:hover {
-    background: #2d4a6b;
+    background: linear-gradient(135deg, #3552f0 0%, #283fb8 100%);
   }
 
   .btn-secondary {
@@ -150,12 +152,12 @@ samp {
 
   .sidebar-link {
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors;
-    color: #4e6784;
+    color: #a9bbd6;
   }
 
   .sidebar-link:hover {
-    background: #edf2f8;
-    color: #2f4d6f;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e5effd;
   }
 
   .sidebar-link-active,
