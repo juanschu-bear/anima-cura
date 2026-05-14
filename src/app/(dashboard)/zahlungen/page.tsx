@@ -10,7 +10,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 
 export default function ZahlungenPage() {
   const router = useRouter();
-  const { locale } = useAppStore();
+  const { locale, theme } = useAppStore();
   const isGerman = locale === "de";
 
   const [statusFilter, setStatusFilter] = useState("alle");
@@ -168,7 +168,7 @@ export default function ZahlungenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="ac-page-title">{isGerman ? "Zahlungen" : "Payments"}</h1>
-          <p className="text-sm text-praxis-400 mt-1">
+          <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
             {visibleTransactions.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
         </div>
@@ -177,13 +177,24 @@ export default function ZahlungenPage() {
         </button>
       </div>
 
-      {syncHint && <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">{syncHint}</div>}
+      {syncHint && (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--ac-border)",
+            background: "var(--ac-surface)",
+            color: "var(--ac-text-soft)",
+          }}
+        >
+          {syncHint}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label={isGerman ? "Eingänge heute" : "Incoming today"} value={`${metrics.incomingToday.toLocaleString("de-DE")}€`} green />
-        <MetricCard label={isGerman ? "Auto-zugeordnet" : "Auto-assigned"} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${isGerman ? "Trefferquote" : "match rate"}`} />
-        <MetricCard label={isGerman ? "Manuell prüfen" : "Needs review"} value={String(metrics.unclear)} amber />
-        <MetricCard label={isGerman ? "Transaktionen gesamt" : "Total transactions"} value={String(metrics.total)} sub={isGerman ? "Letzte 5 Tage" : "Last 5 days"} />
+        <MetricCard label={isGerman ? "Eingänge heute" : "Incoming today"} value={`${metrics.incomingToday.toLocaleString("de-DE")}€`} green theme={theme} />
+        <MetricCard label={isGerman ? "Auto-zugeordnet" : "Auto-assigned"} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${isGerman ? "Trefferquote" : "match rate"}`} theme={theme} />
+        <MetricCard label={isGerman ? "Manuell prüfen" : "Needs review"} value={String(metrics.unclear)} amber theme={theme} />
+        <MetricCard label={isGerman ? "Transaktionen gesamt" : "Total transactions"} value={String(metrics.total)} sub={isGerman ? "Letzte 5 Tage" : "Last 5 days"} theme={theme} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -198,8 +209,15 @@ export default function ZahlungenPage() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
-        <p className="font-semibold text-praxis-700 mb-1">{isGerman ? "Status erklärt" : "Status explained"}</p>
+      <div
+        className="rounded-lg border px-4 py-3 text-sm"
+        style={{
+          borderColor: "var(--ac-border)",
+          background: "var(--ac-surface)",
+          color: "var(--ac-text-soft)",
+        }}
+      >
+        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Status erklärt" : "Status explained"}</p>
         <p>
           <span className="font-semibold">{isGerman ? "auto" : "auto"}:</span> {isGerman ? "System hat Zahlung eindeutig zugeordnet." : "System matched transaction with high confidence."}
           {" · "}
@@ -208,17 +226,31 @@ export default function ZahlungenPage() {
           <span className="font-semibold">{isGerman ? "unklar" : "unclear"}:</span> {isGerman ? "Keine sichere Zuordnung möglich." : "No safe assignment possible."}
         </p>
       </div>
-      <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-xs text-praxis-500">
-        <span className="font-semibold text-praxis-700">{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
+      <div
+        className="rounded-lg border px-4 py-3 text-xs"
+        style={{
+          borderColor: "var(--ac-border)",
+          background: "var(--ac-surface)",
+          color: "var(--ac-text-mute)",
+        }}
+      >
+        <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
         {isGerman
           ? "→ öffnet manuelle Zuordnung, × markiert als ignoriert, ✓ bestätigt den bestehenden Vorschlag."
           : "→ opens manual assignment, × marks as ignored, ✓ confirms existing suggestion."}
       </div>
 
-      <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
+      <div
+        className="overflow-hidden rounded-[16px] border"
+        style={{
+          borderColor: "var(--ac-border)",
+          background: "var(--ac-surface)",
+          boxShadow: "var(--ac-shadow-soft)",
+        }}
+      >
         <table className="w-full">
           <thead>
-            <tr className="bg-surface-50">
+            <tr style={{ background: "var(--ac-surface-muted)" }}>
               <th className="table-header">Datum</th>
               <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
               <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
@@ -232,13 +264,19 @@ export default function ZahlungenPage() {
             {visibleTransactions.map((tx) => (
               <tr
                 key={tx.id}
-                className={`hover:bg-surface-50/50 transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
+                className={`transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = theme === "dark" ? "#151c2a" : "#f8faff";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
                 onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
               >
-                <td className="table-cell py-3 text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
-                <td className="table-cell py-3 text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{tx.absender_name}</td>
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
-                <td className="table-cell py-3 text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>{tx.verwendungszweck || "—"}</td>
                 <td className="table-cell py-3">
                   <button
                     type="button"
@@ -251,11 +289,12 @@ export default function ZahlungenPage() {
                     <StatusBadge status={tx.matching_status} />
                   </button>
                 </td>
-                <td className="table-cell py-3 text-sm text-praxis-600">
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
                   {tx.patients && tx.matched_patient_id ? (
                     <button
                       type="button"
-                      className="font-medium text-[#4b42d6] hover:text-[#392fb8]"
+                      className="font-medium hover:text-[#392fb8]"
+                      style={{ color: theme === "dark" ? "#b8b4ff" : "#4b42d6" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/patienten/${tx.matched_patient_id}`);
@@ -288,6 +327,7 @@ export default function ZahlungenPage() {
                           }}
                           type="button"
                           className="p-1.5 text-praxis-400 hover:bg-surface-100 rounded-lg transition-colors"
+                          style={{ color: theme === "dark" ? "#8fa2bf" : undefined }}
                           title={isGerman ? "Ignorieren" : "Ignore"}
                         >
                           <X size={14} />
@@ -336,17 +376,24 @@ export default function ZahlungenPage() {
         };
         return (
           <div
-            className="fixed z-[100] w-[340px] rounded-lg border border-surface-200 bg-white p-3 text-sm text-praxis-600 shadow-elevated"
-            style={{ left: statusHelpPos.left, top: statusHelpPos.top }}
+            className="fixed z-[100] w-[340px] rounded-lg border p-3 text-sm shadow-elevated"
+            style={{
+              left: statusHelpPos.left,
+              top: statusHelpPos.top,
+              borderColor: "var(--ac-border)",
+              background: "var(--ac-surface)",
+              color: "var(--ac-text-soft)",
+            }}
             onMouseEnter={() => setStatusHelpFor(tx.id)}
             onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+            role="tooltip"
           >
-            <p className="font-semibold text-praxis-800 mb-1">{isGerman ? "Matching-Status" : "Matching status"}</p>
+            <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Matching-Status" : "Matching status"}</p>
             <p>{statusText[tx.matching_status] || tx.matching_status}</p>
-            <p className="mt-2 text-xs text-praxis-500">
+            <p className="mt-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
               {isGerman ? "Match-Score" : "Match score"}: {score}
             </p>
-            <p className="mt-1 text-xs text-praxis-500">
+            <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
               {isGerman ? "Aktionen: → manuell zuordnen, × ignorieren, ✓ Vorschlag bestätigen" : "Actions: → assign manually, × ignore, ✓ confirm suggestion"}
             </p>
           </div>
@@ -356,15 +403,15 @@ export default function ZahlungenPage() {
       <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={isGerman ? "Transaktion manuell zuordnen" : "Assign transaction manually"} size="lg">
         {matchModal && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-accent-blue/25 bg-accent-blue/5 px-3 py-2 text-sm text-praxis-700">
+            <div className="rounded-lg border border-accent-blue/25 bg-accent-blue/5 px-3 py-2 text-sm" style={{ color: "var(--ac-text)" }}>
               {isGerman
                 ? "Wähle den passenden Patienten aus der Liste. Danach wird die Transaktion direkt übernommen."
                 : "Choose the matching patient from the list. The transaction will be assigned immediately."}
             </div>
-            <div className="bg-surface-50 rounded-lg p-4">
-              <p className="text-sm font-medium text-praxis-700">{matchModal.absender_name}</p>
-              <p className="text-xs text-praxis-400">{matchModal.verwendungszweck}</p>
-              <p className="text-lg font-bold text-praxis-800 mt-1">{matchModal.betrag?.toLocaleString("de-DE")} €</p>
+            <div className="rounded-lg p-4" style={{ background: "var(--ac-surface-muted)" }}>
+              <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{matchModal.absender_name}</p>
+              <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{matchModal.verwendungszweck}</p>
+              <p className="mt-1 text-lg font-bold" style={{ color: "var(--ac-text)" }}>{matchModal.betrag?.toLocaleString("de-DE")} €</p>
             </div>
 
             <div className="relative">
@@ -383,16 +430,22 @@ export default function ZahlungenPage() {
                 <button
                   key={p.id}
                   onClick={() => handleManualMatch(matchModal.id, p.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-praxis-50 transition-colors text-left"
+                  className="w-full flex items-center gap-3 rounded-lg p-3 text-left transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = theme === "dark" ? "#171f2e" : "#f5f8ff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <div className="w-8 h-8 rounded-full bg-praxis-100 flex items-center justify-center text-xs font-semibold text-praxis-600">
                     {p.vorname[0]}{p.nachname[0]}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-praxis-700">{p.nachname}, {p.vorname}</p>
-                    <p className="text-xs text-praxis-400">{(p.raten || []).filter((r: any) => r.status === "offen").length} {isGerman ? "offene Raten" : "open rates"}</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{p.nachname}, {p.vorname}</p>
+                    <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{(p.raten || []).filter((r: any) => r.status === "offen").length} {isGerman ? "offene Raten" : "open rates"}</p>
                   </div>
-                  <ArrowRight size={14} className="text-praxis-400" />
+                  <ArrowRight size={14} style={{ color: "var(--ac-text-mute)" }} />
                 </button>
               ))}
             </div>
@@ -409,18 +462,27 @@ function MetricCard({
   sub,
   green,
   amber,
+  theme,
 }: {
   label: string;
   value: string;
   sub?: string;
   green?: boolean;
   amber?: boolean;
+  theme: "light" | "dark";
 }) {
   return (
-    <div className="rounded-[16px] border border-surface-200 bg-white px-6 py-5 shadow-card">
-      <p className="text-[14px] font-semibold text-[#8797ac]">{label}</p>
-      <p className={`mt-2 text-[52px] leading-none tracking-tight font-bold ${green ? "text-[#5f9339]" : amber ? "text-[#c8942d]" : "text-[#1f2f43]"}`}>{value}</p>
-      {sub ? <p className="mt-2 text-sm text-[#7f8ea2]">{sub}</p> : null}
+    <div
+      className="rounded-[16px] border px-6 py-5"
+      style={{
+        borderColor: "var(--ac-border)",
+        background: "var(--ac-surface)",
+        boxShadow: "var(--ac-shadow-soft)",
+      }}
+    >
+      <p className="text-[14px] font-semibold" style={{ color: "var(--ac-text-mute)" }}>{label}</p>
+      <p className={`mt-2 text-[44px] leading-none tracking-tight font-bold ${green ? "text-[#5f9339]" : amber ? "text-[#c8942d]" : ""}`} style={!green && !amber ? { color: theme === "dark" ? "#eef2fb" : "#1f2f43" } : undefined}>{value}</p>
+      {sub ? <p className="mt-2 text-sm" style={{ color: "var(--ac-text-soft)" }}>{sub}</p> : null}
     </div>
   );
 }

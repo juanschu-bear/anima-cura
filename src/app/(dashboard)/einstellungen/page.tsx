@@ -9,7 +9,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 type JsonRecord = Record<string, any>;
 
 export default function EinstellungenPage() {
-  const { locale } = useAppStore();
+  const { locale, theme } = useAppStore();
   const isGerman = locale === "de";
   const { settings, loading, updateSetting } = useEinstellungen();
   const { connections, refetch: refetchConnections } = useBankConnections();
@@ -62,14 +62,14 @@ export default function EinstellungenPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-praxis-400">Einstellungen werden geladen…</p>;
+    return <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>Einstellungen werden geladen…</p>;
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="ac-page-title">Einstellungen</h1>
-        <p className="text-sm text-praxis-400 mt-1">
+        <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
           {isGerman
             ? "Regeln fuer Matching, Mahnungen und Benachrichtigungen."
             : "Rules for matching, reminders, and notifications."}
@@ -77,13 +77,27 @@ export default function EinstellungenPage() {
       </div>
 
       {hint && (
-        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--ac-border)",
+            background: "var(--ac-surface)",
+            color: "var(--ac-text-soft)",
+          }}
+        >
           {hint}
         </div>
       )}
 
-      <section className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
-        <p className="font-semibold text-praxis-700 mb-1">{isGerman ? "Betriebslogik in der Praxis" : "Operational logic in practice"}</p>
+      <section
+        className="rounded-lg border px-4 py-3 text-sm"
+        style={{
+          borderColor: "var(--ac-border)",
+          background: "var(--ac-surface)",
+          color: "var(--ac-text-soft)",
+        }}
+      >
+        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Betriebslogik in der Praxis" : "Operational logic in practice"}</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>{isGerman ? "Mahn-Pipeline wird aus überfälligen Raten automatisch berechnet (Karenz, Stufe 1, Stufe 2, Eskalation)." : "Dunning pipeline is automatically derived from overdue installments."}</li>
           <li>{isGerman ? "Benachrichtigungen/E-Mails steuerst du hier unter „Benachrichtigungen“." : "Notification and email automation is configured in the notifications section below."}</li>
@@ -93,7 +107,7 @@ export default function EinstellungenPage() {
       </section>
 
       <section className="stat-card space-y-4">
-        <div className="flex items-center gap-2 text-praxis-700">
+        <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
           <Landmark size={16} />
           <h2 className="ac-section-title">{isGerman ? "Bankverbindung" : "Bank connection"}</h2>
         </div>
@@ -101,30 +115,35 @@ export default function EinstellungenPage() {
           {connections.map((conn) => (
             <div
               key={conn.id}
-              className="rounded-xl border border-surface-200 bg-white p-4 text-sm text-praxis-600"
+              className="rounded-xl border p-4 text-sm"
+              style={{
+                borderColor: "var(--ac-border)",
+                background: "var(--ac-surface-muted)",
+                color: "var(--ac-text-soft)",
+              }}
             >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-2 text-sm">
-                  <p className="text-praxis-400">{isGerman ? "Anbieter" : "Provider"}</p>
-                  <p className="font-semibold text-praxis-700">{conn.provider || "finAPI Access"}</p>
-                  <p className="text-praxis-400">{isGerman ? "Bank" : "Bank"}</p>
-                  <p className="font-semibold text-praxis-700">{conn.bank_name}</p>
-                  <p className="text-praxis-400">{isGerman ? "Letzter Sync" : "Last sync"}</p>
-                  <p className="font-semibold text-praxis-700">{conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Anbieter" : "Provider"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.provider || "finAPI Access"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Bank" : "Bank"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.bank_name}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Letzter Sync" : "Last sync"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
                 </div>
                 <div className="space-y-2 text-sm">
-                  <p className="text-praxis-400">{isGerman ? "Status" : "Status"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Status" : "Status"}</p>
                   <p className="font-semibold text-[#5a8d3a]">● {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}</p>
-                  <p className="text-praxis-400">IBAN</p>
-                  <p className="font-mono font-semibold text-praxis-700">{conn.iban || "—"}</p>
-                  <p className="text-praxis-400">{isGerman ? "TAN-Erneuerung" : "TAN renewal"}</p>
-                  <p className="font-semibold text-praxis-700">{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>IBAN</p>
+                  <p className="font-mono font-semibold" style={{ color: "var(--ac-text)" }}>{conn.iban || "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "TAN-Erneuerung" : "TAN renewal"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
                 </div>
               </div>
             </div>
           ))}
           {connections.length === 0 && (
-            <p className="text-sm text-praxis-400">
+            <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>
               {isGerman ? "Noch keine Bankverbindung hinterlegt." : "No bank connection configured yet."}
             </p>
           )}
@@ -141,7 +160,7 @@ export default function EinstellungenPage() {
       </section>
 
       <section className="stat-card space-y-4">
-        <div className="flex items-center gap-2 text-praxis-700">
+        <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
           <Settings size={16} />
           <h2 className="ac-section-title">Mahnfristen</h2>
         </div>
@@ -197,21 +216,25 @@ export default function EinstellungenPage() {
             label="Automatische E-Mail-Mahnungen"
             checked={!!benachrichtigungen.auto_email}
             onChange={(v) => (benachrichtigungen.auto_email = v)}
+            theme={theme}
           />
           <Toggle
             label="Automatische Brief-Mahnungen"
             checked={!!benachrichtigungen.auto_brief}
             onChange={(v) => (benachrichtigungen.auto_brief = v)}
+            theme={theme}
           />
           <Toggle
             label="Sabine-Briefing aktiv"
             checked={!!benachrichtigungen.sabine_briefing}
             onChange={(v) => (benachrichtigungen.sabine_briefing = v)}
+            theme={theme}
           />
           <Toggle
             label="Maria-Eskalation aktiv"
             checked={!!benachrichtigungen.maria_eskalation}
             onChange={(v) => (benachrichtigungen.maria_eskalation = v)}
+            theme={theme}
           />
         </div>
       </section>
@@ -221,7 +244,7 @@ export default function EinstellungenPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-surface-50">
+              <tr style={{ background: "var(--ac-surface-muted)" }}>
                 <th className="table-header text-left">{isGerman ? "Benutzer" : "User"}</th>
                 <th className="table-header text-left">{isGerman ? "Rolle" : "Role"}</th>
                 <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
@@ -231,21 +254,21 @@ export default function EinstellungenPage() {
             </thead>
             <tbody>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">Dr. Maria Schubert</td>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>Dr. Maria Schubert</td>
                 <td className="table-cell"><span className="badge badge-info">Admin</span></td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
               </tr>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Sabine (Verwaltung)" : "Sabine (Office)"}</td>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Sabine (Verwaltung)" : "Sabine (Office)"}</td>
                 <td className="table-cell"><span className="badge badge-warning">{isGerman ? "Verwaltung" : "Office"}</span></td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">—</td>
               </tr>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Empfang" : "Reception"}</td>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Empfang" : "Reception"}</td>
                 <td className="table-cell"><span className="badge badge-neutral">{isGerman ? "Lesezugriff" : "Read-only"}</span></td>
                 <td className="table-cell">—</td>
                 <td className="table-cell">—</td>
@@ -285,7 +308,7 @@ function NumberField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-praxis-500 mb-1">{label}</span>
+      <span className="mb-1 block text-xs font-medium" style={{ color: "var(--ac-text-mute)" }}>{label}</span>
       <input
         type="number"
         className="input"
@@ -300,18 +323,27 @@ function Toggle({
   label,
   checked,
   onChange,
+  theme,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  theme: "light" | "dark";
 }) {
   return (
-    <label className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-3 py-3">
-      <span className="text-sm text-praxis-700">{label}</span>
+    <label
+      className="flex items-center justify-between rounded-lg border px-3 py-3"
+      style={{
+        borderColor: "var(--ac-border)",
+        background: "var(--ac-surface-muted)",
+      }}
+    >
+      <span className="text-sm" style={{ color: "var(--ac-text)" }}>{label}</span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 rounded-full transition-colors ${checked ? "bg-[#5b4de1]" : "bg-surface-200"}`}
+        className={`relative h-7 w-12 rounded-full transition-colors ${checked ? "bg-[#5b4de1]" : ""}`}
+        style={!checked ? { background: theme === "dark" ? "#2b3447" : "#dfe5ef" } : undefined}
       >
         <span
           className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`}
