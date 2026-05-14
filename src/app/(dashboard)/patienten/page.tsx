@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { createBrowserClient } from "@/lib/db/supabase";
@@ -38,6 +38,8 @@ export default function PatientenPage() {
   const { patienten, loading, refetch } = usePatienten(search);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncHint, setSyncHint] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [form, setForm] = useState({
     vorname: "",
@@ -89,6 +91,28 @@ export default function PatientenPage() {
     refetch();
   }
 
+  async function handleIvorisSync() {
+    setSyncing(true);
+    setSyncHint("");
+    try {
+      const res = await fetch("/api/ivoris/patients/sync", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        setSyncHint(payload.error || "IVORIS-Sync fehlgeschlagen.");
+      } else {
+        const result = payload.result || {};
+        setSyncHint(
+          `IVORIS-Sync: ${result.imported ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.skipped ?? 0} übersprungen.`
+        );
+        refetch();
+      }
+    } catch {
+      setSyncHint("IVORIS-Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   const totalActive = useMemo(() => patienten.filter((p) => (p.raten || []).length > 0).length, [patienten]);
 
   return (
@@ -98,10 +122,22 @@ export default function PatientenPage() {
           <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">Patienten</h1>
           <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
         </div>
-        <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus size={16} /> Neuer Patient
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing}>
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Synchronisiere..." : "IVORIS Sync"}
+          </button>
+          <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
+            <Plus size={16} /> Neuer Patient
+          </button>
+        </div>
       </div>
+
+      {syncHint && (
+        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+          {syncHint}
+        </div>
+      )}
 
       <div className="relative max-w-[420px]">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />

@@ -10,6 +10,7 @@ import { syncBankTransactions } from "@/lib/services/bank-sync";
 import { runBatchMatching } from "@/lib/services/matching-engine";
 import { runDunningEngine } from "@/lib/services/dunning-engine";
 import { detectAnomalies, generateCashflowForecast } from "@/lib/services/claude-analysis";
+import { syncIvorisPatients } from "@/lib/services/ivoris-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Vercel Pro: bis zu 60 Sekunden
@@ -25,6 +26,12 @@ export async function GET(req: NextRequest) {
   const results: Record<string, unknown> = {};
 
   try {
+    // Schritt 0: Optionale Praxisdaten-Synchronisation (IVORIS)
+    if (process.env.IVORIS_SYNC_ENABLED === "true") {
+      console.log("🏥 IVORIS Patienten-Sync starten...");
+      results.ivoris = await syncIvorisPatients();
+    }
+
     // Schritt 1: Bank-Sync
     console.log("🏦 Bank-Sync starten...");
     results.bankSync = await syncBankTransactions();

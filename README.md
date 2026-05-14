@@ -158,6 +158,31 @@ cp .env.example .env.local
 
 Fill in your API keys for Supabase, finAPI, Anthropic (Claude), and SMTP.
 
+### IVORIS Praxissoftware anbinden (Patienten-Sync)
+
+Setze diese Variablen in `.env.local`:
+
+```bash
+IVORIS_SYNC_ENABLED=true
+IVORIS_LINKNAME=<dein-linkname-aus-ivoris-relay>
+IVORIS_APP=<app_name>
+IVORIS_APP_VERSION=<deine-version>
+IVORIS_API_KEY=<api_key>
+```
+
+Optional (falls deine Installation andere Endpoint-Namen nutzt):
+
+```bash
+IVORIS_PATIENTS_SERVICE=Patient
+IVORIS_PATIENTS_VERSION=v1
+IVORIS_PATIENTS_ACTION=List
+IVORIS_PATIENTS_METHOD=GET
+```
+
+Verfügbare Endpoints:
+- `GET /api/ivoris/about/documentation` (lädt die Webservice-Doku via About/v1/Documentation)
+- `POST /api/ivoris/patients/sync` (importiert/aktualisiert Patienten in `patients` via `ivoris_id`)
+
 ### 4. Run locally
 
 ```bash
