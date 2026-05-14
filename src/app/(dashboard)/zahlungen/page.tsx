@@ -167,7 +167,7 @@ export default function ZahlungenPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
+          <h1 className="ac-page-title">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
             {visibleTransactions.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
@@ -417,10 +417,10 @@ function MetricCard({
   amber?: boolean;
 }) {
   return (
-    <div className="stat-card">
-      <p className="text-sm text-praxis-400 font-medium">{label}</p>
-      <p className={`mt-1 text-[34px] leading-none tracking-tight font-extrabold ${green ? "text-[#4ca43f]" : amber ? "text-accent-amber" : "text-praxis-800"}`}>{value}</p>
-      {sub ? <p className="mt-1 text-xs text-praxis-400">{sub}</p> : null}
+    <div className="rounded-[16px] border border-surface-200 bg-white px-6 py-5 shadow-card">
+      <p className="text-[14px] font-semibold text-[#8797ac]">{label}</p>
+      <p className={`mt-2 text-[52px] leading-none tracking-tight font-bold ${green ? "text-[#5f9339]" : amber ? "text-[#c8942d]" : "text-[#1f2f43]"}`}>{value}</p>
+      {sub ? <p className="mt-2 text-sm text-[#7f8ea2]">{sub}</p> : null}
     </div>
   );
 }

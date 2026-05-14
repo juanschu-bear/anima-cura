@@ -16,14 +16,6 @@ export default function UebersichtPage() {
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
 
-  const verlaufHistorie = [
-    33800, 35200, 36100, 35800, 36900, 37500, 38900, 39200, 40100, 39800, 41200, 42100,
-    36800, 39200, 38200, 41500, 44100, 48000,
-  ];
-  const prognoseSmoothing = verlaufHistorie.map((value, idx, all) => {
-    const slice = all.slice(Math.max(0, idx - 5), idx + 1);
-    return Math.round(slice.reduce((sum, n) => sum + n, 0) / slice.length);
-  });
   const chartMonate = ["Dez", "Jan", "Feb", "Mär", "Apr", "Mai"];
   const zahlungsverlauf = chartMonate.map((monat, i) => ({
     monat,
@@ -57,30 +49,6 @@ export default function UebersichtPage() {
 
   return (
     <div className="space-y-5">
-      <nav className="flex items-center gap-7 border-b border-surface-200 pb-3">
-        {[
-          ["Übersicht", "/uebersicht"],
-          ["Zahlungen", "/zahlungen"],
-          ["Patienten", "/patienten"],
-          ["Ratenplan", "/ratenplan"],
-          ["Mahnwesen", "/mahnwesen"],
-          ["Quartalsbericht", "/quartal"],
-          ["Einstellungen", "/einstellungen"],
-        ].map(([label, href]) => (
-          <Link
-            key={href}
-            href={href}
-            className={`pb-2 text-base font-semibold leading-none ${
-              href === "/uebersicht"
-                ? "text-[#5b4de1] border-b-[3px] border-[#5b4de1]"
-                : "text-praxis-500 hover:text-praxis-700"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
-
       <div>
         <h1 className="ac-page-title">Übersicht</h1>
         <p className="text-sm text-praxis-400 mt-1">
@@ -235,9 +203,9 @@ function KpiCard({
 }) {
   return (
     <div className="rounded-[16px] border border-surface-200 bg-white px-6 py-5 shadow-card">
-      <p className="text-[13px] font-semibold text-praxis-400">{label}</p>
-      <p className={`mt-2 text-[58px] leading-none font-bold text-praxis-800 ${valueClass || ""}`}>{value}</p>
-      {sub ? <p className={`mt-2 text-sm text-praxis-500 ${subClass || ""}`}>{sub}</p> : null}
+      <p className="text-[14px] font-semibold text-[#8797ac]">{label}</p>
+      <p className={`mt-2 text-[62px] leading-none font-bold tracking-tight text-[#1f2f43] ${valueClass || ""}`}>{value}</p>
+      {sub ? <p className={`mt-2 text-sm text-[#7f8ea2] ${subClass || ""}`}>{sub}</p> : null}
     </div>
   );
 }

@@ -143,7 +143,7 @@ export default function EinstellungenPage() {
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2 text-praxis-700">
           <Settings size={16} />
-          <h2 className="text-sm font-semibold">Mahnfristen</h2>
+          <h2 className="ac-section-title">Mahnfristen</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <NumberField
@@ -170,7 +170,7 @@ export default function EinstellungenPage() {
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="text-sm font-semibold text-praxis-700">Matching</h2>
+        <h2 className="ac-section-title">Matching</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NumberField
             label="Mindestscore"

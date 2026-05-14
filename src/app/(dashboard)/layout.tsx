@@ -68,11 +68,15 @@ export default function DashboardLayout({
     <div className="ac-shell">
       <aside className="ac-sidebar flex w-[17.5rem] flex-col">
         <div className="border-b border-surface-200 p-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-praxis-400">
+          <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+            theme === "dark"
+              ? "border border-white/10 bg-white/5 text-white/70"
+              : "border border-surface-200 bg-white text-praxis-400"
+          }`}>
             Praxis Companion
           </div>
-          <h1 className="mt-3 text-[28px] font-bold leading-none text-praxis-800">Anima Curo</h1>
-          <p className="mt-1 text-xs font-medium text-praxis-400">Intelligent Practice Finance</p>
+          <h1 className={`mt-3 text-[28px] font-bold leading-none ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Anima Curo</h1>
+          <p className={`mt-1 text-xs font-medium ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>Intelligent Practice Finance</p>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -94,16 +98,18 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="p-3 border-t border-surface-200">
+        <div className={`p-3 border-t ${theme === "dark" ? "border-white/10" : "border-surface-200"}`}>
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-praxis-100 flex items-center justify-center text-sm font-semibold text-praxis-600">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+              theme === "dark" ? "bg-white/10 text-white" : "bg-praxis-100 text-praxis-600"
+            }`}>
               MS
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-praxis-800 truncate">Maria Schubert</p>
-              <p className="text-xs text-praxis-400">{isGerman ? "Admin" : "Admin"}</p>
+              <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Maria Schubert</p>
+              <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{isGerman ? "Admin" : "Admin"}</p>
             </div>
-            <button className="text-praxis-400 hover:text-praxis-600 transition-colors">
+            <button className={`${theme === "dark" ? "text-white/65 hover:text-white" : "text-praxis-400 hover:text-praxis-600"} transition-colors`}>
               <LogOut size={16} />
             </button>
           </div>
@@ -141,7 +147,11 @@ export default function DashboardLayout({
                 <span className="h-2 w-2 rounded-full bg-accent-emerald" />
                 {isGerman ? "System aktiv" : "System active"}
               </span>
-              <button className="relative rounded-xl border border-surface-200 bg-white p-2 text-praxis-400 transition-colors hover:text-praxis-600">
+              <button className={`relative rounded-xl border p-2 transition-colors ${
+                theme === "dark"
+                  ? "border-white/10 bg-white/5 text-white/65 hover:text-white"
+                  : "border-surface-200 bg-white text-praxis-400 hover:text-praxis-600"
+              }`}>
                 <Bell size={18} />
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-coral" />
               </button>
