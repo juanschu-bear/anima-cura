@@ -49,6 +49,16 @@ async function parseBestEffortResponse(response: Response): Promise<unknown> {
   }
 }
 
+function formatPayload(payload: unknown) {
+  if (typeof payload === "string") return payload;
+  if (payload === null || payload === undefined) return "null";
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return String(payload);
+  }
+}
+
 function buildHeaders(creds: IvorisCredentials) {
   const headers: Record<string, string> = {
     Accept: "application/json, text/plain, text/html, */*",
@@ -77,7 +87,7 @@ export async function fetchIvorisDocumentation() {
 
   const payload = await parseBestEffortResponse(response);
   if (!response.ok) {
-    throw new Error(`IVORIS About/Documentation fehlgeschlagen (${response.status}): ${String(payload)}`);
+    throw new Error(`IVORIS About/Documentation fehlgeschlagen (${response.status}): ${formatPayload(payload)}`);
   }
 
   return payload;
@@ -111,7 +121,7 @@ export async function fetchIvorisPatientsRaw() {
 
       const payload = await parseBestEffortResponse(response);
       if (!response.ok) {
-        throw new Error(`IVORIS Patienten-Endpoint fehlgeschlagen (${response.status}) bei ${path}: ${String(payload)}`);
+        throw new Error(`IVORIS Patienten-Endpoint fehlgeschlagen (${response.status}) bei ${path}: ${formatPayload(payload)}`);
       }
 
       if (!Array.isArray(payload) || payload.length === 0) {
@@ -137,7 +147,7 @@ export async function fetchIvorisPatientsRaw() {
   });
   const payload = await parseBestEffortResponse(response);
   if (!response.ok) {
-    throw new Error(`IVORIS Patienten-Endpoint fehlgeschlagen (${response.status}) bei ${path}: ${String(payload)}`);
+    throw new Error(`IVORIS Patienten-Endpoint fehlgeschlagen (${response.status}) bei ${path}: ${formatPayload(payload)}`);
   }
   return payload;
 }
