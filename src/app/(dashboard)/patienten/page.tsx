@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Users } from "lucide-react";
@@ -32,6 +33,7 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 export default function PatientenPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const { patienten, loading, refetch } = usePatienten(search);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -174,6 +176,8 @@ export default function PatientenPage() {
                       restschuld: rest,
                       raten,
                       router,
+                      statusPopoverFor,
+                      setStatusPopoverFor,
                     })}
                   </td>
                 </tr>
@@ -248,12 +252,16 @@ function renderStatusBadge({
   restschuld,
   raten,
   router,
+  statusPopoverFor,
+  setStatusPopoverFor,
 }: {
   status: string;
   patientId: string;
   restschuld: number;
   raten: any[];
   router: ReturnType<typeof useRouter>;
+  statusPopoverFor: string | null;
+  setStatusPopoverFor: Dispatch<SetStateAction<string | null>>;
 }) {
   const mahnrelevant = ["stufe1", "verzug", "eskalation", "abweichung"].includes(status);
   if (!mahnrelevant) return <StatusBadge status={status} />;
@@ -265,9 +273,14 @@ function renderStatusBadge({
   const dueDate = first?.faellig_am ? new Date(first.faellig_am) : null;
   const daysLate = dueDate ? Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
   const dueLabel = dueDate ? dueDate.toLocaleDateString("de-DE") : "—";
+  const isOpen = statusPopoverFor === patientId;
 
   return (
-    <div className="group relative inline-flex flex-col items-start gap-1">
+    <div
+      className="relative inline-flex flex-col items-start gap-1"
+      onMouseEnter={() => setStatusPopoverFor(patientId)}
+      onMouseLeave={() => setStatusPopoverFor((curr) => (curr === patientId ? null : curr))}
+    >
       <button
         type="button"
         className="cursor-pointer"
@@ -283,17 +296,28 @@ function renderStatusBadge({
         className="text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
         onClick={(e) => {
           e.stopPropagation();
-          router.push(`/mahnwesen?patient=${patientId}`);
+          setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
         }}
       >
-        Mahnwesen öffnen
+        Details
       </button>
-      <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden min-w-[230px] rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated group-hover:block group-focus-within:block">
+      {isOpen && (
+        <div className="absolute left-0 top-full z-30 mt-1 min-w-[230px] rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated">
         <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
         <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
         <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
-        <p className="mt-1 text-praxis-400">Klick: Mahnwesen öffnen</p>
-      </div>
+          <button
+            type="button"
+            className="mt-2 text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/mahnwesen?patient=${patientId}`);
+            }}
+          >
+            Zu Mahnwesen
+          </button>
+        </div>
+      )}
     </div>
   );
 }
