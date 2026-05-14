@@ -66,13 +66,16 @@ export default function DashboardLayout({
 
   return (
     <div className="ac-shell">
-      <aside className="ac-sidebar flex w-64 flex-col">
+      <aside className="ac-sidebar flex w-[17.5rem] flex-col">
         <div className="border-b border-surface-200 p-5">
-          <h1 className="text-[30px] font-extrabold leading-none text-praxis-800">Anima Curo</h1>
+          <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-praxis-400">
+            Praxis Companion
+          </div>
+          <h1 className="mt-3 text-[28px] font-bold leading-none text-praxis-800">Anima Curo</h1>
           <p className="mt-1 text-xs font-medium text-praxis-400">Intelligent Practice Finance</p>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
           {NAV_ITEMS.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -108,7 +111,7 @@ export default function DashboardLayout({
       </aside>
 
       <main className="ac-main flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 border-b border-surface-200 px-6">
+        <header className="h-16 border-b border-surface-200 px-6">
           <div className="flex h-full items-center justify-between gap-4">
             <div className="hidden md:block text-xs text-praxis-400 tracking-wide">{now}</div>
             <div className="relative hidden lg:block w-full max-w-sm">
@@ -138,7 +141,7 @@ export default function DashboardLayout({
                 <span className="h-2 w-2 rounded-full bg-accent-emerald" />
                 {isGerman ? "System aktiv" : "System active"}
               </span>
-              <button className="relative rounded-lg p-2 text-praxis-400 transition-colors hover:bg-surface-50 hover:text-praxis-600">
+              <button className="relative rounded-xl border border-surface-200 bg-white p-2 text-praxis-400 transition-colors hover:text-praxis-600">
                 <Bell size={18} />
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-coral" />
               </button>
@@ -146,7 +149,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <div className="ac-content flex-1 overflow-y-auto p-6">
+        <div className="ac-content flex-1 overflow-y-auto p-7">
           {children}
         </div>
       </main>

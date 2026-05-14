@@ -53,6 +53,9 @@ body {
 body {
   font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--ac-bg);
+  background-image:
+    radial-gradient(circle at 6% 6%, rgba(75, 66, 214, 0.08), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(52, 85, 124, 0.1), transparent 34%);
   color: var(--ac-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -86,10 +89,16 @@ samp {
   }
 
   .stat-card {
-    @apply rounded-[14px] border p-5;
+    @apply rounded-[16px] border p-5;
     background: var(--ac-surface);
     border-color: var(--ac-border);
     box-shadow: var(--ac-shadow-soft);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .stat-card:hover {
+    border-color: var(--ac-border-strong);
+    box-shadow: var(--ac-shadow);
   }
 
   .btn-primary {
@@ -154,6 +163,14 @@ samp {
     background: var(--ac-sidebar-active-bg);
     color: var(--ac-sidebar-active-ink);
     box-shadow: 0 8px 18px rgba(35, 60, 90, 0.22);
+  }
+
+  .ac-page-title {
+    @apply text-[28px] font-bold tracking-tight text-praxis-800;
+  }
+
+  .ac-section-title {
+    @apply text-[22px] font-bold tracking-tight text-praxis-700;
   }
 
   .badge {
