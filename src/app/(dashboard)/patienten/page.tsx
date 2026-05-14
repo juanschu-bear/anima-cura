@@ -264,7 +264,6 @@ function renderStatusBadge({
   setStatusPopoverFor: Dispatch<SetStateAction<string | null>>;
 }) {
   const mahnrelevant = ["stufe1", "verzug", "eskalation", "abweichung"].includes(status);
-  if (!mahnrelevant) return <StatusBadge status={status} />;
 
   const ueberfaellig = raten
     .filter((r) => r.status === "überfällig")
@@ -286,7 +285,8 @@ function renderStatusBadge({
         className="cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
-          router.push(`/mahnwesen?patient=${patientId}`);
+          if (mahnrelevant) router.push(`/mahnwesen?patient=${patientId}`);
+          else setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
         }}
       >
         <StatusBadge status={status} />
@@ -303,19 +303,28 @@ function renderStatusBadge({
       </button>
       {isOpen && (
         <div className="absolute left-0 top-full z-30 mt-1 min-w-[230px] rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated">
-        <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
-        <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
-        <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
-          <button
-            type="button"
-            className="mt-2 text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/mahnwesen?patient=${patientId}`);
-            }}
-          >
-            Zu Mahnwesen
-          </button>
+          {mahnrelevant ? (
+            <>
+              <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
+              <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
+              <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
+              <button
+                type="button"
+                className="mt-2 text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/mahnwesen?patient=${patientId}`);
+                }}
+              >
+                Zu Mahnwesen
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-praxis-700">Kein aktiver Mahnfall</p>
+              <p className="mt-1 text-praxis-500">Dieser Patient ist aktuell nicht im Verzug.</p>
+            </>
+          )}
         </div>
       )}
     </div>
