@@ -3,6 +3,7 @@
 import {
   LineChart,
   Line,
+  Area,
   BarChart,
   Bar,
   PieChart,
@@ -31,12 +32,21 @@ export function ZahlungsverlaufChart({ data }: { data: { monat: string; eingang:
       <LineChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="#eceef4" />
         <XAxis dataKey="monat" tick={{ fontSize: 12 }} stroke="#9dacbf" axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 12 }} stroke="#9dacbf" axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`} />
+        <YAxis
+          tick={{ fontSize: 12 }}
+          stroke="#9dacbf"
+          axisLine={false}
+          tickLine={false}
+          domain={[36000, 48000]}
+          ticks={[36000, 38000, 40000, 42000, 44000, 46000, 48000]}
+          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
+        />
         <Tooltip
           contentStyle={{ borderRadius: "10px", border: "1px solid #e5e8eb", fontSize: "13px" }}
           formatter={(value: number, key: string) => [`${value.toLocaleString("de-DE")}€`, key === "eingang" ? "Eingang" : "Erwartet"]}
         />
         <Legend verticalAlign="top" align="left" iconType="plainline" wrapperStyle={{ fontSize: "12px", paddingBottom: "8px" }} />
+        <Area type="monotone" dataKey="eingang" fill="#5a8d3a" fillOpacity={0.08} strokeOpacity={0} />
         <Line
           type="monotone"
           dataKey="eingang"

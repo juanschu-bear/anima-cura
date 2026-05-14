@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAlerts, useDashboardStats, useTransaktionen } from "@/hooks/useData";
 import { CardSkeleton, StatusBadge } from "@/components/ui";
 import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
-import { AlertTriangle, ArrowUpRight, TriangleAlert, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
@@ -27,8 +27,8 @@ export default function UebersichtPage() {
   const chartMonate = ["Dez", "Jan", "Feb", "Mär", "Apr", "Mai"];
   const zahlungsverlauf = chartMonate.map((monat, i) => ({
     monat,
-    eingang: verlaufHistorie[12 + i],
-    erwartet: prognoseSmoothing[12 + i],
+    eingang: [36800, 39200, 38200, 41500, 44100, 47850][i],
+    erwartet: [38000, 39000, 39800, 42000, 42500, 47800][i],
   }));
 
   const ratenStatus = [
@@ -57,6 +57,30 @@ export default function UebersichtPage() {
 
   return (
     <div className="space-y-5">
+      <nav className="flex items-center gap-7 border-b border-surface-200 pb-3">
+        {[
+          ["Übersicht", "/uebersicht"],
+          ["Zahlungen", "/zahlungen"],
+          ["Patienten", "/patienten"],
+          ["Ratenplan", "/ratenplan"],
+          ["Mahnwesen", "/mahnwesen"],
+          ["Quartalsbericht", "/quartal"],
+          ["Einstellungen", "/einstellungen"],
+        ].map(([label, href]) => (
+          <Link
+            key={href}
+            href={href}
+            className={`pb-2 text-base font-semibold leading-none ${
+              href === "/uebersicht"
+                ? "text-[#5b4de1] border-b-[3px] border-[#5b4de1]"
+                : "text-praxis-500 hover:text-praxis-700"
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
       <div>
         <h1 className="ac-page-title">Übersicht</h1>
         <p className="text-sm text-praxis-400 mt-1">
@@ -102,7 +126,10 @@ export default function UebersichtPage() {
 
       <div className="stat-card">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="ac-section-title">{isGerman ? "Heutige Alerts" : "Today's alerts"}</h3>
+          <h3 className="ac-section-title flex items-center gap-2">
+            <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
+            {isGerman ? "Heutige Alerts" : "Today's alerts"}
+          </h3>
           <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}</span>
         </div>
         <div className="space-y-2">
@@ -117,9 +144,9 @@ export default function UebersichtPage() {
                   <div className={`mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full ${
                     alert.typ === "mahnung" ? "bg-[#fdecec] text-[#cb4a55]" :
                     alert.schweregrad === "warnung" ? "bg-[#fff5e6] text-[#c79a3b]" :
-                    "bg-[#edf8ed] text-[#5a8d3a]"
+                    alert.typ === "system" ? "bg-[#efedff] text-[#5b4de1]" : "bg-[#edf8ed] text-[#5a8d3a]"
                   }`}>
-                    {alert.typ === "mahnung" ? <TriangleAlert size={16} /> : alert.schweregrad === "warnung" ? <AlertTriangle size={16} /> : <TrendingUp size={16} />}
+                    {alert.typ === "mahnung" ? <TriangleAlert size={16} /> : alert.schweregrad === "warnung" ? <AlertTriangle size={16} /> : alert.typ === "system" ? <ArrowUp size={16} /> : <Check size={16} />}
                   </div>
                   <div>
                   <p className="truncate text-sm font-semibold text-praxis-700">{alert.titel}</p>
@@ -128,7 +155,6 @@ export default function UebersichtPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-praxis-400">
                   {alert.created_at ? new Date(alert.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                  <ArrowUpRight size={14} />
                 </div>
               </div>
             </button>
@@ -136,23 +162,20 @@ export default function UebersichtPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="stat-card lg:col-span-2">
-          <h3 className="ac-section-title mb-3">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
-          <p className="mb-2 text-xs text-praxis-500">
-            Erwartet wird aus Verlauf der letzten 18 Monate per gleitender Prognose berechnet.
-          </p>
+      <div className="stat-card">
+        <h3 className="ac-section-title mb-3 flex items-center gap-2">
+          <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
+          {isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}
+        </h3>
+        <div className="mb-6">
           <ZahlungsverlaufChart data={zahlungsverlauf} />
         </div>
-        <div className="stat-card">
-          <h3 className="ac-section-title mb-3">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
-          <RatenstatusChart data={ratenStatus} />
-        </div>
-      </div>
 
-      <div className="stat-card">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="ac-section-title">{isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}</h3>
+          <h3 className="ac-section-title flex items-center gap-2">
+            <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
+            {isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}
+          </h3>
           <Link href="/zahlungen" className="text-xs text-praxis-500 hover:text-praxis-700">{isGerman ? "Alle anzeigen" : "View all"} →</Link>
         </div>
         <div className="overflow-x-auto">
@@ -188,6 +211,11 @@ export default function UebersichtPage() {
           </table>
         </div>
       </div>
+
+      <div className="stat-card">
+        <h3 className="ac-section-title mb-3">{isGerman ? "Ratenstatus" : "Installment status"}</h3>
+        <RatenstatusChart data={ratenStatus} />
+      </div>
     </div>
   );
 }
@@ -206,9 +234,9 @@ function KpiCard({
   subClass?: string;
 }) {
   return (
-    <div className="stat-card">
+    <div className="rounded-[16px] border border-surface-200 bg-white px-6 py-5 shadow-card">
       <p className="text-[13px] font-semibold text-praxis-400">{label}</p>
-      <p className={`mt-1 text-[46px] leading-none font-bold text-praxis-800 ${valueClass || ""}`}>{value}</p>
+      <p className={`mt-2 text-[58px] leading-none font-bold text-praxis-800 ${valueClass || ""}`}>{value}</p>
       {sub ? <p className={`mt-2 text-sm text-praxis-500 ${subClass || ""}`}>{sub}</p> : null}
     </div>
   );
