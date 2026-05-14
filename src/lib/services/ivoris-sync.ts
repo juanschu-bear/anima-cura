@@ -71,16 +71,18 @@ function mapInsurance(raw: string | null): "privat" | "gesetzlich" {
   const value = raw.toLowerCase();
   if (value.includes("gesetz")) return "gesetzlich";
   if (value.includes("gkv")) return "gesetzlich";
+  if (value.includes("statutory")) return "gesetzlich";
+  if (value.includes("private")) return "privat";
   return "privat";
 }
 
 function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPatient } | { ok: false; reason: string } {
   const ivorisId =
-    pickString(raw, ["id", "patientId", "patient_id", "externalId", "nummer", "patientNumber"]) || "";
-  const vorname = pickString(raw, ["vorname", "firstName", "firstname", "givenName"]) || "";
-  const nachname = pickString(raw, ["nachname", "lastName", "lastname", "familyName"]) || "";
+    pickString(raw, ["Id", "id", "patientId", "patient_id", "externalId", "nummer", "patientNumber"]) || "";
+  const vorname = pickString(raw, ["Firstname", "vorname", "firstName", "firstname", "givenName"]) || "";
+  const nachname = pickString(raw, ["Lastname", "nachname", "lastName", "lastname", "familyName"]) || "";
   const geburtsdatum =
-    parseDate(pickString(raw, ["geburtsdatum", "birthDate", "dateOfBirth", "dob"])) || null;
+    parseDate(pickString(raw, ["Birthday", "geburtsdatum", "birthDate", "dateOfBirth", "dob"])) || null;
   const behandlung =
     pickString(raw, ["behandlung", "treatment", "treatmentType", "therapy", "caseType"]) || "KFO";
   const behandlungStart =
@@ -91,22 +93,25 @@ function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPa
   if (!vorname || !nachname) return { ok: false, reason: `missing name for ${ivorisId}` };
   if (!geburtsdatum) return { ok: false, reason: `missing/invalid birthDate for ${ivorisId}` };
 
+  const address = (raw.Address && typeof raw.Address === "object" ? (raw.Address as GenericRecord) : null);
+  const insuranceRaw = pickString(raw, ["HealthInsurance", "kasse", "insuranceType", "insurance", "payerType"]);
+
   const patient: NormalizedPatient = {
     ivoris_id: ivorisId,
     vorname,
     nachname,
     geburtsdatum,
-    kasse: mapInsurance(pickString(raw, ["kasse", "insuranceType", "insurance", "payerType"])),
+    kasse: mapInsurance(insuranceRaw),
     behandlung,
     behandlung_start: behandlungStart,
     geschlecht: mapGender(pickString(raw, ["geschlecht", "gender", "sex"])),
     versichertennummer: pickString(raw, ["versichertennummer", "insuranceNumber", "insuranceNo"]),
-    telefon: pickString(raw, ["telefon", "phone", "mobile", "tel"]),
+    telefon: pickString(raw, ["Phone", "Mobile", "telefon", "phone", "mobile", "tel"]),
     email: pickString(raw, ["email", "mail"]),
-    strasse: pickString(raw, ["strasse", "street", "addressLine1", "address"]),
-    plz: pickString(raw, ["plz", "zip", "postalCode"]),
-    ort: pickString(raw, ["ort", "city"]),
-    land: pickString(raw, ["land", "country"]) || "DE",
+    strasse: address ? pickString(address, ["Street", "strasse", "street", "addressLine1", "address"]) : pickString(raw, ["strasse", "street", "addressLine1", "address"]),
+    plz: address ? pickString(address, ["Zip", "zip", "PostalCode", "plz", "postalCode"]) : pickString(raw, ["plz", "zip", "postalCode"]),
+    ort: address ? pickString(address, ["City", "ort", "city"]) : pickString(raw, ["ort", "city"]),
+    land: address ? pickString(address, ["Country", "land", "country"]) || "DE" : pickString(raw, ["land", "country"]) || "DE",
     notizen: pickString(raw, ["notizen", "notes", "comment"]),
   };
 

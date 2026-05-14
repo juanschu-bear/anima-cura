@@ -168,14 +168,15 @@ IVORIS_LINKNAME=<dein-linkname-aus-ivoris-relay>
 IVORIS_APP=<app_name>
 IVORIS_APP_VERSION=<deine-version>
 IVORIS_API_KEY=<api_key>
+IVORIS_USERNAME=<ivoris-benutzername>
+IVORIS_PASSWORD=<ivoris-passwort>
+IVORIS_MANDANT_INDEX=<optional>
 ```
 
 Optional (falls deine Installation andere Endpoint-Namen nutzt):
 
 ```bash
-IVORIS_PATIENTS_SERVICE=Patient
-IVORIS_PATIENTS_VERSION=v1
-IVORIS_PATIENTS_ACTION=List
+IVORIS_PATIENTS_PATH=/Patient/v1/AllPatients
 IVORIS_PATIENTS_METHOD=GET
 ```
 
