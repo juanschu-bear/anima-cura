@@ -68,7 +68,7 @@ export default function EinstellungenPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-praxis-800">Einstellungen</h1>
+        <h1 className="ac-page-title">Einstellungen</h1>
         <p className="text-sm text-praxis-400 mt-1">
           {isGerman
             ? "Regeln fuer Matching, Mahnungen und Benachrichtigungen."
@@ -95,25 +95,31 @@ export default function EinstellungenPage() {
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2 text-praxis-700">
           <Landmark size={16} />
-          <h2 className="text-sm font-semibold">{isGerman ? "Bankverbindungen" : "Bank connections"}</h2>
+          <h2 className="ac-section-title">{isGerman ? "Bankverbindung" : "Bank connection"}</h2>
         </div>
         <div className="space-y-3">
           {connections.map((conn) => (
             <div
               key={conn.id}
-              className="rounded-lg border border-surface-200 bg-white p-3 text-sm text-praxis-600"
+              className="rounded-xl border border-surface-200 bg-white p-4 text-sm text-praxis-600"
             >
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-praxis-700">{conn.bank_name}</p>
-                <span className={`badge ${conn.status === "connected" ? "badge-success" : "badge-warning"}`}>
-                  {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}
-                </span>
-              </div>
-              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-praxis-500">
-                <p>IBAN: <span className="font-mono">{conn.iban || "—"}</span></p>
-                <p>{isGerman ? "Letzter Sync" : "Last sync"}: {conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
-                <p>{isGerman ? "TAN-Erneuerung" : "TAN renewal"}: {conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
-                <p>{isGerman ? "Anbieter" : "Provider"}: {conn.provider || "finAPI Access"}</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2 text-sm">
+                  <p className="text-praxis-400">{isGerman ? "Anbieter" : "Provider"}</p>
+                  <p className="font-semibold text-praxis-700">{conn.provider || "finAPI Access"}</p>
+                  <p className="text-praxis-400">{isGerman ? "Bank" : "Bank"}</p>
+                  <p className="font-semibold text-praxis-700">{conn.bank_name}</p>
+                  <p className="text-praxis-400">{isGerman ? "Letzter Sync" : "Last sync"}</p>
+                  <p className="font-semibold text-praxis-700">{conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <p className="text-praxis-400">{isGerman ? "Status" : "Status"}</p>
+                  <p className="font-semibold text-[#5a8d3a]">● {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}</p>
+                  <p className="text-praxis-400">IBAN</p>
+                  <p className="font-mono font-semibold text-praxis-700">{conn.iban || "—"}</p>
+                  <p className="text-praxis-400">{isGerman ? "TAN-Erneuerung" : "TAN renewal"}</p>
+                  <p className="font-semibold text-praxis-700">{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                </div>
               </div>
             </div>
           ))}
@@ -161,14 +167,6 @@ export default function EinstellungenPage() {
             onChange={(v) => (mahnfristen.eskalation_ab_tag = v)}
           />
         </div>
-        <button
-          className="btn-primary inline-flex items-center gap-2"
-          disabled={saving === "mahnfristen"}
-          onClick={() => save("mahnfristen", { ...mahnfristen })}
-        >
-          <Save size={14} />
-          {saving === "mahnfristen" ? "Speichere…" : "Mahnfristen speichern"}
-        </button>
       </section>
 
       <section className="stat-card space-y-4">
@@ -190,18 +188,10 @@ export default function EinstellungenPage() {
             onChange={(v) => (matching.fuzzy_threshold = v / 100)}
           />
         </div>
-        <button
-          className="btn-primary inline-flex items-center gap-2"
-          disabled={saving === "matching"}
-          onClick={() => save("matching", { ...matching })}
-        >
-          <Save size={14} />
-          {saving === "matching" ? "Speichere…" : "Matching speichern"}
-        </button>
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="text-sm font-semibold text-praxis-700">Benachrichtigungen</h2>
+        <h2 className="ac-section-title">Benachrichtigungen</h2>
         <div className="space-y-2">
           <Toggle
             label="Automatische E-Mail-Mahnungen"
@@ -224,22 +214,15 @@ export default function EinstellungenPage() {
             onChange={(v) => (benachrichtigungen.maria_eskalation = v)}
           />
         </div>
-        <button
-          className="btn-primary inline-flex items-center gap-2"
-          disabled={saving === "benachrichtigungen"}
-          onClick={() => save("benachrichtigungen", { ...benachrichtigungen })}
-        >
-          <Save size={14} />
-          {saving === "benachrichtigungen" ? "Speichere…" : "Benachrichtigungen speichern"}
-        </button>
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="text-sm font-semibold text-praxis-700">{isGerman ? "Rollen & Berechtigungen (Starter)" : "Roles & permissions (starter)"}</h2>
+        <h2 className="ac-section-title">{isGerman ? "Benutzerrechte" : "User permissions"}</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-surface-50">
+                <th className="table-header text-left">{isGerman ? "Benutzer" : "User"}</th>
                 <th className="table-header text-left">{isGerman ? "Rolle" : "Role"}</th>
                 <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
                 <th className="table-header text-left">{isGerman ? "Mahnwesen" : "Dunning"}</th>
@@ -248,19 +231,22 @@ export default function EinstellungenPage() {
             </thead>
             <tbody>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">Admin</td>
+                <td className="table-cell font-semibold text-praxis-700">Dr. Maria Schubert</td>
+                <td className="table-cell"><span className="badge badge-info">Admin</span></td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
               </tr>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Verwaltung" : "Office"}</td>
+                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Sabine (Verwaltung)" : "Sabine (Office)"}</td>
+                <td className="table-cell"><span className="badge badge-warning">{isGerman ? "Verwaltung" : "Office"}</span></td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">✓</td>
                 <td className="table-cell">—</td>
               </tr>
               <tr>
-                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Leser" : "Read-only"}</td>
+                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Empfang" : "Reception"}</td>
+                <td className="table-cell"><span className="badge badge-neutral">{isGerman ? "Lesezugriff" : "Read-only"}</span></td>
                 <td className="table-cell">—</td>
                 <td className="table-cell">—</td>
                 <td className="table-cell">—</td>
@@ -269,6 +255,21 @@ export default function EinstellungenPage() {
           </table>
         </div>
       </section>
+
+      <div>
+        <button
+          className="btn-primary inline-flex items-center gap-2 px-6 py-3"
+          disabled={saving !== null}
+          onClick={async () => {
+            await save("mahnfristen", { ...mahnfristen });
+            await save("matching", { ...matching });
+            await save("benachrichtigungen", { ...benachrichtigungen });
+          }}
+        >
+          <Save size={14} />
+          {isGerman ? "Einstellungen speichern" : "Save settings"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -305,13 +306,17 @@ function Toggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-3 py-2">
+    <label className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-3 py-3">
       <span className="text-sm text-praxis-700">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 rounded-full transition-colors ${checked ? "bg-[#5b4de1]" : "bg-surface-200"}`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`}
+        />
+      </button>
     </label>
   );
 }

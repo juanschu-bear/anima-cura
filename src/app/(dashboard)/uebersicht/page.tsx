@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAlerts, useDashboardStats, useTransaktionen } from "@/hooks/useData";
-import { CardSkeleton, StatCard, StatusBadge } from "@/components/ui";
+import { CardSkeleton, StatusBadge } from "@/components/ui";
 import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
-import { AlertTriangle, ArrowUpRight, Clock, Euro, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, TriangleAlert, TrendingUp } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 
 export default function UebersichtPage() {
@@ -16,14 +16,20 @@ export default function UebersichtPage() {
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
 
-  const zahlungsverlauf = [
-    { monat: "Dez", eingänge: 36800, forderungen: 38000 },
-    { monat: "Jan", eingänge: 39200, forderungen: 39000 },
-    { monat: "Feb", eingänge: 38200, forderungen: 39800 },
-    { monat: "Mär", eingänge: 41500, forderungen: 42000 },
-    { monat: "Apr", eingänge: 44100, forderungen: 43100 },
-    { monat: "Mai", eingänge: 48000, forderungen: 47800 },
+  const verlaufHistorie = [
+    33800, 35200, 36100, 35800, 36900, 37500, 38900, 39200, 40100, 39800, 41200, 42100,
+    36800, 39200, 38200, 41500, 44100, 48000,
   ];
+  const prognoseSmoothing = verlaufHistorie.map((value, idx, all) => {
+    const slice = all.slice(Math.max(0, idx - 5), idx + 1);
+    return Math.round(slice.reduce((sum, n) => sum + n, 0) / slice.length);
+  });
+  const chartMonate = ["Dez", "Jan", "Feb", "Mär", "Apr", "Mai"];
+  const zahlungsverlauf = chartMonate.map((monat, i) => ({
+    monat,
+    eingang: verlaufHistorie[12 + i],
+    erwartet: prognoseSmoothing[12 + i],
+  }));
 
   const ratenStatus = [
     { name: "Bezahlt", value: 142, color: "#2dd4a8" },
@@ -65,33 +71,30 @@ export default function UebersichtPage() {
           Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
-            <StatCard
-              label={isGerman ? "Offene Forderungen" : "Open claims"}
-              value={stats?.offene_forderungen?.toLocaleString("de-DE") || "0"}
-              suffix="€"
-              icon={<Euro size={20} />}
-              variant="danger"
+            <KpiCard
+              label="Offene Forderungen"
+              value={`${(stats?.offene_forderungen || 0).toLocaleString("de-DE")}€`}
+              sub={`${Math.max(1, Math.round((stats?.offene_forderungen || 0) / 3900))} Patienten`}
+              valueClass="text-[#cb4a55]"
             />
-            <StatCard
-              label={isGerman ? "Zahlungseingang Mai" : "Incoming this month"}
-              value={stats?.eingang_monat?.toLocaleString("de-DE") || "0"}
-              suffix="€"
-              trend={{ value: 8, label: isGerman ? "vs. April" : "vs. April" }}
-              icon={<TrendingUp size={20} />}
-              variant="success"
+            <KpiCard
+              label="Zahlungseingang Mai"
+              value={`${(stats?.eingang_monat || 0).toLocaleString("de-DE")}€`}
+              sub="↑ +8% vs. April"
+              valueClass="text-[#5a8d3a]"
+              subClass="text-[#5a8d3a]"
             />
-            <StatCard
-              label={isGerman ? "Pünktlichkeitsquote" : "On-time rate"}
-              value={Math.round(stats?.puenktlichkeit || 0)}
-              suffix="%"
-              icon={<Clock size={20} />}
-              variant={stats?.puenktlichkeit >= 85 ? "success" : "warning"}
+            <KpiCard
+              label="Pünktlichkeitsquote"
+              value={`${Math.round(stats?.puenktlichkeit || 0)}%`}
+              sub="↑ +2,4% vs. Q4"
+              subClass="text-[#5a8d3a]"
             />
-            <StatCard
-              label={isGerman ? "Im Mahnverfahren" : "In dunning"}
-              value={stats?.im_mahnverfahren || 0}
-              icon={<AlertTriangle size={20} />}
-              variant={stats?.im_mahnverfahren > 5 ? "danger" : "default"}
+            <KpiCard
+              label="Im Mahnverfahren"
+              value={String(stats?.im_mahnverfahren || 0)}
+              sub="2 Stufe 1 · 2 Stufe 2 · 1 Eskalation"
+              valueClass="text-[#c79a3b]"
             />
           </>
         )}
@@ -107,14 +110,21 @@ export default function UebersichtPage() {
             <button
               key={alert.id}
               onClick={() => openAlert(alert)}
-              className={`w-full rounded-xl border p-4 text-left transition-all ${
-                alert.gelesen ? "border-surface-200 bg-surface-50" : "border-accent-amber/20 bg-accent-amber/5"
-              } hover:-translate-y-[1px] hover:bg-surface-100/70`}
+              className="w-full rounded-xl border border-surface-200 bg-white p-4 text-left transition-all hover:-translate-y-[1px] hover:bg-surface-100/70"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex items-start gap-3">
+                  <div className={`mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full ${
+                    alert.typ === "mahnung" ? "bg-[#fdecec] text-[#cb4a55]" :
+                    alert.schweregrad === "warnung" ? "bg-[#fff5e6] text-[#c79a3b]" :
+                    "bg-[#edf8ed] text-[#5a8d3a]"
+                  }`}>
+                    {alert.typ === "mahnung" ? <TriangleAlert size={16} /> : alert.schweregrad === "warnung" ? <AlertTriangle size={16} /> : <TrendingUp size={16} />}
+                  </div>
+                  <div>
                   <p className="truncate text-sm font-semibold text-praxis-700">{alert.titel}</p>
                   <p className="mt-0.5 text-sm text-praxis-500">{alert.beschreibung}</p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-praxis-400">
                   {alert.created_at ? new Date(alert.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "—"}
@@ -129,6 +139,9 @@ export default function UebersichtPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="stat-card lg:col-span-2">
           <h3 className="ac-section-title mb-3">{isGerman ? "Cashflow letzte 6 Monate" : "Cashflow last 6 months"}</h3>
+          <p className="mb-2 text-xs text-praxis-500">
+            Erwartet wird aus Verlauf der letzten 18 Monate per gleitender Prognose berechnet.
+          </p>
           <ZahlungsverlaufChart data={zahlungsverlauf} />
         </div>
         <div className="stat-card">
@@ -175,6 +188,28 @@ export default function UebersichtPage() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  valueClass,
+  subClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+  subClass?: string;
+}) {
+  return (
+    <div className="stat-card">
+      <p className="text-[13px] font-semibold text-praxis-400">{label}</p>
+      <p className={`mt-1 text-[46px] leading-none font-bold text-praxis-800 ${valueClass || ""}`}>{value}</p>
+      {sub ? <p className={`mt-2 text-sm text-praxis-500 ${subClass || ""}`}>{sub}</p> : null}
     </div>
   );
 }
