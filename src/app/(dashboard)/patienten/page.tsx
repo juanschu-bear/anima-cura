@@ -34,6 +34,7 @@ export default function PatientenPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
+  const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const { patienten, loading, refetch } = usePatienten(search);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -114,7 +115,7 @@ export default function PatientenPage() {
       </div>
 
       <div className="rounded-card border border-surface-200 bg-white shadow-card">
-        <div className="overflow-x-auto overflow-y-visible">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="bg-surface-50">
@@ -177,7 +178,9 @@ export default function PatientenPage() {
                       raten,
                       router,
                       statusPopoverFor,
+                      statusPopoverPos,
                       setStatusPopoverFor,
+                      setStatusPopoverPos,
                     })}
                   </td>
                 </tr>
@@ -253,7 +256,9 @@ function renderStatusBadge({
   raten,
   router,
   statusPopoverFor,
+  statusPopoverPos,
   setStatusPopoverFor,
+  setStatusPopoverPos,
 }: {
   status: string;
   patientId: string;
@@ -261,7 +266,9 @@ function renderStatusBadge({
   raten: any[];
   router: ReturnType<typeof useRouter>;
   statusPopoverFor: string | null;
+  statusPopoverPos: { left: number; top: number } | null;
   setStatusPopoverFor: Dispatch<SetStateAction<string | null>>;
+  setStatusPopoverPos: Dispatch<SetStateAction<{ left: number; top: number } | null>>;
 }) {
   const mahnrelevant = ["stufe1", "verzug", "eskalation", "abweichung"].includes(status);
 
@@ -273,11 +280,22 @@ function renderStatusBadge({
   const daysLate = dueDate ? Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
   const dueLabel = dueDate ? dueDate.toLocaleDateString("de-DE") : "—";
   const isOpen = statusPopoverFor === patientId;
+  const setPopoverPosition = (el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    const width = 300;
+    const margin = 12;
+    const left = Math.min(rect.left, window.innerWidth - width - margin);
+    const top = rect.bottom + 8;
+    setStatusPopoverPos({ left: Math.max(margin, left), top });
+  };
 
   return (
     <div
       className="relative inline-flex flex-col items-start gap-1"
-      onMouseEnter={() => setStatusPopoverFor(patientId)}
+      onMouseEnter={(e) => {
+        setPopoverPosition(e.currentTarget);
+        setStatusPopoverFor(patientId);
+      }}
       onMouseLeave={() => setStatusPopoverFor((curr) => (curr === patientId ? null : curr))}
     >
       <button
@@ -286,7 +304,10 @@ function renderStatusBadge({
         onClick={(e) => {
           e.stopPropagation();
           if (mahnrelevant) router.push(`/mahnwesen?patient=${patientId}`);
-          else setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
+          else {
+            setPopoverPosition(e.currentTarget);
+            setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
+          }
         }}
       >
         <StatusBadge status={status} />
@@ -296,21 +317,28 @@ function renderStatusBadge({
         className="text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
         onClick={(e) => {
           e.stopPropagation();
+          setPopoverPosition(e.currentTarget);
           setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
         }}
       >
         Details
       </button>
-      {isOpen && (
-        <div className="absolute left-0 top-full z-30 mt-1 min-w-[230px] rounded-lg border border-surface-200 bg-white p-2 text-left text-xs text-praxis-600 shadow-elevated">
+      {isOpen && statusPopoverPos && (
+        <div
+          className="fixed z-[100] w-[300px] rounded-lg border border-surface-200 bg-white p-3 text-left text-sm text-praxis-600 shadow-elevated"
+          style={{ left: statusPopoverPos.left, top: statusPopoverPos.top }}
+          onMouseEnter={() => setStatusPopoverFor(patientId)}
+          onMouseLeave={() => setStatusPopoverFor((curr) => (curr === patientId ? null : curr))}
+        >
           {mahnrelevant ? (
             <>
               <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
               <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
               <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
+              <p className="mt-2 text-xs text-praxis-500">Klick: Mahnwesen öffnen</p>
               <button
                 type="button"
-                className="mt-2 text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
+                className="mt-2 text-sm font-semibold text-[#4b42d6] hover:text-[#392fb8]"
                 onClick={(e) => {
                   e.stopPropagation();
                   router.push(`/mahnwesen?patient=${patientId}`);

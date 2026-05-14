@@ -20,6 +20,9 @@ export default function ZahlungenPage() {
   const { patienten } = usePatienten(patSearch);
   const [syncing, setSyncing] = useState(false);
   const [syncHint, setSyncHint] = useState("");
+  const [statusHelpFor, setStatusHelpFor] = useState<string | null>(null);
+  const [statusHelpPos, setStatusHelpPos] = useState<{ left: number; top: number } | null>(null);
+  const [clientTx, setClientTx] = useState<any[]>([]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -27,12 +30,16 @@ export default function ZahlungenPage() {
     if (status) setStatusFilter(status);
   }, []);
 
+  useEffect(() => {
+    setClientTx(transaktionen);
+  }, [transaktionen]);
+
   const metrics = useMemo(() => {
-    const total = transaktionen.length;
-    const auto = transaktionen.filter((t) => t.matching_status === "auto").length;
-    const unclear = transaktionen.filter((t) => t.matching_status === "unklar" || t.matching_status === "abweichung").length;
+    const total = clientTx.length;
+    const auto = clientTx.filter((t) => t.matching_status === "auto").length;
+    const unclear = clientTx.filter((t) => t.matching_status === "unklar" || t.matching_status === "abweichung").length;
     const today = new Date().toISOString().slice(0, 10);
-    const incomingToday = transaktionen
+    const incomingToday = clientTx
       .filter((t) => t.datum?.slice?.(0, 10) === today)
       .reduce((sum, t) => sum + Number(t.betrag || 0), 0);
 
@@ -43,22 +50,58 @@ export default function ZahlungenPage() {
       incomingToday,
       autoRate: total > 0 ? Math.round((auto / total) * 100) : 0,
     };
-  }, [transaktionen]);
+  }, [clientTx]);
 
   async function handleManualMatch(txId: string, patientId: string) {
+    const selectedPatient = patienten.find((p) => p.id === patientId);
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("transaktionen")
       .update({ matching_status: "manuell", matched_patient_id: patientId, matching_score: 100 })
       .eq("id", txId);
+    if (error) {
+      setSyncHint(isGerman ? "Backend nicht erreichbar - lokal zugeordnet." : "Backend not reachable - assigned locally.");
+    } else {
+      setSyncHint(isGerman ? "Transaktion manuell zugeordnet." : "Transaction assigned manually.");
+    }
+    setClientTx((prev) =>
+      prev.map((tx) =>
+        tx.id === txId
+          ? {
+              ...tx,
+              matching_status: "manuell",
+              matched_patient_id: patientId,
+              matching_score: 100,
+              patients: selectedPatient
+                ? { vorname: selectedPatient.vorname, nachname: selectedPatient.nachname }
+                : tx.patients,
+            }
+          : tx
+      )
+    );
     setMatchModal(null);
     refetch();
   }
 
   async function handleIgnore(txId: string) {
     const supabase = createBrowserClient();
-    await supabase.from("transaktionen").update({ matching_status: "ignoriert" }).eq("id", txId);
+    const { error } = await supabase.from("transaktionen").update({ matching_status: "ignoriert" }).eq("id", txId);
+    if (error) {
+      setSyncHint(isGerman ? "Backend nicht erreichbar - lokal ignoriert." : "Backend not reachable - ignored locally.");
+    } else {
+      setSyncHint(isGerman ? "Transaktion als ignoriert markiert." : "Transaction marked as ignored.");
+    }
+    setClientTx((prev) => prev.map((tx) => (tx.id === txId ? { ...tx, matching_status: "ignoriert" } : tx)));
     refetch();
+  }
+
+  function openStatusHelp(id: string, el: HTMLElement) {
+    const rect = el.getBoundingClientRect();
+    const width = 340;
+    const margin = 12;
+    const left = Math.min(rect.left, window.innerWidth - width - margin);
+    setStatusHelpPos({ left: Math.max(margin, left), top: rect.bottom + 8 });
+    setStatusHelpFor(id);
   }
 
   async function handleBankSync() {
@@ -92,6 +135,7 @@ export default function ZahlungenPage() {
     { key: "abweichung", label: isGerman ? "Abweichung" : "Deviation" },
     { key: "unklar", label: isGerman ? "Unklar" : "Unclear" },
   ];
+  const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
 
   return (
     <div className="space-y-5">
@@ -99,7 +143,7 @@ export default function ZahlungenPage() {
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Zahlungen" : "Payments"}</h1>
           <p className="text-sm text-praxis-400 mt-1">
-            {transaktionen.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
+            {visibleTransactions.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
@@ -128,6 +172,17 @@ export default function ZahlungenPage() {
         ))}
       </div>
 
+      <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+        <p className="font-semibold text-praxis-700 mb-1">{isGerman ? "Status erklärt" : "Status explained"}</p>
+        <p>
+          <span className="font-semibold">{isGerman ? "auto" : "auto"}:</span> {isGerman ? "System hat Zahlung eindeutig zugeordnet." : "System matched transaction with high confidence."}
+          {" · "}
+          <span className="font-semibold">{isGerman ? "abweichung" : "deviation"}:</span> {isGerman ? "Patient passt, Betrag/Zweck weicht ab." : "Patient likely matches, amount/purpose deviates."}
+          {" · "}
+          <span className="font-semibold">{isGerman ? "unklar" : "unclear"}:</span> {isGerman ? "Keine sichere Zuordnung möglich." : "No safe assignment possible."}
+        </p>
+      </div>
+
       <div className="bg-white rounded-card shadow-card border border-surface-200 overflow-hidden">
         <table className="w-full">
           <thead>
@@ -142,7 +197,7 @@ export default function ZahlungenPage() {
             </tr>
           </thead>
           <tbody>
-            {transaktionen.map((tx) => (
+            {visibleTransactions.map((tx) => (
               <tr
                 key={tx.id}
                 className={`hover:bg-surface-50/50 transition-colors ${tx.matched_patient_id ? "cursor-pointer" : ""}`}
@@ -152,9 +207,31 @@ export default function ZahlungenPage() {
                 <td className="table-cell text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
                 <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
                 <td className="table-cell text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
-                <td className="table-cell"><StatusBadge status={tx.matching_status} /></td>
+                <td className="table-cell">
+                  <button
+                    type="button"
+                    className="cursor-help"
+                    onMouseEnter={(e) => openStatusHelp(tx.id, e.currentTarget)}
+                    onFocus={(e) => openStatusHelp(tx.id, e.currentTarget)}
+                    onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+                    onBlur={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+                  >
+                    <StatusBadge status={tx.matching_status} />
+                  </button>
+                </td>
                 <td className="table-cell text-sm text-praxis-600">
-                  {tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : "—"}
+                  {tx.patients && tx.matched_patient_id ? (
+                    <button
+                      type="button"
+                      className="font-medium text-[#4b42d6] hover:text-[#392fb8]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/patienten/${tx.matched_patient_id}`);
+                      }}
+                    >
+                      {tx.patients.nachname}, {tx.patients.vorname}
+                    </button>
+                  ) : "—"}
                 </td>
                 <td className="table-cell">
                   <div className="flex items-center gap-1">
@@ -164,6 +241,7 @@ export default function ZahlungenPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setMatchModal(tx);
+                            setSyncHint(isGerman ? "Bitte Patient für Zuordnung auswählen." : "Select a patient for assignment.");
                           }}
                           type="button"
                           className="p-1.5 text-accent-blue hover:bg-accent-blue/10 rounded-lg transition-colors"
@@ -184,9 +262,9 @@ export default function ZahlungenPage() {
                         </button>
                         {tx.matching_status === "abweichung" && tx.matched_patient_id && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleManualMatch(tx.id, tx.matched_patient_id);
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManualMatch(tx.id, tx.matched_patient_id);
                             }}
                             type="button"
                             className="p-1.5 text-accent-emerald hover:bg-accent-emerald/10 rounded-lg transition-colors"
@@ -204,7 +282,7 @@ export default function ZahlungenPage() {
           </tbody>
         </table>
 
-        {transaktionen.length === 0 && (
+        {visibleTransactions.length === 0 && (
           <EmptyState
             icon={<CreditCard size={24} />}
             title={isGerman ? "Keine Transaktionen" : "No transactions"}
@@ -213,9 +291,44 @@ export default function ZahlungenPage() {
         )}
       </div>
 
+      {statusHelpFor && statusHelpPos && (() => {
+        const tx = visibleTransactions.find((item) => item.id === statusHelpFor) || clientTx.find((item) => item.id === statusHelpFor);
+        if (!tx) return null;
+        const score = tx.matching_score ? `${Math.round(Number(tx.matching_score))}%` : "—";
+        const statusText: Record<string, string> = {
+          auto: isGerman ? "Automatisch zugeordnet (hohe Sicherheit)." : "Auto-assigned (high confidence).",
+          abweichung: isGerman ? "Zuordnung wahrscheinlich, aber Abweichung bei Betrag oder Verwendungszweck." : "Likely match but amount/purpose deviation.",
+          unklar: isGerman ? "Keine sichere Zuordnung gefunden, bitte manuell prüfen." : "No safe match found, requires manual review.",
+          manuell: isGerman ? "Durch Team manuell bestätigt." : "Manually assigned by team.",
+          ignoriert: isGerman ? "Bewusst nicht zugeordnet." : "Deliberately ignored.",
+        };
+        return (
+          <div
+            className="fixed z-[100] w-[340px] rounded-lg border border-surface-200 bg-white p-3 text-sm text-praxis-600 shadow-elevated"
+            style={{ left: statusHelpPos.left, top: statusHelpPos.top }}
+            onMouseEnter={() => setStatusHelpFor(tx.id)}
+            onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
+          >
+            <p className="font-semibold text-praxis-800 mb-1">{isGerman ? "Matching-Status" : "Matching status"}</p>
+            <p>{statusText[tx.matching_status] || tx.matching_status}</p>
+            <p className="mt-2 text-xs text-praxis-500">
+              {isGerman ? "Match-Score" : "Match score"}: {score}
+            </p>
+            <p className="mt-1 text-xs text-praxis-500">
+              {isGerman ? "Aktionen: → manuell zuordnen, × ignorieren, ✓ Vorschlag bestätigen" : "Actions: → assign manually, × ignore, ✓ confirm suggestion"}
+            </p>
+          </div>
+        );
+      })()}
+
       <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={isGerman ? "Transaktion manuell zuordnen" : "Assign transaction manually"} size="lg">
         {matchModal && (
           <div className="space-y-4">
+            <div className="rounded-lg border border-accent-blue/25 bg-accent-blue/5 px-3 py-2 text-sm text-praxis-700">
+              {isGerman
+                ? "Wähle den passenden Patienten aus der Liste. Danach wird die Transaktion direkt übernommen."
+                : "Choose the matching patient from the list. The transaction will be assigned immediately."}
+            </div>
             <div className="bg-surface-50 rounded-lg p-4">
               <p className="text-sm font-medium text-praxis-700">{matchModal.absender_name}</p>
               <p className="text-xs text-praxis-400">{matchModal.verwendungszweck}</p>

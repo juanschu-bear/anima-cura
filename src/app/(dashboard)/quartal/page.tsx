@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
@@ -43,6 +43,7 @@ function KPI({ title, value, sub, accent }: { title: string; value: string; sub?
 export default function QuartalPage() {
   const { locale } = useAppStore();
   const isGerman = locale === "de";
+  const [hoverQuarter, setHoverQuarter] = useState<string | null>(null);
 
   const current = quarterRevenue[quarterRevenue.length - 1]?.value ?? 0;
   const previous = quarterRevenue[quarterRevenue.length - 2]?.value ?? 0;
@@ -99,11 +100,20 @@ export default function QuartalPage() {
             return (
               <div key={row.quartal} className="flex flex-col items-center gap-2">
                 <div className="text-xs text-praxis-400">{Math.round(row.value / 1000)}k€</div>
-                <div className="flex h-[220px] items-end">
+                <div
+                  className="relative flex h-[220px] items-end"
+                  onMouseEnter={() => setHoverQuarter(row.quartal)}
+                  onMouseLeave={() => setHoverQuarter((curr) => (curr === row.quartal ? null : curr))}
+                >
                   <div
                     className={`w-16 rounded-t-xl ${active ? "bg-[#4b42d6]" : "bg-[#c4befb]"}`}
                     style={{ height }}
                   />
+                  {hoverQuarter === row.quartal && (
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 rounded-md border border-surface-200 bg-white px-2 py-1 text-xs text-praxis-700 shadow-card whitespace-nowrap">
+                      {row.quartal}: {formatEuro(row.value)}
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm font-medium text-praxis-500">{row.quartal}</div>
               </div>

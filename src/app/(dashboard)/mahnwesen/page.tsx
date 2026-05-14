@@ -124,6 +124,14 @@ export default function MahnwesenPage() {
         <p className="text-sm text-praxis-400 mt-1">Pipeline, offene Volumen und Eskalationen im Blick</p>
       </div>
 
+      <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+        <p className="font-semibold text-praxis-700 mb-1">Wie die Pipeline arbeitet</p>
+        <p>
+          Fälle werden automatisch aus überfälligen Raten in Stufen eingeteilt: Karenz (1–5 Tage), Stufe 1 (6–20),
+          Stufe 2 (21–42), Eskalation (ab 42 Tagen). Klick auf einen Fall öffnet direkt die Patientendetails.
+        </p>
+      </div>
+
       {patientFilter && (
         <div className="rounded-lg border border-accent-violet/20 bg-accent-violet/5 px-4 py-3 text-sm text-praxis-700">
           Patientenfilter aktiv.{" "}

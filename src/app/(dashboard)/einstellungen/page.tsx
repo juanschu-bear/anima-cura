@@ -82,6 +82,16 @@ export default function EinstellungenPage() {
         </div>
       )}
 
+      <section className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+        <p className="font-semibold text-praxis-700 mb-1">{isGerman ? "Betriebslogik in der Praxis" : "Operational logic in practice"}</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>{isGerman ? "Mahn-Pipeline wird aus überfälligen Raten automatisch berechnet (Karenz, Stufe 1, Stufe 2, Eskalation)." : "Dunning pipeline is automatically derived from overdue installments."}</li>
+          <li>{isGerman ? "Benachrichtigungen/E-Mails steuerst du hier unter „Benachrichtigungen“." : "Notification and email automation is configured in the notifications section below."}</li>
+          <li>{isGerman ? "Bankkonto-Anbindung läuft über finAPI. Bankdaten werden in der Bankverbindung gepflegt." : "Bank account integration runs through finAPI and is managed in bank connections."}</li>
+          <li>{isGerman ? "Rollen & Rechte sind aktuell als Startset hinterlegt und können als nächster Schritt detailliert ausgebaut werden." : "Roles and permissions are currently a starter setup and can be expanded next."}</li>
+        </ul>
+      </section>
+
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2 text-praxis-700">
           <Landmark size={16} />
@@ -222,6 +232,42 @@ export default function EinstellungenPage() {
           <Save size={14} />
           {saving === "benachrichtigungen" ? "Speichere…" : "Benachrichtigungen speichern"}
         </button>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <h2 className="text-sm font-semibold text-praxis-700">{isGerman ? "Rollen & Berechtigungen (Starter)" : "Roles & permissions (starter)"}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-surface-50">
+                <th className="table-header text-left">{isGerman ? "Rolle" : "Role"}</th>
+                <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
+                <th className="table-header text-left">{isGerman ? "Mahnwesen" : "Dunning"}</th>
+                <th className="table-header text-left">{isGerman ? "Einstellungen" : "Settings"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="table-cell font-semibold text-praxis-700">Admin</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+              </tr>
+              <tr>
+                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Verwaltung" : "Office"}</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">—</td>
+              </tr>
+              <tr>
+                <td className="table-cell font-semibold text-praxis-700">{isGerman ? "Leser" : "Read-only"}</td>
+                <td className="table-cell">—</td>
+                <td className="table-cell">—</td>
+                <td className="table-cell">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
