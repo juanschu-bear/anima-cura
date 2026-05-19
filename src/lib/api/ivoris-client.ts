@@ -94,6 +94,7 @@ export async function fetchIvorisDocumentation() {
 }
 
 export async function fetchIvorisPatientsRaw() {
+  console.log("[IVORIS-SYNC] fetchIvorisPatientsRaw called, IVORIS_PATIENTS_PATH=" + (process.env.IVORIS_PATIENTS_PATH || "(default)"));
   const creds = getIvorisCredentials();
   const baseUrl = buildBaseUrl(creds.linkname);
   const path = process.env.IVORIS_PATIENTS_PATH || "/Patient/v1/AllPatients";
