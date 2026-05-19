@@ -3,7 +3,7 @@ import { fetchIvorisPatientsRaw } from "@/lib/api/ivoris-client";
 import { syncIvorisPatients } from "@/lib/services/ivoris-sync";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST() {
   try {
