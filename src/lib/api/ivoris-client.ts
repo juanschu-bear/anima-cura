@@ -130,6 +130,8 @@ export async function fetchIvorisPatientsRaw() {
       }
 
       aggregated.push(...payload);
+      // Throttle: avoid overwhelming the IVORIS relay server
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     return aggregated;
