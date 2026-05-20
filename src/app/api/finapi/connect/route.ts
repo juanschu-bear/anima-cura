@@ -1,164 +1,155 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { getClientToken } from "@/lib/api/finapi-client";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // Vercel Pro
+export const maxDuration = 30;
 
-const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
-const PAGES_PER_BATCH = 10;
+const FINAPI_BASE = process.env.FINAPI_BASE_URL || "https://sandbox.finapi.io";
+const WEBFORM_BASE = FINAPI_BASE.includes("sandbox")
+  ? "https://webform-sandbox.finapi.io"
+  : "https://webform.finapi.io";
+const CLIENT_ID = process.env.FINAPI_CLIENT_ID!;
+const CLIENT_SECRET = process.env.FINAPI_CLIENT_SECRET!;
+const APP_URL = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
 
-async function fetchIvorisPage(page: number) {
-  const app = process.env.IVORIS_APP!;
-  const appVersion = process.env.IVORIS_APP_VERSION!;
-  const apiKey = process.env.IVORIS_API_KEY!;
-  const linkname = process.env.IVORIS_LINKNAME!;
-  const username = process.env.IVORIS_USERNAME!;
-  const password = process.env.IVORIS_PASSWORD!;
-  const baseUrl = `${DEFAULT_RELAY_HOST}/relay/${linkname}/webservice/api`;
-  const basic = Buffer.from(`${username}:${password}`).toString("base64");
+// finAPI User-ID for the practice (deterministic)
+const FINAPI_USER_ID = "anima-cura-praxis";
+const FINAPI_USER_PASSWORD = "Pr4x1s-S3cur3!2026";
+const FINAPI_USER_EMAIL = "praxis@anima-cura.app";
 
-  const url = `${baseUrl}/Patient/v1/AllPatients?app=${encodeURIComponent(app)}&app_version=${encodeURIComponent(appVersion)}&api_key=${encodeURIComponent(apiKey)}&page=${page}`;
+async function ensureFinapiUser(clientToken: string): Promise<string> {
+  // Try to get user token first (user might already exist)
+  try {
+    const tokenRes = await fetch(`${FINAPI_BASE}/api/v2/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "password",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        username: FINAPI_USER_ID,
+        password: FINAPI_USER_PASSWORD,
+      }),
+    });
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Basic ${basic}`, Accept: "application/json" },
-    cache: "no-store",
+    if (tokenRes.ok) {
+      const data = await tokenRes.json();
+      return data.access_token;
+    }
+  } catch {
+    // User doesn't exist yet, create below
+  }
+
+  // Create user
+  const createRes = await fetch(`${FINAPI_BASE}/api/v2/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${clientToken}`,
+    },
+    body: JSON.stringify({
+      id: FINAPI_USER_ID,
+      password: FINAPI_USER_PASSWORD,
+      email: FINAPI_USER_EMAIL,
+    }),
   });
 
-  if (!res.ok) throw new Error(`IVORIS page ${page}: HTTP ${res.status}`);
-  return await res.json();
-}
-
-function mapGender(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const v = raw.toLowerCase();
-  if (["m", "male", "mann", "männlich"].includes(v)) return "m";
-  if (["w", "f", "female", "frau", "weiblich"].includes(v)) return "w";
-  if (["d", "divers", "diverse"].includes(v)) return "d";
-  return null;
-}
-
-function mapInsurance(raw: string | null | undefined): string {
-  if (!raw) return "privat";
-  const v = raw.toLowerCase();
-  if (v.includes("statutory") || v.includes("gesetz") || v.includes("gkv")) return "gesetzlich";
-  return "privat";
-}
-
-function normalizePatient(raw: any) {
-  const ivorisId = raw.Id;
-  if (!ivorisId) return null;
-
-  const treatment = raw.Treatment && typeof raw.Treatment === "object" ? raw.Treatment : null;
-  const currentInsurance = raw.CurrentInsurance && typeof raw.CurrentInsurance === "object" ? raw.CurrentInsurance : null;
-  const address = raw.Address && typeof raw.Address === "object" ? raw.Address : null;
-
-  return {
-    ivoris_id: ivorisId,
-    vorname: raw.Firstname || "",
-    nachname: raw.Lastname || "",
-    geburtsdatum: raw.Birthday ? new Date(raw.Birthday).toISOString().slice(0, 10) : null,
-    geschlecht: mapGender(raw.Gender),
-    kasse: mapInsurance(raw.HealthInsurance),
-    versichertennummer: currentInsurance?.InsuranceNumber || null,
-    behandlung: treatment?.OrthodontistStage || "Unbekannt",
-    behandlung_start: null as string | null,
-    telefon: raw.Phone || raw.Mobile || null,
-    email: raw.Email || null,
-    strasse: address?.Street || null,
-    plz: address?.Zip || null,
-    ort: address?.City || null,
-    land: address?.Country || "DE",
-  };
-}
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const startPage = parseInt(searchParams.get("startPage") || "0", 10);
-  const appUrl = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
-
-  const db = createServerClient();
-  let totalFetched = 0;
-  let totalUpdated = 0;
-  let totalInserted = 0;
-  let totalSkipped = 0;
-  let reachedEnd = false;
-  const errors: string[] = [];
-
-  for (let page = startPage; page < startPage + PAGES_PER_BATCH; page++) {
-    let patients: any[];
-    try {
-      patients = await fetchIvorisPage(page);
-    } catch (e) {
-      errors.push(String(e));
-      continue;
-    }
-
-    if (!Array.isArray(patients) || patients.length === 0) {
-      reachedEnd = true;
-      break;
-    }
-
-    totalFetched += patients.length;
-
-    for (const raw of patients) {
-      const normalized = normalizePatient(raw);
-      if (!normalized) { totalSkipped++; continue; }
-
-      // Check if patient exists
-      const { data: existing } = await db
-        .from("patients")
-        .select("id")
-        .eq("ivoris_id", normalized.ivoris_id)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        // Update
-        const { ivoris_id, ...updateFields } = normalized;
-        const { error } = await db
-          .from("patients")
-          .update(updateFields)
-          .eq("ivoris_id", ivoris_id);
-
-        if (error) {
-          errors.push(`Update ${ivoris_id}: ${error.message}`);
-          totalSkipped++;
-        } else {
-          totalUpdated++;
-        }
-      } else {
-        // Insert
-        const { error } = await db.from("patients").insert(normalized);
-        if (error) {
-          errors.push(`Insert ${normalized.ivoris_id}: ${error.message}`);
-          totalSkipped++;
-        } else {
-          totalInserted++;
-        }
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    // If user already exists (409), try to login again
+    if (createRes.status === 409 || createRes.status === 422) {
+      const retryRes = await fetch(`${FINAPI_BASE}/api/v2/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "password",
+          client_id: CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          username: FINAPI_USER_ID,
+          password: FINAPI_USER_PASSWORD,
+        }),
+      });
+      if (retryRes.ok) {
+        const data = await retryRes.json();
+        return data.access_token;
       }
     }
-
-    // Throttle between pages
-    await new Promise((r) => setTimeout(r, 300));
+    throw new Error(`finAPI User erstellen fehlgeschlagen: ${createRes.status} ${err}`);
   }
 
-  const nextPage = reachedEnd ? null : startPage + PAGES_PER_BATCH;
-
-  // If not done, chain the next batch automatically
-  if (nextPage !== null) {
-    const nextUrl = `${appUrl}/api/ivoris/patients/batch-sync?startPage=${nextPage}`;
-    // Fire and forget — don't await, so this response returns immediately
-    fetch(nextUrl, { cache: "no-store" }).catch(() => {});
-  }
-
-  return NextResponse.json({
-    ok: true,
-    batch: { startPage, pagesProcessed: Math.min(PAGES_PER_BATCH, (reachedEnd ? 93 : startPage + PAGES_PER_BATCH) - startPage) },
-    results: { fetched: totalFetched, updated: totalUpdated, inserted: totalInserted, skipped: totalSkipped },
-    errors: errors.slice(0, 20),
-    done: reachedEnd,
-    nextPage,
-    message: reachedEnd
-      ? `Sync abgeschlossen! ${totalFetched} Patienten verarbeitet.`
-      : `Batch ${startPage}-${startPage + PAGES_PER_BATCH - 1} fertig. Nächster Batch startet automatisch (Seite ${nextPage}).`,
+  // Now get user token
+  const tokenRes = await fetch(`${FINAPI_BASE}/api/v2/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "password",
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      username: FINAPI_USER_ID,
+      password: FINAPI_USER_PASSWORD,
+    }),
   });
+
+  if (!tokenRes.ok) {
+    throw new Error(`finAPI User-Token fehlgeschlagen: ${tokenRes.status}`);
+  }
+
+  const data = await tokenRes.json();
+  return data.access_token;
+}
+
+export async function POST() {
+  try {
+    // Step 1: Get client token
+    const clientToken = await getClientToken();
+
+    // Step 2: Ensure finAPI user exists and get user token
+    const userToken = await ensureFinapiUser(clientToken);
+
+    // Step 3: Create Web Form for bank connection import
+    const webFormRes = await fetch(`${WEBFORM_BASE}/api/webForms/bankConnectionImport`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({
+        accountTypes: ["CHECKING"],
+        callbacks: {
+          finalised: `${APP_URL}/api/finapi/callback`,
+        },
+      }),
+    });
+
+    if (!webFormRes.ok) {
+      const err = await webFormRes.text();
+      throw new Error(`Web Form erstellen fehlgeschlagen: ${webFormRes.status} ${err}`);
+    }
+
+    const webForm = await webFormRes.json();
+
+    // Store the web form ID and user token for later callback processing
+    const db = createServerClient();
+    await db.from("einstellungen").upsert({
+      key: "finapi_user",
+      value: { userId: FINAPI_USER_ID, password: FINAPI_USER_PASSWORD },
+    });
+    await db.from("einstellungen").upsert({
+      key: "finapi_webform_pending",
+      value: { webFormId: webForm.id, createdAt: new Date().toISOString() },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      webFormUrl: webForm.url,
+      webFormId: webForm.id,
+      expiresAt: webForm.expiresAt,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: String(error) },
+      { status: 500 }
+    );
+  }
 }
