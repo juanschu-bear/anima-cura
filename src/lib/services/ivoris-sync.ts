@@ -10,7 +10,7 @@ type NormalizedPatient = {
   geburtsdatum: string;
   kasse: "privat" | "gesetzlich";
   behandlung: string;
-  behandlung_start: string;
+  behandlung_start: string | null;
   geschlecht?: "m" | "w" | "d";
   versichertennummer?: string | null;
   telefon?: string | null;
@@ -83,11 +83,17 @@ function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPa
   const nachname = pickString(raw, ["Lastname", "nachname", "lastName", "lastname", "familyName"]) || "";
   const geburtsdatum =
     parseDate(pickString(raw, ["Birthday", "geburtsdatum", "birthDate", "dateOfBirth", "dob"])) || null;
+
+  // IVORIS liefert Treatment als verschachteltes Objekt: { OrthodontistStage, DentistPractitioner, ... }
+  const treatment = (raw.Treatment && typeof raw.Treatment === "object" ? (raw.Treatment as GenericRecord) : null);
   const behandlung =
-    pickString(raw, ["behandlung", "treatment", "treatmentType", "therapy", "caseType"]) || "KFO";
+    (treatment ? pickString(treatment, ["OrthodontistStage", "DentistPractitioner"]) : null) ||
+    pickString(raw, ["behandlung", "treatmentType", "therapy", "caseType"]) ||
+    null;
+
+  // Kein Default-Datum mehr — lieber null als falsche Daten
   const behandlungStart =
-    parseDate(pickString(raw, ["behandlung_start", "treatmentStart", "caseStart", "startDate"])) ||
-    new Date().toISOString().slice(0, 10);
+    parseDate(pickString(raw, ["behandlung_start", "treatmentStart", "caseStart", "startDate"])) || null;
 
   if (!ivorisId) return { ok: false, reason: "missing ivoris_id" };
   if (!vorname || !nachname) return { ok: false, reason: `missing name for ${ivorisId}` };
@@ -96,18 +102,24 @@ function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPa
   const address = (raw.Address && typeof raw.Address === "object" ? (raw.Address as GenericRecord) : null);
   const insuranceRaw = pickString(raw, ["HealthInsurance", "kasse", "insuranceType", "insurance", "payerType"]);
 
+  // IVORIS liefert CurrentInsurance als verschachteltes Objekt mit InsuranceNumber
+  const currentInsurance = (raw.CurrentInsurance && typeof raw.CurrentInsurance === "object" ? (raw.CurrentInsurance as GenericRecord) : null);
+  const versichertennummer =
+    (currentInsurance ? pickString(currentInsurance, ["InsuranceNumber", "insuranceNumber"]) : null) ||
+    pickString(raw, ["versichertennummer", "insuranceNumber", "insuranceNo"]);
+
   const patient: NormalizedPatient = {
     ivoris_id: ivorisId,
     vorname,
     nachname,
     geburtsdatum,
     kasse: mapInsurance(insuranceRaw),
-    behandlung,
-    behandlung_start: behandlungStart,
-    geschlecht: mapGender(pickString(raw, ["geschlecht", "gender", "sex"])),
-    versichertennummer: pickString(raw, ["versichertennummer", "insuranceNumber", "insuranceNo"]),
+    behandlung: behandlung || "Unbekannt",
+    behandlung_start: behandlungStart || "",
+    geschlecht: mapGender(pickString(raw, ["Gender", "geschlecht", "gender", "sex"])),
+    versichertennummer,
     telefon: pickString(raw, ["Phone", "Mobile", "telefon", "phone", "mobile", "tel"]),
-    email: pickString(raw, ["email", "mail"]),
+    email: pickString(raw, ["Email", "email", "mail"]),
     strasse: address ? pickString(address, ["Street", "strasse", "street", "addressLine1", "address"]) : pickString(raw, ["strasse", "street", "addressLine1", "address"]),
     plz: address ? pickString(address, ["Zip", "zip", "PostalCode", "plz", "postalCode"]) : pickString(raw, ["plz", "zip", "postalCode"]),
     ort: address ? pickString(address, ["City", "ort", "city"]) : pickString(raw, ["ort", "city"]),
