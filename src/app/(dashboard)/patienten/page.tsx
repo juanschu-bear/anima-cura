@@ -35,7 +35,7 @@ export default function PatientenPage() {
   const [search, setSearch] = useState("");
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
-  const { patienten, loading, refetch } = usePatienten(search);
+  const { patienten, totalCount, loading, refetch } = usePatienten(search);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -120,7 +120,7 @@ export default function PatientenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">Patienten</h1>
-          <p className="mt-1 text-sm text-praxis-400">{patienten.length} Patienten gesamt · {totalActive} mit aktiven Ratenplänen</p>
+          <p className="mt-1 text-sm text-praxis-400">{totalCount} Patienten gesamt · {totalActive} mit aktiven Ratenplänen</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing}>
