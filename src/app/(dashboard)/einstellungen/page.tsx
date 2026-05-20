@@ -1,430 +1,389 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import { useBankConnections, useEinstellungen } from "@/hooks/useData";
+import { Save, Settings, Landmark, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Search, Users } from "lucide-react";
-import { usePatienten } from "@/hooks/useData";
-import { EmptyState, Modal, StatusBadge } from "@/components/ui";
-import { createBrowserClient } from "@/lib/db/supabase";
-import { DEMO_TREATMENT_TYPES } from "@/lib/mock-data";
+import { useAppStore } from "@/hooks/useAppStore";
 
-function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
-  const max = Math.min(Math.max(total, 1), 36);
-  return Array.from({ length: max }).map((_, idx) => {
-    const isDone = idx < paid;
-    const isLateMarker = idx === paid && hasOverdue;
-    return (
-      <span
-        key={`pb-${idx}`}
-        className={`h-4 w-4 rounded-[4px] border ${
-          isDone
-            ? "border-[#4ca43f] bg-[#4ca43f]"
-            : isLateMarker
-            ? "border-accent-coral bg-accent-coral"
-            : "border-surface-200 bg-white"
-        }`}
-      />
-    );
-  });
-}
+type JsonRecord = Record<string, any>;
 
-export default function PatientenPage() {
-  const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
-  const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
-  const { patienten, totalCount, loading, refetch } = usePatienten(search);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+export default function EinstellungenPage() {
+  const { locale, theme } = useAppStore();
+  const isGerman = locale === "de";
+  const { settings, loading, updateSetting } = useEinstellungen();
+  const { connections, refetch: refetchConnections } = useBankConnections();
+  const [saving, setSaving] = useState<string | null>(null);
+  const [hint, setHint] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
-  const [syncHint, setSyncHint] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [form, setForm] = useState({
-    vorname: "",
-    nachname: "",
-    geburtsdatum: "",
-    kasse: "privat",
-    behandlung: "",
-    behandlung_start: new Date().toISOString().slice(0, 10),
-    email: "",
-    telefon: "",
-  });
 
-  async function handleCreatePatient() {
-    if (!form.vorname || !form.nachname || !form.geburtsdatum || !form.behandlung) {
-      setErrorMsg("Bitte alle Pflichtfelder ausfuellen.");
-      return;
+  const mahnfristen = useMemo<JsonRecord>(() => settings.mahnfristen || {}, [settings.mahnfristen]);
+  const benachrichtigungen = useMemo<JsonRecord>(
+    () => settings.benachrichtigungen || {},
+    [settings.benachrichtigungen]
+  );
+  const matching = useMemo<JsonRecord>(() => settings.matching || {}, [settings.matching]);
+
+  async function save(key: string, value: JsonRecord) {
+    setSaving(key);
+    setHint("");
+    try {
+      await updateSetting(key, value);
+      setHint("Einstellungen gespeichert.");
+    } catch {
+      setHint("Speichern fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setSaving(null);
     }
-    setSaving(true);
-    setErrorMsg("");
-    const supabase = createBrowserClient();
-    const { error } = await supabase.from("patients").insert({
-      vorname: form.vorname.trim(),
-      nachname: form.nachname.trim(),
-      geburtsdatum: form.geburtsdatum,
-      kasse: form.kasse,
-      behandlung: form.behandlung.trim(),
-      behandlung_start: form.behandlung_start,
-      email: form.email.trim() || null,
-      telefon: form.telefon.trim() || null,
-    });
-
-    setSaving(false);
-    if (error) {
-      setErrorMsg(error.message || "Patient konnte nicht erstellt werden.");
-      return;
-    }
-
-    setCreateOpen(false);
-    setForm({
-      vorname: "",
-      nachname: "",
-      geburtsdatum: "",
-      kasse: "privat",
-      behandlung: "",
-      behandlung_start: new Date().toISOString().slice(0, 10),
-      email: "",
-      telefon: "",
-    });
-    refetch();
   }
 
-  async function handleIvorisSync() {
+  async function runBankSync() {
     setSyncing(true);
-    setSyncHint("");
+    setHint("");
     try {
-      const res = await fetch("/api/ivoris/patients/sync", { method: "POST" });
+      const res = await fetch("/api/finapi/transactions", { method: "POST" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
-        setSyncHint(payload.error || "IVORIS-Sync fehlgeschlagen.");
+        setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
       } else {
-        const result = payload.result || {};
-        setSyncHint(
-          `IVORIS-Sync: ${result.imported ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.skipped ?? 0} übersprungen.`
+        const imported = payload.bankSync?.newTransactions ?? 0;
+        setHint(
+          isGerman
+            ? `Bank-Sync erfolgreich: ${imported} neue Buchungen importiert.`
+            : `Bank sync successful: ${imported} new bookings imported.`
         );
-        refetch();
       }
+      refetchConnections();
     } catch {
-      setSyncHint("IVORIS-Sync fehlgeschlagen.");
+      setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
     } finally {
       setSyncing(false);
     }
   }
 
-  const totalActive = useMemo(() => patienten.filter((p) => (p.raten || []).length > 0).length, [patienten]);
+  if (loading) {
+    return <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>Einstellungen werden geladen…</p>;
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">Patienten</h1>
-          <p className="mt-1 text-sm text-praxis-400">{totalCount} Patienten gesamt · {totalActive} mit aktiven Ratenplänen</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing}>
-            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Synchronisiere..." : "IVORIS Sync"}
-          </button>
-          <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} /> Neuer Patient
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="ac-page-title">Einstellungen</h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
+          {isGerman
+            ? "Regeln fuer Matching, Mahnungen und Benachrichtigungen."
+            : "Rules for matching, reminders, and notifications."}
+        </p>
       </div>
 
-      {syncHint && (
-        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
-          {syncHint}
+      {hint && (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--ac-border)",
+            background: "var(--ac-surface)",
+            color: "var(--ac-text-soft)",
+          }}
+        >
+          {hint}
         </div>
       )}
 
-      <div className="relative max-w-[420px]">
-        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
-        <input
-          type="text"
-          placeholder="Patient suchen (Name)..."
-          className="input pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="rounded-card border border-surface-200 bg-white shadow-card">
-        <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-surface-50">
-              <th className="table-header">Patient</th>
-              <th className="table-header">Behandlung</th>
-              <th className="table-header">Fortschritt</th>
-              <th className="table-header text-right">Rate/Monat</th>
-              <th className="table-header text-right">Restschuld</th>
-              <th className="table-header">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patienten.map((p) => {
-              const raten = p.raten || [];
-              const total = Math.max(raten.length, 1);
-              const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-              const hasOverdue = raten.some((r: any) => r.status === "überfällig");
-              const maxMahn = raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
-              const offene = raten.filter((r: any) => r.status !== "bezahlt");
-              const rest = offene.reduce((s: number, r: any) => s + (r.betrag || 0), 0);
-              const rateMonat = raten[0]?.betrag || 0;
-
-              let status: string = "pünktlich";
-              if (maxMahn >= 3) status = "eskalation";
-              else if (maxMahn === 2) status = "verzug";
-              else if (maxMahn === 1) status = "stufe1";
-              else if (hasOverdue) status = "abweichung";
-
-              return (
-                <tr
-                  key={p.id}
-                  className="cursor-pointer transition-colors hover:bg-surface-50/80"
-                  onClick={() => router.push(`/patienten/${p.id}`)}
-                >
-                  <td className="table-cell">
-                    <Link href={`/patienten/${p.id}`} className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-praxis-100 text-sm font-bold text-praxis-600">
-                        {p.vorname?.[0]}
-                        {p.nachname?.[0]}
-                      </div>
-                      <span className="text-[15px] leading-tight font-semibold text-praxis-800">
-                        {p.nachname}, {p.vorname}
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "KFO"}</td>
-                  <td className="table-cell">
-                    <div className="flex items-center gap-3">
-                      <div className="flex max-w-[360px] flex-wrap gap-1">{progressBlocks(total, bezahlt, hasOverdue)}</div>
-                      <span className="text-sm font-medium text-praxis-400">{bezahlt}/{total}</span>
-                    </div>
-                  </td>
-                  <td className="table-cell text-right text-[18px] font-semibold text-praxis-800">{rateMonat.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell text-right text-[18px] font-semibold text-accent-coral">{rest.toLocaleString("de-DE")}€</td>
-                  <td className="table-cell relative overflow-visible">
-                    {renderStatusBadge({
-                      status,
-                      patientId: p.id,
-                      restschuld: rest,
-                      raten,
-                      router,
-                      statusPopoverFor,
-                      statusPopoverPos,
-                      setStatusPopoverFor,
-                      setStatusPopoverPos,
-                    })}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        </div>
-
-        {patienten.length === 0 && !loading && (
-          <EmptyState
-            icon={<Users size={24} />}
-            title="Keine Patienten gefunden"
-            description={search ? "Versuche einen anderen Suchbegriff." : "Noch keine Patienten angelegt."}
-            action={<button className="btn-primary" onClick={() => setCreateOpen(true)}>Ersten Patienten anlegen</button>}
-          />
-        )}
-      </div>
-
-      <Modal
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setErrorMsg("");
+      <section
+        className="rounded-lg border px-4 py-3 text-sm"
+        style={{
+          borderColor: "var(--ac-border)",
+          background: "var(--ac-surface)",
+          color: "var(--ac-text-soft)",
         }}
-        title="Neuen Patienten anlegen"
       >
+        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Betriebslogik in der Praxis" : "Operational logic in practice"}</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>{isGerman ? "Mahn-Pipeline wird aus überfälligen Raten automatisch berechnet (Karenz, Stufe 1, Stufe 2, Eskalation)." : "Dunning pipeline is automatically derived from overdue installments."}</li>
+          <li>{isGerman ? "Benachrichtigungen/E-Mails steuerst du hier unter „Benachrichtigungen“." : "Notification and email automation is configured in the notifications section below."}</li>
+          <li>{isGerman ? "Bankkonto-Anbindung läuft über finAPI. Bankdaten werden in der Bankverbindung gepflegt." : "Bank account integration runs through finAPI and is managed in bank connections."}</li>
+          <li>{isGerman ? "Rollen & Rechte sind aktuell als Startset hinterlegt und können als nächster Schritt detailliert ausgebaut werden." : "Roles and permissions are currently a starter setup and can be expanded next."}</li>
+        </ul>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
+          <Landmark size={16} />
+          <h2 className="ac-section-title">{isGerman ? "Bankverbindung" : "Bank connection"}</h2>
+        </div>
         <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <FormField label="Vorname *" value={form.vorname} onChange={(value) => setForm((prev) => ({ ...prev, vorname: value }))} />
-            <FormField label="Nachname *" value={form.nachname} onChange={(value) => setForm((prev) => ({ ...prev, nachname: value }))} />
-            <DateField label="Geburtsdatum *" value={form.geburtsdatum} onChange={(value) => setForm((prev) => ({ ...prev, geburtsdatum: value }))} />
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Kasse *</span>
-              <select className="input" value={form.kasse} onChange={(e) => setForm((prev) => ({ ...prev, kasse: e.target.value }))}>
-                <option value="privat">Privat</option>
-                <option value="gesetzlich">Gesetzlich</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Behandlung *</span>
-              <select className="input" value={form.behandlung} onChange={(e) => setForm((prev) => ({ ...prev, behandlung: e.target.value }))}>
-                <option value="">Bitte wählen</option>
-                {DEMO_TREATMENT_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </label>
-
-            <DateField label="Behandlung Start *" value={form.behandlung_start} onChange={(value) => setForm((prev) => ({ ...prev, behandlung_start: value }))} />
-            <FormField label="E-Mail" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
-            <FormField label="Telefon" value={form.telefon} onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))} />
-          </div>
-
-          {errorMsg && <p className="text-sm text-accent-coral">{errorMsg}</p>}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Abbrechen</button>
-            <button className="btn-primary" onClick={handleCreatePatient} disabled={saving}>{saving ? "Speichere..." : "Patient anlegen"}</button>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-function renderStatusBadge({
-  status,
-  patientId,
-  restschuld,
-  raten,
-  router,
-  statusPopoverFor,
-  statusPopoverPos,
-  setStatusPopoverFor,
-  setStatusPopoverPos,
-}: {
-  status: string;
-  patientId: string;
-  restschuld: number;
-  raten: any[];
-  router: ReturnType<typeof useRouter>;
-  statusPopoverFor: string | null;
-  statusPopoverPos: { left: number; top: number } | null;
-  setStatusPopoverFor: Dispatch<SetStateAction<string | null>>;
-  setStatusPopoverPos: Dispatch<SetStateAction<{ left: number; top: number } | null>>;
-}) {
-  const mahnrelevant = ["stufe1", "verzug", "eskalation", "abweichung"].includes(status);
-
-  const ueberfaellig = raten
-    .filter((r) => r.status === "überfällig")
-    .sort((a, b) => new Date(a.faellig_am).getTime() - new Date(b.faellig_am).getTime());
-  const first = ueberfaellig[0];
-  const dueDate = first?.faellig_am ? new Date(first.faellig_am) : null;
-  const daysLate = dueDate ? Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-  const dueLabel = dueDate ? dueDate.toLocaleDateString("de-DE") : "—";
-  const isOpen = statusPopoverFor === patientId;
-  const setPopoverPosition = (el: HTMLElement) => {
-    const rect = el.getBoundingClientRect();
-    const width = 300;
-    const margin = 12;
-    const left = Math.min(rect.left, window.innerWidth - width - margin);
-    const top = rect.bottom + 8;
-    setStatusPopoverPos({ left: Math.max(margin, left), top });
-  };
-
-  return (
-    <div
-      className="relative inline-flex flex-col items-start gap-1"
-      onMouseEnter={(e) => {
-        setPopoverPosition(e.currentTarget);
-        setStatusPopoverFor(patientId);
-      }}
-      onMouseLeave={() => setStatusPopoverFor((curr) => (curr === patientId ? null : curr))}
-    >
-      <button
-        type="button"
-        className="cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (mahnrelevant) router.push(`/mahnwesen?patient=${patientId}`);
-          else {
-            setPopoverPosition(e.currentTarget);
-            setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
-          }
-        }}
-      >
-        <StatusBadge status={status} />
-      </button>
-      <button
-        type="button"
-        className="text-[11px] font-semibold text-[#4b42d6] hover:text-[#392fb8]"
-        onClick={(e) => {
-          e.stopPropagation();
-          setPopoverPosition(e.currentTarget);
-          setStatusPopoverFor((curr) => (curr === patientId ? null : patientId));
-        }}
-      >
-        Details
-      </button>
-      {isOpen && statusPopoverPos && (
-        <div
-          className="fixed z-[100] w-[300px] rounded-lg border border-surface-200 bg-white p-3 text-left text-sm text-praxis-600 shadow-elevated"
-          style={{ left: statusPopoverPos.left, top: statusPopoverPos.top }}
-          onMouseEnter={() => setStatusPopoverFor(patientId)}
-          onMouseLeave={() => setStatusPopoverFor((curr) => (curr === patientId ? null : curr))}
-        >
-          {mahnrelevant ? (
-            <>
-              <p><span className="font-semibold text-praxis-700">Restschuld:</span> {restschuld.toLocaleString("de-DE")}€</p>
-              <p><span className="font-semibold text-praxis-700">Fällig seit:</span> {dueLabel}</p>
-              <p><span className="font-semibold text-praxis-700">Verzugstage:</span> {daysLate}</p>
-              <p className="mt-2 text-xs text-praxis-500">Klick: Mahnwesen öffnen</p>
-              <button
-                type="button"
-                className="mt-2 text-sm font-semibold text-[#4b42d6] hover:text-[#392fb8]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/mahnwesen?patient=${patientId}`);
-                }}
-              >
-                Zu Mahnwesen
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold text-praxis-700">Kein aktiver Mahnfall</p>
-              <p className="mt-1 text-praxis-500">Dieser Patient ist aktuell nicht im Verzug.</p>
-            </>
+          {connections.map((conn) => (
+            <div
+              key={conn.id}
+              className="rounded-xl border p-4 text-sm"
+              style={{
+                borderColor: "var(--ac-border)",
+                background: "var(--ac-surface-muted)",
+                color: "var(--ac-text-soft)",
+              }}
+            >
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2 text-sm">
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Anbieter" : "Provider"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.provider || "finAPI Access"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Bank" : "Bank"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.bank_name}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Letzter Sync" : "Last sync"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Status" : "Status"}</p>
+                  <p className="font-semibold text-[#5a8d3a]">● {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>IBAN</p>
+                  <p className="font-mono font-semibold" style={{ color: "var(--ac-text)" }}>{conn.iban || "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "TAN-Erneuerung" : "TAN renewal"}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {connections.length === 0 && (
+            <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>
+              {isGerman ? "Noch keine Bankverbindung hinterlegt." : "No bank connection configured yet."}
+            </p>
           )}
         </div>
-      )}
+        <div className="flex flex-wrap gap-2">
+          {connections.length === 0 && (
+            <button
+              className="btn-primary inline-flex items-center gap-2"
+              onClick={async () => {
+                const pw = prompt(isGerman ? "Admin-Passwort eingeben:" : "Enter admin password:");
+                if (!pw) return;
+                setSyncing(true);
+                setHint("");
+                try {
+                  const res = await fetch("/api/finapi/connect", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ password: pw }),
+                  });
+                  const data = await res.json();
+                  if (!data.ok) {
+                    setHint(data.error || "Fehler beim Verbinden");
+                    setSyncing(false);
+                    return;
+                  }
+                  // Redirect to finAPI Web Form
+                  window.location.href = data.webFormUrl;
+                } catch (err) {
+                  setHint(String(err));
+                  setSyncing(false);
+                }
+              }}
+              disabled={syncing}
+            >
+              <Landmark size={14} />
+              {syncing ? (isGerman ? "Verbinde…" : "Connecting…") : isGerman ? "Bankkonto verbinden" : "Connect bank account"}
+            </button>
+          )}
+          {connections.length > 0 && (
+            <button className="btn-primary inline-flex items-center gap-2" onClick={runBankSync} disabled={syncing}>
+              <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+              {syncing ? (isGerman ? "Synchronisiere…" : "Syncing…") : isGerman ? "Bank-Sync starten" : "Start bank sync"}
+            </button>
+          )}
+          <Link href="/zahlungen" className="btn-secondary inline-flex items-center gap-2">
+            {isGerman ? "Zu Zahlungseingängen" : "Open payments"}
+          </Link>
+        </div>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
+          <Settings size={16} />
+          <h2 className="ac-section-title">Mahnfristen</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <NumberField
+            label="Karenz (Tage)"
+            value={mahnfristen.karenz_tage ?? 5}
+            onChange={(v) => (mahnfristen.karenz_tage = v)}
+          />
+          <NumberField
+            label="Stufe 1 ab Tag"
+            value={mahnfristen.stufe1_ab_tag ?? 6}
+            onChange={(v) => (mahnfristen.stufe1_ab_tag = v)}
+          />
+          <NumberField
+            label="Stufe 2 ab Tag"
+            value={mahnfristen.stufe2_ab_tag ?? 21}
+            onChange={(v) => (mahnfristen.stufe2_ab_tag = v)}
+          />
+          <NumberField
+            label="Eskalation ab Tag"
+            value={mahnfristen.eskalation_ab_tag ?? 42}
+            onChange={(v) => (mahnfristen.eskalation_ab_tag = v)}
+          />
+        </div>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <h2 className="ac-section-title">Matching</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <NumberField
+            label="Mindestscore"
+            value={matching.min_score ?? 70}
+            onChange={(v) => (matching.min_score = v)}
+          />
+          <NumberField
+            label="Auto-Freigabe ab"
+            value={matching.auto_approve_score ?? 90}
+            onChange={(v) => (matching.auto_approve_score = v)}
+          />
+          <NumberField
+            label="Fuzzy-Schwelle (%)"
+            value={Math.round((matching.fuzzy_threshold ?? 0.7) * 100)}
+            onChange={(v) => (matching.fuzzy_threshold = v / 100)}
+          />
+        </div>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <h2 className="ac-section-title">Benachrichtigungen</h2>
+        <div className="space-y-2">
+          <Toggle
+            label="Automatische E-Mail-Mahnungen"
+            checked={!!benachrichtigungen.auto_email}
+            onChange={(v) => (benachrichtigungen.auto_email = v)}
+            theme={theme}
+          />
+          <Toggle
+            label="Automatische Brief-Mahnungen"
+            checked={!!benachrichtigungen.auto_brief}
+            onChange={(v) => (benachrichtigungen.auto_brief = v)}
+            theme={theme}
+          />
+          <Toggle
+            label="Sabine-Briefing aktiv"
+            checked={!!benachrichtigungen.sabine_briefing}
+            onChange={(v) => (benachrichtigungen.sabine_briefing = v)}
+            theme={theme}
+          />
+          <Toggle
+            label="Maria-Eskalation aktiv"
+            checked={!!benachrichtigungen.maria_eskalation}
+            onChange={(v) => (benachrichtigungen.maria_eskalation = v)}
+            theme={theme}
+          />
+        </div>
+      </section>
+
+      <section className="stat-card space-y-4">
+        <h2 className="ac-section-title">{isGerman ? "Benutzerrechte" : "User permissions"}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: "var(--ac-surface-muted)" }}>
+                <th className="table-header text-left">{isGerman ? "Benutzer" : "User"}</th>
+                <th className="table-header text-left">{isGerman ? "Rolle" : "Role"}</th>
+                <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
+                <th className="table-header text-left">{isGerman ? "Mahnwesen" : "Dunning"}</th>
+                <th className="table-header text-left">{isGerman ? "Einstellungen" : "Settings"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>Dr. Maria Schubert</td>
+                <td className="table-cell"><span className="badge badge-info">Admin</span></td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+              </tr>
+              <tr>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Sabine (Verwaltung)" : "Sabine (Office)"}</td>
+                <td className="table-cell"><span className="badge badge-warning">{isGerman ? "Verwaltung" : "Office"}</span></td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">✓</td>
+                <td className="table-cell">—</td>
+              </tr>
+              <tr>
+                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Empfang" : "Reception"}</td>
+                <td className="table-cell"><span className="badge badge-neutral">{isGerman ? "Lesezugriff" : "Read-only"}</span></td>
+                <td className="table-cell">—</td>
+                <td className="table-cell">—</td>
+                <td className="table-cell">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div>
+        <button
+          className="btn-primary inline-flex items-center gap-2 px-6 py-3"
+          disabled={saving !== null}
+          onClick={async () => {
+            await save("mahnfristen", { ...mahnfristen });
+            await save("matching", { ...matching });
+            await save("benachrichtigungen", { ...benachrichtigungen });
+          }}
+        >
+          <Save size={14} />
+          {isGerman ? "Einstellungen speichern" : "Save settings"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function FormField({
+function NumberField({
   label,
   value,
   onChange,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  value: number;
+  onChange: (value: number) => void;
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-praxis-500">{label}</span>
-      <input className="input" value={value} onChange={(e) => onChange(e.target.value)} />
+      <span className="mb-1 block text-xs font-medium" style={{ color: "var(--ac-text-mute)" }}>{label}</span>
+      <input
+        type="number"
+        className="input"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
     </label>
   );
 }
 
-function DateField({
+function Toggle({
   label,
-  value,
+  checked,
   onChange,
+  theme,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  theme: "light" | "dark";
 }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-praxis-500">{label}</span>
-      <input type="date" className="input" value={value} onChange={(e) => onChange(e.target.value)} />
+    <label
+      className="flex items-center justify-between rounded-lg border px-3 py-3"
+      style={{
+        borderColor: "var(--ac-border)",
+        background: "var(--ac-surface-muted)",
+      }}
+    >
+      <span className="text-sm" style={{ color: "var(--ac-text)" }}>{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 rounded-full transition-colors ${checked ? "bg-[#5b4de1]" : ""}`}
+        style={!checked ? { background: theme === "dark" ? "#2b3447" : "#dfe5ef" } : undefined}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`}
+        />
+      </button>
     </label>
   );
 }
