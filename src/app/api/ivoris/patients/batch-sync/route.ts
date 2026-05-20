@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
 
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
-const PAGES_PER_BATCH = 10;
+const PAGES_PER_BATCH = 100; // All pages in one go - 93 pages × ~2s = ~200s, fits in 300s maxDuration
 
 async function fetchIvorisPage(page: number) {
   const app = process.env.IVORIS_APP!;
@@ -143,12 +143,7 @@ export async function GET(request: Request) {
 
   const nextPage = reachedEnd ? null : startPage + PAGES_PER_BATCH;
 
-  // If not done, chain the next batch automatically
-  if (nextPage !== null) {
-    const nextUrl = `${appUrl}/api/ivoris/patients/batch-sync?startPage=${nextPage}`;
-    // Fire and forget — don't await, so this response returns immediately
-    fetch(nextUrl, { cache: "no-store" }).catch(() => {});
-  }
+  // Done - no chaining needed, all pages processed in one go
 
   return NextResponse.json({
     ok: true,
