@@ -120,7 +120,7 @@ export default function PatientenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">Patienten</h1>
-          <p className="mt-1 text-sm text-praxis-400">Patienten mit aktiven Ratenplänen ({totalActive})</p>
+          <p className="mt-1 text-sm text-praxis-400">{patienten.length} Patienten gesamt · {totalActive} mit aktiven Ratenplänen</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing}>
