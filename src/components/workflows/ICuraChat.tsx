@@ -106,7 +106,6 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         throw new Error(`Server antwortete mit ${res.status}`);
       }
 
-<<<<<<< HEAD
       const text = await res.text();
       // Parse SSE response: extract JSON from "data: {...}" lines
       let data: any;
@@ -126,9 +125,6 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
           throw new Error("Antwort konnte nicht verarbeitet werden.");
         }
       }
-=======
-      const text = await res.text(); let data: any; for (const line of text.split("\n")) { if (line.startsWith("data: ")) { try { data = JSON.parse(line.slice(6)); } catch {} } } if (!data) { try { data = JSON.parse(text); } catch { throw new Error("Antwort konnte nicht verarbeitet werden."); } };
->>>>>>> 6e5c0dc8e04ae9010dafccddd1525539bc07d722
       let response: Message;
       if (data.type === "proposal") {
         response = {
