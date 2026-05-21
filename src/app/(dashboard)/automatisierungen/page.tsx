@@ -28,6 +28,9 @@ import { TestRunDialog } from "@/components/workflows/TestRunDialog";
 import { VersionHistoryDrawer } from "@/components/workflows/VersionHistoryDrawer";
 import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflows/types";
 import { t } from "@/lib/i18n";
+import { AutomationPortalBackground } from "@/components/workflows/AutomationPortalBackground";
+import { useCountUp } from "@/components/workflows/useCountUp";
+import { useTilt } from "@/components/workflows/useTilt";
 
 const SETTING_KEY = "workflows";
 
@@ -347,26 +350,41 @@ export default function AutomatisierungenPage() {
   }
 
   return (
-    <div className="space-y-7">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[30px] font-extrabold tracking-tight" style={{ color: "var(--ac-text)" }}>
-            {t("workflow.title", locale)}
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-            {t("workflow.subtitle", locale)}
-          </p>
-        </div>
-        <button onClick={() => setShowTemplates(true)} className="wf-primary-btn wf-primary-btn-lg">
-          <Plus size={16} /> {t("workflow.new", locale)}
-        </button>
-      </div>
+    <div className="portal-shell">
+      <AutomationPortalBackground />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <KpiCard icon={Zap} label={t("workflow.activeCount", locale)} value={String(activeCount)} hint={`${workflows.length} ${t("workflow.totalCount", locale)}`} accent="var(--ac-primary)" />
-        <KpiCard icon={Activity} label={t("workflow.runsToday", locale)} value={String(runsToday)} hint={t("workflow.last24h", locale)} accent="#5f9339" />
-        <KpiCard icon={AlertOctagon} label={t("workflow.errorsToday", locale)} value={String(errorsToday)} hint={errorsToday === 0 ? t("workflow.stable", locale) : t("workflow.needsReview", locale)} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} />
-      </div>
+      <section className="portal-hero">
+        <div className="portal-hero-eyebrow">
+          <span className="portal-hero-dot" />
+          {t("workflow.title", locale).toUpperCase()} · {t("search.systemActive", locale).toUpperCase()}
+        </div>
+        <h1 className="portal-hero-title">
+          <span className="portal-hero-word">{t("workflow.title", locale)}</span>
+        </h1>
+        <p className="portal-hero-sub">{t("workflow.subtitle", locale)}</p>
+        <div className="portal-hero-actions">
+          <button onClick={() => setShowTemplates(true)} className="portal-cta">
+            <span className="portal-cta-glow" />
+            <Plus size={18} strokeWidth={2.6} />
+            <span>{t("workflow.new", locale)}</span>
+            <span className="portal-cta-shimmer" />
+          </button>
+          <div className="portal-hero-stats">
+            <span><b>{workflows.length}</b> {t("workflow.workflows", locale)}</span>
+            <span className="portal-divider" />
+            <span><b>{runsToday}</b> {t("common.today", locale)}</span>
+            <span className="portal-divider" />
+            <span className="portal-stat-pulse" />
+            <span>{t("search.systemActive", locale)}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="portal-kpis">
+        <PortalKpi icon={Zap}        label={t("workflow.activeCount", locale)} value={activeCount}  hint={`${workflows.length} ${t("workflow.totalCount", locale)}`} accent="#8d86ff" gradient="linear-gradient(135deg, #8d86ff 0%, #b78bff 50%, #4cc9f0 100%)" />
+        <PortalKpi icon={Activity}   label={t("workflow.runsToday", locale)}   value={runsToday}     hint={t("workflow.last24h", locale)} accent="#5f9339" gradient="linear-gradient(135deg, #5f9339 0%, #7afff5 100%)" />
+        <PortalKpi icon={AlertOctagon} label={t("workflow.errorsToday", locale)} value={errorsToday}  hint={errorsToday === 0 ? t("workflow.stable", locale) : t("workflow.needsReview", locale)} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} gradient={errorsToday === 0 ? "linear-gradient(135deg, #5f9339 0%, #4cc9f0 100%)" : "linear-gradient(135deg, #cb4f56 0%, #ff8da1 100%)"} />
+      </section>
 
       {persistError && (
         <div className="wf-persist-error">
@@ -378,8 +396,8 @@ export default function AutomatisierungenPage() {
         </div>
       )}
 
-      <div className="wf-list-toolbar">
-        <div className="wf-search">
+      <div className="portal-toolbar">
+        <div className="wf-search portal-search">
           <Search size={14} />
           <input
             placeholder={t("workflow.searchPlaceholder", locale)}
@@ -387,94 +405,44 @@ export default function AutomatisierungenPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
-          {filtered.length} {t("workflow.workflows", locale)}
+        <div className="portal-count">
+          {filtered.length} <span>{t("workflow.workflows", locale)}</span>
         </div>
       </div>
 
-      <div className="wf-list">
+      <div className="portal-list">
         {filtered.length === 0 && (
-          <div className="wf-empty">
-            <Sparkles size={20} style={{ color: "var(--ac-primary)" }} />
+          <div className="portal-empty">
+            <div className="portal-empty-orb"><Sparkles size={22} /></div>
             <h3>{t("workflow.emptyTitle", locale)}</h3>
             <p>{t("workflow.emptyDesc", locale)}</p>
-            <button onClick={() => setShowTemplates(true)} className="wf-primary-btn">
+            <button onClick={() => setShowTemplates(true)} className="portal-cta portal-cta-sm">
               <Plus size={14} /> {t("workflow.create", locale)}
             </button>
           </div>
         )}
 
-        {filtered.map((w) => {
+        {filtered.map((w, idx) => {
           const nodeCount = w.nodes.length;
           const triggerNode = w.nodes.find((n) => n.type === "trigger");
           const triggerLabel = triggerSummary(triggerNode, locale);
           return (
-            <div key={w.id} className="wf-card" onClick={() => setEditingId(w.id)} role="button" tabIndex={0}>
-              <div className="wf-card-left">
-                <div className={`wf-status-dot ${w.active ? "wf-status-on" : "wf-status-off"}`} />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="wf-card-title">{w.name}</h3>
-                    {w.active && (
-                      <span className="wf-badge wf-badge-on">
-                        <span className="wf-pulse" /> {t("common.active", locale)}
-                      </span>
-                    )}
-                  </div>
-                  {w.description && <p className="wf-card-desc">{w.description}</p>}
-                  <div className="wf-card-meta">
-                    <span className="wf-meta-chip"><Zap size={11} /> {triggerLabel}</span>
-                    <span className="wf-meta-chip"><CircleDot size={11} /> {nodeCount} {nodeCount === 1 ? t("common.node", locale) : t("common.nodes", locale)}</span>
-                    <span className="wf-meta-chip"><Activity size={11} /> {w.runsToday ?? 0} {t("common.today", locale)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="wf-card-right" onClick={(e) => e.stopPropagation()}>
-                <Link
-                  href={`/automatisierungen/${w.id}/runs`}
-                  className="wf-iconbtn"
-                  title={t("workflow.viewHistory", locale)}
-                >
-                  <History size={15} />
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => updateWorkflow(w.id, { active: !w.active })}
-                  className={`wf-toggle wf-toggle-sm ${w.active ? "wf-toggle-on" : ""}`}
-                  aria-pressed={w.active}
-                  title={w.active ? t("common.deactivate", locale) : t("common.activate", locale)}
-                >
-                  <span className="wf-toggle-dot" />
-                </button>
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setMenuOpenId(menuOpenId === w.id ? null : w.id)}
-                    className="wf-iconbtn"
-                  >
-                    <MoreHorizontal size={16} />
-                  </button>
-                  {menuOpenId === w.id && (
-                    <div className="wf-menu" onMouseLeave={() => setMenuOpenId(null)}>
-                      <button onClick={() => { setEditingId(w.id); setMenuOpenId(null); }}>
-                        <Power size={13} /> {t("common.open", locale)}
-                      </button>
-                      <Link href={`/automatisierungen/${w.id}/runs`} className="block">
-                        <History size={13} /> {t("common.history", locale)}
-                      </Link>
-                      <button onClick={() => duplicateWorkflow(w.id)}>
-                        <Copy size={13} /> {t("common.duplicate", locale)}
-                      </button>
-                      <button onClick={() => deleteWorkflow(w.id)} className="wf-menu-danger">
-                        <Trash2 size={13} /> {t("common.delete", locale)}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <PortalWorkflowCard
+              key={w.id}
+              index={idx}
+              workflow={w}
+              triggerLabel={triggerLabel}
+              nodeCount={nodeCount}
+              locale={locale}
+              menuOpen={menuOpenId === w.id}
+              onClick={() => setEditingId(w.id)}
+              onToggleMenu={() => setMenuOpenId(menuOpenId === w.id ? null : w.id)}
+              onCloseMenu={() => setMenuOpenId(null)}
+              onToggleActive={() => updateWorkflow(w.id, { active: !w.active })}
+              onDuplicate={() => duplicateWorkflow(w.id)}
+              onDelete={() => deleteWorkflow(w.id)}
+              onOpen={() => { setEditingId(w.id); setMenuOpenId(null); }}
+            />
           );
         })}
       </div>
@@ -486,29 +454,124 @@ export default function AutomatisierungenPage() {
   );
 }
 
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  icon: any;
-  label: string;
-  value: string;
-  hint: string;
-  accent: string;
-}) {
+function PortalKpi({ icon: Icon, label, value, hint, accent, gradient }: { icon: any; label: string; value: number; hint: string; accent: string; gradient: string }) {
+  const ref = useTilt<HTMLDivElement>(6);
+  const animated = useCountUp(value);
   return (
-    <div className="wf-kpi">
-      <div className="wf-kpi-icon" style={{ background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>
-        <Icon size={16} strokeWidth={2.4} />
+    <div ref={ref} className="portal-kpi" style={{ ["--kpi-accent" as any]: accent, ["--kpi-gradient" as any]: gradient } as any}>
+      <div className="portal-kpi-inner">
+        <div className="portal-kpi-shine" />
+        <div className="portal-kpi-head">
+          <div className="portal-kpi-icon"><Icon size={16} strokeWidth={2.4} /></div>
+          <span className="portal-kpi-label">{label}</span>
+        </div>
+        <div className="portal-kpi-value">{animated}</div>
+        <div className="portal-kpi-hint">{hint}</div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="wf-kpi-label">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <span className="wf-kpi-value">{value}</span>
-          <span className="wf-kpi-hint">{hint}</span>
+    </div>
+  );
+}
+
+const NODE_KIND_ACCENT: Record<string, string> = {
+  trigger: "#c8942d",
+  condition: "#3b6fb8",
+  action_email: "#5f9339",
+  action_whatsapp: "#3f9772",
+  action_alert: "#cb4f56",
+  action_mahnstufe: "#d27130",
+  action_scoring: "#7a52d6",
+  action_wait: "#6b7d99",
+};
+
+function PortalWorkflowCard({ workflow: w, index, triggerLabel, nodeCount, locale, menuOpen, onClick, onToggleMenu, onCloseMenu, onToggleActive, onDuplicate, onDelete, onOpen }: any) {
+  const ref = useTilt<HTMLDivElement>(4);
+  return (
+    <div
+      ref={ref}
+      className={`portal-card ${w.active ? "portal-card-active" : ""}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      style={{ animationDelay: `${index * 0.07}s` } as any}
+    >
+      <div className="portal-card-inner">
+        <div className="portal-card-shine" />
+        <div className="portal-card-left">
+          <div className={`portal-card-orb ${w.active ? "portal-card-orb-on" : ""}`}>
+            <span className="portal-card-orb-ring" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="portal-card-title">{w.name}</h3>
+              {w.active && (
+                <span className="portal-card-badge">
+                  <span className="wf-pulse" /> {t("common.active", locale)}
+                </span>
+              )}
+            </div>
+            {w.description && <p className="portal-card-desc">{w.description}</p>}
+            <div className="portal-card-meta">
+              <span className="portal-chip"><Zap size={11} /> {triggerLabel}</span>
+              <span className="portal-chip"><CircleDot size={11} /> {nodeCount} {nodeCount === 1 ? t("common.node", locale) : t("common.nodes", locale)}</span>
+              <span className="portal-chip"><Activity size={11} /> {w.runsToday ?? 0} {t("common.today", locale)}</span>
+            </div>
+            <div className="portal-card-strip" aria-hidden>
+              {w.nodes.slice(0, 8).map((n: any, i: number) => (
+                <span
+                  key={i}
+                  className="portal-strip-node"
+                  style={{ background: NODE_KIND_ACCENT[n.type as string] || "#9caac0" }}
+                  title={n.type}
+                />
+              ))}
+              {w.nodes.length > 8 && <span className="portal-strip-more">+{w.nodes.length - 8}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="portal-card-right" onClick={(e) => e.stopPropagation()}>
+          <Link
+            href={`/automatisierungen/${w.id}/runs`}
+            className="wf-iconbtn"
+            title={t("workflow.viewHistory", locale)}
+          >
+            <History size={15} />
+          </Link>
+          <button
+            type="button"
+            onClick={onToggleActive}
+            className={`wf-toggle wf-toggle-sm ${w.active ? "wf-toggle-on" : ""}`}
+            aria-pressed={w.active}
+            title={w.active ? t("common.deactivate", locale) : t("common.activate", locale)}
+          >
+            <span className="wf-toggle-dot" />
+          </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={onToggleMenu}
+              className="wf-iconbtn"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && (
+              <div className="wf-menu" onMouseLeave={onCloseMenu}>
+                <button onClick={onOpen}>
+                  <Power size={13} /> {t("common.open", locale)}
+                </button>
+                <Link href={`/automatisierungen/${w.id}/runs`} className="block">
+                  <History size={13} /> {t("common.history", locale)}
+                </Link>
+                <button onClick={onDuplicate}>
+                  <Copy size={13} /> {t("common.duplicate", locale)}
+                </button>
+                <button onClick={onDelete} className="wf-menu-danger">
+                  <Trash2 size={13} /> {t("common.delete", locale)}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
