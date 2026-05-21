@@ -1,1 +1,9 @@
 sync-all-patients.mjs
+
+# Next.js
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Dependencies
+node_modules/
