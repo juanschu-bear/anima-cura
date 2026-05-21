@@ -6,10 +6,11 @@ import { ArrowLeft } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 export default function PatientDetailPage() {
   const params = useParams();
-  const { theme } = useAppStore();
+  const { theme, locale } = useAppStore();
   const { patient, loading } = usePatient(params.id as string);
 
   if (loading) {
@@ -21,7 +22,7 @@ export default function PatientDetailPage() {
     );
   }
 
-  if (!patient) return <p className="text-praxis-400">Patient nicht gefunden.</p>;
+  if (!patient) return <p className="text-praxis-400">{t("patients.notFound", locale)}</p>;
 
   const raten = (patient.raten || []).sort((a: any, b: any) => a.rate_nummer - b.rate_nummer);
   const totalRaten = Math.max(raten.length, 1);
@@ -42,28 +43,28 @@ export default function PatientDetailPage() {
 
   const mahnStageMeta: Record<string, { label: string; border: string; glow: string; badgeBg: string; badgeText: string }> = {
     stufe1: {
-      label: "Im Mahnsystem: Stufe 1",
+      label: t("detail.mahnStage1", locale),
       border: "#d8a33a",
       glow: theme === "dark" ? "0 0 0 1px rgba(216, 163, 58, 0.6), 0 0 24px rgba(216, 163, 58, 0.2)" : "0 0 0 1px rgba(216, 163, 58, 0.42), 0 0 16px rgba(216, 163, 58, 0.12)",
       badgeBg: theme === "dark" ? "rgba(216, 163, 58, 0.18)" : "#fdf4df",
       badgeText: "#b57f1f",
     },
     verzug: {
-      label: "Im Mahnsystem: Stufe 2 (Verzug)",
+      label: t("detail.mahnStage2", locale),
       border: "#c16f2a",
       glow: theme === "dark" ? "0 0 0 1px rgba(193, 111, 42, 0.64), 0 0 24px rgba(193, 111, 42, 0.24)" : "0 0 0 1px rgba(193, 111, 42, 0.4), 0 0 16px rgba(193, 111, 42, 0.12)",
       badgeBg: theme === "dark" ? "rgba(193, 111, 42, 0.18)" : "#fdeedc",
       badgeText: "#b6662a",
     },
     eskalation: {
-      label: "Im Mahnsystem: Eskalation",
+      label: t("detail.mahnEsc", locale),
       border: "#cb4f56",
       glow: theme === "dark" ? "0 0 0 1px rgba(203, 79, 86, 0.68), 0 0 28px rgba(203, 79, 86, 0.28)" : "0 0 0 1px rgba(203, 79, 86, 0.44), 0 0 18px rgba(203, 79, 86, 0.14)",
       badgeBg: theme === "dark" ? "rgba(203, 79, 86, 0.2)" : "#fde9ed",
       badgeText: "#bc4558",
     },
     abweichung: {
-      label: "Im Mahnsystem: Abweichung erkannt",
+      label: t("detail.mahnDeviation", locale),
       border: "#c8942d",
       glow: theme === "dark" ? "0 0 0 1px rgba(200, 148, 45, 0.62), 0 0 22px rgba(200, 148, 45, 0.22)" : "0 0 0 1px rgba(200, 148, 45, 0.38), 0 0 14px rgba(200, 148, 45, 0.12)",
       badgeBg: theme === "dark" ? "rgba(200, 148, 45, 0.2)" : "#fdf4df",
@@ -85,7 +86,7 @@ export default function PatientDetailPage() {
     <div className="space-y-6">
       <Link href="/patienten" className="inline-flex items-center gap-2 text-sm font-semibold text-[#5d4fd8] hover:text-[#4c40be]">
         <ArrowLeft size={15} />
-        Zurück zur Liste
+        {t("patients.backToList", locale)}
       </Link>
 
       <div
@@ -124,27 +125,27 @@ export default function PatientDetailPage() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-5 text-sm md:grid-cols-3">
-          <Info label="IVORIS-Nr." value={patient.ivoris_nummer || "—"} />
-          <Info label="Geburtsdatum" value={formatDate(patient.geburtsdatum)} />
-          <Info label="Geschlecht" value={patient.geschlecht === "w" ? "Weiblich" : patient.geschlecht === "m" ? "Männlich" : patient.geschlecht === "d" ? "Divers" : "—"} />
-          <Info label="Behandlung" value={patient.behandlung || "Kein Status"} />
-          <Info label="Versicherung" value={
-            patient.versicherung_status === "Family" ? "Familienversichert (GKV)" :
-            patient.versicherung_status === "Statutory" ? "Gesetzlich (GKV)" :
-            patient.versicherung_status === "Private" ? "Privat (PKV)" :
-            patient.versicherung_status === "Retired" ? "Rentner (GKV)" :
-            patient.kasse === "gesetzlich" ? "Gesetzlich" : "Privat"
+          <Info label={t("detail.ivorisNr", locale)} value={patient.ivoris_nummer || "—"} />
+          <Info label={t("detail.birthdate", locale)} value={formatDate(patient.geburtsdatum, locale)} />
+          <Info label={t("detail.gender", locale)} value={patient.geschlecht === "w" ? t("detail.female", locale) : patient.geschlecht === "m" ? t("detail.male", locale) : patient.geschlecht === "d" ? t("detail.diverse", locale) : "—"} />
+          <Info label={t("detail.treatment", locale)} value={patient.behandlung || t("detail.noStatus", locale)} />
+          <Info label={t("detail.insurance", locale)} value={
+            patient.versicherung_status === "Family" ? t("insurance.familyGKV", locale) :
+            patient.versicherung_status === "Statutory" ? t("insurance.statutoryGKV", locale) :
+            patient.versicherung_status === "Private" ? t("insurance.privatePKV", locale) :
+            patient.versicherung_status === "Retired" ? t("insurance.retiredGKV", locale) :
+            patient.kasse === "gesetzlich" ? t("insurance.statutory", locale) : t("insurance.private", locale)
           } />
-          <Info label="Versichertennr." value={patient.versichertennummer || "—"} mono />
+          <Info label={t("detail.insuranceNr", locale)} value={patient.versichertennummer || "—"} mono />
           {patient.versicherter_vorname && patient.versicherter_nachname &&
             (patient.versicherter_vorname !== patient.vorname || patient.versicherter_nachname !== patient.nachname) ? (
-            <Info label="Versicherungsnehmer" value={`${patient.versicherter_vorname} ${patient.versicherter_nachname}`} />
+            <Info label={t("detail.insuredPerson", locale)} value={`${patient.versicherter_vorname} ${patient.versicherter_nachname}`} />
           ) : null}
-          <Info label="Patient seit" value={formatDate(patient.versicherung_seit)} />
-          <Info label="Telefon" value={patient.telefon || "—"} />
-          <Info label="Mobil" value={patient.mobiltelefon || "—"} />
-          <Info label="E-Mail" value={patient.email || "—"} />
-          <Info label="Adresse" value={
+          <Info label={t("detail.patientSince", locale)} value={formatDate(patient.versicherung_seit, locale)} />
+          <Info label={t("detail.phone", locale)} value={patient.telefon || "—"} />
+          <Info label={t("detail.mobile", locale)} value={patient.mobiltelefon || "—"} />
+          <Info label={t("detail.email", locale)} value={patient.email || "—"} />
+          <Info label={t("detail.address", locale)} value={
             [patient.strasse, [patient.plz, patient.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"
           } />
         </div>
@@ -157,10 +158,10 @@ export default function PatientDetailPage() {
               color: "var(--ac-text-soft)",
             }}
           >
-            <span className="font-bold" style={{ color: "var(--ac-text)" }}>Mahnstatus aktiv.</span>{" "}
-            Dieser Patient befindet sich aktuell im Mahnsystem. Prüfe den Fall im Bereich{" "}
+            <span className="font-bold" style={{ color: "var(--ac-text)" }}>{t("detail.mahnNoteBold", locale)}</span>{" "}
+            {t("detail.mahnNote", locale)}{" "}
             <Link href={`/mahnwesen?patient=${patient.id}`} className="font-bold text-[#5d4fd8] hover:text-[#4c40be]">
-              Mahnwesen
+              {t("detail.dunningLink", locale)}
             </Link>
             .
           </div>
@@ -168,13 +169,13 @@ export default function PatientDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <MetricCard label="Monatliche Rate" value={`${monatlicheRate.toLocaleString("de-DE")}€`} />
-        <MetricCard label="Fortschritt" value={`${bezahlt} / ${totalRaten} Raten`} sub={`${progressPct}% abgeschlossen`} />
-        <MetricCard label="Restschuld" value={`${restschuld.toLocaleString("de-DE")}€`} accent />
+        <MetricCard label={t("detail.monthlyRate", locale)} value={`${monatlicheRate.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} />
+        <MetricCard label={t("detail.progressLabel", locale)} value={`${bezahlt} / ${totalRaten}`} sub={`${progressPct}% ${t("detail.completed", locale)}`} />
+        <MetricCard label={t("detail.remainingDebt", locale)} value={`${restschuld.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} accent />
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Ratenplan</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("detail.ratePlan", locale)}</h3>
         <div className="flex max-w-[760px] flex-wrap gap-1.5">
           {Array.from({ length: totalRaten }).map((_, idx) => {
             const rate = raten[idx];
@@ -195,29 +196,29 @@ export default function PatientDetailPage() {
           })}
         </div>
         <div className="mt-3 flex flex-wrap gap-5 text-sm text-praxis-500">
-          <Legend color="bg-[#4ca43f]" label="Bezahlt" />
-          <Legend color="bg-accent-coral" label="Überfällig" />
-          <Legend color="bg-white border border-surface-200" label="Ausstehend" />
+          <Legend color="bg-[#4ca43f]" label={t("detail.paid", locale)} />
+          <Legend color="bg-accent-coral" label={t("detail.overdue", locale)} />
+          <Legend color="bg-white border border-surface-200" label={t("detail.pending", locale)} />
         </div>
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Zahlungshistorie</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("detail.paymentHistory", locale)}</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-surface-50">
-                <th className="table-header">Datum</th>
-                <th className="table-header text-right">Betrag</th>
-                <th className="table-header">Status</th>
+                <th className="table-header">{t("detail.dateHeader", locale)}</th>
+                <th className="table-header text-right">{t("detail.amount", locale)}</th>
+                <th className="table-header">{t("detail.statusHeader", locale)}</th>
               </tr>
             </thead>
             <tbody>
               {history.map((h: any) => (
                 <tr key={h.id} className="hover:bg-surface-50/70">
-                  <td className="table-cell text-base text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am)}</td>
+                  <td className="table-cell text-base text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am, locale)}</td>
                   <td className="table-cell text-right text-[24px] font-extrabold text-[#4ca43f]">
-                    {(h.bezahlt_betrag || h.betrag || 0).toLocaleString("de-DE")}€
+                    {(h.bezahlt_betrag || h.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€
                   </td>
                   <td className="table-cell">
                     <StatusBadge status="auto" />
@@ -227,7 +228,7 @@ export default function PatientDetailPage() {
               {history.length === 0 && (
                 <tr>
                   <td className="table-cell text-sm text-praxis-400" colSpan={3}>
-                    Noch keine verbuchten Zahlungen vorhanden.
+                    {t("detail.noPayments", locale)}
                   </td>
                 </tr>
               )}
@@ -281,9 +282,9 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function formatDate(input?: string | null) {
+function formatDate(input?: string | null, locale: string = "de") {
   if (!input) return "—";
   const time = new Date(input).getTime();
   if (Number.isNaN(time)) return "—";
-  return new Date(input).toLocaleDateString("de-DE");
+  return new Date(input).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE");
 }

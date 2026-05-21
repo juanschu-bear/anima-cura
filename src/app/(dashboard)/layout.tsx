@@ -21,16 +21,17 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { useRouter } from "next/navigation";
+import { t } from "@/lib/i18n";
 
 const NAV_ITEMS = [
-  { href: "/uebersicht", icon: LayoutDashboard, labelDe: "Übersicht", labelEn: "Overview" },
-  { href: "/zahlungen", icon: CreditCard, labelDe: "Zahlungen", labelEn: "Payments" },
-  { href: "/patienten", icon: Users, labelDe: "Patienten", labelEn: "Patients" },
-  { href: "/ratenplan", icon: CalendarRange, labelDe: "Ratenpläne", labelEn: "Installments" },
-  { href: "/mahnwesen", icon: AlertTriangle, labelDe: "Mahnwesen", labelEn: "Dunning" },
-  { href: "/quartal", icon: BarChart3, labelDe: "Quartalsbericht", labelEn: "Quarterly" },
-  { href: "/automatisierungen", icon: Zap, labelDe: "Automatisierungen", labelEn: "Automations" },
-  { href: "/einstellungen", icon: Settings, labelDe: "Einstellungen", labelEn: "Settings" },
+  { href: "/uebersicht", icon: LayoutDashboard, key: "nav.overview" },
+  { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
+  { href: "/patienten", icon: Users, key: "nav.patients" },
+  { href: "/ratenplan", icon: CalendarRange, key: "nav.rateplans" },
+  { href: "/mahnwesen", icon: AlertTriangle, key: "nav.dunning" },
+  { href: "/quartal", icon: BarChart3, key: "nav.quarterly" },
+  { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
+  { href: "/einstellungen", icon: Settings, key: "nav.settings" },
 ];
 
 export default function DashboardLayout({
@@ -96,7 +97,7 @@ export default function DashboardLayout({
                 className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
               >
                 <Icon size={18} />
-                {isGerman ? item.labelDe : item.labelEn}
+                {t(item.key, locale)}
               </Link>
             );
           })}
@@ -111,7 +112,7 @@ export default function DashboardLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Dr. Elena Schubert</p>
-              <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{isGerman ? "Praxisleitung" : "Practice Owner"}</p>
+              <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{t("header.practiceOwner", locale)}</p>
             </div>
             <button className={`${theme === "dark" ? "text-white/65 hover:text-white" : "text-praxis-400 hover:text-praxis-600"} transition-colors`}>
               <LogOut size={16} />
@@ -128,7 +129,7 @@ export default function DashboardLayout({
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
               <input
                 className="input pl-9"
-                placeholder={isGerman ? "Patient suchen..." : "Search patient..."}
+                placeholder={t("search.placeholder", locale)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
                     const val = (e.target as HTMLInputElement).value.trim();
@@ -144,7 +145,7 @@ export default function DashboardLayout({
                 type="button"
                 className="ac-chip"
                 onClick={() => setLocale(isGerman ? "en" : "de")}
-                title={isGerman ? "Auf Englisch wechseln" : "Switch to German"}
+                title={t("header.toggleLanguage", locale)}
               >
                 <Languages size={13} />
                 {isGerman ? "DE" : "EN"}
@@ -153,14 +154,14 @@ export default function DashboardLayout({
                 type="button"
                 className="ac-chip"
                 onClick={toggleTheme}
-                title={theme === "light" ? "Dark Mode" : "Light Mode"}
+                title={t("header.toggleTheme", locale)}
               >
                 {theme === "light" ? <Moon size={13} /> : <Sun size={13} />}
                 {theme === "light" ? "Dark" : "Light"}
               </button>
               <span className="hidden md:inline-flex items-center gap-2 text-xs text-praxis-400">
                 <span className="h-2 w-2 rounded-full bg-accent-emerald" />
-                {isGerman ? "System aktiv" : "System active"}
+                {t("header.systemActive", locale)}
               </span>
               <button className={`relative rounded-xl border p-2 transition-colors ${
                 theme === "dark"

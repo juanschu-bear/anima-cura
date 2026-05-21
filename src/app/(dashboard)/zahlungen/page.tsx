@@ -7,11 +7,11 @@ import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { ArrowRight, Check, CreditCard, Search, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 export default function ZahlungenPage() {
   const router = useRouter();
   const { locale, theme } = useAppStore();
-  const isGerman = locale === "de";
 
   const [statusFilter, setStatusFilter] = useState("alle");
   const { transaktionen, refetch } = useTransaktionen({ status: statusFilter });
@@ -60,9 +60,9 @@ export default function ZahlungenPage() {
       .update({ matching_status: "manuell", matched_patient_id: patientId, matching_score: 100 })
       .eq("id", txId);
     if (error) {
-      setSyncHint(isGerman ? "Backend nicht erreichbar - lokal zugeordnet." : "Backend not reachable - assigned locally.");
+      setSyncHint(t("payments.manualMatchedLocal", locale));
     } else {
-      setSyncHint(isGerman ? "Transaktion manuell zugeordnet." : "Transaction assigned manually.");
+      setSyncHint(t("payments.manualMatched", locale));
     }
     setClientTx((prev) =>
       prev.map((tx) =>
@@ -87,9 +87,9 @@ export default function ZahlungenPage() {
     const supabase = createBrowserClient();
     const { error } = await supabase.from("transaktionen").update({ matching_status: "ignoriert" }).eq("id", txId);
     if (error) {
-      setSyncHint(isGerman ? "Backend nicht erreichbar - lokal ignoriert." : "Backend not reachable - ignored locally.");
+      setSyncHint(t("payments.ignoredMarkedLocal", locale));
     } else {
-      setSyncHint(isGerman ? "Transaktion als ignoriert markiert." : "Transaction marked as ignored.");
+      setSyncHint(t("payments.ignoredMarked", locale));
     }
     setClientTx((prev) => prev.map((tx) => (tx.id === txId ? { ...tx, matching_status: "ignoriert" } : tx)));
     refetch();
@@ -103,9 +103,9 @@ export default function ZahlungenPage() {
       .update({ matching_status: "auto", matching_score: Math.max(Number(tx.matching_score || 0), 90) })
       .eq("id", tx.id);
     if (error) {
-      setSyncHint(isGerman ? "Backend nicht erreichbar - Vorschlag lokal bestätigt." : "Backend not reachable - suggestion confirmed locally.");
+      setSyncHint(t("payments.suggestionConfirmedLocal", locale));
     } else {
-      setSyncHint(isGerman ? "Vorschlag bestätigt und automatisch übernommen." : "Suggestion confirmed and auto-assigned.");
+      setSyncHint(t("payments.suggestionConfirmed", locale));
     }
     setClientTx((prev) =>
       prev.map((row) =>
@@ -137,29 +137,25 @@ export default function ZahlungenPage() {
       const res = await fetch("/api/finapi/transactions", { method: "POST" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
-        setSyncHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
+        setSyncHint(t("payments.syncFailed", locale));
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
         const auto = payload.matching?.auto ?? 0;
-        setSyncHint(
-          isGerman
-            ? `${imported} neue Buchungen importiert, ${auto} automatisch zugeordnet.`
-            : `${imported} new transactions imported, ${auto} auto-assigned.`
-        );
+        setSyncHint(t("payments.syncImported", locale, { imported, auto }));
       }
       refetch();
     } catch {
-      setSyncHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
+      setSyncHint(t("payments.syncFailed", locale));
     } finally {
       setSyncing(false);
     }
   }
 
   const filters = [
-    { key: "alle", label: isGerman ? "Alle" : "All" },
-    { key: "auto", label: isGerman ? "Automatisch" : "Automatic" },
-    { key: "abweichung", label: isGerman ? "Abweichung" : "Deviation" },
-    { key: "unklar", label: isGerman ? "Unklar" : "Unclear" },
+    { key: "alle", label: t("payments.filter.all", locale) },
+    { key: "auto", label: t("payments.filter.auto", locale) },
+    { key: "abweichung", label: t("payments.filter.deviation", locale) },
+    { key: "unklar", label: t("payments.filter.unclear", locale) },
   ];
   const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
 
@@ -175,28 +171,25 @@ export default function ZahlungenPage() {
     if (tx.matching_status !== "abweichung") return null;
     const expected = getExpectedAmount(tx);
     if (expected === null) {
-      return isGerman
-        ? "Abweichung bei Betrag oder Verwendungszweck"
-        : "Deviation in amount or purpose";
+      return t("payments.deviationAmount", locale);
     }
     const diff = Number(tx.betrag || 0) - expected;
     const sign = diff > 0 ? "+" : "";
-    return isGerman
-      ? `Erwartet ${expected.toLocaleString("de-DE")}€ · Differenz ${sign}${diff.toLocaleString("de-DE")}€`
-      : `Expected ${expected.toLocaleString("de-DE")}€ · Delta ${sign}${diff.toLocaleString("de-DE")}€`;
+    const dl = locale === "en" ? "en-GB" : "de-DE";
+    return t("payments.expectedDiff", locale, { expected: expected.toLocaleString(dl), sign, diff: diff.toLocaleString(dl) });
   }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="ac-page-title">{isGerman ? "Zahlungen" : "Payments"}</h1>
+          <h1 className="ac-page-title">{t("payments.title", locale)}</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-            {visibleTransactions.length} {isGerman ? "Transaktionen" : "transactions"} · {metrics.unclear} {isGerman ? "offen" : "open"}
+            {visibleTransactions.length} {t("payments.transactions", locale)} · {metrics.unclear} {t("payments.open", locale)}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
-          {syncing ? (isGerman ? "Synchronisiere..." : "Syncing...") : isGerman ? "Bank-Sync starten" : "Start bank sync"}
+          {syncing ? t("payments.syncing", locale) : t("payments.bankSync", locale)}
         </button>
       </div>
 
@@ -214,10 +207,10 @@ export default function ZahlungenPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label={isGerman ? "Eingänge heute" : "Incoming today"} value={`${metrics.incomingToday.toLocaleString("de-DE")}€`} green theme={theme} />
-        <MetricCard label={isGerman ? "Auto-zugeordnet" : "Auto-assigned"} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${isGerman ? "Trefferquote" : "match rate"}`} theme={theme} />
-        <MetricCard label={isGerman ? "Manuell prüfen" : "Needs review"} value={String(metrics.unclear)} amber theme={theme} />
-        <MetricCard label={isGerman ? "Transaktionen gesamt" : "Total transactions"} value={String(metrics.total)} sub={isGerman ? "Letzte 5 Tage" : "Last 5 days"} theme={theme} />
+        <MetricCard label={t("payments.incomingToday", locale)} value={`${metrics.incomingToday.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} green theme={theme} />
+        <MetricCard label={t("payments.autoAssigned", locale)} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${t("payments.matchRate", locale)}`} theme={theme} />
+        <MetricCard label={t("payments.needsReview", locale)} value={String(metrics.unclear)} amber theme={theme} />
+        <MetricCard label={t("payments.totalTransactions", locale)} value={String(metrics.total)} sub={t("payments.last5days", locale)} theme={theme} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -240,13 +233,13 @@ export default function ZahlungenPage() {
           color: "var(--ac-text-soft)",
         }}
       >
-        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Status erklärt" : "Status explained"}</p>
+        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.statusExplained", locale)}</p>
         <p>
-          <span className="font-semibold">{isGerman ? "automatisch" : "automatic"}:</span> {isGerman ? "System hat Zahlung eindeutig zugeordnet." : "System matched transaction with high confidence."}
+          <span className="font-semibold">{t("payments.status.automatic", locale)}:</span> {t("payments.status.automaticDesc", locale)}
           {" · "}
-          <span className="font-semibold">{isGerman ? "abweichung" : "deviation"}:</span> {isGerman ? "Patient passt, Betrag/Zweck weicht ab." : "Patient likely matches, amount/purpose deviates."}
+          <span className="font-semibold">{t("payments.status.deviation", locale)}:</span> {t("payments.status.deviationDesc", locale)}
           {" · "}
-          <span className="font-semibold">{isGerman ? "unklar" : "unclear"}:</span> {isGerman ? "Keine sichere Zuordnung möglich." : "No safe assignment possible."}
+          <span className="font-semibold">{t("payments.status.unclear", locale)}:</span> {t("payments.status.unclearDesc", locale)}
         </p>
       </div>
       <div
@@ -257,10 +250,8 @@ export default function ZahlungenPage() {
           color: "var(--ac-text-mute)",
         }}
       >
-        <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
-        {isGerman
-          ? "→ öffnet manuelle Zuordnung, × markiert als ignoriert, ✓ bestätigt den bestehenden Vorschlag."
-          : "→ opens manual assignment, × marks as ignored, ✓ confirms existing suggestion."}
+        <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.actions", locale)}</span>{" "}
+        {t("payments.actionsDesc", locale)}
       </div>
 
       <div
@@ -274,13 +265,13 @@ export default function ZahlungenPage() {
         <table className="w-full">
           <thead>
             <tr style={{ background: "var(--ac-surface-muted)" }}>
-              <th className="table-header">Datum</th>
-              <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
-              <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
-              <th className="table-header">{isGerman ? "Verwendungszweck" : "Purpose"}</th>
-              <th className="table-header">Status</th>
-              <th className="table-header">{isGerman ? "Zuordnung" : "Assignment"}</th>
-              <th className="table-header">{isGerman ? "Aktionen" : "Actions"}</th>
+              <th className="table-header">{t("payments.date", locale)}</th>
+              <th className="table-header">{t("payments.sender", locale)}</th>
+              <th className="table-header text-right">{t("payments.amount", locale)}</th>
+              <th className="table-header">{t("payments.purpose", locale)}</th>
+              <th className="table-header">{t("payments.status", locale)}</th>
+              <th className="table-header">{t("payments.assignment", locale)}</th>
+              <th className="table-header">{t("payments.actionsHeader", locale)}</th>
             </tr>
           </thead>
           <tbody>
@@ -296,9 +287,9 @@ export default function ZahlungenPage() {
                 }}
                 onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
               >
-                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
                 <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{tx.absender_name}</td>
-                <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
+                <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>{tx.verwendungszweck || "—"}</td>
                 <td className="table-cell py-3">
                   <div className="flex flex-col items-start gap-1">
@@ -340,11 +331,11 @@ export default function ZahlungenPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setMatchModal(tx);
-                        setSyncHint(isGerman ? "Bitte Patient für Zuordnung auswählen." : "Select a patient for assignment.");
+                        setSyncHint(t("payments.selectPatient", locale));
                       }}
                       type="button"
                       className="rounded-lg p-1.5 text-accent-blue transition-colors hover:bg-accent-blue/10"
-                      title={isGerman ? "Manuell zuordnen" : "Manual assign"}
+                      title={t("payments.manualAssign", locale)}
                     >
                       <ArrowRight size={14} />
                     </button>
@@ -356,7 +347,7 @@ export default function ZahlungenPage() {
                       type="button"
                       className="rounded-lg p-1.5 text-praxis-400 transition-colors hover:bg-surface-100"
                       style={{ color: theme === "dark" ? "#8fa2bf" : undefined }}
-                      title={isGerman ? "Ignorieren" : "Ignore"}
+                      title={t("payments.ignore", locale)}
                     >
                       <X size={14} />
                     </button>
@@ -366,17 +357,13 @@ export default function ZahlungenPage() {
                         if (tx.matched_patient_id) {
                           handleConfirmSuggestion(tx);
                         } else {
-                          setSyncHint(
-                            isGerman
-                              ? "Bitte zuerst über → einem Patienten zuordnen."
-                              : "Please assign to a patient first using →."
-                          );
+                          setSyncHint(t("payments.assignFirst", locale));
                           setMatchModal(tx);
                         }
                       }}
                       type="button"
                       className="rounded-lg p-1.5 text-accent-emerald transition-colors hover:bg-accent-emerald/10"
-                      title={isGerman ? "Vorschlag bestätigen / als automatisch markieren" : "Confirm suggestion / mark as automatic"}
+                      title={t("payments.confirmSuggestion", locale)}
                     >
                       <Check size={14} />
                     </button>
@@ -393,15 +380,13 @@ export default function ZahlungenPage() {
               <CreditCard size={28} style={{ color: "var(--ac-text-mute)" }} />
             </div>
             <h3 className="text-lg font-bold" style={{ color: "var(--ac-text)" }}>
-              {isGerman ? "Keine Transaktionen vorhanden" : "No transactions yet"}
+              {t("payments.noTransactions", locale)}
             </h3>
             <p className="mt-2 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-              {isGerman
-                ? "Sobald die Bankverbindung aktiv ist, werden Zahlungseingänge automatisch importiert und mit Patientenraten abgeglichen."
-                : "Once the bank connection is active, incoming payments will be automatically imported and matched with patient installments."}
+              {t("payments.noTransactionsDesc", locale)}
             </p>
             <a href="/einstellungen" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ac-primary)" }}>
-              {isGerman ? "Bankverbindung einrichten →" : "Set up bank connection →"}
+              {t("payments.setupBank", locale)}
             </a>
           </div>
         )}
@@ -410,32 +395,30 @@ export default function ZahlungenPage() {
       {/* Rücklastschriften */}
       <div className="stat-card">
         <h3 className="mb-2 text-xl font-bold" style={{ color: "var(--ac-text)" }}>
-          {isGerman ? "Rücklastschriften" : "Chargebacks"}
+          {t("payments.chargebacks", locale)}
         </h3>
         <p className="mb-4 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-          {isGerman
-            ? "Rücklastschriften werden automatisch erkannt wenn ein Patient eine Lastschrift zurückholt. Negative Buchungen auf dem Praxiskonto lösen sofort einen Alert aus."
-            : "Chargebacks are detected automatically when a patient reverses a direct debit. Negative transactions trigger an immediate alert."}
+          {t("payments.chargebacksDesc", locale)}
         </p>
         {clientTx.filter(tx => Number(tx.betrag || 0) < 0).length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr style={{ background: "var(--ac-surface-muted)" }}>
-                  <th className="table-header">Datum</th>
-                  <th className="table-header">{isGerman ? "Patient" : "Patient"}</th>
-                  <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
-                  <th className="table-header">{isGerman ? "Grund" : "Reason"}</th>
-                  <th className="table-header">{isGerman ? "Bankgebühr" : "Bank fee"}</th>
+                  <th className="table-header">{t("payments.date", locale)}</th>
+                  <th className="table-header">{t("payments.chargebacks.patient", locale)}</th>
+                  <th className="table-header text-right">{t("payments.amount", locale)}</th>
+                  <th className="table-header">{t("payments.chargebacks.reason", locale)}</th>
+                  <th className="table-header">{t("payments.chargebacks.bankFee", locale)}</th>
                 </tr>
               </thead>
               <tbody>
                 {clientTx.filter(tx => Number(tx.betrag || 0) < 0).map((tx) => (
                   <tr key={tx.id}>
-                    <td className="table-cell text-sm">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                    <td className="table-cell text-sm">{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
                     <td className="table-cell text-sm font-semibold">{tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : tx.absender_name || "—"}</td>
-                    <td className="table-cell text-right text-sm font-bold" style={{ color: "var(--ac-danger)" }}>{Number(tx.betrag).toLocaleString("de-DE")}€</td>
-                    <td className="table-cell text-sm">{tx.verwendungszweck || "Lastschriftrückgabe"}</td>
+                    <td className="table-cell text-right text-sm font-bold" style={{ color: "var(--ac-danger)" }}>{Number(tx.betrag).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
+                    <td className="table-cell text-sm">{tx.verwendungszweck || t("payments.chargebacks.defaultReason", locale)}</td>
                     <td className="table-cell text-sm" style={{ color: "var(--ac-warning)" }}>+3,50€</td>
                   </tr>
                 ))}
@@ -445,9 +428,7 @@ export default function ZahlungenPage() {
         ) : (
           <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface-muted)" }}>
             <p className="text-sm font-medium" style={{ color: "var(--ac-text-mute)" }}>
-              {isGerman
-                ? "Keine Rücklastschriften erkannt. Dieser Bereich wird automatisch befüllt sobald die Bankverbindung aktiv ist."
-                : "No chargebacks detected. This section fills automatically once the bank connection is active."}
+              {t("payments.noChargebacks", locale)}
             </p>
           </div>
         )}
@@ -459,16 +440,17 @@ export default function ZahlungenPage() {
         const score = tx.matching_score ? `${Math.round(Number(tx.matching_score))}%` : "—";
         const expected = getExpectedAmount(tx);
         const delta = expected === null ? null : Number(tx.betrag || 0) - expected;
+        const dl = locale === "en" ? "en-GB" : "de-DE";
         const deltaLabel =
           delta === null
             ? null
-            : `${delta > 0 ? "+" : ""}${delta.toLocaleString("de-DE")}€`;
+            : `${delta > 0 ? "+" : ""}${delta.toLocaleString(dl)}€`;
         const statusText: Record<string, string> = {
-          auto: isGerman ? "Automatisch zugeordnet (hohe Sicherheit)." : "Auto-assigned (high confidence).",
-          abweichung: isGerman ? "Zuordnung wahrscheinlich, aber Abweichung bei Betrag oder Verwendungszweck." : "Likely match but amount/purpose deviation.",
-          unklar: isGerman ? "Keine sichere Zuordnung gefunden, bitte manuell prüfen." : "No safe match found, requires manual review.",
-          manuell: isGerman ? "Durch Team manuell bestätigt." : "Manually assigned by team.",
-          ignoriert: isGerman ? "Bewusst nicht zugeordnet." : "Deliberately ignored.",
+          auto: t("payments.status.auto", locale),
+          abweichung: t("payments.status.deviationLong", locale),
+          unklar: t("payments.status.unclearLong", locale),
+          manuell: t("payments.status.manuell", locale),
+          ignoriert: t("payments.status.ignoriert", locale),
         };
         return (
           <div
@@ -484,55 +466,47 @@ export default function ZahlungenPage() {
             onMouseLeave={() => setStatusHelpFor((curr) => (curr === tx.id ? null : curr))}
             role="tooltip"
           >
-            <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Matching-Status" : "Matching status"}</p>
+            <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltipMatchingStatus", locale)}</p>
             <p>{statusText[tx.matching_status] || tx.matching_status}</p>
             <p className="mt-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Match-Score" : "Match score"}:</span> {score}
+              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltip.matchScore", locale)}:</span> {score}
             </p>
             <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-              {isGerman
-                ? "Aussage: Vertrauenswert von 0-100 für die automatische Zuordnung (Name, Betrag und Verwendungszweck)."
-                : "Meaning: confidence value from 0-100 for automatic assignment (name, amount, and payment purpose)."}
+              {t("payments.tooltip.matchScoreMeaning", locale)}
             </p>
             {tx.matching_status === "abweichung" && (
               <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-                <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Abweichung" : "Deviation"}:</span>{" "}
+                <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltip.deviation", locale)}:</span>{" "}
                 {expected === null
-                  ? isGerman
-                    ? "Betrag oder Zweck weicht vom erwarteten Ratenmuster ab."
-                    : "Amount or purpose deviates from expected installment pattern."
-                  : isGerman
-                  ? `Erwartet ${expected.toLocaleString("de-DE")}€, eingegangen ${Number(tx.betrag || 0).toLocaleString("de-DE")}€ (${deltaLabel}).`
-                  : `Expected ${expected.toLocaleString("de-DE")}€, received ${Number(tx.betrag || 0).toLocaleString("de-DE")}€ (${deltaLabel}).`}
+                  ? t("payments.tooltip.deviationGeneric", locale)
+                  : t("payments.tooltip.deviationSpecific", locale, { expected: expected.toLocaleString(dl), received: Number(tx.betrag || 0).toLocaleString(dl), delta: deltaLabel || "" })}
               </p>
             )}
             <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Aktionen:" : "Actions:"}</span>{" "}
-              {isGerman ? "→ manuell zuordnen, × ignorieren, ✓ Vorschlag bestätigen" : "→ assign manually, × ignore, ✓ confirm suggestion"}
+              <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.actions", locale)}</span>{" "}
+              {t("payments.tooltip.actionsHint", locale)}
             </p>
           </div>
         );
       })()}
 
-      <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={isGerman ? "Transaktion manuell zuordnen" : "Assign transaction manually"} size="lg">
+      <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={t("payments.modalTitle", locale)} size="lg">
         {matchModal && (
           <div className="space-y-4">
             <div className="rounded-lg border border-accent-blue/25 bg-accent-blue/5 px-3 py-2 text-sm" style={{ color: "var(--ac-text)" }}>
-              {isGerman
-                ? "Wähle den passenden Patienten aus der Liste. Danach wird die Transaktion direkt übernommen."
-                : "Choose the matching patient from the list. The transaction will be assigned immediately."}
+              {t("payments.modalIntro", locale)}
             </div>
             <div className="rounded-lg p-4" style={{ background: "var(--ac-surface-muted)" }}>
               <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{matchModal.absender_name}</p>
               <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{matchModal.verwendungszweck}</p>
-              <p className="mt-1 text-lg font-bold" style={{ color: "var(--ac-text)" }}>{matchModal.betrag?.toLocaleString("de-DE")} €</p>
+              <p className="mt-1 text-lg font-bold" style={{ color: "var(--ac-text)" }}>{matchModal.betrag?.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} €</p>
             </div>
 
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
               <input
                 type="text"
-                placeholder={isGerman ? "Patient suchen..." : "Search patient..."}
+                placeholder={t("search.placeholder", locale)}
                 className="input pl-9"
                 value={patSearch}
                 onChange={(e) => setPatSearch(e.target.value)}
@@ -557,7 +531,7 @@ export default function ZahlungenPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{p.nachname}, {p.vorname}</p>
-                    <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{(p.raten || []).filter((r: any) => r.status === "offen").length} {isGerman ? "offene Raten" : "open rates"}</p>
+                    <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{(p.raten || []).filter((r: any) => r.status === "offen").length} {t("payments.openRates", locale)}</p>
                   </div>
                   <ArrowRight size={14} style={{ color: "var(--ac-text-mute)" }} />
                 </button>

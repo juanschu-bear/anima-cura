@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { t } from "@/lib/i18n";
 
 interface QuartalData {
   totalPatienten: number;
@@ -29,7 +30,6 @@ function KPI({ title, value, sub, accent }: { title: string; value: string; sub?
 
 export default function QuartalPage() {
   const { locale } = useAppStore();
-  const isGerman = locale === "de";
   const [data, setData] = useState<QuartalData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,30 +95,30 @@ export default function QuartalPage() {
     fetch();
   }, []);
 
-  if (loading) return <div className="text-praxis-400">Lade Quartalsdaten...</div>;
-  if (!data) return <div className="text-praxis-400">Keine Daten verfügbar.</div>;
+  if (loading) return <div className="text-praxis-400">{t("quarterly.loading", locale)}</div>;
+  if (!data) return <div className="text-praxis-400">{t("quarterly.noData", locale)}</div>;
 
   const maxBeh = Math.max(...data.behandlungSplit.map(b => b.patients), 1);
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
+        <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{t("quarterly.title", locale)}</h1>
         <p className="mt-1 text-sm text-praxis-400">
-          {isGerman ? "Praxiskennzahlen auf Basis der aktuellen Patientendaten" : "Practice KPIs based on current patient data"}
+          {t("quarterly.subtitle", locale)}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPI title={isGerman ? "Patienten gesamt" : "Total patients"} value={String(data.totalPatienten)} />
-        <KPI title={isGerman ? "Kinder (unter 18)" : "Children (under 18)"} value={String(data.kinderCount)} sub={`${data.erwachseneCount} Erwachsene`} />
-        <KPI title={isGerman ? "Erreichbarkeit E-Mail" : "Email reachability"} value={`${Math.round((data.mitEmail / data.totalPatienten) * 100)}%`} sub={`${data.mitEmail} von ${data.totalPatienten}`} accent={data.mitEmail / data.totalPatienten > 0.5 ? "green" : "red"} />
-        <KPI title={isGerman ? "Erreichbarkeit Telefon" : "Phone reachability"} value={`${Math.round((data.mitTelefon / data.totalPatienten) * 100)}%`} sub={`${data.mitTelefon} Festnetz, ${data.mitMobil} Mobil`} accent={data.mitTelefon / data.totalPatienten > 0.5 ? "green" : "red"} />
+        <KPI title={t("quarterly.totalPatients", locale)} value={String(data.totalPatienten)} />
+        <KPI title={t("quarterly.children", locale)} value={String(data.kinderCount)} sub={`${data.erwachseneCount} ${t("quarterly.adultsSuffix", locale)}`} />
+        <KPI title={t("quarterly.emailReach", locale)} value={`${Math.round((data.mitEmail / data.totalPatienten) * 100)}%`} sub={`${data.mitEmail} ${t("quarterly.outOf", locale)} ${data.totalPatienten}`} accent={data.mitEmail / data.totalPatienten > 0.5 ? "green" : "red"} />
+        <KPI title={t("quarterly.phoneReach", locale)} value={`${Math.round((data.mitTelefon / data.totalPatienten) * 100)}%`} sub={t("quarterly.landlineMobile", locale, { l: data.mitTelefon, m: data.mitMobil })} accent={data.mitTelefon / data.totalPatienten > 0.5 ? "green" : "red"} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="stat-card">
-          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Versicherungsverteilung" : "Insurance distribution"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{t("quarterly.insuranceDist", locale)}</h3>
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <div className="h-[220px] w-full md:w-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -146,7 +146,7 @@ export default function QuartalPage() {
         </div>
 
         <div className="stat-card">
-          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Behandlungsstatus" : "Treatment status"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{t("quarterly.treatmentStatus", locale)}</h3>
           <div className="space-y-4">
             {data.behandlungSplit.map((row) => {
               const width = Math.max(10, Math.round((row.patients / maxBeh) * 100));
@@ -167,11 +167,9 @@ export default function QuartalPage() {
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-3 text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Hinweis" : "Note"}</h3>
+        <h3 className="mb-3 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("quarterly.note", locale)}</h3>
         <p className="text-sm text-praxis-500">
-          {isGerman
-            ? "Finanzkennzahlen (Umsatz, Ausfallquote, durchschnittliche Raten) werden verfügbar sobald Ratenpläne angelegt und die Bankverbindung eingerichtet sind."
-            : "Financial KPIs (revenue, default rate, average installments) will be available once rate plans are created and the bank connection is set up."}
+          {t("quarterly.financialNote", locale)}
         </p>
       </div>
     </div>

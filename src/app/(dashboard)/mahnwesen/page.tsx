@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useRef, DragEvent } from "react";
 import Link from "next/link";
 import { AlertTriangle, Mail, Phone, Shield, GripVertical, Info } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 interface MahnItem {
   id: string;
@@ -20,12 +22,14 @@ interface MahnItem {
 
 type StufeKey = "karenz" | "stufe1" | "stufe2" | "stufe3";
 
-const STUFEN: { key: StufeKey; title: string; icon: any; borderClass: string; desc: string }[] = [
-  { key: "karenz", title: "Karenz (1-5 Tage)", icon: Shield, borderClass: "border-l-surface-300", desc: "Automatische Wartezeit. Keine Aktion nötig." },
-  { key: "stufe1", title: "Stufe 1 (6-20 Tage)", icon: Mail, borderClass: "border-l-accent-amber", desc: "Freundliche E-Mail-Erinnerung wird automatisch versendet." },
-  { key: "stufe2", title: "Stufe 2 (21-42 Tage)", icon: Phone, borderClass: "border-l-accent-coral", desc: "Formelles Schreiben + Telefonat-Aufgabe erstellt." },
-  { key: "stufe3", title: "Eskalation (42+)", icon: AlertTriangle, borderClass: "border-l-red-800", desc: "Fall wird an Praxisleitung eskaliert." },
-];
+function getStufen(locale: string): { key: StufeKey; title: string; icon: any; borderClass: string; desc: string }[] {
+  return [
+    { key: "karenz", title: t("dunning.grace", locale), icon: Shield, borderClass: "border-l-surface-300", desc: t("dunning.graceDesc", locale) },
+    { key: "stufe1", title: t("dunning.stage1", locale), icon: Mail, borderClass: "border-l-accent-amber", desc: t("dunning.stage1Desc", locale) },
+    { key: "stufe2", title: t("dunning.stage2", locale), icon: Phone, borderClass: "border-l-accent-coral", desc: t("dunning.stage2Desc", locale) },
+    { key: "stufe3", title: t("dunning.escalation", locale), icon: AlertTriangle, borderClass: "border-l-red-800", desc: t("dunning.escalationDesc", locale) },
+  ];
+}
 
 // Demo items for testing drag & drop
 const DEMO_ITEMS: MahnItem[] = [
@@ -37,6 +41,8 @@ const DEMO_ITEMS: MahnItem[] = [
 ];
 
 export default function MahnwesenPage() {
+  const { locale } = useAppStore();
+  const STUFEN = getStufen(locale);
   const [patientFilter, setPatientFilter] = useState<string | null>(null);
   const [pipeline, setPipeline] = useState<Record<StufeKey, MahnItem[]>>({ karenz: [], stufe1: [], stufe2: [], stufe3: [] });
   const [dragItem, setDragItem] = useState<string | null>(null);
@@ -152,8 +158,8 @@ export default function MahnwesenPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">Mahnwesen</h1>
-        <p className="text-sm text-praxis-400 mt-1">Pipeline, offene Volumen und Eskalationen im Blick</p>
+        <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{t("dunning.title", locale)}</h1>
+        <p className="text-sm text-praxis-400 mt-1">{t("dunning.subtitle", locale)}</p>
       </div>
 
       {!hasRealData && showDemo && (
@@ -161,12 +167,12 @@ export default function MahnwesenPage() {
           <div className="flex items-start gap-3">
             <Info size={18} className="mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold">Demo-Modus</p>
-              <p className="mt-1">Diese Karten sind Beispieldaten zum Testen. Ziehe sie per Drag & Drop zwischen den Stufen hin und her. Echte Fälle erscheinen automatisch sobald Ratenpläne angelegt und überfällige Zahlungen erkannt werden.</p>
+              <p className="font-semibold">{t("dunning.demoMode", locale)}</p>
+              <p className="mt-1">{t("dunning.demoDesc", locale)}</p>
               <p className="mt-2 text-blue-600">
-                <strong>Rücklastschriften</strong> werden automatisch erkannt sobald die Bankverbindung aktiv ist. Negative Buchungen auf dem Praxiskonto lösen sofort eine Benachrichtigung aus und der betroffene Patient wird automatisch in die Pipeline aufgenommen.
+                {t("dunning.chargebackInfo", locale)}
               </p>
-              <button onClick={() => setShowDemo(false)} className="mt-2 text-xs font-semibold text-blue-500 hover:text-blue-700">Demo ausblenden</button>
+              <button onClick={() => setShowDemo(false)} className="mt-2 text-xs font-semibold text-blue-500 hover:text-blue-700">{t("dunning.hideDemo", locale)}</button>
             </div>
           </div>
         </div>
@@ -174,21 +180,21 @@ export default function MahnwesenPage() {
 
       {patientFilter && (
         <div className="rounded-lg border border-accent-violet/20 bg-accent-violet/5 px-4 py-3 text-sm text-praxis-700">
-          Patientenfilter aktiv.{" "}
-          <Link href="/mahnwesen" className="font-semibold text-[#4b42d6] hover:text-[#3b32bf]">Filter zurücksetzen</Link>
+          {t("dunning.filterActive", locale)}{" "}
+          <Link href="/mahnwesen" className="font-semibold text-[#4b42d6] hover:text-[#3b32bf]">{t("dunning.resetFilter", locale)}</Link>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Kpi title="Im Mahnverfahren" value={String(allItems.length)} />
-        <Kpi title="Offenes Volumen" value={`${totalAmount.toLocaleString("de-DE")}€`} accent />
-        <Kpi title="Ø Verzugstage" value={String(avgDelay)} />
-        <Kpi title="Rücklastschriften" value="—" sub="Aktiv nach Bankanbindung" />
+        <Kpi title={t("dunning.inProcess", locale)} value={String(allItems.length)} />
+        <Kpi title={t("dunning.openVolume", locale)} value={`${totalAmount.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} accent />
+        <Kpi title={t("dunning.avgDelay", locale)} value={String(avgDelay)} />
+        <Kpi title={t("dunning.chargebacksKpi", locale)} value="—" sub={t("dunning.activeAfterBank", locale)} />
       </div>
 
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Mahnpipeline</h3>
-        <p className="mb-4 text-sm text-praxis-400">Fälle per Drag & Drop zwischen Stufen verschieben</p>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("dunning.pipeline", locale)}</h3>
+        <p className="mb-4 text-sm text-praxis-400">{t("dunning.dragHint", locale)}</p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {STUFEN.map((stufe) => {
             const items = patientFilter
@@ -229,8 +235,8 @@ export default function MahnwesenPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-praxis-800">{item.patient_name}</p>
-                            <p className="mt-1 text-sm text-praxis-600">Rate {item.rate_nummer} · {Number(item.betrag || 0).toLocaleString("de-DE")}€</p>
-                            <p className="text-sm text-praxis-500">Tag {days} · fällig {new Date(item.faellig_am).toLocaleDateString("de-DE")}</p>
+                            <p className="mt-1 text-sm text-praxis-600">{t("dunning.rate", locale)} {item.rate_nummer} · {Number(item.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</p>
+                            <p className="text-sm text-praxis-500">{t("dunning.day", locale)} {days} · {t("dunning.due", locale)} {new Date(item.faellig_am).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</p>
                             {item.patient_email && <p className="mt-1 text-xs text-praxis-400">✉ {item.patient_email}</p>}
                           </div>
                           <GripVertical size={16} className="mt-1 text-praxis-300" />
@@ -238,7 +244,7 @@ export default function MahnwesenPage() {
                       </div>
                     );
                   })}
-                  {items.length === 0 && <p className="rounded-lg bg-white p-3 text-sm text-praxis-400">Keine Fälle</p>}
+                  {items.length === 0 && <p className="rounded-lg bg-white p-3 text-sm text-praxis-400">{t("dunning.noCases", locale)}</p>}
                 </div>
               </div>
             );

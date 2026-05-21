@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { X, History, RotateCcw, Eye } from "lucide-react";
 import type { Workflow, WorkflowVersion } from "./types";
 import { readVersions } from "./storage";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/hooks/useAppStore";
 
 interface Props {
   workflow: Workflow;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export function VersionHistoryDrawer({ workflow, onClose, onRestore }: Props) {
+  const { locale } = useAppStore();
   const [versions, setVersions] = useState<WorkflowVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -32,18 +35,18 @@ export function VersionHistoryDrawer({ workflow, onClose, onRestore }: Props) {
         <header className="wf-drawer-head">
           <div className="flex items-center gap-2">
             <History size={16} style={{ color: "var(--ac-primary)" }} />
-            <h3 className="text-[16px] font-bold" style={{ color: "var(--ac-text)" }}>Versionen</h3>
+            <h3 className="text-[16px] font-bold" style={{ color: "var(--ac-text)" }}>{t("common.versions", locale)}</h3>
           </div>
-          <button onClick={onClose} className="wf-iconbtn" aria-label="Schließen">
+          <button onClick={onClose} className="wf-iconbtn" aria-label={t("common.close", locale)}>
             <X size={15} />
           </button>
         </header>
 
         <div className="wf-drawer-body">
-          {loading && <p className="wf-empty-inline">Lade …</p>}
+          {loading && <p className="wf-empty-inline">{t("common.loading", locale)}</p>}
           {!loading && versions.length === 0 && (
             <p className="wf-empty-inline">
-              Noch keine Versionen — Versionen entstehen beim Speichern des Workflows.
+              {t("workflow.noVersions", locale)}
             </p>
           )}
           {versions.map((v) => (
@@ -52,18 +55,18 @@ export function VersionHistoryDrawer({ workflow, onClose, onRestore }: Props) {
                 <div className="flex items-center gap-2">
                   <span className="wf-version-badge">v{v.version}</span>
                   <p className="wf-version-time">
-                    {new Date(v.created_at).toLocaleString("de-DE")}
+                    {new Date(v.created_at).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}
                   </p>
                 </div>
                 {v.note && <p className="wf-version-note">{v.note}</p>}
                 <p className="wf-version-stats">
-                  {(v.snapshot?.nodes?.length ?? 0)} Nodes · {(v.snapshot?.edges?.length ?? 0)} Verbindungen
+                  {(v.snapshot?.nodes?.length ?? 0)} {t("common.nodes", locale)} · {(v.snapshot?.edges?.length ?? 0)} {t("common.connections", locale)}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   className="wf-iconbtn"
-                  title="Vorschau"
+                  title={t("common.preview", locale)}
                   onClick={() => setPreviewId(previewId === v.id ? null : v.id)}
                 >
                   <Eye size={14} />
@@ -72,13 +75,13 @@ export function VersionHistoryDrawer({ workflow, onClose, onRestore }: Props) {
                   className="wf-primary-btn"
                   style={{ padding: "6px 10px", fontSize: 12 }}
                   onClick={() => {
-                    if (confirm(`Workflow auf Version ${v.version} zurücksetzen?`)) {
+                    if (confirm(t("workflow.restoreConfirm", locale, { version: v.version }))) {
                       onRestore(v.snapshot as Workflow);
                       onClose();
                     }
                   }}
                 >
-                  <RotateCcw size={12} /> Wiederherstellen
+                  <RotateCcw size={12} /> {t("common.restore", locale)}
                 </button>
               </div>
             </div>
@@ -87,7 +90,7 @@ export function VersionHistoryDrawer({ workflow, onClose, onRestore }: Props) {
           {preview && (
             <div className="wf-version-preview">
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
-                Vorschau v{preview.version}
+                {t("workflow.previewVersion", locale, { version: preview.version })}
               </p>
               <pre>{JSON.stringify(preview.snapshot, null, 2)}</pre>
             </div>

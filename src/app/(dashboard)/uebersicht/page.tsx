@@ -9,6 +9,7 @@ import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
 import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert, Users, Stethoscope, Shield, CreditCard } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { t } from "@/lib/i18n";
 
 interface PraxisStats {
   totalPatienten: number;
@@ -24,7 +25,6 @@ interface PraxisStats {
 export default function UebersichtPage() {
   const router = useRouter();
   const { locale, theme } = useAppStore();
-  const isGerman = locale === "de";
   const isDark = theme === "dark";
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
@@ -126,11 +126,9 @@ export default function UebersichtPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className={`ac-page-title ${isDark ? "text-white" : ""}`}>Übersicht</h1>
+        <h1 className={`ac-page-title ${isDark ? "text-white" : ""}`}>{t("overview.title", locale)}</h1>
         <p className={`mt-1 text-sm ${isDark ? "text-[#b6c2d6]" : "text-praxis-400"}`}>
-          {isGerman
-            ? "Willkommen zurück, Frau Dr. Schubert. Hier ist Ihr Tages-Briefing."
-            : "Welcome back, Dr. Schubert. Here is your daily briefing."}
+          {t("overview.welcome", locale)}
         </p>
       </div>
 
@@ -142,30 +140,30 @@ export default function UebersichtPage() {
           <>
             <KpiCard
               icon={<Users size={18} />}
-              label={isGerman ? "Patienten gesamt" : "Total patients"}
+              label={t("overview.totalPatients", locale)}
               value={String(stats?.totalPatienten || 0)}
-              sub={`${stats?.mitEmail || 0} mit E-Mail · ${stats?.mitTelefon || 0} mit Telefon`}
+              sub={`${stats?.mitEmail || 0} ${t("overview.withEmail", locale)} · ${stats?.mitTelefon || 0} ${t("overview.withPhone", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<Stethoscope size={18} />}
-              label={isGerman ? "Mit Behandlungsstatus" : "With treatment status"}
+              label={t("overview.withTreatment", locale)}
               value={String(stats?.behandlungVerteilung?.reduce((s, b) => s + b.value, 0) || 0)}
-              sub={`${stats?.behandlungVerteilung?.find(b => b.name === "Kein Status")?.value || 0} ohne Status`}
+              sub={`${stats?.behandlungVerteilung?.find(b => b.name === "Kein Status")?.value || 0} ${t("overview.withoutStatus", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<Shield size={18} />}
-              label={isGerman ? "Versicherung" : "Insurance"}
-              value={`${stats?.kasseVerteilung?.find(k => k.name === "Gesetzlich")?.value || 0} GKV`}
-              sub={`${stats?.kasseVerteilung?.find(k => k.name === "Privat")?.value || 0} Privatpatienten`}
+              label={t("overview.insurance", locale)}
+              value={`${stats?.kasseVerteilung?.find(k => k.name === "Gesetzlich")?.value || 0} ${t("insurance.gkv", locale)}`}
+              sub={`${stats?.kasseVerteilung?.find(k => k.name === "Privat")?.value || 0} ${t("overview.privatePatients", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<CreditCard size={18} />}
-              label={isGerman ? "Offene Raten" : "Open installments"}
+              label={t("overview.openInstallments", locale)}
               value={stats?.offeneRaten ? String(stats.offeneRaten) : "—"}
-              sub={stats?.imMahnverfahren ? `${stats.imMahnverfahren} im Mahnverfahren` : isGerman ? "Noch keine Ratenpläne angelegt" : "No rate plans yet"}
+              sub={stats?.imMahnverfahren ? `${stats.imMahnverfahren} ${t("overview.inDunning", locale)}` : t("overview.noRatePlans", locale)}
               valueClass={stats?.offeneRaten ? "text-[#cb4a55]" : ""}
               dark={isDark}
             />
@@ -178,7 +176,7 @@ export default function UebersichtPage() {
         <div className="stat-card">
           <h3 className="ac-section-title mb-4 flex items-center gap-2">
             <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
-            {isGerman ? "Behandlungsverteilung" : "Treatment distribution"}
+            {t("overview.treatmentDist", locale)}
           </h3>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {stats.behandlungVerteilung.map((b) => (
@@ -199,7 +197,7 @@ export default function UebersichtPage() {
         <div className="stat-card">
           <h3 className="ac-section-title mb-3 flex items-center gap-2">
             <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
-            {isGerman ? "Versicherungsverteilung" : "Insurance distribution"}
+            {t("overview.insuranceDist", locale)}
           </h3>
           <RatenstatusChart data={stats.kasseVerteilung} />
         </div>
@@ -210,14 +208,14 @@ export default function UebersichtPage() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="ac-section-title flex items-center gap-2">
             <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
-            {isGerman ? "System-Alerts" : "System alerts"}
+            {t("overview.systemAlerts", locale)}
           </h3>
-          <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {isGerman ? "neu" : "new"}</span>
+          <span className="badge badge-danger">{alerts.filter((a) => !a.gelesen).length} {t("overview.new", locale)}</span>
         </div>
         <div className="space-y-2">
           {alerts.length === 0 && (
             <p className={`text-sm py-4 text-center ${isDark ? "text-[#7a8da6]" : "text-praxis-400"}`}>
-              {isGerman ? "Keine Alerts vorhanden" : "No alerts"}
+              {t("overview.noAlerts", locale)}
             </p>
           )}
           {alerts.slice(0, 6).map((alert) => (
@@ -258,23 +256,23 @@ export default function UebersichtPage() {
         <div className="mb-3 flex items-center justify-between">
           <h3 className="ac-section-title flex items-center gap-2">
             <Circle size={11} className="fill-[#5b4de1] text-[#5b4de1]" />
-            {isGerman ? "Letzte Zahlungseingänge" : "Latest incoming payments"}
+            {t("overview.latestPayments", locale)}
           </h3>
           <Link
             href="/zahlungen"
             className={`text-xs ${isDark ? "text-[#9db0cc] hover:text-[#dbe6f8]" : "text-praxis-500 hover:text-praxis-700"}`}
           >
-            {isGerman ? "Alle anzeigen" : "View all"} →
+            {t("overview.viewAll", locale)} →
           </Link>
         </div>
         {transaktionen.length === 0 ? (
           <div className={`rounded-xl border p-8 text-center ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-surface-50"}`}>
             <CreditCard size={32} className={`mx-auto mb-3 ${isDark ? "text-[#4a5d7a]" : "text-praxis-300"}`} />
             <p className={`text-sm font-medium ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>
-              {isGerman ? "Noch keine Bankverbindung eingerichtet" : "No bank connection set up yet"}
+              {t("overview.noBankConnection", locale)}
             </p>
             <Link href="/einstellungen" className={`mt-2 inline-block text-xs ${isDark ? "text-[#7b93b4]" : "text-praxis-400"} hover:underline`}>
-              {isGerman ? "In Einstellungen verbinden →" : "Connect in settings →"}
+              {t("overview.connectInSettings", locale)}
             </Link>
           </div>
         ) : (
@@ -282,12 +280,12 @@ export default function UebersichtPage() {
             <table className="w-full">
               <thead>
                 <tr className={isDark ? "bg-white/5" : "bg-surface-50"}>
-                  <th className="table-header">Datum</th>
-                  <th className="table-header">{isGerman ? "Absender" : "Sender"}</th>
-                  <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
-                  <th className="table-header">{isGerman ? "Verwendungszweck" : "Purpose"}</th>
-                  <th className="table-header">Status</th>
-                  <th className="table-header">{isGerman ? "Zuordnung" : "Assignment"}</th>
+                  <th className="table-header">{t("overview.date", locale)}</th>
+                  <th className="table-header">{t("overview.sender", locale)}</th>
+                  <th className="table-header text-right">{t("overview.amount", locale)}</th>
+                  <th className="table-header">{t("overview.purpose", locale)}</th>
+                  <th className="table-header">{t("overview.status", locale)}</th>
+                  <th className="table-header">{t("overview.assignment", locale)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -297,9 +295,9 @@ export default function UebersichtPage() {
                     className="cursor-pointer hover:bg-surface-50/60"
                     onClick={() => router.push(tx.matched_patient_id ? `/patienten/${tx.matched_patient_id}` : "/zahlungen")}
                   >
-                    <td className="table-cell text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                    <td className="table-cell text-sm text-praxis-700">{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
                     <td className="table-cell text-sm font-semibold text-praxis-800">{tx.absender_name}</td>
-                    <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString("de-DE")}€</td>
+                    <td className="table-cell text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
                     <td className="table-cell text-sm text-praxis-600">{tx.verwendungszweck || "—"}</td>
                     <td className="table-cell"><StatusBadge status={tx.matching_status} /></td>
                     <td className="table-cell text-sm text-praxis-600">

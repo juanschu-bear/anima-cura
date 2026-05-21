@@ -16,6 +16,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 const COLORS = {
   primary: "#4b5f88",
@@ -27,6 +29,8 @@ const COLORS = {
 
 // ─── Zahlungsverlauf (Line Chart: Eingang vs Erwartet) ─────
 export function ZahlungsverlaufChart({ data }: { data: { monat: string; eingang: number; erwartet: number }[] }) {
+  const { locale } = useAppStore();
+  const dl = locale === "en" ? "en-GB" : "de-DE";
   return (
     <ResponsiveContainer width="100%" height={280}>
       <LineChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
@@ -43,7 +47,7 @@ export function ZahlungsverlaufChart({ data }: { data: { monat: string; eingang:
         />
         <Tooltip
           contentStyle={{ borderRadius: "10px", border: "1px solid #e5e8eb", fontSize: "13px" }}
-          formatter={(value: number, key: string) => [`${value.toLocaleString("de-DE")}€`, key === "eingang" ? "Eingang" : "Erwartet"]}
+          formatter={(value: number, key: string) => [`${value.toLocaleString(dl)}€`, key === "eingang" ? t("chart.income", locale) : t("chart.expected", locale)]}
         />
         <Legend verticalAlign="top" align="left" iconType="plainline" wrapperStyle={{ fontSize: "12px", paddingBottom: "8px" }} />
         <Area type="monotone" dataKey="eingang" fill="#5a8d3a" fillOpacity={0.08} strokeOpacity={0} />
@@ -54,7 +58,7 @@ export function ZahlungsverlaufChart({ data }: { data: { monat: string; eingang:
           strokeWidth={2.5}
           dot={{ r: 4, fill: COLORS.emerald }}
           activeDot={{ r: 6 }}
-          name="Eingang"
+          name={t("chart.income", locale)}
         />
         <Line
           type="monotone"
@@ -63,7 +67,7 @@ export function ZahlungsverlaufChart({ data }: { data: { monat: string; eingang:
           strokeWidth={2.5}
           strokeDasharray="6 4"
           dot={false}
-          name="Erwartet"
+          name={t("chart.expected", locale)}
         />
       </LineChart>
     </ResponsiveContainer>
@@ -106,6 +110,8 @@ export function RatenstatusChart({ data }: { data: { name: string; value: number
 
 // ─── Monatliche Einnahmen (Bar Chart) ───────────────────────
 export function MonatseinnahmenChart({ data }: { data: { monat: string; privat: number; kasse: number }[] }) {
+  const { locale } = useAppStore();
+  const dl = locale === "en" ? "en-GB" : "de-DE";
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -114,10 +120,10 @@ export function MonatseinnahmenChart({ data }: { data: { monat: string; privat: 
         <YAxis tick={{ fontSize: 12 }} stroke="#8ba8c4" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
         <Tooltip
           contentStyle={{ borderRadius: "8px", border: "1px solid #e5e8eb", fontSize: "13px" }}
-          formatter={(value: number) => [`${value.toLocaleString("de-DE")} €`, ""]}
+          formatter={(value: number) => [`${value.toLocaleString(dl)} €`, ""]}
         />
-        <Bar dataKey="privat" fill={COLORS.primary} radius={[4, 4, 0, 0]} name="Privat" />
-        <Bar dataKey="kasse" fill={COLORS.blue} radius={[4, 4, 0, 0]} name="Kasse" />
+        <Bar dataKey="privat" fill={COLORS.primary} radius={[4, 4, 0, 0]} name={t("chart.private", locale)} />
+        <Bar dataKey="kasse" fill={COLORS.blue} radius={[4, 4, 0, 0]} name={t("chart.statutory", locale)} />
         <Legend />
       </BarChart>
     </ResponsiveContainer>
