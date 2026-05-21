@@ -136,11 +136,10 @@ export default function PatientDetailPage() {
             patient.kasse === "gesetzlich" ? "Gesetzlich" : "Privat"
           } />
           <Info label="Versichertennr." value={patient.versichertennummer || "—"} mono />
-          {patient.versicherter_vorname && patient.versicherter_nachname && (
-            patient.versicherter_vorname !== patient.vorname || patient.versicherter_nachname !== patient.nachname
-          ) && (
+          {patient.versicherter_vorname && patient.versicherter_nachname &&
+            (patient.versicherter_vorname !== patient.vorname || patient.versicherter_nachname !== patient.nachname) ? (
             <Info label="Versicherungsnehmer" value={`${patient.versicherter_vorname} ${patient.versicherter_nachname}`} />
-          )}
+          ) : null}
           <Info label="Patient seit" value={formatDate(patient.versicherung_seit)} />
           <Info label="Telefon" value={patient.telefon || "—"} />
           <Info label="Mobil" value={patient.mobiltelefon || "—"} />

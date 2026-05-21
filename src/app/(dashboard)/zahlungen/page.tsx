@@ -388,11 +388,68 @@ export default function ZahlungenPage() {
         </table>
 
         {visibleTransactions.length === 0 && (
-          <EmptyState
-            icon={<CreditCard size={24} />}
-            title={isGerman ? "Keine Transaktionen" : "No transactions"}
-            description={isGerman ? "Es wurden noch keine Bankbuchungen importiert." : "No bank transactions imported yet."}
-          />
+          <div className="p-10 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "var(--ac-surface-muted)" }}>
+              <CreditCard size={28} style={{ color: "var(--ac-text-mute)" }} />
+            </div>
+            <h3 className="text-lg font-bold" style={{ color: "var(--ac-text)" }}>
+              {isGerman ? "Keine Transaktionen vorhanden" : "No transactions yet"}
+            </h3>
+            <p className="mt-2 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+              {isGerman
+                ? "Sobald die Bankverbindung aktiv ist, werden Zahlungseingänge automatisch importiert und mit Patientenraten abgeglichen."
+                : "Once the bank connection is active, incoming payments will be automatically imported and matched with patient installments."}
+            </p>
+            <a href="/einstellungen" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ac-primary)" }}>
+              {isGerman ? "Bankverbindung einrichten →" : "Set up bank connection →"}
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Rücklastschriften */}
+      <div className="stat-card">
+        <h3 className="mb-2 text-xl font-bold" style={{ color: "var(--ac-text)" }}>
+          {isGerman ? "Rücklastschriften" : "Chargebacks"}
+        </h3>
+        <p className="mb-4 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+          {isGerman
+            ? "Rücklastschriften werden automatisch erkannt wenn ein Patient eine Lastschrift zurückholt. Negative Buchungen auf dem Praxiskonto lösen sofort einen Alert aus."
+            : "Chargebacks are detected automatically when a patient reverses a direct debit. Negative transactions trigger an immediate alert."}
+        </p>
+        {clientTx.filter(tx => Number(tx.betrag || 0) < 0).length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: "var(--ac-surface-muted)" }}>
+                  <th className="table-header">Datum</th>
+                  <th className="table-header">{isGerman ? "Patient" : "Patient"}</th>
+                  <th className="table-header text-right">{isGerman ? "Betrag" : "Amount"}</th>
+                  <th className="table-header">{isGerman ? "Grund" : "Reason"}</th>
+                  <th className="table-header">{isGerman ? "Bankgebühr" : "Bank fee"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientTx.filter(tx => Number(tx.betrag || 0) < 0).map((tx) => (
+                  <tr key={tx.id}>
+                    <td className="table-cell text-sm">{new Date(tx.datum).toLocaleDateString("de-DE")}</td>
+                    <td className="table-cell text-sm font-semibold">{tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : tx.absender_name || "—"}</td>
+                    <td className="table-cell text-right text-sm font-bold" style={{ color: "var(--ac-danger)" }}>{Number(tx.betrag).toLocaleString("de-DE")}€</td>
+                    <td className="table-cell text-sm">{tx.verwendungszweck || "Lastschriftrückgabe"}</td>
+                    <td className="table-cell text-sm" style={{ color: "var(--ac-warning)" }}>+3,50€</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface-muted)" }}>
+            <p className="text-sm font-medium" style={{ color: "var(--ac-text-mute)" }}>
+              {isGerman
+                ? "Keine Rücklastschriften erkannt. Dieser Bereich wird automatisch befüllt sobald die Bankverbindung aktiv ist."
+                : "No chargebacks detected. This section fills automatically once the bank connection is active."}
+            </p>
+          </div>
         )}
       </div>
 
