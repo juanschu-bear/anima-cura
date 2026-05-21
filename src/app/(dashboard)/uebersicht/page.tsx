@@ -185,7 +185,7 @@ export default function UebersichtPage() {
                 className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}
               >
                 <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{b.value}</p>
-                <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>{b.name}</p>
+                <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>{tData(b.name, locale)}</p>
               </div>
             ))}
           </div>

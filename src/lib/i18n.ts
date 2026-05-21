@@ -743,3 +743,27 @@ export function t(key: string, locale: string = "de", vars?: Record<string, stri
 }
 
 export default translations;
+
+export function tData(value: string | null | undefined, locale: string = "de"): string {
+  if (!value) return t("common.noStatus", locale);
+  const map: Record<string, { de: string; en: string }> = {
+    "Beratung": { de: "Beratung", en: "Consultation" },
+    "KFO": { de: "KFO", en: "Orthodontics" },
+    "Plan": { de: "Plan", en: "Plan" },
+    "Nachkontrolle": { de: "Nachkontrolle", en: "Follow-up" },
+    "Unbekannt": { de: "Unbekannt", en: "Unknown" },
+    "Kein Status": { de: "Kein Status", en: "No status" },
+    "Familienversichert": { de: "Familienversichert", en: "Family insured" },
+    "Gesetzlich": { de: "Gesetzlich", en: "Statutory" },
+    "Privat": { de: "Privat", en: "Private" },
+    "Rentner": { de: "Rentner", en: "Retired" },
+    "Family": { de: "Familienversichert", en: "Family insured" },
+    "Statutory": { de: "Gesetzlich", en: "Statutory" },
+    "Private": { de: "Privat", en: "Private" },
+    "Retired": { de: "Rentner", en: "Retired" },
+    "gesetzlich": { de: "Gesetzlich", en: "Statutory" },
+    "privat": { de: "Privat", en: "Private" },
+  };
+  const entry = map[value];
+  return entry ? (locale === "en" ? entry.en : entry.de) : value;
+}

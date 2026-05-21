@@ -137,7 +137,7 @@ export default function QuartalPage() {
                 return (
                   <p key={slice.name} className="flex items-center gap-2 text-sm text-praxis-700">
                     <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
-                    {slice.name}: {slice.value} ({pct}%)
+                    {tData(slice.name, locale)}: {slice.value} ({pct}%)
                   </p>
                 );
               })}
@@ -153,7 +153,7 @@ export default function QuartalPage() {
               return (
                 <div key={row.label}>
                   <div className="mb-1 flex items-center justify-between text-sm text-praxis-700">
-                    <span>{row.label}</span>
+                    <span>{tData(row.label, locale)}</span>
                     <span className="font-semibold">{row.patients}</span>
                   </div>
                   <div className="h-3 rounded-full bg-[#e9e8ff]">

@@ -445,6 +445,8 @@ samp {
   min-width: 0;
 }
 .wf-card-right {
+  position: relative;
+  overflow: visible;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -588,7 +590,7 @@ samp {
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 30;
+  z-index: 50;
   min-width: 170px;
   padding: 6px;
   border-radius: 12px;
@@ -704,7 +706,7 @@ samp {
   background: color-mix(in srgb, var(--ac-success) 14%, var(--ac-surface));
   border: 1px solid color-mix(in srgb, var(--ac-success) 40%, var(--ac-border));
   box-shadow: var(--ac-shadow);
-  z-index: 30;
+  z-index: 50;
   animation: wf-toast-in 0.25s ease-out;
 }
 @keyframes wf-toast-in {
