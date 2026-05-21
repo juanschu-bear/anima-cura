@@ -616,6 +616,21 @@ samp {
 .wf-menu-danger:hover { background: color-mix(in srgb, var(--ac-danger) 10%, transparent) !important; }
 
 /* Empty state */
+.wf-persist-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ac-danger) 10%, var(--ac-surface));
+  border: 1px solid color-mix(in srgb, var(--ac-danger) 35%, var(--ac-border));
+  color: var(--ac-danger);
+  font-size: 12.5px;
+}
+.wf-persist-error strong { display: block; font-weight: 700; color: var(--ac-danger); }
+.wf-persist-error span { display: block; margin-top: 2px; color: var(--ac-text-soft); }
+.wf-persist-error > svg { margin-top: 2px; flex-shrink: 0; }
+
 .wf-empty {
   display: flex;
   flex-direction: column;

@@ -72,7 +72,9 @@ export default function AutomatisierungenPage() {
   const isDark = theme === "dark";
   const isGerman = locale === "de";
 
-  const [workflows, setWorkflows] = useState<Workflow[]>(SEED);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [persistError, setPersistError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [search, setSearch] = useState("");
@@ -84,16 +86,27 @@ export default function AutomatisierungenPage() {
     (async () => {
       try {
         const supabase = createBrowserClient();
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("einstellungen")
           .select("value")
           .eq("key", SETTING_KEY)
           .maybeSingle();
-        if (!cancelled && data?.value && Array.isArray(data.value) && data.value.length > 0) {
-          setWorkflows(data.value as Workflow[]);
+        if (cancelled) return;
+        if (error) {
+          console.error("[workflows] read failed", error);
         }
-      } catch {
-        // ignore
+        if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
+          setWorkflows(data.value as Workflow[]);
+        } else {
+          setWorkflows(SEED);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[workflows] read threw", err);
+          setWorkflows(SEED);
+        }
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => {
@@ -102,11 +115,21 @@ export default function AutomatisierungenPage() {
   }, []);
 
   async function persist(next: Workflow[]) {
+    if (!loaded) return;
     try {
       const supabase = createBrowserClient();
-      await supabase.from("einstellungen").upsert({ key: SETTING_KEY, value: next });
-    } catch {
-      // soft-fail
+      const { error } = await supabase
+        .from("einstellungen")
+        .upsert({ key: SETTING_KEY, value: next }, { onConflict: "key" });
+      if (error) {
+        console.error("[workflows] persist failed", error);
+        setPersistError(error.message || "Speichern fehlgeschlagen");
+      } else {
+        setPersistError(null);
+      }
+    } catch (err: any) {
+      console.error("[workflows] persist threw", err);
+      setPersistError(err?.message || "Speichern fehlgeschlagen");
     }
   }
 
@@ -263,6 +286,16 @@ export default function AutomatisierungenPage() {
         <KpiCard icon={Activity} label={isGerman ? "Ausführungen heute" : "Runs today"} value={String(runsToday)} hint={isGerman ? "letzte 24 h" : "last 24 h"} accent="#5f9339" />
         <KpiCard icon={AlertOctagon} label={isGerman ? "Fehler heute" : "Errors today"} value={String(errorsToday)} hint={errorsToday === 0 ? (isGerman ? "alles stabil" : "all stable") : (isGerman ? "Eingriff prüfen" : "needs review")} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} />
       </div>
+
+      {persistError && (
+        <div className="wf-persist-error">
+          <AlertOctagon size={14} />
+          <div>
+            <strong>{isGerman ? "Speichern fehlgeschlagen" : "Save failed"}</strong>
+            <span>{persistError}</span>
+          </div>
+        </div>
+      )}
 
       <div className="wf-list-toolbar">
         <div className="wf-search">
