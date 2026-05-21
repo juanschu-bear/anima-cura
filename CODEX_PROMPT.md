@@ -10,4 +10,4 @@ Wichtig:
 - SSE-Streaming für den AI-Assist-Endpoint
 - Zod-Validierung auf alle Tool-Outputs
 - Keine Frontend-Änderungen
-- Alle Texte auf Deutsch
+- Alle Texte zweisprachig (Deutsch + Englisch), Standard ist Deutsch

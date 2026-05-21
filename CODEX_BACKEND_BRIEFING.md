@@ -375,5 +375,5 @@ npm install resend zod
 - Server-Client: `import { createServerClient } from "@/lib/db/supabase";`
 - Keine Frontend-Arbeit nötig — nur Backend/API
 - Anthropic SDK ist bereits installiert und `ANTHROPIC_API_KEY` ist in Vercel gesetzt
-- Alle Texte, Fehlermeldungen und Logs auf Deutsch
+- Alle Texte, Fehlermeldungen und Logs zweisprachig (Deutsch + Englisch). Die App hat einen Locale-Toggle (de/en). E-Mail-Templates und AI-Antworten standardmäßig auf Deutsch, aber der System-Prompt soll auch englische Antworten unterstützen wenn der User auf Englisch fragt.
 - Zod für Validierung nutzen, nicht einfach casten
