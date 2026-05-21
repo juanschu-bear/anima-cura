@@ -17,6 +17,47 @@ export default function EinstellungenPage() {
   const [hint, setHint] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
 
+  interface UserEntry {
+    name: string;
+    role: string;
+    password: string;
+    permissions: { zahlungen: boolean; mahnwesen: boolean; einstellungen: boolean };
+  }
+
+  const [users, setUsers] = useState<UserEntry[]>([
+    { name: "Dr. Elena Schubert", role: "admin", password: "", permissions: { zahlungen: true, mahnwesen: true, einstellungen: true } },
+    { name: "Sabine (Verwaltung)", role: "verwaltung", password: "", permissions: { zahlungen: true, mahnwesen: true, einstellungen: false } },
+    { name: "Empfang", role: "lesezugriff", password: "", permissions: { zahlungen: false, mahnwesen: false, einstellungen: false } },
+  ]);
+
+  function updateUser(idx: number, field: string, value: any) {
+    setUsers((prev) => prev.map((u, i) => {
+      if (i !== idx) return u;
+      if (field === "name") return { ...u, name: value };
+      if (field === "role") {
+        const perms = field === "admin"
+          ? { zahlungen: true, mahnwesen: true, einstellungen: true }
+          : value === "verwaltung"
+          ? { zahlungen: true, mahnwesen: true, einstellungen: false }
+          : { zahlungen: false, mahnwesen: false, einstellungen: false };
+        return { ...u, role: value, permissions: perms };
+      }
+      if (field === "password") return { ...u, password: value };
+      if (["zahlungen", "mahnwesen", "einstellungen"].includes(field)) {
+        return { ...u, permissions: { ...u.permissions, [field]: value } };
+      }
+      return u;
+    }));
+  }
+
+  function addUser() {
+    setUsers((prev) => [...prev, { name: "", role: "lesezugriff", password: "", permissions: { zahlungen: false, mahnwesen: false, einstellungen: false } }]);
+  }
+
+  function removeUser(idx: number) {
+    setUsers((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   const mahnfristen = useMemo<JsonRecord>(() => settings.mahnfristen || {}, [settings.mahnfristen]);
   const benachrichtigungen = useMemo<JsonRecord>(
     () => settings.benachrichtigungen || {},
@@ -266,7 +307,7 @@ export default function EinstellungenPage() {
             theme={theme}
           />
           <Toggle
-            label="Maria-Eskalation aktiv"
+            label="Eskalation an Praxisleitung"
             checked={!!benachrichtigungen.maria_eskalation}
             onChange={(v) => (benachrichtigungen.maria_eskalation = v)}
             theme={theme}
@@ -285,32 +326,52 @@ export default function EinstellungenPage() {
                 <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
                 <th className="table-header text-left">{isGerman ? "Mahnwesen" : "Dunning"}</th>
                 <th className="table-header text-left">{isGerman ? "Einstellungen" : "Settings"}</th>
+                <th className="table-header text-left">{isGerman ? "Passwort" : "Password"}</th>
+                <th className="table-header text-left"></th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>Dr. Maria Schubert</td>
-                <td className="table-cell"><span className="badge badge-info">Admin</span></td>
-                <td className="table-cell">✓</td>
-                <td className="table-cell">✓</td>
-                <td className="table-cell">✓</td>
-              </tr>
-              <tr>
-                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Sabine (Verwaltung)" : "Sabine (Office)"}</td>
-                <td className="table-cell"><span className="badge badge-warning">{isGerman ? "Verwaltung" : "Office"}</span></td>
-                <td className="table-cell">✓</td>
-                <td className="table-cell">✓</td>
-                <td className="table-cell">—</td>
-              </tr>
-              <tr>
-                <td className="table-cell font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Empfang" : "Reception"}</td>
-                <td className="table-cell"><span className="badge badge-neutral">{isGerman ? "Lesezugriff" : "Read-only"}</span></td>
-                <td className="table-cell">—</td>
-                <td className="table-cell">—</td>
-                <td className="table-cell">—</td>
-              </tr>
+              {users.map((user, idx) => (
+                <tr key={idx}>
+                  <td className="table-cell">
+                    <input className="input text-sm font-semibold" value={user.name} onChange={(e) => updateUser(idx, "name", e.target.value)} style={{ maxWidth: 200 }} />
+                  </td>
+                  <td className="table-cell">
+                    <select className="input text-sm" value={user.role} onChange={(e) => updateUser(idx, "role", e.target.value)}>
+                      <option value="admin">Admin</option>
+                      <option value="verwaltung">{isGerman ? "Verwaltung" : "Office"}</option>
+                      <option value="lesezugriff">{isGerman ? "Lesezugriff" : "Read-only"}</option>
+                    </select>
+                  </td>
+                  <td className="table-cell text-center">
+                    <input type="checkbox" checked={user.permissions.zahlungen} onChange={(e) => updateUser(idx, "zahlungen", e.target.checked)} />
+                  </td>
+                  <td className="table-cell text-center">
+                    <input type="checkbox" checked={user.permissions.mahnwesen} onChange={(e) => updateUser(idx, "mahnwesen", e.target.checked)} />
+                  </td>
+                  <td className="table-cell text-center">
+                    <input type="checkbox" checked={user.permissions.einstellungen} onChange={(e) => updateUser(idx, "einstellungen", e.target.checked)} />
+                  </td>
+                  <td className="table-cell">
+                    <input type="password" className="input text-sm" placeholder="••••••" value={user.password || ""} onChange={(e) => updateUser(idx, "password", e.target.value)} style={{ maxWidth: 120 }} />
+                  </td>
+                  <td className="table-cell">
+                    {idx > 0 && (
+                      <button className="text-xs text-accent-coral hover:underline" onClick={() => removeUser(idx)}>
+                        {isGerman ? "Entfernen" : "Remove"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+          <button
+            className="mt-3 btn-secondary inline-flex items-center gap-1.5 text-sm"
+            onClick={addUser}
+          >
+            + {isGerman ? "Benutzer hinzufügen" : "Add user"}
+          </button>
         </div>
       </section>
 

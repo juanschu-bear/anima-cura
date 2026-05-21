@@ -43,7 +43,7 @@ export default function UebersichtPage() {
       // Behandlung
       const { data: allPatients } = await supabase
         .from("patients")
-        .select("behandlung, kasse, geschlecht, email, telefon")
+        .select("behandlung, kasse, geschlecht, email, telefon, versicherung_status")
         .range(0, 9999);
 
       if (!allPatients) {
@@ -58,11 +58,15 @@ export default function UebersichtPage() {
       let mitTelefon = 0;
 
       for (const p of allPatients) {
-        const beh = p.behandlung || "Unbekannt";
+        const beh = p.behandlung || "Kein Status";
         behandlungMap[beh] = (behandlungMap[beh] || 0) + 1;
 
-        const k = p.kasse || "unbekannt";
-        kasseMap[k] = (kasseMap[k] || 0) + 1;
+        const vs = p.versicherung_status === "Family" ? "Familienversichert"
+          : p.versicherung_status === "Statutory" ? "Gesetzlich"
+          : p.versicherung_status === "Private" ? "Privat"
+          : p.versicherung_status === "Retired" ? "Rentner"
+          : p.kasse === "gesetzlich" ? "Gesetzlich" : "Privat";
+        kasseMap[vs] = (kasseMap[vs] || 0) + 1;
 
         const g = p.geschlecht === "w" ? "Weiblich" : p.geschlecht === "m" ? "Männlich" : "Andere";
         geschlechtMap[g] = (geschlechtMap[g] || 0) + 1;
@@ -90,9 +94,13 @@ export default function UebersichtPage() {
         kasseVerteilung: Object.entries(kasseMap)
           .sort((a, b) => b[1] - a[1])
           .map(([name, value]) => ({
-            name: name === "gesetzlich" ? "Gesetzlich" : name === "privat" ? "Privat" : name,
+            name,
             value,
-            color: name === "gesetzlich" ? "#1aa57a" : "#4b42d6",
+            color: name === "Familienversichert" ? "#1aa57a"
+              : name === "Gesetzlich" ? "#2cb88a"
+              : name === "Privat" ? "#4b42d6"
+              : name === "Rentner" ? "#7a6fe0"
+              : "#999",
           })),
         geschlechtVerteilung: Object.entries(geschlechtMap)
           .sort((a, b) => b[1] - a[1])
@@ -121,8 +129,8 @@ export default function UebersichtPage() {
         <h1 className={`ac-page-title ${isDark ? "text-white" : ""}`}>Übersicht</h1>
         <p className={`mt-1 text-sm ${isDark ? "text-[#b6c2d6]" : "text-praxis-400"}`}>
           {isGerman
-            ? "Willkommen zurück, Maria. Hier ist dein Tages-Briefing."
-            : "Welcome back, Maria. Here is your daily briefing."}
+            ? "Willkommen zurück, Frau Dr. Schubert. Hier ist Ihr Tages-Briefing."
+            : "Welcome back, Dr. Schubert. Here is your daily briefing."}
         </p>
       </div>
 
@@ -141,9 +149,9 @@ export default function UebersichtPage() {
             />
             <KpiCard
               icon={<Stethoscope size={18} />}
-              label={isGerman ? "In Behandlung" : "In treatment"}
-              value={String(stats?.behandlungVerteilung?.find(b => b.name !== "Beratung" && b.name !== "Unbekannt")?.value || 0)}
-              sub={`${stats?.behandlungVerteilung?.find(b => b.name === "Beratung")?.value || 0} in Beratung`}
+              label={isGerman ? "Mit Behandlungsstatus" : "With treatment status"}
+              value={String(stats?.behandlungVerteilung?.reduce((s, b) => s + b.value, 0) || 0)}
+              sub={`${stats?.behandlungVerteilung?.find(b => b.name === "Kein Status")?.value || 0} ohne Status`}
               dark={isDark}
             />
             <KpiCard

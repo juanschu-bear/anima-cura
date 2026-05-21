@@ -107,11 +107,11 @@ export default function DashboardLayout({
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
               theme === "dark" ? "bg-white/10 text-white" : "bg-praxis-100 text-praxis-600"
             }`}>
-              MS
+              ES
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Maria Schubert</p>
-              <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{isGerman ? "Admin" : "Admin"}</p>
+              <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Dr. Elena Schubert</p>
+              <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{isGerman ? "Praxisleitung" : "Practice Owner"}</p>
             </div>
             <button className={`${theme === "dark" ? "text-white/65 hover:text-white" : "text-praxis-400 hover:text-praxis-600"} transition-colors`}>
               <LogOut size={16} />
