@@ -14,6 +14,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.dunning": { de: "Mahnwesen", en: "Dunning" },
   "nav.quarterly": { de: "Quartalsbericht", en: "Quarterly" },
   "nav.automations": { de: "Automatisierungen", en: "Automations" },
+  "nav.import": { de: "Datenimport", en: "Data Import" },
   "nav.settings": { de: "Einstellungen", en: "Settings" },
 
   // ─── Common ─────────────────────────────────────────────

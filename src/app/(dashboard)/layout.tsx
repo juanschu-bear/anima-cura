@@ -18,6 +18,7 @@ import {
   Languages,
   Search,
   Zap,
+  Upload,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { useRouter } from "next/navigation";
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { href: "/mahnwesen", icon: AlertTriangle, key: "nav.dunning" },
   { href: "/quartal", icon: BarChart3, key: "nav.quarterly" },
   { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
+  { href: "/import", icon: Upload, key: "nav.import" },
   { href: "/einstellungen", icon: Settings, key: "nav.settings" },
 ];
 
