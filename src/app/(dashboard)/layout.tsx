@@ -82,7 +82,7 @@ export default function DashboardLayout({
           }`}>
             Praxis Companion
           </div>
-          <h1 className={`mt-3 text-[28px] font-bold leading-none ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Anima Curo</h1>
+          <h1 className={`mt-3 text-[28px] font-bold leading-none ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Anima Cura</h1>
           <p className={`mt-1 text-xs font-medium ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>Intelligent Practice Finance</p>
         </div>
 
