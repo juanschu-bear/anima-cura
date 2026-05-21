@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { createBrowserClient } from "@/lib/db/supabase";
-import { t } from "@/lib/i18n";
+import { t, tData } from "@/lib/i18n";
 
 interface QuartalData {
   totalPatienten: number;

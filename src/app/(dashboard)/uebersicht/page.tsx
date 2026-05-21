@@ -9,7 +9,7 @@ import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
 import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert, Users, Stethoscope, Shield, CreditCard } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { createBrowserClient } from "@/lib/db/supabase";
-import { t } from "@/lib/i18n";
+import { t, tData } from "@/lib/i18n";
 
 interface PraxisStats {
   totalPatienten: number;
