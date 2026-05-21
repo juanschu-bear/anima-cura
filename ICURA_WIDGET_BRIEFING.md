@@ -2,21 +2,21 @@
 
 ## Vision
 
-Ein Browser-basierter AI-Assistent der in Anima Cura lebt — auf jeder Seite verfügbar, kontextbewusst, sprachgesteuert, und in der Lage den User visuell durch die App zu führen. Think Clicky (farzaa/clicky), aber als Web-Widget statt native macOS App.
+A browser-based AI assistant that lives inside Anima Cura — available on every page, context-aware, voice-enabled, and capable of visually guiding the user through the UI. Think Clicky (farzaa/clicky), but as a web widget instead of a native macOS app.
 
-Langfristig wird das Widget in eine eigene Repo extrahiert als eigenständiges Open-Source-Produkt das in jede Web-App eingebettet werden kann. Für jetzt bauen wir es direkt in Anima Cura.
+Long-term, the widget will be extracted into its own repo as a standalone open-source product that can be embedded in any web app. For now, we build it directly inside Anima Cura.
 
 ## Tech Stack
 
 - **Framework:** React 18, TypeScript
-- **Styling:** Tailwind CSS + CSS Custom Properties (Anima Cura Design Tokens)
-- **State:** zustand (bereits installiert)
+- **Styling:** Tailwind CSS + CSS Custom Properties (Anima Cura design tokens)
+- **State:** zustand (already installed)
 - **Icons:** lucide-react@0.383.0
 - **Voice:** Web Speech API (SpeechRecognition + SpeechSynthesis)
-- **Backend:** Bestehender Endpoint `POST /api/workflows/assist` (SSE Stream mit Anthropic SDK)
-- **KEINE neuen Dependencies** außer ggf. `framer-motion` für Animationen (optional)
+- **Backend:** Existing endpoint `POST /api/workflows/assist` (SSE stream with Anthropic SDK)
+- **NO new dependencies** except optionally `framer-motion` for animations
 
-## Design Tokens (verwenden!)
+## Design Tokens (must use!)
 
 ```css
 --ac-primary: #5b4de1;
@@ -28,202 +28,222 @@ Langfristig wird das Widget in eine eigene Repo extrahiert als eigenständiges O
 --ac-shadow: 0 12px 28px rgba(26, 44, 68, 0.08);
 ```
 
-Dark Mode über `data-theme="dark"` auf `:root`.
+Dark mode via `data-theme="dark"` on `:root`.
 
-## Was gebaut werden muss
+## What to Build
 
 ### 1. Floating Button (Global)
 
-Ein schwebender Button unten rechts auf JEDER Seite der App.
+A floating button in the bottom-right corner on EVERY page of the app.
 
 - **Position:** `fixed`, bottom-right, `z-index: 9999`
-- **Aussehen:** Runder Button (56px), Sparkles-Icon oder custom iCura-Logo, subtiler Glow/Pulse-Effekt wenn idle, stärkerer Glow wenn aktiv
-- **Animation:** Sanftes Einblenden beim Seitenload, leichte Bounce-Animation beim Hover
-- **Dark Mode:** Muss in beiden Themes gut aussehen
+- **Appearance:** Round button (56px), Sparkles icon or custom iCura logo, subtle glow/pulse effect when idle, stronger glow when active
+- **Animation:** Smooth fade-in on page load, subtle bounce on hover
+- **Dark mode:** Must look great in both themes
 
-### 2. Chat-Panel
+### 2. Chat Panel
 
-Klick auf den Button öffnet ein Chat-Panel.
+Clicking the button opens a chat panel.
 
-- **Position:** Fixed, bottom-right, oberhalb des Buttons
-- **Größe:** ~380px breit, ~520px hoch, resizable am oberen Rand
-- **Animation:** Smooth slide-up + fade-in, nicht abrupt
-- **Header:** "iCura" + Subtitle "AI-Assistent" + Close-Button + Minimize-Button
-- **Chat-Bereich:** Scrollbare Message-Liste, Nachrichten von User (rechts, primary-Farbe) und iCura (links, surface-Farbe)
-- **Input-Bereich:** Textfeld + Send-Button + Voice-Button (Mikrofon-Icon)
-- **Quick-Actions:** Kontextabhängige Chips oben im Chat basierend auf der aktuellen Seite
+- **Position:** Fixed, bottom-right, above the button
+- **Size:** ~380px wide, ~520px tall, resizable from top edge
+- **Animation:** Smooth slide-up + fade-in, not abrupt
+- **Header:** "iCura" + subtitle "AI Assistant" + Close button + Minimize button
+- **Chat area:** Scrollable message list, user messages (right, primary color) and iCura messages (left, surface color)
+- **Input area:** Text field + Send button + Voice button (microphone icon)
+- **Quick actions:** Context-dependent chips at the top of the chat based on the current page
 
 ### 3. Voice Input/Output
 
 **Input (Speech-to-Text):**
-- Mikrofon-Button im Input-Bereich
-- Klick = Push-to-Talk (hält die Aufnahme solange gedrückt)
-- Oder: Toggle-Mode (Klick startet, Klick stoppt)
+- Microphone button in the input area
+- Click = Push-to-Talk (records while pressed)
+- Or: Toggle mode (click to start, click to stop)
 - Web Speech API `SpeechRecognition`
-- Visueller Indikator dass zugehört wird (pulsierender Ring um den Button)
-- Transkription erscheint live im Textfeld
+- Visual indicator that it's listening (pulsating ring around the button)
+- Live transcription appears in the text field
 
 **Output (Text-to-Speech):**
-- iCura-Antworten werden optional vorgelesen
+- iCura responses are optionally read aloud
 - Web Speech API `SpeechSynthesis`
-- Toggle in den Chat-Settings: "Antworten vorlesen" an/aus
-- Deutsche Stimme als Default, Englische wenn locale=en
+- Toggle in chat settings: "Read answers aloud" on/off
+- German voice as default, English when locale=en
 
-### 4. Kontext-Bewusstsein
+### 4. Context Awareness
 
-iCura weiß auf welcher Seite der User ist und was angezeigt wird.
+iCura knows which page the user is on and what data is displayed.
 
-**Kontext sammeln (bei jedem Message-Send mitschicken):**
+**Context to collect (sent with every message):**
 
 ```typescript
 interface AppContext {
-  currentPage: string;        // z.B. "/patienten", "/automatisierungen"
-  locale: string;             // "de" oder "en"
-  theme: string;              // "light" oder "dark"
-  patientCount?: number;      // Wenn auf Übersicht
-  selectedPatient?: {         // Wenn auf Patient-Detail
+  currentPage: string;        // e.g. "/patienten", "/automatisierungen"
+  locale: string;             // "de" or "en"
+  theme: string;              // "light" or "dark"
+  patientCount?: number;      // When on overview
+  selectedPatient?: {         // When on patient detail
     name: string;
     id: string;
     behandlung?: string;
   };
-  activeWorkflows?: number;   // Wenn auf Automatisierungen
-  openRaten?: number;         // Wenn verfügbar
+  activeWorkflows?: number;   // When on automations
+  openRaten?: number;         // When available
 }
 ```
 
-**Kontext in den API-Call einbauen:**
-Der bestehende `/api/workflows/assist` Endpoint muss erweitert werden um einen `context` Parameter. Der System-Prompt wird um den Kontext ergänzt.
+**Include context in the API call:**
+The existing `/api/workflows/assist` endpoint must be extended with a `context` parameter. The system prompt is augmented with the context.
 
-### 5. UI-Highlighting (das "Clicky"-Feature)
+### 5. UI Highlighting (the "Clicky" Feature)
 
-Wenn iCura dem User sagt "Klick auf Zahlungen in der Sidebar", soll das Element visuell hervorgehoben werden.
+When iCura tells the user "Click on Payments in the sidebar", the element should be visually highlighted.
 
-**Mechanismus:**
-- iCura-Antworten können spezielle Tags enthalten: `[highlight:selector]` oder `[navigate:/path]`
-- Das Frontend parsed diese Tags und führt die Aktion aus
-- Highlighting: CSS-Overlay mit pulsierendem Ring um das Ziel-Element
-- Navigation: `router.push()` zur angegebenen Route
+**Mechanism:**
+- iCura responses can contain special tags: `[highlight:selector]` or `[navigate:/path]`
+- The frontend parses these tags and executes the action
+- Highlighting: CSS overlay with pulsating ring around the target element
+- Navigation: `router.push()` to the specified route
 
-**Tool-Use im Backend:**
-Erweitere den `/api/workflows/assist` Endpoint um ein neues Tool:
+**Tool-Use in the backend:**
+Extend the `/api/workflows/assist` endpoint with a new tool:
 
 ```typescript
 {
   name: "guide_user",
-  description: "Führt den Benutzer visuell zu einem UI-Element oder einer Seite",
+  description: "Visually guides the user to a UI element or page",
   input_schema: {
     type: "object",
     properties: {
       action: { type: "string", enum: ["highlight", "navigate", "open_chat"] },
-      target: { type: "string", description: "CSS-Selektor oder Pfad" },
-      explanation: { type: "string", description: "Was der User dort finden wird" }
+      target: { type: "string", description: "CSS selector or path" },
+      explanation: { type: "string", description: "What the user will find there" }
     },
     required: ["action", "target", "explanation"]
   }
 }
 ```
 
-**Bekannte Selektoren/Pfade:**
+**Known selectors/paths:**
 ```
-/uebersicht — Übersicht
-/zahlungen — Zahlungen
-/patienten — Patienten
-/ratenplan — Ratenpläne
-/mahnwesen — Mahnwesen
-/quartal — Quartalsbericht
-/automatisierungen — Automatisierungen
-/import — Datenimport
-/einstellungen — Einstellungen
-[data-nav="zahlungen"] — Sidebar-Link zu Zahlungen
-[data-nav="patienten"] — Sidebar-Link zu Patienten
-.btn-primary — Primärer Action-Button auf der aktuellen Seite
+/uebersicht — Overview
+/zahlungen — Payments
+/patienten — Patients
+/ratenplan — Rate Plans
+/mahnwesen — Dunning
+/quartal — Quarterly Report
+/automatisierungen — Automations
+/import — Data Import
+/einstellungen — Settings
+[data-nav="zahlungen"] — Sidebar link to Payments
+[data-nav="patienten"] — Sidebar link to Patients
+.btn-primary — Primary action button on the current page
 ```
 
 ### 6. Quick-Action Chips
 
-Kontextabhängige Vorschläge oben im Chat-Panel:
+Context-dependent suggestions at the top of the chat panel:
 
-**Auf /uebersicht:**
-- "Zeig mir kritische Patienten"
-- "Wie ist die Zahlungsquote?"
-- "Neue Automatisierung erstellen"
+**On /uebersicht:**
+- "Show critical patients"
+- "What's the payment rate?"
+- "Create a new automation"
 
-**Auf /patienten:**
-- "Suche einen Patienten"
-- "Wie viele Kinder sind registriert?"
-- "Patienten ohne E-Mail finden"
+**On /patienten:**
+- "Search for a patient"
+- "How many children are registered?"
+- "Find patients without email"
 
-**Auf /automatisierungen:**
-- "Erstell eine Zahlungserinnerung"
-- "Eskalationspipeline bauen"
-- "Rücklastschrift-Alert einrichten"
+**On /automatisierungen:**
+- "Create a payment reminder"
+- "Build an escalation pipeline"
+- "Set up chargeback alert"
 
-**Auf /zahlungen:**
-- "Wie richte ich die Bankverbindung ein?"
-- "Was sind Rücklastschriften?"
-- "Offene Zuordnungen zeigen"
+**On /zahlungen:**
+- "How do I set up the bank connection?"
+- "What are chargebacks?"
+- "Show open assignments"
 
-**Auf /import:**
-- "Wie exportiere ich aus IVORIS?"
-- "Welche Formate werden unterstützt?"
-- "CSV hochladen"
+**On /import:**
+- "How do I export from IVORIS?"
+- "Which formats are supported?"
+- "Upload a CSV"
 
-**Auf /einstellungen:**
-- "Benutzer hinzufügen"
-- "E-Mail-Provider einrichten"
-- "Bankverbindung konfigurieren"
+**On /einstellungen:**
+- "Add a user"
+- "Set up email provider"
+- "Configure bank connection"
 
-### 7. System-Prompt Erweiterung
+### 7. System Prompt Extension
 
-Der System-Prompt für den Assist-Endpoint muss erweitert werden:
+The system prompt for the assist endpoint must be extended:
 
 ```
-Du bist iCura, der KI-Assistent von Anima Cura. Du lebst als Widget in der App und hilfst dem Benutzer bei allem.
+You are iCura, the AI assistant of Anima Cura. You live as a widget inside the app and help the user with everything.
 
-DEIN KONTEXT:
-- Du weißt auf welcher Seite der Benutzer ist
-- Du kennst die App-Struktur und kannst den Benutzer zu jeder Seite navigieren
-- Du kannst UI-Elemente highlighten um dem Benutzer zu zeigen wo er klicken soll
-- Du antwortest in der Sprache des Benutzers
+YOUR CONTEXT:
+- You know which page the user is on
+- You know the app structure and can navigate the user to any page
+- You can highlight UI elements to show the user where to click
+- You respond in the language the user writes in
 
-DEINE FÄHIGKEITEN:
-1. Fragen beantworten über die App, Funktionen, Daten
-2. Workflows erstellen (wie bisher)
-3. Den Benutzer visuell durch die App führen (highlight, navigate)
-4. Daten aus der App interpretieren und erklären
-5. Empfehlungen geben basierend auf dem Kontext
+YOUR CAPABILITIES:
+1. Answer questions about the app, features, data
+2. Create workflows (as before)
+3. Visually guide the user through the app (highlight, navigate)
+4. Interpret and explain data from the app
+5. Give recommendations based on context
 
-PERSÖNLICHKEIT:
-- Freundlich, kompetent, nicht aufdringlich
-- Kurze Antworten bevorzugen (2-3 Sätze wenn möglich)
-- Bei komplexen Themen nachfragen statt raten
-- Spricht den Benutzer mit "Sie" an
+PERSONALITY:
+- Friendly, competent, not pushy
+- Prefer short answers (2-3 sentences when possible)
+- Ask follow-up questions on complex topics rather than guessing
+- Address the user formally ("Sie" in German)
 ```
 
-## Dateistruktur
+### 8. Cross-Page Workflow Creation
+
+The most important feature: the user can say "Create an automation for payment reminders" from ANY page and iCura will:
+
+1. Automatically navigate to `/automatisierungen` (via `guide_user` tool with `action: "navigate"`)
+2. Create the workflow via the existing `propose_workflow` tool
+3. Place the nodes on the canvas
+4. Show the user the result and ask whether to activate it
+
+**Backend flow:**
+- If `context.currentPage !== "/automatisierungen"` and the user asks for an automation:
+  - First call `guide_user({ action: "navigate", target: "/automatisierungen" })`
+  - Then call `propose_workflow(...)` with nodes/edges
+- The frontend navigates the user, waits briefly, then injects the workflow into the editor
+
+**Same applies to other actions:**
+- "Show me patient Mueller" → navigate to `/patienten`, fill in search
+- "Import a CSV" → navigate to `/import`
+- "How's my quarterly report?" → navigate to `/quartal`
+
+## File Structure
 
 ```
 src/components/icura/
-  ICuraWidget.tsx           — Floating Button + Panel Container
-  ICuraChat.tsx             — Chat-Nachrichten-Ansicht
-  ICuraInput.tsx            — Textfeld + Voice + Send
-  ICuraVoice.tsx            — Web Speech API Wrapper
-  ICuraHighlight.tsx        — UI-Highlighting Overlay
-  ICuraQuickActions.tsx     — Kontextabhängige Chips
-  ICuraProvider.tsx         — Context Provider (wraps the app)
-  useICura.ts               — Zustand Store für iCura State
-  types.ts                  — TypeScript Types
+  ICuraWidget.tsx           — Floating button + panel container
+  ICuraChat.tsx             — Chat message view
+  ICuraInput.tsx            — Text field + voice + send
+  ICuraVoice.tsx            — Web Speech API wrapper
+  ICuraHighlight.tsx        — UI highlighting overlay
+  ICuraQuickActions.tsx     — Context-dependent chips
+  ICuraProvider.tsx         — Context provider (wraps the app)
+  useICura.ts               — Zustand store for iCura state
+  types.ts                  — TypeScript types
 ```
 
-## Integration in die App
+## Integration into the App
 
-In `src/app/(dashboard)/layout.tsx` den Provider und das Widget einbinden:
+In `src/app/(dashboard)/layout.tsx`, include the provider and widget:
 
 ```tsx
 import { ICuraProvider } from "@/components/icura/ICuraProvider";
 import { ICuraWidget } from "@/components/icura/ICuraWidget";
 
-// Im Layout:
+// In the layout:
 <ICuraProvider>
   <div className="ac-shell">
     {/* ... existing layout ... */}
@@ -233,52 +253,34 @@ import { ICuraWidget } from "@/components/icura/ICuraWidget";
 </ICuraProvider>
 ```
 
-## Backend-Änderungen
+## Backend Changes
 
-Der `/api/workflows/assist` Endpoint muss erweitert werden:
+The `/api/workflows/assist` endpoint must be extended:
 
-1. **Neuer Parameter `context`** im Request Body (AppContext Objekt)
-2. **Neues Tool `guide_user`** für Navigation und Highlighting
-3. **Erweiterter System-Prompt** mit App-Struktur und Kontext
-4. **Mode-Parameter:** `mode: "workflow" | "assistant"` — im Workflow-Builder bleibt das alte Verhalten, überall sonst der neue Assistenten-Modus
+1. **New parameter `context`** in request body (AppContext object)
+2. **New tool `guide_user`** for navigation and highlighting
+3. **Extended system prompt** with app structure and context
+4. **Mode parameter:** `mode: "workflow" | "assistant"` — in the workflow builder, the old behavior remains; everywhere else, the new assistant mode
+5. **Cross-page actions:** When a user requests a workflow from a non-automation page, chain `guide_user` (navigate) + `propose_workflow` in sequence
 
-### Cross-Page Workflow-Erstellung
+## Design Requirements
 
-Das wichtigste Feature: Der User kann von JEDER Seite aus sagen "Erstell eine Automatisierung für Zahlungserinnerungen" und iCura:
+- **Premium, futuristic** — no generic chat widget
+- Subtle glassmorphism effects on the panel (backdrop-blur)
+- Smooth animations everywhere (open/close, messages, highlighting)
+- The floating button should feel alive (subtle idle animation)
+- Voice indicator should be visually impressive (pulsating ring, waveform)
+- Highlighting should be smooth (not abrupt box-shadow, but animated glow)
+- Dark mode must look equally good as light mode
+- Mobile-responsive: On small screens the panel goes fullscreen
 
-1. Navigiert automatisch zu `/automatisierungen` (via `guide_user` Tool mit `action: "navigate"`)
-2. Erstellt den Workflow über das bestehende `propose_workflow` Tool
-3. Legt die Nodes auf den Canvas
-4. Zeigt dem User das Ergebnis und fragt ob er es aktivieren möchte
+## Important Notes
 
-Der Flow im Backend:
-- Wenn `context.currentPage !== "/automatisierungen"` und der User nach einer Automatisierung fragt:
-  - Erst `guide_user({ action: "navigate", target: "/automatisierungen" })` aufrufen
-  - Dann `propose_workflow(...)` mit den Nodes/Edges
-- Das Frontend navigiert den User, wartet kurz, und injected dann den Workflow in den Editor
-
-Gleiches gilt für andere Aktionen:
-- "Zeig mir Patient Müller" → navigate zu `/patienten`, Suche ausfüllen
-- "Importiere eine CSV" → navigate zu `/import`
-- "Wie ist mein Quartalsbericht?" → navigate zu `/quartal`
-
-## Design-Anforderungen
-
-- **Premium, futuristisch** — kein generisches Chat-Widget
-- Subtile Glassmorphism-Effekte auf dem Panel (backdrop-blur)
-- Smooth Animationen überall (open/close, messages, highlighting)
-- Der Floating Button soll sich lebendig anfühlen (subtle idle animation)
-- Voice-Indikator soll visuell beeindruckend sein (pulsierender Ring, Waveform)
-- Highlighting soll smooth sein (nicht abruptes Box-Shadow, sondern animated glow)
-- Dark Mode muss genauso gut aussehen wie Light Mode
-- Mobile-responsive: Auf kleinen Screens wird das Panel fullscreen
-
-## Wichtige Hinweise
-
-1. `"use client"` auf allen Komponenten
-2. Voice ist optional — wenn der Browser die Web Speech API nicht unterstützt, nur Text-Input zeigen
-3. Der bestehende iCura Chat im Workflow-Builder (`src/components/workflows/ICuraChat.tsx`) bleibt bestehen — das neue Widget ist zusätzlich und global
-4. Sidebar-Links brauchen `data-nav` Attribute für das Highlighting (in layout.tsx hinzufügen)
-5. Alle Texte zweisprachig über `t()` aus `src/lib/i18n.ts`
-6. Build muss durchgehen (`npm run build`)
-7. Kein localStorage — Zustand-Store für Session-State
+1. `"use client"` on all components
+2. Voice is optional — if the browser doesn't support Web Speech API, show text input only
+3. The existing iCura chat in the workflow builder (`src/components/workflows/ICuraChat.tsx`) stays — the new widget is additional and global
+4. Sidebar links need `data-nav` attributes for highlighting (add in layout.tsx)
+5. All texts bilingual via `t()` from `src/lib/i18n.ts`
+6. Build must pass (`npm run build`)
+7. No localStorage — use Zustand store for session state
+8. The widget is designed for future extraction into its own repo — keep it self-contained with minimal coupling to Anima Cura internals
