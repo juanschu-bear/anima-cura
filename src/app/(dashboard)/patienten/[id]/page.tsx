@@ -124,12 +124,30 @@ export default function PatientDetailPage() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-5 text-sm md:grid-cols-3">
+          <Info label="IVORIS-Nr." value={patient.ivoris_nummer || "—"} />
           <Info label="Geburtsdatum" value={formatDate(patient.geburtsdatum)} />
-          <Info label="Kassenart" value={patient.kasse === "privat" ? "Privat" : "Gesetzlich"} />
-          <Info label="Behandlungsbeginn" value={formatDate(patient.behandlung_start)} />
+          <Info label="Geschlecht" value={patient.geschlecht === "w" ? "Weiblich" : patient.geschlecht === "m" ? "Männlich" : patient.geschlecht === "d" ? "Divers" : "—"} />
+          <Info label="Behandlung" value={patient.behandlung || "Kein Status"} />
+          <Info label="Versicherung" value={
+            patient.versicherung_status === "Family" ? "Familienversichert (GKV)" :
+            patient.versicherung_status === "Statutory" ? "Gesetzlich (GKV)" :
+            patient.versicherung_status === "Private" ? "Privat (PKV)" :
+            patient.versicherung_status === "Retired" ? "Rentner (GKV)" :
+            patient.kasse === "gesetzlich" ? "Gesetzlich" : "Privat"
+          } />
+          <Info label="Versichertennr." value={patient.versichertennummer || "—"} mono />
+          {patient.versicherter_vorname && patient.versicherter_nachname && (
+            patient.versicherter_vorname !== patient.vorname || patient.versicherter_nachname !== patient.nachname
+          ) && (
+            <Info label="Versicherungsnehmer" value={`${patient.versicherter_vorname} ${patient.versicherter_nachname}`} />
+          )}
+          <Info label="Patient seit" value={formatDate(patient.versicherung_seit)} />
           <Info label="Telefon" value={patient.telefon || "—"} />
+          <Info label="Mobil" value={patient.mobiltelefon || "—"} />
           <Info label="E-Mail" value={patient.email || "—"} />
-          <Info label="IBAN" value={patient.iban || "—"} mono />
+          <Info label="Adresse" value={
+            [patient.strasse, [patient.plz, patient.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"
+          } />
         </div>
         {mahnHighlight && (
           <div

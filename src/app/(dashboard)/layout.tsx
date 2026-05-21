@@ -19,6 +19,7 @@ import {
   Search,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
+import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/uebersicht", icon: LayoutDashboard, labelDe: "Übersicht", labelEn: "Overview" },
@@ -36,6 +37,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme, toggleTheme, locale, setLocale } = useAppStore();
   const isGerman = locale === "de";
   const now = new Date().toLocaleDateString(isGerman ? "de-DE" : "en-GB", {
@@ -122,7 +124,15 @@ export default function DashboardLayout({
             <div className="hidden md:block text-xs text-praxis-400 tracking-wide">{now}</div>
             <div className="relative hidden lg:block w-full max-w-sm">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
-              <input className="input pl-9" placeholder={isGerman ? "Patient suchen..." : "Search patient..."} />
+              <input
+                className="input pl-9"
+                placeholder={isGerman ? "Patient suchen..." : "Search patient..."}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
+                    router.push(`/patienten?q=${encodeURIComponent((e.target as HTMLInputElement).value.trim())}`);
+                  }
+                }}
+              />
             </div>
             <div className="flex items-center gap-2">
               <button

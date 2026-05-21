@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { createBrowserClient } from "@/lib/db/supabase";
-import { DEMO_TREATMENT_TYPES } from "@/lib/mock-data";
 
 function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
   const max = Math.min(Math.max(total, 1), 36);
@@ -32,7 +31,8 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 
 export default function PatientenPage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams?.get("q") || "");
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const { patienten, totalCount, loading, refetch } = usePatienten(search);
@@ -93,21 +93,21 @@ export default function PatientenPage() {
 
   async function handleIvorisSync() {
     setSyncing(true);
-    setSyncHint("");
+    setSyncHint("Synchronisiere mit IVORIS... Das kann einige Minuten dauern.");
     try {
-      const res = await fetch("/api/ivoris/patients/sync", { method: "POST" });
+      const res = await fetch("/api/ivoris/patients/batch-sync");
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
         setSyncHint(payload.error || "IVORIS-Sync fehlgeschlagen.");
       } else {
-        const result = payload.result || {};
+        const r = payload.results || {};
         setSyncHint(
-          `IVORIS-Sync: ${result.imported ?? 0} neu, ${result.updated ?? 0} aktualisiert, ${result.skipped ?? 0} übersprungen.`
+          `IVORIS-Sync abgeschlossen: ${r.fetched ?? 0} geholt, ${r.updated ?? 0} aktualisiert, ${r.inserted ?? 0} neu.`
         );
         refetch();
       }
     } catch {
-      setSyncHint("IVORIS-Sync fehlgeschlagen.");
+      setSyncHint("IVORIS-Sync fehlgeschlagen. Versuche es erneut.");
     } finally {
       setSyncing(false);
     }
@@ -262,7 +262,7 @@ export default function PatientenPage() {
               <span className="mb-1 block text-xs font-medium text-praxis-500">Behandlung *</span>
               <select className="input" value={form.behandlung} onChange={(e) => setForm((prev) => ({ ...prev, behandlung: e.target.value }))}>
                 <option value="">Bitte wählen</option>
-                {DEMO_TREATMENT_TYPES.map((type) => (
+                {["Beratung", "KFO", "Plan", "Nachkontrolle", "Retention", "Abgeschlossen"].map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
