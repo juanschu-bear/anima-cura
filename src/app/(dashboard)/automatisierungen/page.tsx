@@ -1,381 +1,409 @@
 "use client";
 
-import { useState } from "react";
-import { Mail, MessageCircle, AlertTriangle, TrendingDown, Clock, Shield, ToggleLeft, ToggleRight, ChevronRight, Zap, Save, X, Edit3 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Zap,
+  Activity,
+  AlertOctagon,
+  Save,
+  ChevronLeft,
+  Sparkles,
+  Search,
+  MoreHorizontal,
+  CircleDot,
+  Trash2,
+  Copy,
+  Power,
+} from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
+import { createBrowserClient } from "@/lib/db/supabase";
+import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
+import { WorkflowTemplatePicker } from "@/components/workflows/WorkflowTemplates";
+import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflows/types";
 
-interface Automation {
-  id: string;
-  icon: any;
-  title: string;
-  description: string;
-  trigger: string;
-  action: string;
-  status: "aktiv" | "inaktiv" | "coming_soon";
-  category: "zahlung" | "kommunikation" | "analyse";
-  template?: { subject: string; body: string };
-  config?: { delayDays?: number; channel?: string; threshold?: number };
+const SETTING_KEY = "workflows";
+
+function nid() {
+  return Math.random().toString(36).slice(2, 10);
 }
 
-const DEFAULT_AUTOMATIONS: Automation[] = [
+const SEED: Workflow[] = [
   {
-    id: "auto-email-reminder",
-    icon: Mail,
-    title: "Zahlungserinnerung per E-Mail",
-    description: "Automatische freundliche Erinnerung wenn eine Rate überfällig ist. Der Patient erhält eine personalisierte E-Mail mit Zahlungsdetails und Kontoverbindung.",
-    trigger: "Rate ist X Tage überfällig",
-    action: "E-Mail an Patient (oder Versicherungsnehmer bei Kindern)",
-    status: "inaktiv",
-    category: "kommunikation",
-    template: {
-      subject: "Erinnerung: Offene Ratenzahlung - Praxis Dr. Schubert",
-      body: "Sehr geehrte/r {{patient_name}},\n\nwir möchten Sie freundlich daran erinnern, dass die Ratenzahlung Nr. {{rate_nummer}} über {{betrag}}€ seit dem {{faellig_am}} offen ist.\n\nBitte überweisen Sie den Betrag auf folgendes Konto:\nKieferorthopädische Praxis Dr. Elena Schubert\nIBAN: DE XX XXXX XXXX XXXX XXXX XX\nVerwendungszweck: Rate {{rate_nummer}} / {{patient_name}}\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen\nPraxis Dr. Elena Schubert\nNikolaistraße 20, 04109 Leipzig",
-    },
-    config: { delayDays: 6 },
+    id: nid(),
+    name: "Zahlungserinnerung — 6 Tage",
+    description: "Freundliche E-Mail wenn Rate 6 Tage überfällig ist",
+    active: true,
+    updatedAt: new Date().toISOString(),
+    runsToday: 4,
+    errors: 0,
+    nodes: [
+      { id: "t", type: "trigger", position: { x: 40, y: 220 }, data: { event: "rate_overdue", days: 6 } },
+      { id: "c", type: "condition", position: { x: 380, y: 220 }, data: { field: "email_vorhanden", operator: "is_true" } },
+      { id: "e", type: "action_email", position: { x: 740, y: 160 }, data: {
+        recipient: "patient",
+        subject: "Erinnerung: Offene Rate {{rate_nummer}}",
+        body: "Sehr geehrte/r {{patient_name}},\n\nwir möchten Sie freundlich daran erinnern, dass die Rate Nr. {{rate_nummer}} über {{betrag}}€ seit dem {{faellig_am}} offen ist.\n\nMit freundlichen Grüßen\n{{praxis_name}}",
+      } },
+    ],
+    edges: [
+      { id: "e1", source: "t", target: "c", type: "smoothstep", animated: true },
+      { id: "e2", source: "c", sourceHandle: "true", target: "e", type: "smoothstep", animated: true },
+    ],
   },
   {
-    id: "auto-email-stufe2",
-    icon: Mail,
-    title: "Formelle Mahnung per E-Mail",
-    description: "Formelleres Schreiben bei fortgesetztem Zahlungsverzug. Weist auf vertragliche Konsequenzen hin.",
-    trigger: "Rate ist X Tage überfällig (Stufe 2)",
-    action: "Formelle E-Mail + Telefonat-Aufgabe",
-    status: "inaktiv",
-    category: "kommunikation",
-    template: {
-      subject: "Mahnung: Offene Ratenzahlung - Praxis Dr. Schubert",
-      body: "Sehr geehrte/r {{patient_name}},\n\ntrotz unserer Erinnerung ist die Ratenzahlung Nr. {{rate_nummer}} über {{betrag}}€ (fällig am {{faellig_am}}) weiterhin offen.\n\nWir bitten Sie dringend, den ausstehenden Betrag innerhalb der nächsten 7 Werktage zu überweisen.\n\nGemäß Ihrer Ratenvereinbarung wird bei Zahlungsverzug die Gesamtsumme fällig.\n\nBitte kontaktieren Sie uns unter 0341-XXXXXXX falls Sie Schwierigkeiten haben.\n\nMit freundlichen Grüßen\nPraxis Dr. Elena Schubert",
-    },
-    config: { delayDays: 21 },
-  },
-  {
-    id: "auto-whatsapp",
-    icon: MessageCircle,
-    title: "WhatsApp-Benachrichtigung",
-    description: "Nachricht über WhatsApp an den Patienten oder die Eltern bei Zahlungsverzug.",
-    trigger: "Rate ist X Tage überfällig",
-    action: "WhatsApp-Nachricht an hinterlegte Mobilnummer",
-    status: "coming_soon",
-    category: "kommunikation",
-    template: {
-      subject: "",
-      body: "Guten Tag {{patient_name}}, hier eine freundliche Erinnerung der Praxis Dr. Schubert: Ihre Ratenzahlung Nr. {{rate_nummer}} über {{betrag}}€ ist seit dem {{faellig_am}} offen. Bei Fragen erreichen Sie uns unter 0341-XXXXXXX.",
-    },
-    config: { delayDays: 3 },
-  },
-  {
-    id: "auto-ruecklast",
-    icon: AlertTriangle,
-    title: "Rücklastschrift-Erkennung",
-    description: "Erkennt automatisch wenn ein Patient eine Lastschrift zurückholt. Erstellt sofort eine Benachrichtigung und stuft den Patienten in die Mahnpipeline ein. Bankgebühren werden automatisch vermerkt.",
-    trigger: "Negative Buchung auf dem Praxiskonto erkannt",
-    action: "Alert + Patient in Mahnpipeline + Gebühren vermerken",
-    status: "coming_soon",
-    category: "zahlung",
-    config: {},
-  },
-  {
-    id: "auto-scoring",
-    icon: TrendingDown,
-    title: "Patienten-Scoring",
-    description: "Bewertet die Zahlungszuverlässigkeit jedes Patienten (0-100). Berücksichtigt: pünktliche Zahlungen, Rücklastschriften, Verzögerungen. Red-Flag bei kritischem Wert.",
-    trigger: "Nach jeder Zahlungsabgleichung",
-    action: "Score aktualisieren, Red-Flag bei Wert unter Schwellwert",
-    status: "coming_soon",
-    category: "analyse",
-    config: { threshold: 80 },
-  },
-  {
-    id: "auto-eskalation",
-    icon: Shield,
-    title: "Automatische Eskalation",
-    description: "Verschiebt Fälle automatisch durch die Mahnstufen basierend auf den konfigurierten Zeiträumen. Jede Stufe löst die entsprechende Automation aus.",
-    trigger: "Tägliche Prüfung um 06:00 Uhr",
-    action: "Mahnstufe erhöhen + Aktion auslösen",
-    status: "inaktiv",
-    category: "zahlung",
-  },
-  {
-    id: "auto-daily-briefing",
-    icon: Clock,
-    title: "Tägliches Briefing",
-    description: "Die Praxisleitung erhält jeden Morgen eine E-Mail-Zusammenfassung mit den wichtigsten Ereignissen.",
-    trigger: "Täglich um 06:30 Uhr",
-    action: "E-Mail an Praxisleitung",
-    status: "inaktiv",
-    category: "kommunikation",
-    template: {
-      subject: "Anima Cura - Tagesbriefing {{datum}}",
-      body: "Guten Morgen Frau Dr. Schubert,\n\nhier ist Ihr tägliches Briefing:\n\n• Neue Zahlungseingänge: {{neue_zahlungen}}\n• Überfällige Raten: {{ueberfaellige_raten}}\n• Rücklastschriften: {{ruecklastschriften}}\n• Patienten mit kritischem Scoring: {{kritische_patienten}}\n\nEine gute Woche wünscht\nIhr Anima Cura System",
-    },
+    id: nid(),
+    name: "Rücklastschrift-Alert",
+    description: "Eskalation bei zurückgegebener Lastschrift",
+    active: false,
+    updatedAt: new Date().toISOString(),
+    runsToday: 0,
+    errors: 0,
+    nodes: [
+      { id: "t", type: "trigger", position: { x: 40, y: 220 }, data: { event: "rate_returned" } },
+      { id: "a", type: "action_alert", position: { x: 380, y: 220 }, data: { severity: "critical", recipient: "praxisleitung", message: "Rücklastschrift bei {{patient_name}}" } },
+    ],
+    edges: [{ id: "e1", source: "t", target: "a", type: "smoothstep", animated: true }],
   },
 ];
 
 export default function AutomatisierungenPage() {
-  const { theme } = useAppStore();
+  const { theme, locale } = useAppStore();
   const isDark = theme === "dark";
-  const [automations, setAutomations] = useState<Automation[]>(DEFAULT_AUTOMATIONS);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const isGerman = locale === "de";
+
+  const [workflows, setWorkflows] = useState<Workflow[]>(SEED);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTemplate, setEditTemplate] = useState<{ subject: string; body: string }>({ subject: "", body: "" });
-  const [editConfig, setEditConfig] = useState<{ delayDays?: number; threshold?: number }>({});
-  const [saveHint, setSaveHint] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [search, setSearch] = useState("");
+  const [saveHint, setSaveHint] = useState<string>("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
-  function handleToggle(id: string) {
-    const auto = automations.find((a) => a.id === id);
-    if (auto?.status === "coming_soon") return;
-    setAutomations((prev) =>
-      prev.map((a) => a.id === id ? { ...a, status: a.status === "aktiv" ? "inaktiv" : "aktiv" } : a)
-    );
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data } = await supabase
+          .from("einstellungen")
+          .select("value")
+          .eq("key", SETTING_KEY)
+          .maybeSingle();
+        if (!cancelled && data?.value && Array.isArray(data.value) && data.value.length > 0) {
+          setWorkflows(data.value as Workflow[]);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function persist(next: Workflow[]) {
+    try {
+      const supabase = createBrowserClient();
+      await supabase.from("einstellungen").upsert({ key: SETTING_KEY, value: next });
+    } catch {
+      // soft-fail
+    }
   }
 
-  function startEditing(auto: Automation) {
-    setEditingId(auto.id);
-    setEditTemplate(auto.template || { subject: "", body: "" });
-    setEditConfig(auto.config || {});
-    setExpandedId(auto.id);
+  function updateWorkflow(id: string, patch: Partial<Workflow>) {
+    setWorkflows((prev) => {
+      const next = prev.map((w) => (w.id === id ? { ...w, ...patch, updatedAt: new Date().toISOString() } : w));
+      persist(next);
+      return next;
+    });
   }
 
-  function saveEditing(id: string) {
-    setAutomations((prev) =>
-      prev.map((a) => a.id === id ? { ...a, template: { ...editTemplate }, config: { ...editConfig } } : a)
-    );
+  function addWorkflow(w: Workflow) {
+    setWorkflows((prev) => {
+      const next = [w, ...prev];
+      persist(next);
+      return next;
+    });
+    setShowTemplates(false);
+    setEditingId(w.id);
+  }
+
+  function deleteWorkflow(id: string) {
+    setWorkflows((prev) => {
+      const next = prev.filter((w) => w.id !== id);
+      persist(next);
+      return next;
+    });
+    setMenuOpenId(null);
+  }
+
+  function duplicateWorkflow(id: string) {
+    const src = workflows.find((w) => w.id === id);
+    if (!src) return;
+    const copy: Workflow = {
+      ...src,
+      id: nid(),
+      name: `${src.name} (Kopie)`,
+      active: false,
+      updatedAt: new Date().toISOString(),
+    };
+    setWorkflows((prev) => {
+      const next = [copy, ...prev];
+      persist(next);
+      return next;
+    });
+    setMenuOpenId(null);
+  }
+
+  function handleCanvasChange(id: string, nodes: WorkflowNode[], edges: WorkflowEdge[]) {
+    updateWorkflow(id, { nodes, edges });
+  }
+
+  function saveAndClose() {
+    setSaveHint("Workflow gespeichert");
+    setTimeout(() => setSaveHint(""), 1800);
     setEditingId(null);
-    setSaveHint("Gespeichert!");
-    setTimeout(() => setSaveHint(""), 2000);
   }
 
-  function cancelEditing() {
-    setEditingId(null);
-  }
+  const editing = useMemo(() => workflows.find((w) => w.id === editingId) || null, [workflows, editingId]);
 
-  const activeCount = automations.filter((a) => a.status === "aktiv").length;
-  const availableCount = automations.filter((a) => a.status !== "coming_soon").length;
-  const soonCount = automations.filter((a) => a.status === "coming_soon").length;
+  const activeCount = workflows.filter((w) => w.active).length;
+  const runsToday = workflows.reduce((s, w) => s + (w.runsToday || 0), 0);
+  const errorsToday = workflows.reduce((s, w) => s + (w.errors || 0), 0);
 
-  const categories = [
-    { key: "kommunikation", label: "Kommunikation", icon: Mail },
-    { key: "zahlung", label: "Zahlungen & Mahnwesen", icon: AlertTriangle },
-    { key: "analyse", label: "Analyse & Scoring", icon: TrendingDown },
-  ];
+  const filtered = workflows.filter((w) =>
+    search.trim() === ""
+      ? true
+      : w.name.toLowerCase().includes(search.toLowerCase()) ||
+        (w.description || "").toLowerCase().includes(search.toLowerCase())
+  );
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className={`text-[30px] font-extrabold tracking-tight ${isDark ? "text-white" : "text-praxis-800"}`}>Automatisierungen</h1>
-        <p className={`mt-1 text-sm ${isDark ? "text-[#b6c2d6]" : "text-praxis-400"}`}>
-          Regeln und Workflows die automatisch im Hintergrund arbeiten. Aktivieren, konfigurieren, fertig.
-        </p>
-      </div>
-
-      {saveHint && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-700">{saveHint}</div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="Aktive Automationen" value={String(activeCount)} isDark={isDark} />
-        <StatCard label="Verfügbar" value={String(availableCount)} isDark={isDark} />
-        <StatCard label="In Entwicklung" value={String(soonCount)} isDark={isDark} accent />
-      </div>
-
-      {categories.map((cat) => {
-        const items = automations.filter((a) => a.category === cat.key);
-        const CatIcon = cat.icon;
-        return (
-          <div key={cat.key} className="space-y-3">
-            <h2 className={`flex items-center gap-2 text-lg font-bold ${isDark ? "text-[#e2eaf6]" : "text-praxis-700"}`}>
-              <CatIcon size={18} />
-              {cat.label}
-            </h2>
-            <div className="space-y-2">
-              {items.map((auto) => {
-                const Icon = auto.icon;
-                const isOn = auto.status === "aktiv";
-                const isExpanded = expandedId === auto.id;
-                const isEditing = editingId === auto.id;
-                const isSoon = auto.status === "coming_soon";
-
-                return (
-                  <div
-                    key={auto.id}
-                    className={`rounded-xl border p-5 transition-all ${isDark ? "border-white/10 bg-[#111824]" : "border-surface-200 bg-white"} ${isSoon ? "opacity-70" : ""}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div
-                        className="flex flex-1 items-center gap-4 cursor-pointer"
-                        onClick={() => setExpandedId(isExpanded ? null : auto.id)}
-                      >
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                          isSoon ? "bg-gray-100 text-gray-400"
-                          : isOn ? "bg-[#edf8ed] text-[#3d9c46]"
-                          : isDark ? "bg-white/5 text-[#7b93b4]" : "bg-surface-100 text-praxis-400"
-                        }`}>
-                          <Icon size={20} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className={`text-[15px] font-semibold ${isDark ? "text-[#e9eef8]" : "text-praxis-800"}`}>{auto.title}</p>
-                            {isSoon && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">COMING SOON</span>}
-                            {isOn && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">AKTIV</span>}
-                          </div>
-                          <p className={`mt-0.5 text-sm truncate ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>{auto.description}</p>
-                        </div>
-                        <ChevronRight size={16} className={`transition-transform ${isExpanded ? "rotate-90" : ""} ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`} />
-                      </div>
-
-                      <button
-                        onClick={() => handleToggle(auto.id)}
-                        className={`ml-4 shrink-0 ${isSoon ? "cursor-not-allowed" : "cursor-pointer"}`}
-                        disabled={isSoon}
-                      >
-                        {isOn ? <ToggleRight size={36} className="text-[#3d9c46]" /> : <ToggleLeft size={36} className={isDark ? "text-[#4a5d7a]" : "text-praxis-300"} />}
-                      </button>
-                    </div>
-
-                    {isExpanded && (
-                      <div className={`mt-4 space-y-4 rounded-lg border p-4 ${isDark ? "border-white/5 bg-[#0c1018]" : "border-surface-100 bg-surface-50"}`}>
-                        <p className={`text-sm ${isDark ? "text-[#b4c0d4]" : "text-praxis-600"}`}>{auto.description}</p>
-
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div>
-                            <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>Auslöser</p>
-                            <p className={`mt-1 text-sm font-medium ${isDark ? "text-[#e2eaf6]" : "text-praxis-700"}`}>
-                              <Zap size={12} className="inline mr-1 text-amber-500" />{auto.trigger}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>Aktion</p>
-                            <p className={`mt-1 text-sm font-medium ${isDark ? "text-[#e2eaf6]" : "text-praxis-700"}`}>{auto.action}</p>
-                          </div>
-                        </div>
-
-                        {/* Config: Delay Days */}
-                        {auto.config?.delayDays !== undefined && (
-                          <div>
-                            <label className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>
-                              Verzögerung (Tage nach Fälligkeit)
-                            </label>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                className="input mt-1 w-32"
-                                value={editConfig.delayDays ?? auto.config.delayDays}
-                                onChange={(e) => setEditConfig((prev) => ({ ...prev, delayDays: Number(e.target.value) }))}
-                              />
-                            ) : (
-                              <p className={`mt-1 text-sm font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{auto.config.delayDays} Tage</p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Config: Threshold */}
-                        {auto.config?.threshold !== undefined && (
-                          <div>
-                            <label className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>
-                              Scoring-Schwellwert für Red-Flag
-                            </label>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                className="input mt-1 w-32"
-                                value={editConfig.threshold ?? auto.config.threshold}
-                                onChange={(e) => setEditConfig((prev) => ({ ...prev, threshold: Number(e.target.value) }))}
-                              />
-                            ) : (
-                              <p className={`mt-1 text-sm font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>Unter {auto.config.threshold}%</p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Template Editor */}
-                        {auto.template && (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>
-                                {auto.id.includes("whatsapp") ? "Nachrichtenvorlage" : "E-Mail-Vorlage"}
-                              </p>
-                              {!isEditing && !isSoon && (
-                                <button
-                                  onClick={() => startEditing(auto)}
-                                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-[#4b42d6] hover:bg-[#f5f3ff]"
-                                >
-                                  <Edit3 size={12} /> Bearbeiten
-                                </button>
-                              )}
-                            </div>
-
-                            {auto.template.subject && (
-                              <div>
-                                <p className={`text-xs ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>Betreff:</p>
-                                {isEditing ? (
-                                  <input
-                                    className="input mt-1"
-                                    value={editTemplate.subject}
-                                    onChange={(e) => setEditTemplate((prev) => ({ ...prev, subject: e.target.value }))}
-                                  />
-                                ) : (
-                                  <p className={`mt-1 text-sm font-medium ${isDark ? "text-[#e2eaf6]" : "text-praxis-700"}`}>{auto.template.subject}</p>
-                                )}
-                              </div>
-                            )}
-
-                            <div>
-                              <p className={`text-xs ${isDark ? "text-[#7b93b4]" : "text-praxis-400"}`}>
-                                {auto.id.includes("whatsapp") ? "Nachricht:" : "Inhalt:"}
-                              </p>
-                              {isEditing ? (
-                                <textarea
-                                  className="input mt-1 min-h-[200px] font-mono text-sm"
-                                  value={editTemplate.body}
-                                  onChange={(e) => setEditTemplate((prev) => ({ ...prev, body: e.target.value }))}
-                                />
-                              ) : (
-                                <pre className={`mt-1 whitespace-pre-wrap rounded-lg border p-3 text-sm ${isDark ? "border-white/5 bg-[#080c14] text-[#c8d5e8]" : "border-surface-200 bg-white text-praxis-600"}`}>
-                                  {auto.template.body}
-                                </pre>
-                              )}
-                            </div>
-
-                            <div className={`rounded-lg px-3 py-2 text-xs ${isDark ? "bg-white/5 text-[#9db0cc]" : "bg-blue-50 text-blue-600"}`}>
-                              Verfügbare Variablen: <code>{"{{patient_name}}"}</code>, <code>{"{{rate_nummer}}"}</code>, <code>{"{{betrag}}"}</code>, <code>{"{{faellig_am}}"}</code>, <code>{"{{datum}}"}</code>
-                            </div>
-
-                            {isEditing && (
-                              <div className="flex items-center gap-2 pt-1">
-                                <button
-                                  onClick={() => saveEditing(auto.id)}
-                                  className="btn-primary inline-flex items-center gap-1.5 text-sm"
-                                >
-                                  <Save size={14} /> Speichern
-                                </button>
-                                <button
-                                  onClick={cancelEditing}
-                                  className="btn-secondary inline-flex items-center gap-1.5 text-sm"
-                                >
-                                  <X size={14} /> Abbrechen
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+  if (editing) {
+    return (
+      <div className="wf-editor-shell">
+        <div className="wf-editor-topbar">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={saveAndClose} className="wf-iconbtn" aria-label="Zurück">
+              <ChevronLeft size={18} />
+            </button>
+            <div className="min-w-0">
+              <input
+                value={editing.name}
+                onChange={(e) => updateWorkflow(editing.id, { name: e.target.value })}
+                className="wf-title-input"
+                placeholder="Workflow-Name"
+              />
+              <input
+                value={editing.description || ""}
+                onChange={(e) => updateWorkflow(editing.id, { description: e.target.value })}
+                className="wf-subtitle-input"
+                placeholder="Kurze Beschreibung …"
+              />
             </div>
           </div>
-        );
-      })}
+
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => updateWorkflow(editing.id, { active: !editing.active })}
+              className={`wf-toggle ${editing.active ? "wf-toggle-on" : ""}`}
+              aria-pressed={editing.active}
+            >
+              <span className="wf-toggle-dot" />
+              <span className="wf-toggle-label">
+                {editing.active ? (
+                  <>
+                    <span className="wf-pulse" /> Aktiv
+                  </>
+                ) : (
+                  "Inaktiv"
+                )}
+              </span>
+            </button>
+
+            <button onClick={saveAndClose} className="wf-primary-btn">
+              <Save size={14} /> Speichern
+            </button>
+          </div>
+        </div>
+
+        {saveHint && <div className="wf-toast">{saveHint}</div>}
+
+        <WorkflowCanvas
+          key={editing.id}
+          initialNodes={editing.nodes}
+          initialEdges={editing.edges}
+          onChange={(n, e) => handleCanvasChange(editing.id, n, e)}
+          isDark={isDark}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-7">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[30px] font-extrabold tracking-tight" style={{ color: "var(--ac-text)" }}>
+            {isGerman ? "Automatisierungen" : "Automations"}
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+            {isGerman
+              ? "Visueller Workflow-Builder — verbinde Trigger, Bedingungen und Aktionen zu intelligenten Abläufen."
+              : "Visual workflow builder — connect triggers, conditions and actions."}
+          </p>
+        </div>
+        <button onClick={() => setShowTemplates(true)} className="wf-primary-btn wf-primary-btn-lg">
+          <Plus size={16} /> {isGerman ? "Neuer Workflow" : "New Workflow"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <KpiCard icon={Zap} label={isGerman ? "Aktive Workflows" : "Active workflows"} value={String(activeCount)} hint={`${workflows.length} ${isGerman ? "insgesamt" : "total"}`} accent="var(--ac-primary)" />
+        <KpiCard icon={Activity} label={isGerman ? "Ausführungen heute" : "Runs today"} value={String(runsToday)} hint={isGerman ? "letzte 24 h" : "last 24 h"} accent="#5f9339" />
+        <KpiCard icon={AlertOctagon} label={isGerman ? "Fehler heute" : "Errors today"} value={String(errorsToday)} hint={errorsToday === 0 ? (isGerman ? "alles stabil" : "all stable") : (isGerman ? "Eingriff prüfen" : "needs review")} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} />
+      </div>
+
+      <div className="wf-list-toolbar">
+        <div className="wf-search">
+          <Search size={14} />
+          <input
+            placeholder={isGerman ? "Workflows durchsuchen …" : "Search workflows …"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
+          {filtered.length} {isGerman ? "Workflows" : "workflows"}
+        </div>
+      </div>
+
+      <div className="wf-list">
+        {filtered.length === 0 && (
+          <div className="wf-empty">
+            <Sparkles size={20} style={{ color: "var(--ac-primary)" }} />
+            <h3>{isGerman ? "Noch keine Workflows" : "No workflows yet"}</h3>
+            <p>{isGerman ? "Lege deinen ersten Workflow an — wähle eine Vorlage oder starte mit einem leeren Canvas." : "Create your first workflow — pick a template or start blank."}</p>
+            <button onClick={() => setShowTemplates(true)} className="wf-primary-btn">
+              <Plus size={14} /> {isGerman ? "Workflow erstellen" : "Create workflow"}
+            </button>
+          </div>
+        )}
+
+        {filtered.map((w) => {
+          const nodeCount = w.nodes.length;
+          const triggerNode = w.nodes.find((n) => n.type === "trigger");
+          const triggerLabel = triggerSummary(triggerNode);
+          return (
+            <div key={w.id} className="wf-card" onClick={() => setEditingId(w.id)} role="button" tabIndex={0}>
+              <div className="wf-card-left">
+                <div className={`wf-status-dot ${w.active ? "wf-status-on" : "wf-status-off"}`} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="wf-card-title">{w.name}</h3>
+                    {w.active && (
+                      <span className="wf-badge wf-badge-on">
+                        <span className="wf-pulse" /> Aktiv
+                      </span>
+                    )}
+                  </div>
+                  {w.description && <p className="wf-card-desc">{w.description}</p>}
+                  <div className="wf-card-meta">
+                    <span className="wf-meta-chip"><Zap size={11} /> {triggerLabel}</span>
+                    <span className="wf-meta-chip"><CircleDot size={11} /> {nodeCount} {nodeCount === 1 ? "Node" : "Nodes"}</span>
+                    <span className="wf-meta-chip"><Activity size={11} /> {w.runsToday ?? 0} heute</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="wf-card-right" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => updateWorkflow(w.id, { active: !w.active })}
+                  className={`wf-toggle wf-toggle-sm ${w.active ? "wf-toggle-on" : ""}`}
+                  aria-pressed={w.active}
+                  title={w.active ? "Deaktivieren" : "Aktivieren"}
+                >
+                  <span className="wf-toggle-dot" />
+                </button>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpenId(menuOpenId === w.id ? null : w.id)}
+                    className="wf-iconbtn"
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                  {menuOpenId === w.id && (
+                    <div className="wf-menu" onMouseLeave={() => setMenuOpenId(null)}>
+                      <button onClick={() => { setEditingId(w.id); setMenuOpenId(null); }}>
+                        <Power size={13} /> Öffnen
+                      </button>
+                      <button onClick={() => duplicateWorkflow(w.id)}>
+                        <Copy size={13} /> Duplizieren
+                      </button>
+                      <button onClick={() => deleteWorkflow(w.id)} className="wf-menu-danger">
+                        <Trash2 size={13} /> Löschen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {showTemplates && (
+        <WorkflowTemplatePicker onPick={addWorkflow} onClose={() => setShowTemplates(false)} />
+      )}
     </div>
   );
 }
 
-function StatCard({ label, value, isDark, accent }: { label: string; value: string; isDark: boolean; accent?: boolean }) {
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  hint: string;
+  accent: string;
+}) {
   return (
-    <div className={`rounded-xl border px-5 py-4 ${isDark ? "border-white/10 bg-[#111824]" : "border-surface-200 bg-white"}`}>
-      <p className={`text-sm font-medium ${isDark ? "text-[#9fb2cd]" : "text-praxis-400"}`}>{label}</p>
-      <p className={`mt-1 text-3xl font-bold ${accent ? "text-amber-500" : isDark ? "text-white" : "text-praxis-800"}`}>{value}</p>
+    <div className="wf-kpi">
+      <div className="wf-kpi-icon" style={{ background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>
+        <Icon size={16} strokeWidth={2.4} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="wf-kpi-label">{label}</p>
+        <div className="flex items-baseline gap-2">
+          <span className="wf-kpi-value">{value}</span>
+          <span className="wf-kpi-hint">{hint}</span>
+        </div>
+      </div>
     </div>
   );
+}
+
+function triggerSummary(node: WorkflowNode | undefined): string {
+  if (!node) return "Kein Trigger";
+  const d: any = node.data || {};
+  switch (d.event) {
+    case "rate_overdue":
+      return `Rate ${d.days ?? "?"} Tage überfällig`;
+    case "rate_returned":
+      return "Rücklastschrift erkannt";
+    case "daily_at":
+      return `Täglich ${d.time || "06:00"}`;
+    case "scoring_below":
+      return `Scoring < ${d.threshold ?? 80}%`;
+    default:
+      return "Trigger";
+  }
 }
