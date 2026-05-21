@@ -115,7 +115,7 @@ const triggerNodeSchema = nodeBaseSchema.extend({
   type: z.literal("trigger"),
   data: z.object({
     event: z.enum(["rate_ueberfaellig", "ruecklastschrift", "taeglicher_cron", "scoring_kritisch"]),
-    delayDays: z.number().int().optional(),
+    delayDays: z.number().int().nonnegative().optional(),
     threshold: z.number().optional(),
     cronTime: z.string().optional(),
   }),
@@ -161,7 +161,7 @@ const mahnstufeNodeSchema = nodeBaseSchema.extend({
   type: z.literal("action_mahnstufe"),
   data: z.object({
     action: z.enum(["increase", "set"]),
-    targetStufe: z.number().int().max(3).optional(),
+    targetStufe: z.number().int().min(0).max(3).optional(),
   }),
 });
 
