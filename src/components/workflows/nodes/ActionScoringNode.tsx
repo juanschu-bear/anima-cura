@@ -21,6 +21,7 @@ export function ActionScoringNode({ data, selected }: NodeProps) {
       title="Scoring anpassen"
       subtitle={subtitle}
       selected={selected}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }

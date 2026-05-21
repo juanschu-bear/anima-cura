@@ -39,6 +39,7 @@ export function ConditionNode({ data, selected }: NodeProps) {
       subtitle={subtitle}
       selected={selected}
       branching
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }

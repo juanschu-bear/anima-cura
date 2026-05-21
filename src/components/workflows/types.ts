@@ -7,7 +7,8 @@ export type NodeKind =
   | "action_whatsapp"
   | "action_alert"
   | "action_mahnstufe"
-  | "action_scoring";
+  | "action_scoring"
+  | "action_wait";
 
 export type TriggerEvent =
   | "rate_overdue"
@@ -68,6 +69,60 @@ export interface ActionScoringData {
   reason?: string;
 }
 
+export interface ActionWaitData {
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+}
+
+export type RunStatus = "running" | "success" | "failed" | "skipped" | "dry_run";
+
+export interface WorkflowRunStep {
+  node_id: string;
+  kind: NodeKind;
+  status: RunStatus;
+  started_at: string;
+  finished_at?: string;
+  output?: any;
+  error?: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflow_id: string;
+  patient_id: string | null;
+  trigger_kind: string;
+  status: RunStatus;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  trigger_payload: any;
+  steps: WorkflowRunStep[];
+  error: string | null;
+  is_test: boolean;
+}
+
+export interface WorkflowVersion {
+  id: string;
+  workflow_id: string;
+  version: number;
+  snapshot: any;
+  author?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface WorkflowPatientState {
+  id: string;
+  workflow_id: string;
+  patient_id: string;
+  current_node_id: string | null;
+  state: "active" | "waiting" | "completed" | "exited" | "failed";
+  context: Record<string, any>;
+  entered_at: string;
+  next_action_at: string | null;
+  updated_at: string;
+}
+
 export type AnyNodeData =
   | (TriggerData & { label?: string })
   | (ConditionData & { label?: string })
@@ -75,7 +130,8 @@ export type AnyNodeData =
   | (ActionWhatsAppData & { label?: string })
   | (ActionAlertData & { label?: string })
   | (ActionMahnstufeData & { label?: string })
-  | (ActionScoringData & { label?: string });
+  | (ActionScoringData & { label?: string })
+  | (ActionWaitData & { label?: string });
 
 export type WorkflowNode = Node & {
   type: NodeKind;
@@ -103,6 +159,7 @@ export const NODE_KINDS: Record<NodeKind, { label: string; description: string }
   action_alert: { label: "Alert", description: "Interne Benachrichtigung" },
   action_mahnstufe: { label: "Mahnstufe ändern", description: "Patient eskalieren" },
   action_scoring: { label: "Scoring anpassen", description: "Punkte hinzu / abziehen" },
+  action_wait: { label: "Warten", description: "Verzögerung bevor es weitergeht" },
 };
 
 export const TEMPLATE_VARIABLES: { key: string; label: string }[] = [

@@ -27,6 +27,7 @@ export function ActionEmailNode({ data, selected }: NodeProps) {
       title="E-Mail senden"
       subtitle={subtitle}
       selected={selected}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }

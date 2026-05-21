@@ -18,6 +18,7 @@ export function ActionMahnstufeNode({ data, selected }: NodeProps) {
       title="Mahnstufe erhöhen"
       subtitle={subtitle}
       selected={selected}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }
