@@ -447,6 +447,8 @@ samp {
 .wf-card-right {
   position: relative;
   overflow: visible;
+  position: relative;
+  overflow: visible;
   display: flex;
   align-items: center;
   gap: 10px;
