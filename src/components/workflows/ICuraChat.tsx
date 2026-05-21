@@ -11,8 +11,17 @@ import {
   Loader2,
   Wand2,
   AlertCircle,
+  Mail,
+  MessageCircle,
+  GitBranch,
+  Bell,
+  TrendingDown,
+  ArrowUpRight,
+  Zap,
 } from "lucide-react";
-import type { Workflow, WorkflowEdge, WorkflowNode } from "./types";
+import { NODE_KINDS, type Workflow, WorkflowEdge, WorkflowNode } from "./types";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/hooks/useAppStore";
 
 type Role = "user" | "assistant";
 
@@ -34,29 +43,208 @@ interface Props {
   onApplyProposal: (nodes: WorkflowNode[], edges: WorkflowEdge[]) => void;
 }
 
-const QUICK_PROMPTS = [
-  "Erinnerung an Patienten 7 Tage nach Fälligkeit",
-  "Eskalation in 3 Stufen über jeweils 7 Tage",
-  "WhatsApp + E-Mail bei Rücklastschrift",
-  "Scoring senken wenn Mahnstufe steigt",
-];
-
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function stripMarkdown(text: string) {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\r/g, "")
+    .trim();
+}
+
+function parseSsePayload(raw: string) {
+  const events: Array<{ event: string | null; data: any }> = [];
+  let currentEvent: string | null = null;
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (line.startsWith("event:")) {
+      currentEvent = line.slice(6).trim();
+      continue;
+    }
+
+    if (line.startsWith("data:")) {
+      try {
+        events.push({
+          event: currentEvent,
+          data: JSON.parse(line.slice(5).trim()),
+        });
+      } catch {
+        // ignore invalid chunks
+      }
+      continue;
+    }
+
+    if (line.trim() === "") {
+      currentEvent = null;
+    }
+  }
+
+  return events.findLast((item) => item.event === "final")?.data ?? events.at(-1)?.data ?? null;
+}
+
+function defaultPosition(index: number) {
+  const col = index % 3;
+  const row = Math.floor(index / 3);
+  return { x: 80 + col * 320, y: 120 + row * 180 };
+}
+
+function normalizeProposal(proposal: Message["proposal"]): Message["proposal"] {
+  if (!proposal) {
+    return proposal;
+  }
+
+  const nodes = proposal.nodes.map((node, index) => {
+    const data = (node.data || {}) as Record<string, any>;
+    const nextNode: WorkflowNode = {
+      ...node,
+      position:
+        node.position && typeof node.position.x === "number" && typeof node.position.y === "number"
+          ? node.position
+          : defaultPosition(index),
+      data: { ...data },
+    } as WorkflowNode;
+
+    if (node.type === "trigger") {
+      const eventMap: Record<string, string> = {
+        rate_ueberfaellig: "rate_overdue",
+        ruecklastschrift: "rate_returned",
+        taeglicher_cron: "daily_at",
+        scoring_kritisch: "scoring_below",
+      };
+      nextNode.data = {
+        ...data,
+        event: eventMap[String(data.event)] || data.event || "rate_overdue",
+        days: data.delayDays ?? data.days,
+        time: data.cronTime ?? data.time,
+        threshold: data.threshold,
+      };
+    }
+
+    if (node.type === "condition") {
+      const fieldMap: Record<string, string> = {
+        email: "email_vorhanden",
+        kasse: "patiententyp",
+      };
+      const operatorMap: Record<string, string> = {
+        equals: "eq",
+        exists: "is_true",
+      };
+      nextNode.data = {
+        ...data,
+        field: fieldMap[String(data.field)] || data.field,
+        operator: operatorMap[String(data.operator)] || data.operator,
+      };
+    }
+
+    if (node.type === "action_email") {
+      nextNode.data = {
+        ...data,
+        recipient: data.to ?? data.recipient ?? "patient",
+        subject: data.subject || "",
+        body: data.body || "",
+      };
+    }
+
+    if (node.type === "action_whatsapp") {
+      nextNode.data = {
+        ...data,
+        message: data.message || "",
+      };
+    }
+
+    if (node.type === "action_alert") {
+      const severityMap: Record<string, string> = {
+        warnung: "warn",
+        kritisch: "critical",
+      };
+      const recipientMap: Record<string, string> = {
+        alle: "team",
+      };
+      nextNode.data = {
+        ...data,
+        severity: severityMap[String(data.severity)] || data.severity || "warn",
+        recipient: recipientMap[String(data.recipient)] || data.recipient || "team",
+      };
+    }
+
+    if (node.type === "action_mahnstufe") {
+      nextNode.data = {
+        ...data,
+        stufe:
+          data.action === "increase"
+            ? data.targetStufe ?? 1
+            : data.targetStufe ?? data.stufe ?? 1,
+      };
+    }
+
+    if (node.type === "action_scoring") {
+      const points = Number(data.points ?? 0);
+      nextNode.data = {
+        ...data,
+        delta: data.action === "decrease" ? -Math.abs(points) : points,
+      };
+    }
+
+    return nextNode;
+  });
+
+  return {
+    rationale: stripMarkdown(proposal.rationale),
+    nodes,
+    edges: proposal.edges,
+  };
+}
+
+function proposalIcon(type: WorkflowNode["type"]) {
+  const size = 13;
+  switch (type) {
+    case "trigger":
+      return <Zap size={size} />;
+    case "condition":
+      return <GitBranch size={size} />;
+    case "action_email":
+      return <Mail size={size} />;
+    case "action_whatsapp":
+      return <MessageCircle size={size} />;
+    case "action_alert":
+      return <Bell size={size} />;
+    case "action_mahnstufe":
+      return <ArrowUpRight size={size} />;
+    case "action_scoring":
+      return <TrendingDown size={size} />;
+    default:
+      return <Wand2 size={size} />;
+  }
+}
+
 export function ICuraChat({ workflow, onApplyProposal }: Props) {
+  const { locale } = useAppStore();
+  const QUICK_PROMPTS = [
+    t("chat.quick.reminder", locale),
+    t("chat.quick.escalation", locale),
+    t("chat.quick.chargeback", locale),
+    t("chat.quick.scoring", locale),
+  ];
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: uid(),
       role: "assistant",
       text: [
-        "Hi, ich bin **iCura** — beschreib mir in deinen Worten was der Workflow tun soll und ich baue ihn dir. Beispiele:",
-        "• Erinnere Patienten 6 Tage nach Fälligkeit per E-Mail",
-        "• Eskaliere in drei Stufen über jeweils eine Woche",
-        "• Bei Rücklastschrift sofort Alert + WhatsApp",
+        t("chat.welcome.intro", locale),
+        t("chat.welcome.ex1", locale),
+        t("chat.welcome.ex2", locale),
+        t("chat.welcome.ex3", locale),
       ].join("\n"),
     },
   ]);
@@ -76,7 +264,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
     setMessages((prev) => [
       ...prev,
       userMsg,
-      { id: pendingId, role: "assistant", text: "iCura denkt …", pending: true },
+      { id: pendingId, role: "assistant", text: t("chat.thinking", locale), pending: true },
     ]);
     setSending(true);
 
@@ -86,10 +274,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trimmed,
-          history: messages
-            .filter((m) => !m.pending && !m.error)
-            .slice(-12)
-            .map((m) => ({ role: m.role, content: m.text })),
+          sessionId: sessionId || undefined,
           currentWorkflow: {
             nodes: workflow.nodes,
             edges: workflow.edges,
@@ -97,30 +282,49 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         }),
       });
 
+      // Read sessionId from response header
+      const respSessionId = res.headers.get("X-Session-Id");
+      if (respSessionId) setSessionId(respSessionId);
+
       if (!res.ok) {
         if (res.status === 404) {
-          throw new Error(
-            "Backend noch nicht verbunden. Codex baut `/api/workflows/assist` parallel — sobald die Route live ist, antworte ich hier."
-          );
+          throw new Error(t("chat.error.backend404", locale));
         }
-        throw new Error(`Server antwortete mit ${res.status}`);
+        throw new Error(t("chat.error.serverStatus", locale, { status: res.status }));
       }
 
-      const data = await res.json();
+      const raw = await res.text();
+      const data = parseSsePayload(raw);
+      if (!data) {
+        try {
+          JSON.parse(raw);
+        } catch {
+          throw new Error(t("chat.error.parse", locale));
+        }
+      }
       let response: Message;
       if (data.type === "proposal") {
+        const normalizedProposal = normalizeProposal({
+          rationale: data.rationale || t("chat.proposal.default", locale),
+          nodes: data.nodes || [],
+          edges: data.edges || [],
+        });
         response = {
           id: uid(),
           role: "assistant",
-          text: data.rationale || "Hier ist mein Vorschlag:",
-          proposal: { rationale: data.rationale || "", nodes: data.nodes || [], edges: data.edges || [] },
+          text: normalizedProposal?.rationale || t("chat.proposal.default", locale),
+          proposal: normalizedProposal,
         };
       } else if (data.type === "question") {
-        response = { id: uid(), role: "assistant", text: data.text || "Kannst du das genauer beschreiben?" };
+        response = {
+          id: uid(),
+          role: "assistant",
+          text: stripMarkdown(data.text || data.question || t("chat.proposal.clarify", locale)),
+        };
       } else if (typeof data.text === "string") {
-        response = { id: uid(), role: "assistant", text: data.text };
+        response = { id: uid(), role: "assistant", text: stripMarkdown(data.text) };
       } else {
-        response = { id: uid(), role: "assistant", text: "Ich habe eine unerwartete Antwort bekommen." };
+        response = { id: uid(), role: "assistant", text: t("chat.error.unexpected", locale) };
       }
       setMessages((prev) => prev.filter((m) => m.id !== pendingId).concat(response));
     } catch (err: any) {
@@ -128,7 +332,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         prev.filter((m) => m.id !== pendingId).concat({
           id: uid(),
           role: "assistant",
-          text: err?.message || "Unerwarteter Fehler — versuch's gleich nochmal.",
+          text: err?.message || t("chat.error.generic", locale),
           error: true,
         })
       );
@@ -144,7 +348,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
       prev.concat({
         id: uid(),
         role: "assistant",
-        text: "✓ Workflow übernommen. Wenn du noch was anpassen willst, sag's mir.",
+        text: t("chat.proposal.applied", locale),
       })
     );
   }
@@ -155,7 +359,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         className={`icura-fab ${open ? "icura-fab-hidden" : ""}`}
-        aria-label="iCura öffnen"
+        aria-label={t("chat.open", locale)}
       >
         <span className="icura-fab-glow" />
         <Sparkles size={16} strokeWidth={2.4} />
@@ -171,10 +375,10 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
               </span>
               <div>
                 <p className="icura-name">iCura</p>
-                <p className="icura-tagline">Workflow-Co-Pilot</p>
+                <p className="icura-tagline">{t("chat.tagline", locale)}</p>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="wf-iconbtn" aria-label="Schließen">
+            <button onClick={() => setOpen(false)} className="wf-iconbtn" aria-label={t("common.close", locale)}>
               <X size={15} />
             </button>
           </header>
@@ -194,20 +398,20 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
                     <span className="icura-error">
                       <AlertCircle size={12} /> {m.text}
                     </span>
-                  ) : (
-                    <span className="icura-text">{renderMarkdown(m.text)}</span>
-                  )}
-
-                  {m.proposal && (
+                  ) : m.proposal ? (
                     <div className="icura-proposal">
                       <div className="icura-proposal-head">
-                        <Wand2 size={12} /> Vorschlag · {m.proposal.nodes.length} Nodes
+                        <Wand2 size={12} /> {t("chat.proposal.head", locale, { count: m.proposal.nodes.length })}
                       </div>
+                      <p className="icura-proposal-rationale">{stripMarkdown(m.proposal.rationale)}</p>
                       <ul className="icura-proposal-list">
-                        {m.proposal.nodes.map((n, i) => (
-                          <li key={i}>
-                            <span className="icura-proposal-kind">{n.type}</span>
-                            {nodeSummary(n)}
+                        {m.proposal.nodes.map((n) => (
+                          <li key={n.id}>
+                            <span className="icura-proposal-kind">
+                              {proposalIcon(n.type)}
+                              {NODE_KINDS[n.type]?.label || n.type}
+                            </span>
+                            {nodeSummary(n, locale)}
                           </li>
                         ))}
                       </ul>
@@ -217,9 +421,11 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
                         style={{ marginTop: 10, padding: "7px 12px", fontSize: 12 }}
                         type="button"
                       >
-                        <Check size={12} /> Übernehmen
+                        <Check size={12} /> {locale === "de" ? "Übernehmen" : "Apply"}
                       </button>
                     </div>
+                  ) : (
+                    <span className="icura-text">{renderMarkdown(stripMarkdown(m.text))}</span>
                   )}
                 </div>
               </div>
@@ -251,14 +457,14 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
               className="icura-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Beschreib deinen Workflow …"
+              placeholder={t("chat.inputPlaceholder", locale)}
               disabled={sending}
             />
             <button
               type="submit"
               className="icura-send"
               disabled={sending || !input.trim()}
-              aria-label="Senden"
+              aria-label={t("common.send", locale)}
             >
               {sending ? <Loader2 size={14} className="icura-spin" /> : <Send size={14} />}
             </button>
@@ -269,23 +475,27 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
   );
 }
 
-function nodeSummary(n: WorkflowNode): string {
+function nodeSummary(n: WorkflowNode, locale: "de" | "en" = "de"): string {
   const d: any = n.data || {};
+  const daysOverdue = locale === "en" ? "days overdue" : "Tage überfällig";
+  const daily = locale === "en" ? "daily" : "täglich";
+  const toLbl = locale === "en" ? "to" : "an";
+  const stage = locale === "en" ? "Stage" : "Stufe";
   switch (n.type) {
     case "trigger":
       return d.event === "rate_overdue"
-        ? ` · ${d.days ?? "?"} Tage überfällig`
+        ? ` · ${d.days ?? "?"} ${daysOverdue}`
         : d.event === "daily_at"
-        ? ` · täglich ${d.time || "06:00"}`
+        ? ` · ${daily} ${d.time || "06:00"}`
         : ` · ${d.event || ""}`;
     case "condition":
       return ` · ${d.field || ""} ${d.operator || ""} ${d.value ?? ""}`;
     case "action_email":
-      return ` · an ${d.recipient || "?"}`;
+      return ` · ${toLbl} ${d.recipient || "?"}`;
     case "action_wait":
       return ` · ${d.amount || 1} ${d.unit || "days"}`;
     case "action_mahnstufe":
-      return ` · Stufe ${d.stufe ?? "?"}`;
+      return ` · ${stage} ${d.stufe ?? "?"}`;
     case "action_scoring":
       return ` · ${d.delta > 0 ? "+" : ""}${d.delta ?? 0}`;
     default:
