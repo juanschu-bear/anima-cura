@@ -1618,3 +1618,1234 @@ samp {
   transition: background 0.12s ease;
 }
 .wf-menu a:hover { background: var(--ac-surface-muted); }
+
+/* ─────────────────────────────────────────────────────────── */
+/* PREMIUM GLOW-UP                                              */
+/* Holographic dark · Aurora mesh · Glass · Animated borders    */
+/* ─────────────────────────────────────────────────────────── */
+
+/* Animatable conic angle for rotating borders (CSS Houdini, well supported) */
+@property --wf-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ── Refined palette overrides ─────────────────────────────── */
+:root {
+  --ac-glow-primary: 91 77 225;          /* rgb tuple for opacity math */
+  --ac-glow-success: 95 147 57;
+  --ac-glow-warning: 200 148 45;
+  --ac-glow-danger: 203 79 86;
+  --ac-iris-1: #6c5ce7;
+  --ac-iris-2: #9d6cff;
+  --ac-iris-3: #4cc9f0;
+  --ac-noise: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+:root[data-theme="dark"] {
+  --ac-bg: #06080d;
+  --ac-surface: #0e1119;
+  --ac-surface-muted: #131826;
+  --ac-border: #1f273a;
+  --ac-border-strong: #2c3650;
+  --ac-glow-primary: 141 134 255;
+  --ac-iris-1: #8d86ff;
+  --ac-iris-2: #b78bff;
+  --ac-iris-3: #7afff5;
+}
+
+/* ── Ambient background: aurora mesh + film grain ─────────── */
+body {
+  background:
+    radial-gradient(900px 520px at 12% 8%,  rgba(91, 77, 225, 0.10), transparent 55%),
+    radial-gradient(820px 480px at 92% 18%, rgba(76, 201, 240, 0.08), transparent 55%),
+    radial-gradient(900px 560px at 80% 92%, rgba(157, 108, 255, 0.08), transparent 55%),
+    radial-gradient(700px 460px at 20% 96%, rgba(95, 147, 57, 0.06), transparent 55%),
+    var(--ac-bg);
+  background-attachment: fixed;
+}
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 520px at 10% 6%,  rgba(141, 134, 255, 0.18), transparent 55%),
+    radial-gradient(820px 480px at 95% 14%, rgba(122, 255, 245, 0.07), transparent 55%),
+    radial-gradient(900px 560px at 85% 95%, rgba(183, 139, 255, 0.12), transparent 55%),
+    radial-gradient(700px 460px at 18% 96%, rgba(78, 207, 142, 0.05), transparent 55%),
+    var(--ac-bg);
+  background-attachment: fixed;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--ac-noise);
+  opacity: 0.5;
+  z-index: 0;
+  mix-blend-mode: overlay;
+}
+
+/* Aurora layer drifting subtly */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  background:
+    conic-gradient(from 0deg at 30% 30%,
+      rgba(91, 77, 225, 0.10) 0deg,
+      transparent 90deg,
+      rgba(76, 201, 240, 0.08) 180deg,
+      transparent 270deg,
+      rgba(91, 77, 225, 0.10) 360deg);
+  filter: blur(80px);
+  opacity: 0.4;
+  z-index: 0;
+  animation: wf-aurora 32s linear infinite;
+}
+:root[data-theme="dark"] body::after {
+  opacity: 0.55;
+  background:
+    conic-gradient(from 0deg at 30% 30%,
+      rgba(141, 134, 255, 0.18) 0deg,
+      transparent 90deg,
+      rgba(122, 255, 245, 0.10) 180deg,
+      transparent 270deg,
+      rgba(183, 139, 255, 0.18) 360deg);
+}
+@keyframes wf-aurora {
+  to { transform: rotate(360deg); }
+}
+
+/* Make sure content sits above ambient layers */
+.ac-shell, .ac-sidebar, .ac-main, .ac-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Sidebar: glassmorphic with active-item glow ──────────── */
+.ac-sidebar {
+  backdrop-filter: blur(16px) saturate(140%);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-sidebar-bg) 86%, transparent) 0%,
+      color-mix(in srgb, var(--ac-sidebar-bg) 76%, transparent) 100%);
+  border-right: 1px solid color-mix(in srgb, var(--ac-border) 60%, transparent);
+}
+:root[data-theme="dark"] .ac-sidebar {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.02) 0%,
+      rgba(255,255,255,0) 36%),
+    color-mix(in srgb, var(--ac-sidebar-bg) 78%, transparent);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,0.04);
+}
+.sidebar-link-active,
+.sidebar-link-active:hover {
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ac-primary) 18%, transparent) 0%,
+      color-mix(in srgb, var(--ac-primary) 8%, transparent) 100%);
+  color: var(--ac-sidebar-active-ink);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ac-primary) 35%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 4px 16px -4px color-mix(in srgb, var(--ac-primary) 35%, transparent);
+  position: relative;
+}
+.sidebar-link-active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--ac-iris-2), var(--ac-iris-1));
+  box-shadow: 0 0 12px var(--ac-iris-1);
+}
+
+/* ── Top header glassmorphism ─────────────────────────────── */
+.ac-main > header {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 72%, transparent) 100%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid color-mix(in srgb, var(--ac-border) 55%, transparent);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+/* ── Cards: bevelled glass with depth ─────────────────────── */
+.stat-card,
+.wf-kpi,
+.wf-card,
+.wf-run-detail,
+.wf-empty {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 95%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--ac-border) 70%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 0 0 1px rgba(255,255,255,0.02) inset,
+    0 1px 2px rgba(15, 22, 36, 0.04),
+    0 12px 32px -8px rgba(15, 22, 36, 0.08);
+  backdrop-filter: blur(8px);
+}
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .wf-kpi,
+:root[data-theme="dark"] .wf-card,
+:root[data-theme="dark"] .wf-run-detail,
+:root[data-theme="dark"] .wf-empty {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac-border) 90%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 0 1px rgba(255,255,255,0.02) inset,
+    0 1px 2px rgba(0,0,0,0.3),
+    0 14px 38px -10px rgba(0,0,0,0.5);
+}
+.stat-card:hover,
+.wf-kpi:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--ac-primary) 30%, var(--ac-border));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-primary) 18%, transparent) inset,
+    0 8px 16px -4px rgba(15, 22, 36, 0.08),
+    0 20px 44px -8px color-mix(in srgb, var(--ac-primary) 24%, transparent);
+}
+:root[data-theme="dark"] .stat-card:hover,
+:root[data-theme="dark"] .wf-kpi:hover {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-primary) 35%, transparent) inset,
+    0 16px 38px -6px rgba(0,0,0,0.55),
+    0 0 24px -2px color-mix(in srgb, var(--ac-primary) 40%, transparent);
+}
+
+/* ── KPI value gets gradient text ─────────────────────────── */
+.wf-kpi-value {
+  background: linear-gradient(135deg, var(--ac-text) 0%, color-mix(in srgb, var(--ac-text) 60%, var(--ac-primary)) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.025em;
+}
+:root[data-theme="dark"] .wf-kpi-value {
+  background: linear-gradient(135deg, #ffffff 0%, var(--ac-iris-2) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Workflow cards: hover lift with iris glow ────────────── */
+.wf-card {
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease,
+    box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.wf-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--ac-iris-1) 8%, transparent) 0%,
+    transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.wf-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--ac-iris-1) 50%, var(--ac-border));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-iris-1) 25%, transparent) inset,
+    0 12px 28px -8px color-mix(in srgb, var(--ac-iris-1) 35%, transparent),
+    0 24px 56px -12px rgba(15,22,36,0.14);
+}
+:root[data-theme="dark"] .wf-card:hover {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-iris-1) 50%, transparent) inset,
+    0 18px 40px -8px rgba(0,0,0,0.55),
+    0 0 32px -4px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+}
+.wf-card:hover::after { opacity: 1; }
+
+/* ── Primary button: holographic shimmer ──────────────────── */
+.wf-primary-btn {
+  position: relative;
+  background:
+    linear-gradient(135deg, var(--ac-iris-1) 0%, var(--ac-iris-2) 50%, var(--ac-iris-1) 100%);
+  background-size: 200% 200%;
+  border: 1px solid color-mix(in srgb, var(--ac-iris-1) 80%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 0 0 1px rgba(255,255,255,0.08) inset,
+    0 8px 18px -4px color-mix(in srgb, var(--ac-iris-1) 50%, transparent),
+    0 18px 38px -8px color-mix(in srgb, var(--ac-iris-1) 40%, transparent);
+  overflow: hidden;
+  isolation: isolate;
+  transition: background-position 0.6s ease, transform 0.18s ease, box-shadow 0.25s ease;
+}
+.wf-primary-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+    transparent 35%,
+    rgba(255,255,255,0.35) 50%,
+    transparent 65%);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.wf-primary-btn:hover {
+  transform: translateY(-1px);
+  background-position: 100% 0%;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.32) inset,
+    0 0 0 1px rgba(255,255,255,0.14) inset,
+    0 12px 24px -4px color-mix(in srgb, var(--ac-iris-1) 60%, transparent),
+    0 26px 52px -10px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+}
+.wf-primary-btn:hover::before { transform: translateX(100%); }
+.wf-primary-btn:active { transform: translateY(0); }
+
+/* ── Secondary button: subtle border-glow on hover ────────── */
+.wf-secondary-btn:hover {
+  border-color: color-mix(in srgb, var(--ac-iris-1) 40%, var(--ac-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ac-iris-1) 10%, transparent),
+    0 4px 14px -4px color-mix(in srgb, var(--ac-iris-1) 18%, transparent);
+}
+
+/* ── Icon button: refined glass ───────────────────────────── */
+.wf-iconbtn {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 92%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 78%, transparent) 100%);
+  backdrop-filter: blur(6px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 1px 2px rgba(15,22,36,0.04);
+}
+.wf-iconbtn:hover {
+  border-color: color-mix(in srgb, var(--ac-iris-1) 35%, var(--ac-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ac-iris-1) 10%, transparent),
+    0 1px 0 rgba(255,255,255,0.55) inset;
+}
+:root[data-theme="dark"] .wf-iconbtn {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.06) 0%,
+      rgba(255,255,255,0.02) 100%),
+    color-mix(in srgb, var(--ac-surface) 90%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* ── Search field: glow on focus ──────────────────────────── */
+.wf-search,
+.input {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 86%, transparent) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 1px 2px rgba(15,22,36,0.03);
+}
+.wf-search:focus-within,
+.input:focus {
+  border-color: color-mix(in srgb, var(--ac-iris-1) 55%, var(--ac-border));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 0 0 4px color-mix(in srgb, var(--ac-iris-1) 14%, transparent),
+    0 0 24px -4px color-mix(in srgb, var(--ac-iris-1) 30%, transparent);
+}
+:root[data-theme="dark"] .wf-search,
+:root[data-theme="dark"] .input {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+}
+
+/* ── Workflow node: glass with iridescent border + glow ───── */
+.wf-node {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 86%, transparent) 100%);
+  backdrop-filter: blur(10px) saturate(140%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 1px 2px rgba(15,22,36,0.04),
+    0 12px 28px -8px rgba(15,22,36,0.10),
+    0 24px 56px -16px color-mix(in srgb, var(--node-accent) 22%, transparent);
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.28s ease,
+    border-color 0.22s ease;
+}
+:root[data-theme="dark"] .wf-node {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.05) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 1px 2px rgba(0,0,0,0.35),
+    0 18px 40px -10px rgba(0,0,0,0.55),
+    0 30px 64px -16px color-mix(in srgb, var(--node-accent) 35%, transparent);
+}
+.wf-node:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 0 0 1px color-mix(in srgb, var(--node-accent) 30%, transparent) inset,
+    0 16px 32px -10px rgba(15,22,36,0.12),
+    0 28px 64px -14px color-mix(in srgb, var(--node-accent) 34%, transparent);
+}
+:root[data-theme="dark"] .wf-node:hover {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 0 0 1px color-mix(in srgb, var(--node-accent) 50%, transparent) inset,
+    0 22px 48px -12px rgba(0,0,0,0.6),
+    0 0 36px -4px color-mix(in srgb, var(--node-accent) 50%, transparent);
+}
+
+/* Selected: rotating conic border */
+.wf-node[data-selected="true"] {
+  border-color: transparent;
+}
+.wf-node[data-selected="true"]::before {
+  background: conic-gradient(
+    from var(--wf-angle),
+    var(--node-accent) 0deg,
+    color-mix(in srgb, var(--node-accent) 30%, transparent) 90deg,
+    var(--node-accent) 180deg,
+    color-mix(in srgb, var(--node-accent) 30%, transparent) 270deg,
+    var(--node-accent) 360deg);
+  opacity: 1;
+  animation: wf-rotate-angle 4s linear infinite;
+}
+@keyframes wf-rotate-angle {
+  to { --wf-angle: 360deg; }
+}
+
+/* Node icon: small inset shadow + highlight */
+.wf-node-icon {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--node-accent) 22%, transparent) 0%,
+      color-mix(in srgb, var(--node-accent) 12%, transparent) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 0 0 1px color-mix(in srgb, var(--node-accent) 25%, transparent) inset,
+    0 4px 10px -4px color-mix(in srgb, var(--node-accent) 35%, transparent);
+}
+
+/* Subtitle: subtle inner shadow */
+.wf-node-subtitle {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface-muted) 85%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface-muted) 65%, transparent) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset;
+}
+:root[data-theme="dark"] .wf-node-subtitle {
+  background: rgba(255,255,255,0.03);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+}
+
+/* ── Edges: gradient stroke with glow ─────────────────────── */
+.react-flow__edge-path {
+  stroke: url(#wf-edge-gradient);
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 6px rgba(var(--ac-glow-primary) / 0.25));
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path {
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 12px rgba(var(--ac-glow-primary) / 0.5));
+}
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 6 5;
+  animation: wf-dash 1.4s linear infinite;
+}
+
+/* Handle pulse */
+.wf-handle {
+  box-shadow:
+    0 0 0 2px var(--ac-surface),
+    0 0 12px color-mix(in srgb, var(--node-accent) 45%, transparent);
+}
+.wf-handle:hover {
+  box-shadow:
+    0 0 0 2px var(--ac-surface),
+    0 0 0 4px color-mix(in srgb, var(--node-accent) 28%, transparent),
+    0 0 24px color-mix(in srgb, var(--node-accent) 70%, transparent);
+}
+
+/* ── Runtime badge: stronger pulse + glow ─────────────────── */
+.wf-node-runtime {
+  box-shadow:
+    0 0 0 2px var(--ac-surface),
+    0 0 18px currentColor;
+}
+.wf-node-runtime-running {
+  background: var(--ac-warning);
+  color: var(--ac-warning);
+  animation: wf-runtime-pulse 1.4s ease-out infinite;
+}
+@keyframes wf-runtime-pulse {
+  0%   { box-shadow: 0 0 0 2px var(--ac-surface), 0 0 0 0 color-mix(in srgb, var(--ac-warning) 70%, transparent), 0 0 18px var(--ac-warning); }
+  60%  { box-shadow: 0 0 0 2px var(--ac-surface), 0 0 0 10px transparent, 0 0 24px var(--ac-warning); }
+  100% { box-shadow: 0 0 0 2px var(--ac-surface), 0 0 0 0 transparent, 0 0 18px var(--ac-warning); }
+}
+
+/* ── Editor topbar: glassmorphic + bevel ──────────────────── */
+.wf-editor-topbar {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 72%, transparent) 100%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid color-mix(in srgb, var(--ac-border) 55%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 1px 2px rgba(0,0,0,0.02);
+}
+:root[data-theme="dark"] .wf-editor-topbar {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 75%, transparent);
+}
+
+/* ── Canvas: deeper aurora ─────────────────────────────────── */
+.wf-canvas {
+  background:
+    radial-gradient(1400px 700px at 12% -10%, color-mix(in srgb, var(--ac-iris-1) 12%, transparent), transparent 55%),
+    radial-gradient(1200px 700px at 100% 110%, color-mix(in srgb, var(--ac-iris-3) 9%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 50% 50%, color-mix(in srgb, var(--ac-iris-2) 6%, transparent), transparent 65%),
+    var(--ac-bg);
+}
+:root[data-theme="dark"] .wf-canvas {
+  background:
+    radial-gradient(1400px 700px at 12% -10%, color-mix(in srgb, var(--ac-iris-1) 22%, transparent), transparent 55%),
+    radial-gradient(1200px 700px at 100% 110%, color-mix(in srgb, var(--ac-iris-3) 14%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 50% 50%, color-mix(in srgb, var(--ac-iris-2) 10%, transparent), transparent 65%),
+    var(--ac-bg);
+}
+
+/* Subtle scan line on canvas */
+.wf-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 50%, rgba(255,255,255,0.02) 50%);
+  background-size: 100% 3px;
+  mix-blend-mode: overlay;
+  opacity: 0.4;
+}
+
+/* ── Palette items: refined hover ─────────────────────────── */
+.wf-palette {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 92%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 80%, transparent) 100%);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid color-mix(in srgb, var(--ac-border) 60%, transparent);
+}
+.wf-palette-item {
+  position: relative;
+  overflow: hidden;
+}
+.wf-palette-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--p-accent) 14%, transparent) 0%,
+    transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.wf-palette-item:hover {
+  border-color: color-mix(in srgb, var(--p-accent) 40%, var(--ac-border));
+  color: var(--ac-text);
+  box-shadow:
+    0 4px 12px -4px color-mix(in srgb, var(--p-accent) 30%, transparent);
+}
+.wf-palette-item:hover::before { opacity: 1; }
+.wf-palette-icon {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 0 0 1px color-mix(in srgb, var(--p-accent) 22%, transparent) inset;
+}
+
+/* ── Modals: dramatic entrance + glass ────────────────────── */
+.wf-modal-backdrop {
+  background: rgba(6, 8, 13, 0.55);
+  backdrop-filter: blur(14px) saturate(120%);
+}
+.wf-modal {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 95%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--ac-border) 70%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.5) inset,
+    0 0 0 1px rgba(255,255,255,0.02) inset,
+    0 30px 80px -16px rgba(15, 22, 36, 0.32),
+    0 60px 140px -30px color-mix(in srgb, var(--ac-iris-1) 30%, transparent);
+  animation: wf-modal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root[data-theme="dark"] .wf-modal {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 40px 100px -20px rgba(0,0,0,0.7),
+    0 80px 180px -40px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+}
+@keyframes wf-modal-pop {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.94); filter: blur(8px); }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Template card: hover lift with iris bloom */
+.wf-template-card {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.wf-template-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 0%, color-mix(in srgb, var(--ac-iris-1) 12%, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.wf-template-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--ac-iris-1) 60%, var(--ac-border));
+  box-shadow:
+    0 16px 36px -10px color-mix(in srgb, var(--ac-iris-1) 40%, transparent),
+    0 30px 60px -20px rgba(15,22,36,0.18);
+}
+.wf-template-card:hover::after { opacity: 1; }
+.wf-template-icon {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ac-iris-1) 24%, transparent) 0%, color-mix(in srgb, var(--ac-iris-2) 16%, transparent) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-iris-1) 30%, transparent) inset;
+}
+
+/* ── Drawer: glass + iris-glow seam ───────────────────────── */
+.wf-drawer-backdrop {
+  background: rgba(6, 8, 13, 0.5);
+  backdrop-filter: blur(12px);
+}
+.wf-drawer {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 100%);
+  box-shadow:
+    -20px 0 60px -10px rgba(0,0,0,0.18),
+    -40px 0 120px -20px color-mix(in srgb, var(--ac-iris-1) 25%, transparent);
+}
+:root[data-theme="dark"] .wf-drawer {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+  box-shadow:
+    -20px 0 60px -10px rgba(0,0,0,0.6),
+    -50px 0 140px -30px color-mix(in srgb, var(--ac-iris-1) 45%, transparent);
+}
+
+/* ── Toggle: refined gradient track ───────────────────────── */
+.wf-toggle {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface-muted) 92%, transparent),
+      color-mix(in srgb, var(--ac-surface-muted) 70%, transparent));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 1px 2px rgba(0,0,0,0.04) inset;
+}
+.wf-toggle-on {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-success) 22%, transparent),
+      color-mix(in srgb, var(--ac-success) 14%, transparent));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.3) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-success) 35%, transparent) inset,
+    0 0 18px -2px color-mix(in srgb, var(--ac-success) 40%, transparent);
+}
+.wf-toggle-dot {
+  background:
+    radial-gradient(circle at 30% 25%, #fff 0%, var(--ac-surface) 60%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 2px 6px rgba(0,0,0,0.18);
+}
+.wf-toggle-on .wf-toggle-dot {
+  background: radial-gradient(circle at 30% 25%, #fff 0%, var(--ac-success) 70%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 2px 8px rgba(0,0,0,0.25),
+    0 0 12px var(--ac-success);
+}
+
+/* ── Status badges in runs: ringed glow ───────────────────── */
+.wf-status-badge {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 0 0 1px currentColor inset,
+    0 0 16px -4px currentColor;
+}
+
+/* ── Run rows: refined ────────────────────────────────────── */
+.wf-run-row {
+  transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.25s ease;
+}
+.wf-run-row:hover {
+  transform: translateX(2px);
+  box-shadow:
+    0 8px 22px -6px color-mix(in srgb, var(--ac-iris-1) 22%, transparent);
+}
+.wf-run-row-selected {
+  box-shadow:
+    0 0 0 1px var(--ac-iris-1) inset,
+    0 0 0 4px color-mix(in srgb, var(--ac-iris-1) 14%, transparent),
+    0 12px 28px -8px color-mix(in srgb, var(--ac-iris-1) 32%, transparent);
+}
+
+/* ── Tab bar: glass pill ──────────────────────────────────── */
+.wf-tab-bar {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 92%, transparent),
+      color-mix(in srgb, var(--ac-surface) 78%, transparent));
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 1px 2px rgba(0,0,0,0.04);
+}
+.wf-tab-active {
+  background:
+    linear-gradient(180deg, var(--ac-surface) 0%, color-mix(in srgb, var(--ac-surface) 92%, transparent) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 0 0 1px color-mix(in srgb, var(--ac-iris-1) 18%, transparent),
+    0 6px 18px -6px color-mix(in srgb, var(--ac-iris-1) 25%, transparent);
+}
+
+/* ── Variable chips: iris hover ───────────────────────────── */
+.wf-var-chip {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 92%, transparent),
+      color-mix(in srgb, var(--ac-surface) 80%, transparent));
+  transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.wf-var-chip:hover {
+  transform: translateY(-1px) scale(1.02);
+  border-color: color-mix(in srgb, var(--ac-iris-1) 45%, var(--ac-border));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ac-iris-1) 30%, transparent);
+}
+
+/* ── Meta chips: subtle bevel ─────────────────────────────── */
+.wf-meta-chip {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface-muted) 95%, transparent),
+      color-mix(in srgb, var(--ac-surface-muted) 78%, transparent));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset;
+}
+:root[data-theme="dark"] .wf-meta-chip {
+  background: rgba(255,255,255,0.04);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+
+/* ── Pulse on active workflows in card ────────────────────── */
+.wf-status-on {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ac-success) 25%, transparent),
+    0 0 18px color-mix(in srgb, var(--ac-success) 60%, transparent);
+}
+.wf-pulse {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ac-success) 65%, transparent),
+              0 0 8px var(--ac-success);
+}
+
+/* ── Page entrance choreography ───────────────────────────── */
+.wf-list > * {
+  animation: wf-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.wf-list > *:nth-child(1) { animation-delay: 0.04s; }
+.wf-list > *:nth-child(2) { animation-delay: 0.08s; }
+.wf-list > *:nth-child(3) { animation-delay: 0.12s; }
+.wf-list > *:nth-child(4) { animation-delay: 0.16s; }
+.wf-list > *:nth-child(5) { animation-delay: 0.20s; }
+.wf-list > *:nth-child(6) { animation-delay: 0.24s; }
+
+.wf-kpi {
+  animation: wf-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.grid > .wf-kpi:nth-child(1) { animation-delay: 0.02s; }
+.grid > .wf-kpi:nth-child(2) { animation-delay: 0.08s; }
+.grid > .wf-kpi:nth-child(3) { animation-delay: 0.14s; }
+.grid > .wf-kpi:nth-child(4) { animation-delay: 0.20s; }
+
+@keyframes wf-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Empty state: subtle glow ─────────────────────────────── */
+.wf-empty {
+  border-style: dashed;
+  position: relative;
+  overflow: hidden;
+}
+.wf-empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(600px 240px at 50% 0%, color-mix(in srgb, var(--ac-iris-1) 12%, transparent), transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Reduced motion respect ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  body::after,
+  .wf-node[data-selected="true"]::before,
+  .wf-node-runtime-running {
+    animation: none !important;
+  }
+  .wf-card:hover,
+  .wf-kpi:hover,
+  .stat-card:hover,
+  .wf-node:hover,
+  .wf-template-card:hover,
+  .wf-primary-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* iCura — Workflow AI Co-Pilot                                 */
+/* ─────────────────────────────────────────────────────────── */
+
+.icura-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 12px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ac-iris-1) 60%, transparent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  background:
+    linear-gradient(135deg, var(--ac-iris-1) 0%, var(--ac-iris-2) 50%, var(--ac-iris-3) 100%);
+  background-size: 200% 200%;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.3) inset,
+    0 0 0 1px rgba(255,255,255,0.12) inset,
+    0 14px 32px -6px color-mix(in srgb, var(--ac-iris-1) 60%, transparent),
+    0 26px 50px -12px color-mix(in srgb, var(--ac-iris-2) 40%, transparent);
+  cursor: pointer;
+  isolation: isolate;
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    background-position 0.8s ease,
+    box-shadow 0.3s ease;
+  animation: icura-bob 3.6s ease-in-out infinite;
+}
+.icura-fab-hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
+@keyframes icura-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.icura-fab:hover {
+  animation-play-state: paused;
+  transform: translateY(-4px) scale(1.04);
+  background-position: 100% 0%;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.35) inset,
+    0 0 0 1px rgba(255,255,255,0.2) inset,
+    0 20px 44px -6px color-mix(in srgb, var(--ac-iris-1) 70%, transparent),
+    0 36px 70px -16px color-mix(in srgb, var(--ac-iris-2) 50%, transparent);
+}
+.icura-fab-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--ac-iris-1) 50%, transparent) 0%, transparent 70%);
+  filter: blur(14px);
+  z-index: -1;
+  animation: icura-glow-pulse 2.8s ease-in-out infinite;
+}
+@keyframes icura-glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.1); }
+}
+.icura-fab-label { font-weight: 800; }
+
+/* ── Panel ────────────────────────────────────────────────── */
+.icura-panel {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 70;
+  width: min(400px, calc(100vw - 44px));
+  height: min(640px, calc(100vh - 100px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--ac-surface) 88%, transparent) 100%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--ac-iris-1) 25%, var(--ac-border));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.55) inset,
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 30px 70px -12px rgba(0,0,0,0.28),
+    0 60px 140px -30px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+  animation: icura-panel-in 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root[data-theme="dark"] .icura-panel {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.01) 100%),
+    color-mix(in srgb, var(--ac-surface) 92%, transparent);
+  border-color: color-mix(in srgb, var(--ac-iris-1) 45%, var(--ac-border));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 40px 100px -16px rgba(0,0,0,0.7),
+    0 80px 180px -40px color-mix(in srgb, var(--ac-iris-1) 65%, transparent);
+}
+@keyframes icura-panel-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.94); filter: blur(8px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* Aurora seam at top */
+.icura-panel::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto -1px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--ac-iris-3) 20%,
+    var(--ac-iris-2) 50%,
+    var(--ac-iris-1) 80%,
+    transparent 100%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Head */
+.icura-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ac-border) 50%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-iris-1) 5%, transparent) 0%,
+      transparent 100%);
+}
+.icura-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--ac-iris-1) 0%, var(--ac-iris-2) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.3) inset,
+    0 0 0 1px rgba(255,255,255,0.15) inset,
+    0 0 18px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+}
+.icura-name {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ac-text);
+}
+.icura-tagline {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac-text-mute);
+  letter-spacing: 0.02em;
+}
+
+/* Body */
+.icura-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+}
+.icura-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  animation: icura-msg-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes icura-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.icura-msg-user { flex-direction: row-reverse; }
+.icura-msg-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--ac-text-soft);
+  background: var(--ac-surface-muted);
+  border: 1px solid var(--ac-border);
+  flex-shrink: 0;
+}
+.icura-msg-user .icura-msg-avatar {
+  color: #fff;
+  background: linear-gradient(135deg, var(--ac-iris-1), var(--ac-iris-2));
+  border-color: color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+}
+.icura-msg-bubble {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ac-text);
+  background: var(--ac-surface-muted);
+  border: 1px solid color-mix(in srgb, var(--ac-border) 70%, transparent);
+}
+.icura-msg-user .icura-msg-bubble {
+  color: #fff;
+  background: linear-gradient(135deg, var(--ac-iris-1) 0%, var(--ac-iris-2) 100%);
+  border-color: color-mix(in srgb, var(--ac-iris-1) 60%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.2) inset,
+    0 8px 18px -4px color-mix(in srgb, var(--ac-iris-1) 40%, transparent);
+}
+.icura-msg-bubble code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.06);
+}
+:root[data-theme="dark"] .icura-msg-bubble code { background: rgba(255,255,255,0.08); }
+
+.icura-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-text-soft);
+  font-size: 12.5px;
+  font-style: italic;
+}
+.icura-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-danger);
+  font-size: 12.5px;
+}
+.icura-spin { animation: wf-spin 1s linear infinite; }
+
+/* Proposal card */
+.icura-proposal {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ac-iris-1) 10%, var(--ac-surface)) 0%,
+      var(--ac-surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--ac-iris-1) 30%, var(--ac-border));
+}
+.icura-proposal-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ac-iris-1);
+  margin-bottom: 6px;
+}
+.icura-proposal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--ac-text-soft);
+}
+.icura-proposal-list li {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ac-iris-1) 4%, transparent);
+}
+.icura-proposal-kind {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ac-iris-1);
+}
+
+/* Quick prompts */
+.icura-quick {
+  padding: 0 12px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border-top: 1px solid color-mix(in srgb, var(--ac-border) 40%, transparent);
+  padding-top: 10px;
+}
+.icura-quick-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--ac-surface-muted);
+  border: 1px solid var(--ac-border);
+  color: var(--ac-text-soft);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.icura-quick-chip:hover {
+  border-color: color-mix(in srgb, var(--ac-iris-1) 45%, var(--ac-border));
+  background: color-mix(in srgb, var(--ac-iris-1) 8%, var(--ac-surface));
+  color: var(--ac-iris-1);
+  transform: translateY(-1px);
+}
+.icura-quick-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Input row */
+.icura-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ac-border) 50%, transparent);
+}
+.icura-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ac-surface) 96%, transparent),
+      color-mix(in srgb, var(--ac-surface) 86%, transparent));
+  border: 1px solid var(--ac-border);
+  font-size: 13px;
+  color: var(--ac-text);
+  outline: 0;
+  transition: border-color 0.18s ease, box-shadow 0.2s ease;
+}
+.icura-input::placeholder { color: var(--ac-text-mute); }
+.icura-input:focus {
+  border-color: color-mix(in srgb, var(--ac-iris-1) 55%, var(--ac-border));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--ac-iris-1) 12%, transparent),
+    0 0 20px -4px color-mix(in srgb, var(--ac-iris-1) 35%, transparent);
+}
+.icura-send {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--ac-iris-1) 60%, transparent);
+  background: linear-gradient(135deg, var(--ac-iris-1) 0%, var(--ac-iris-2) 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.2) inset,
+    0 6px 14px -3px color-mix(in srgb, var(--ac-iris-1) 50%, transparent);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.22s ease, opacity 0.2s ease;
+}
+.icura-send:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.28) inset,
+    0 10px 22px -4px color-mix(in srgb, var(--ac-iris-1) 60%, transparent);
+}
+.icura-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .icura-panel {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    height: 72vh;
+  }
+  .icura-fab { right: 14px; bottom: 14px; }
+}
