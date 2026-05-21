@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Mail, Phone, Shield } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
-import { demoPatientDetail, demoRaten } from "@/lib/mock-data";
 
 interface MahnPipeline {
   karenz: any[];
@@ -32,11 +31,7 @@ export default function MahnwesenPage() {
           .lt("faellig_am", new Date().toISOString().split("T")[0])
           .order("faellig_am", { ascending: true });
 
-        const source = raten?.length
-          ? raten
-          : demoRaten
-              .filter((r) => r.status === "überfällig" || r.status === "offen")
-              .map((r) => ({ ...r, patients: demoPatientDetail(r.patient_id) }));
+        const source = raten || [];
 
         source.forEach((r: any) => {
           if (r.mahnstufe === 0) next.karenz.push(r);
@@ -45,15 +40,7 @@ export default function MahnwesenPage() {
           else next.stufe3.push(r);
         });
       } catch {
-        demoRaten
-          .filter((r) => r.status === "überfällig" || r.status === "offen")
-          .forEach((r: any) => {
-            const entry = { ...r, patients: demoPatientDetail(r.patient_id) };
-            if (entry.mahnstufe === 0) next.karenz.push(entry);
-            else if (entry.mahnstufe === 1) next.stufe1.push(entry);
-            else if (entry.mahnstufe === 2) next.stufe2.push(entry);
-            else next.stufe3.push(entry);
-          });
+        // No data available
       }
       setPipeline(next);
     }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
@@ -31,8 +31,8 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 
 export default function PatientenPage() {
   const router = useRouter();
-  
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams?.get("q") || "");
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const { patienten, totalCount, loading, refetch } = usePatienten(search);
@@ -156,6 +156,8 @@ export default function PatientenPage() {
           <thead>
             <tr className="bg-surface-50">
               <th className="table-header">Patient</th>
+              <th className="table-header">Alter</th>
+              <th className="table-header">Versicherung</th>
               <th className="table-header">Behandlung</th>
               <th className="table-header">Fortschritt</th>
               <th className="table-header text-right">Rate/Monat</th>
@@ -192,12 +194,34 @@ export default function PatientenPage() {
                         {p.vorname?.[0]}
                         {p.nachname?.[0]}
                       </div>
-                      <span className="text-[15px] leading-tight font-semibold text-praxis-800">
-                        {p.nachname}, {p.vorname}
-                      </span>
+                      <div>
+                        <span className="text-[15px] leading-tight font-semibold text-praxis-800">
+                          {p.nachname}, {p.vorname}
+                        </span>
+                        {(() => {
+                          if (!p.geburtsdatum) return null;
+                          const age = Math.floor((Date.now() - new Date(p.geburtsdatum).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                          const isChild = age < 18;
+                          return (
+                            <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${isChild ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-500"}`}>
+                              {isChild ? "Kind" : "Erw."}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </Link>
                   </td>
-                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "KFO"}</td>
+                  <td className="table-cell text-sm text-praxis-600">
+                    {p.geburtsdatum ? Math.floor((Date.now() - new Date(p.geburtsdatum).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : "—"}
+                  </td>
+                  <td className="table-cell text-sm text-praxis-600">
+                    {p.versicherung_status === "Family" ? "Familie"
+                      : p.versicherung_status === "Statutory" ? "GKV"
+                      : p.versicherung_status === "Private" ? "PKV"
+                      : p.versicherung_status === "Retired" ? "Rentner"
+                      : p.kasse === "gesetzlich" ? "GKV" : "PKV"}
+                  </td>
+                  <td className="table-cell text-sm text-praxis-600">{p.behandlung || "—"}</td>
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
                       <div className="flex max-w-[360px] flex-wrap gap-1">{progressBlocks(total, bezahlt, hasOverdue)}</div>

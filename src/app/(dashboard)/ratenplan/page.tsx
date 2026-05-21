@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { Modal, StatusBadge } from "@/components/ui";
-import { DEMO_TREATMENT_TYPES, demoPatients, demoPlaene, demoRaten } from "@/lib/mock-data";
 
 export default function RatenplanPage() {
   const [plaene, setPlaene] = useState<any[]>([]);
@@ -34,9 +33,9 @@ export default function RatenplanPage() {
         supabase.from("raten").select("*").order("rate_nummer", { ascending: true }),
       ]);
 
-      const finalPlans = plans && plans.length > 0 ? plans : demoPlaene;
-      const finalPatients = pats && pats.length > 0 ? pats : demoPatients;
-      const finalRates = rates && rates.length > 0 ? rates : demoRaten;
+      const finalPlans = plans || [];
+      const finalPatients = pats || [];
+      const finalRates = rates || [];
 
       const grouped: Record<string, any[]> = {};
       finalRates.forEach((rate: any) => {
@@ -51,15 +50,9 @@ export default function RatenplanPage() {
         setSelectedPlanId((prev) => prev || finalPlans[0].id);
       }
     } catch {
-      const grouped: Record<string, any[]> = {};
-      demoRaten.forEach((rate: any) => {
-        if (!grouped[rate.ratenplan_id]) grouped[rate.ratenplan_id] = [];
-        grouped[rate.ratenplan_id].push(rate);
-      });
-      setPlaene(demoPlaene);
-      setPatienten(demoPatients);
-      setRatenByPlan(grouped);
-      setSelectedPlanId((prev) => prev || demoPlaene[0]?.id || "");
+      setPlaene([]);
+      setPatienten([]);
+      setRatenByPlan({});
     }
   }
 
@@ -249,7 +242,7 @@ export default function RatenplanPage() {
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-medium text-praxis-500">Behandlungstyp (Info)</span>
               <select className="input" disabled>
-                {DEMO_TREATMENT_TYPES.map((type) => (
+                {["Kassenbehandlung", "Privatbehandlung", "Zusatzleistung"].map((type) => (
                   <option key={type}>{type}</option>
                 ))}
               </select>

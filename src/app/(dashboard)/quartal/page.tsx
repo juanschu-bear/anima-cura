@@ -1,32 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { createBrowserClient } from "@/lib/db/supabase";
 
-const quarterRevenue = [
-  { quartal: "Q1 25", value: 112000 },
-  { quartal: "Q2 25", value: 118000 },
-  { quartal: "Q3 25", value: 106000 },
-  { quartal: "Q4 25", value: 123000 },
-  { quartal: "Q1 26", value: 136000 },
-  { quartal: "Q2 26", value: 47850 },
-];
-
-const insuranceSplit = [
-  { name: "Privatpatienten", value: 193, color: "#4b42d6" },
-  { name: "Gesetzlich", value: 119, color: "#1aa57a" },
-];
-
-const treatmentRevenue = [
-  { label: "Aligner", patients: 124, revenue: 52000 },
-  { label: "Multibracket", patients: 98, revenue: 41000 },
-  { label: "Linguale KFO", patients: 52, revenue: 38000 },
-  { label: "Retainer", patients: 38, revenue: 12000 },
-];
-
-function formatEuro(value: number) {
-  return `${value.toLocaleString("de-DE")}€`;
+interface QuartalData {
+  totalPatienten: number;
+  versicherungSplit: { name: string; value: number; color: string }[];
+  behandlungSplit: { label: string; patients: number }[];
+  kinderCount: number;
+  erwachseneCount: number;
+  mitEmail: number;
+  mitTelefon: number;
+  mitMobil: number;
 }
 
 function KPI({ title, value, sub, accent }: { title: string; value: string; sub?: string; accent?: "green" | "red" | "default" }) {
@@ -43,94 +30,101 @@ function KPI({ title, value, sub, accent }: { title: string; value: string; sub?
 export default function QuartalPage() {
   const { locale } = useAppStore();
   const isGerman = locale === "de";
-  const [hoverQuarter, setHoverQuarter] = useState<string | null>(null);
+  const [data, setData] = useState<QuartalData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const current = quarterRevenue[quarterRevenue.length - 1]?.value ?? 0;
-  const previous = quarterRevenue[quarterRevenue.length - 2]?.value ?? 0;
+  useEffect(() => {
+    async function fetch() {
+      const supabase = createBrowserClient();
+      const { data: patients } = await supabase
+        .from("patients")
+        .select("geburtsdatum, versicherung_status, kasse, behandlung, email, telefon, mobiltelefon")
+        .range(0, 9999);
 
-  const quarterTrend = useMemo(() => {
-    if (!previous) return 0;
-    return ((current - previous) / previous) * 100;
-  }, [current, previous]);
+      if (!patients) { setLoading(false); return; }
 
-  const totalPatients = insuranceSplit.reduce((sum, s) => sum + s.value, 0);
-  const maxRevenue = Math.max(...treatmentRevenue.map((t) => t.revenue));
+      const versMap: Record<string, number> = {};
+      const behMap: Record<string, number> = {};
+      let kinder = 0, erwachsene = 0, mitEmail = 0, mitTelefon = 0, mitMobil = 0;
+      const now = Date.now();
+
+      for (const p of patients) {
+        const vs = p.versicherung_status === "Family" ? "Familienversichert"
+          : p.versicherung_status === "Statutory" ? "Gesetzlich"
+          : p.versicherung_status === "Private" ? "Privat"
+          : p.versicherung_status === "Retired" ? "Rentner"
+          : p.kasse === "gesetzlich" ? "Gesetzlich" : "Privat";
+        versMap[vs] = (versMap[vs] || 0) + 1;
+
+        const beh = p.behandlung || "Kein Status";
+        behMap[beh] = (behMap[beh] || 0) + 1;
+
+        if (p.geburtsdatum) {
+          const age = Math.floor((now - new Date(p.geburtsdatum).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+          if (age < 18) kinder++; else erwachsene++;
+        }
+
+        if (p.email) mitEmail++;
+        if (p.telefon) mitTelefon++;
+        if (p.mobiltelefon) mitMobil++;
+      }
+
+      const colorMap: Record<string, string> = {
+        Familienversichert: "#1aa57a",
+        Gesetzlich: "#2cb88a",
+        Privat: "#4b42d6",
+        Rentner: "#7a6fe0",
+      };
+
+      setData({
+        totalPatienten: patients.length,
+        versicherungSplit: Object.entries(versMap)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, value]) => ({ name, value, color: colorMap[name] || "#999" })),
+        behandlungSplit: Object.entries(behMap)
+          .sort((a, b) => b[1] - a[1])
+          .map(([label, patients]) => ({ label, patients })),
+        kinderCount: kinder,
+        erwachseneCount: erwachsene,
+        mitEmail,
+        mitTelefon,
+        mitMobil,
+      });
+      setLoading(false);
+    }
+    fetch();
+  }, []);
+
+  if (loading) return <div className="text-praxis-400">Lade Quartalsdaten...</div>;
+  if (!data) return <div className="text-praxis-400">Keine Daten verfügbar.</div>;
+
+  const maxBeh = Math.max(...data.behandlungSplit.map(b => b.patients), 1);
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-[30px] font-extrabold tracking-tight text-praxis-800">{isGerman ? "Quartalsbericht" : "Quarter report"}</h1>
         <p className="mt-1 text-sm text-praxis-400">
-          {isGerman ? "Kennzahlen, Vergleich und Umsatztreiber im Überblick" : "KPIs, comparison and revenue drivers at a glance"}
+          {isGerman ? "Praxiskennzahlen auf Basis der aktuellen Patientendaten" : "Practice KPIs based on current patient data"}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPI
-          title={isGerman ? "Q2 2026 Umsatz (bisher)" : "Q2 2026 revenue (to date)"}
-          value={formatEuro(current)}
-          sub={`${quarterTrend >= 0 ? "↑" : "↓"} ${Math.abs(quarterTrend).toFixed(1).replace(".", ",")}% ${isGerman ? "vs. Q1" : "vs Q1"}`}
-          accent={quarterTrend >= 0 ? "green" : "red"}
-        />
-        <KPI
-          title={isGerman ? "Aktive Patienten" : "Active patients"}
-          value={String(totalPatients)}
-          sub={isGerman ? "von 487 gesamt" : "of 487 total"}
-        />
-        <KPI
-          title={isGerman ? "Ø Rate pro Patient" : "Avg installment per patient"}
-          value="228€"
-          sub={isGerman ? "Median: 220€" : "Median: 220€"}
-        />
-        <KPI
-          title={isGerman ? "Ausfallquote" : "Default rate"}
-          value="2,1%"
-          sub={isGerman ? "↓ -0,8% vs. Q1" : "↓ -0.8% vs Q1"}
-          accent="green"
-        />
-      </div>
-
-      <div className="stat-card">
-        <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Quartalsvergleich - Zahlungseingang" : "Quarter comparison - incoming payments"}</h3>
-        <div className="grid grid-cols-6 gap-4">
-          {quarterRevenue.map((row, idx) => {
-            const max = Math.max(...quarterRevenue.map((q) => q.value));
-            const height = Math.max(28, Math.round((row.value / max) * 220));
-            const active = idx === quarterRevenue.length - 1;
-            return (
-              <div key={row.quartal} className="flex flex-col items-center gap-2">
-                <div className="text-xs text-praxis-400">{Math.round(row.value / 1000)}k€</div>
-                <div
-                  className="relative flex h-[220px] items-end"
-                  onMouseEnter={() => setHoverQuarter(row.quartal)}
-                  onMouseLeave={() => setHoverQuarter((curr) => (curr === row.quartal ? null : curr))}
-                >
-                  <div
-                    className={`w-16 rounded-t-xl ${active ? "bg-[#4b42d6]" : "bg-[#c4befb]"}`}
-                    style={{ height }}
-                  />
-                  {hoverQuarter === row.quartal && (
-                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 rounded-md border border-surface-200 bg-white px-2 py-1 text-xs text-praxis-700 shadow-card whitespace-nowrap">
-                      {row.quartal}: {formatEuro(row.value)}
-                    </div>
-                  )}
-                </div>
-                <div className="text-sm font-medium text-praxis-500">{row.quartal}</div>
-              </div>
-            );
-          })}
-        </div>
+        <KPI title={isGerman ? "Patienten gesamt" : "Total patients"} value={String(data.totalPatienten)} />
+        <KPI title={isGerman ? "Kinder (unter 18)" : "Children (under 18)"} value={String(data.kinderCount)} sub={`${data.erwachseneCount} Erwachsene`} />
+        <KPI title={isGerman ? "Erreichbarkeit E-Mail" : "Email reachability"} value={`${Math.round((data.mitEmail / data.totalPatienten) * 100)}%`} sub={`${data.mitEmail} von ${data.totalPatienten}`} accent={data.mitEmail / data.totalPatienten > 0.5 ? "green" : "red"} />
+        <KPI title={isGerman ? "Erreichbarkeit Telefon" : "Phone reachability"} value={`${Math.round((data.mitTelefon / data.totalPatienten) * 100)}%`} sub={`${data.mitTelefon} Festnetz, ${data.mitMobil} Mobil`} accent={data.mitTelefon / data.totalPatienten > 0.5 ? "green" : "red"} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="stat-card">
-          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Patienten nach Kassenart" : "Patients by insurance type"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Versicherungsverteilung" : "Insurance distribution"}</h3>
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <div className="h-[220px] w-full md:w-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={insuranceSplit} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" strokeWidth={0}>
-                    {insuranceSplit.map((slice) => (
+                  <Pie data={data.versicherungSplit} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" strokeWidth={0}>
+                    {data.versicherungSplit.map((slice) => (
                       <Cell key={slice.name} fill={slice.color} />
                     ))}
                   </Pie>
@@ -138,12 +132,12 @@ export default function QuartalPage() {
               </ResponsiveContainer>
             </div>
             <div className="space-y-3">
-              {insuranceSplit.map((slice) => {
-                const pct = Math.round((slice.value / totalPatients) * 100);
+              {data.versicherungSplit.map((slice) => {
+                const pct = Math.round((slice.value / data.totalPatienten) * 100);
                 return (
                   <p key={slice.name} className="flex items-center gap-2 text-sm text-praxis-700">
                     <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
-                    {isGerman ? `${slice.name}: ${slice.value} (${pct}%)` : `${slice.name}: ${slice.value} (${pct}%)`}
+                    {slice.name}: {slice.value} ({pct}%)
                   </p>
                 );
               })}
@@ -152,15 +146,15 @@ export default function QuartalPage() {
         </div>
 
         <div className="stat-card">
-          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Umsatz nach Behandlungsart" : "Revenue by treatment"}</h3>
+          <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Behandlungsstatus" : "Treatment status"}</h3>
           <div className="space-y-4">
-            {treatmentRevenue.map((row) => {
-              const width = Math.max(10, Math.round((row.revenue / maxRevenue) * 100));
+            {data.behandlungSplit.map((row) => {
+              const width = Math.max(10, Math.round((row.patients / maxBeh) * 100));
               return (
                 <div key={row.label}>
                   <div className="mb-1 flex items-center justify-between text-sm text-praxis-700">
-                    <span>{row.label} ({row.patients} {isGerman ? "Pat." : "pts"})</span>
-                    <span className="font-semibold">{Math.round(row.revenue / 1000)}k€</span>
+                    <span>{row.label}</span>
+                    <span className="font-semibold">{row.patients}</span>
                   </div>
                   <div className="h-3 rounded-full bg-[#e9e8ff]">
                     <div className="h-3 rounded-full bg-[#4b42d6]" style={{ width: `${width}%` }} />
@@ -170,6 +164,15 @@ export default function QuartalPage() {
             })}
           </div>
         </div>
+      </div>
+
+      <div className="stat-card">
+        <h3 className="mb-3 text-[24px] font-extrabold tracking-tight text-praxis-700">{isGerman ? "Hinweis" : "Note"}</h3>
+        <p className="text-sm text-praxis-500">
+          {isGerman
+            ? "Finanzkennzahlen (Umsatz, Ausfallquote, durchschnittliche Raten) werden verfügbar sobald Ratenpläne angelegt und die Bankverbindung eingerichtet sind."
+            : "Financial KPIs (revenue, default rate, average installments) will be available once rate plans are created and the bank connection is set up."}
+        </p>
       </div>
     </div>
   );
