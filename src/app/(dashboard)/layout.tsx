@@ -24,6 +24,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
 import ICuraVoiceCompanion from "@/components/icura/ICuraVoiceCompanion";
+import ICuraGuide from "@/components/icura/ICuraGuide";
 
 const NAV_ITEMS = [
   { href: "/uebersicht", icon: LayoutDashboard, key: "nav.overview" },
@@ -183,6 +184,7 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
+      <ICuraGuide />
       <ICuraVoiceCompanion />
     </div>
   );
