@@ -411,7 +411,7 @@ export async function POST(request: Request) {
               },
               {
                 name: "ask_clarification",
-                description: "Stellt eine Rückfrage wenn Informationen fehlen",
+                description: "Stellt NUR eine Rückfrage wenn absolut kritische Informationen fehlen. Bevorzuge IMMER einen Workflow-Vorschlag mit sinnvollen Defaults statt Rückfragen. Maximal 1 Rückfrage pro Konversation.",
                 input_schema: {
                   type: "object" as const,
                   properties: {
