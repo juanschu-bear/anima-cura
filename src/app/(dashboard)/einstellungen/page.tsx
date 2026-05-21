@@ -35,7 +35,7 @@ export default function EinstellungenPage() {
       if (i !== idx) return u;
       if (field === "name") return { ...u, name: value };
       if (field === "role") {
-        const perms = field === "admin"
+        const perms = value === "admin"
           ? { zahlungen: true, mahnwesen: true, einstellungen: true }
           : value === "verwaltung"
           ? { zahlungen: true, mahnwesen: true, einstellungen: false }
