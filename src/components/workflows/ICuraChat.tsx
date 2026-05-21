@@ -50,6 +50,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
   ];
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: uid(),
@@ -88,6 +89,7 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trimmed,
+          sessionId: sessionId || undefined,
           history: messages
             .filter((m) => !m.pending && !m.error)
             .slice(-12)
@@ -98,6 +100,10 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
           },
         }),
       });
+
+      // Read sessionId from response header
+      const respSessionId = res.headers.get("X-Session-Id");
+      if (respSessionId) setSessionId(respSessionId);
 
       if (!res.ok) {
         if (res.status === 404) {
