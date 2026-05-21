@@ -43,6 +43,7 @@ import { ActionScoringNode } from "./nodes/ActionScoringNode";
 import { ActionWaitNode } from "./nodes/ActionWaitNode";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import { useRealtimeRun } from "./useRealtimeRun";
+import { ICuraChat } from "./ICuraChat";
 import type { NodeKind, WorkflowEdge, WorkflowNode } from "./types";
 
 const nodeTypes = {
@@ -240,6 +241,15 @@ function CanvasInner({ initialNodes, initialEdges, onChange, isDark, workflowId 
       </aside>
 
       <div className="wf-canvas">
+        <svg style={{ position: "absolute", width: 0, height: 0 }} aria-hidden>
+          <defs>
+            <linearGradient id="wf-edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="var(--ac-iris-1)" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="var(--ac-iris-2)" stopOpacity="1" />
+              <stop offset="100%" stopColor="var(--ac-iris-3)" stopOpacity="0.9" />
+            </linearGradient>
+          </defs>
+        </svg>
         <ReactFlow
           nodes={nodesWithStatus}
           edges={edges}
@@ -300,6 +310,22 @@ function CanvasInner({ initialNodes, initialEdges, onChange, isDark, workflowId 
         onClose={() => setSelectedNodeId(null)}
         onChange={updateSelectedData}
         onDelete={deleteSelected}
+      />
+
+      <ICuraChat
+        workflow={{
+          id: workflowId || "",
+          name: "",
+          active: false,
+          updatedAt: new Date().toISOString(),
+          nodes: nodes as any,
+          edges: edges as any,
+        }}
+        onApplyProposal={(newNodes, newEdges) => {
+          setNodes(newNodes as any);
+          setEdges(newEdges as any);
+          pushChange(newNodes as any, newEdges as any);
+        }}
       />
     </div>
   );
