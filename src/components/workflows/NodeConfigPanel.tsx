@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Trash2, Info, Copy } from "lucide-react";
+import { X, Trash2, Info, Copy, Check } from "lucide-react";
+import { useState } from "react";
 import type { WorkflowNode, NodeKind } from "./types";
 import { TEMPLATE_VARIABLES } from "./types";
 
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export function NodeConfigPanel({ node, onClose, onChange, onDelete }: Props) {
+  const [justApplied, setJustApplied] = useState(false);
+
   if (!node) return null;
   const data = (node.data || {}) as any;
 
@@ -19,6 +22,14 @@ export function NodeConfigPanel({ node, onClose, onChange, onDelete }: Props) {
 
   function patch(part: Record<string, any>) {
     onChange({ ...data, ...part });
+  }
+
+  function apply() {
+    setJustApplied(true);
+    window.setTimeout(() => {
+      setJustApplied(false);
+      onClose();
+    }, 520);
   }
 
   return (
@@ -66,13 +77,30 @@ export function NodeConfigPanel({ node, onClose, onChange, onDelete }: Props) {
         )}
       </div>
 
-      {node.type !== "trigger" && (
-        <div className="wf-config-foot">
+      <div className="wf-config-foot">
+        {node.type !== "trigger" ? (
           <button onClick={onDelete} className="wf-danger-btn" type="button">
-            <Trash2 size={14} /> Node löschen
+            <Trash2 size={14} /> Löschen
           </button>
-        </div>
-      )}
+        ) : (
+          <span />
+        )}
+        <button
+          onClick={apply}
+          type="button"
+          className={`wf-primary-btn wf-apply-btn ${justApplied ? "wf-apply-btn-done" : ""}`}
+        >
+          {justApplied ? (
+            <>
+              <Check size={14} /> Übernommen
+            </>
+          ) : (
+            <>
+              <Check size={14} /> Übernehmen
+            </>
+          )}
+        </button>
+      </div>
     </aside>
   );
 }

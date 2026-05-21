@@ -988,8 +988,23 @@ samp {
   gap: 18px;
 }
 .wf-config-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 14px 18px;
   border-top: 1px solid var(--ac-border);
+  background: var(--ac-surface);
+}
+.wf-apply-btn {
+  transition: background 0.25s ease, transform 0.15s ease, box-shadow 0.25s ease, filter 0.2s ease;
+}
+.wf-apply-btn-done {
+  background: linear-gradient(135deg, var(--ac-success) 0%, color-mix(in srgb, var(--ac-success) 80%, #000) 100%);
+  border-color: color-mix(in srgb, var(--ac-success) 60%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 8px 22px color-mix(in srgb, var(--ac-success) 38%, transparent);
 }
 .wf-form { display: flex; flex-direction: column; gap: 14px; }
 .wf-field { display: flex; flex-direction: column; gap: 6px; }
