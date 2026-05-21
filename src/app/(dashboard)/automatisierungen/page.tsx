@@ -35,11 +35,12 @@ function nid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const SEED: Workflow[] = [
+function getSeed(locale: string): Workflow[] {
+  return [
   {
     id: nid(),
-    name: "Zahlungserinnerung — 6 Tage",
-    description: "Freundliche E-Mail wenn Rate 6 Tage überfällig ist",
+    name: t("workflow.seedPaymentReminder", locale),
+    description: t("workflow.seedPaymentReminderDesc", locale),
     active: true,
     updatedAt: new Date().toISOString(),
     runsToday: 4,
@@ -60,8 +61,8 @@ const SEED: Workflow[] = [
   },
   {
     id: nid(),
-    name: "Rücklastschrift-Alert",
-    description: "Eskalation bei zurückgegebener Lastschrift",
+    name: t("workflow.seedChargebackAlert", locale),
+    description: t("workflow.seedChargebackAlertDesc", locale),
     active: false,
     updatedAt: new Date().toISOString(),
     runsToday: 0,
@@ -73,6 +74,7 @@ const SEED: Workflow[] = [
     edges: [{ id: "e1", source: "t", target: "a", type: "smoothstep", animated: true }],
   },
 ];
+}
 
 export default function AutomatisierungenPage() {
   const { theme, locale } = useAppStore();
@@ -107,12 +109,12 @@ export default function AutomatisierungenPage() {
         if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
           setWorkflows(data.value as Workflow[]);
         } else {
-          setWorkflows(SEED);
+          setWorkflows(getSeed(locale));
         }
       } catch (err) {
         if (!cancelled) {
           console.error("[workflows] read threw", err);
-          setWorkflows(SEED);
+          setWorkflows(getSeed(locale));
         }
       } finally {
         if (!cancelled) setLoaded(true);

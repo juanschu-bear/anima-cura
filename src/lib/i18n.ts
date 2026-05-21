@@ -729,6 +729,12 @@ const translations: Record<string, { de: string; en: string }> = {
   "header.toggleTheme": { de: "Theme wechseln", en: "Toggle theme" },
   "header.toggleLanguage": { de: "Sprache wechseln", en: "Toggle language" },
   "header.logout": { de: "Abmelden", en: "Logout" },
+
+  // ─── Workflow Seeds ─────────────────────────────────────
+  "workflow.seedPaymentReminder": { de: "Zahlungserinnerung — 6 Tage", en: "Payment reminder — 6 days" },
+  "workflow.seedPaymentReminderDesc": { de: "Freundliche E-Mail wenn Rate 6 Tage überfällig ist", en: "Friendly email when installment is 6 days overdue" },
+  "workflow.seedChargebackAlert": { de: "Rücklastschrift-Alert", en: "Chargeback alert" },
+  "workflow.seedChargebackAlertDesc": { de: "Eskalation bei zurückgegebener Lastschrift", en: "Escalation when direct debit is reversed" },
 };
 
 export function t(key: string, locale: string = "de", vars?: Record<string, string | number>): string {
@@ -741,8 +747,6 @@ export function t(key: string, locale: string = "de", vars?: Record<string, stri
   }
   return value;
 }
-
-export default translations;
 
 export function tData(value: string | null | undefined, locale: string = "de"): string {
   if (!value) return t("common.noStatus", locale);
@@ -767,3 +771,5 @@ export function tData(value: string | null | undefined, locale: string = "de"): 
   const entry = map[value];
   return entry ? (locale === "en" ? entry.en : entry.de) : value;
 }
+
+export default translations;
