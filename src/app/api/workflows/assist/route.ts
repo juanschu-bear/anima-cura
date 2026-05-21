@@ -9,11 +9,35 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `Du bist der Workflow-Assistent von Anima Cura, einem Praxisverwaltungstool für eine kieferorthopädische Praxis.
+const SYSTEM_PROMPT = `Du bist iCura, der KI-Assistent von Anima Cura. Anima Cura ist ein Praxisverwaltungstool für eine kieferorthopädische Praxis (Praxis Dr. Elena Schubert, Nikolaistraße 20, 04109 Leipzig).
 
-Du hilfst beim Erstellen von Automationen. Antworte IMMER in der Sprache in der der Benutzer schreibt. Wenn der Benutzer Deutsch schreibt, antworte auf Deutsch. Wenn der Benutzer Englisch schreibt, antworte auf Englisch. E-Mail-Templates und Nachrichtentexte innerhalb von Workflows sollten standardmäßig auf Deutsch verfasst sein (da die Patienten deutschsprachig sind), es sei denn der Benutzer wünscht es anders.
+Antworte IMMER in der Sprache, in der der Benutzer schreibt (Deutsch oder Englisch). Sprich den Benutzer mit "Sie" / "you" an. Bleib freundlich, kompetent und kurz angebunden (2-3 Sätze bevorzugt). E-Mail-Templates innerhalb von Workflows bleiben Deutsch, da die Patienten deutschsprachig sind.
 
-VERFÜGBARE NODE-TYPEN:
+DU LEBST IN DER APP:
+- Du bekommst bei jeder Anfrage den aktuellen App-Kontext (currentPage, locale, theme, optional: patientCount, activeWorkflows, openRaten, selectedPatient).
+- Du kannst den Benutzer durch die App führen: navigiere ihn zu Seiten oder hebe Elemente visuell hervor.
+
+DEINE FÄHIGKEITEN (Tools):
+1. ask_clarification — Wenn dir Information fehlt, stelle EINE Rückfrage.
+2. propose_workflow — Schlage einen kompletten Workflow vor (Nodes + Edges) für die Automatisierungs-Seite.
+3. guide_user — Führe den Benutzer visuell: action="navigate" (zu einer App-Seite), action="highlight" (CSS-Selektor pulsieren lassen), action="open_chat" (Hinweis).
+
+KENNE DIE APP:
+Seiten: /uebersicht, /zahlungen, /patienten, /ratenplan, /mahnwesen, /quartal, /automatisierungen, /einstellungen, /import.
+Sidebar-Selektoren: [data-nav="uebersicht"], [data-nav="zahlungen"], [data-nav="patienten"], [data-nav="ratenplan"], [data-nav="mahnwesen"], [data-nav="quartal"], [data-nav="automatisierungen"], [data-nav="einstellungen"].
+
+CROSS-PAGE-WORKFLOWS:
+Wenn der Benutzer einen Workflow erstellen möchte und nicht auf /automatisierungen ist, antworte mit guide_user (navigate zu /automatisierungen). Der Benutzer kann dann die Anfrage erneut stellen.
+
+ASSISTENTEN-MODUS (mode="assistant"):
+- Du bevorzugst kurze, hilfreiche Antworten.
+- Bei Navigations-Wünschen rufst Du guide_user auf.
+- Bei Workflow-Erstellung außerhalb von /automatisierungen: zuerst zu /automatisierungen leiten.
+
+WORKFLOW-MODUS (mode="workflow"):
+- Du bist im Workflow-Builder. Nutze propose_workflow direkt.
+
+VERFÜGBARE NODE-TYPEN (für propose_workflow):
 
 1. trigger — Auslöser
    Events: "rate_ueberfaellig", "ruecklastschrift", "taeglicher_cron", "scoring_kritisch"
@@ -81,9 +105,36 @@ WICHTIG:
 - Edges müssen auf existierende Node-IDs verweisen.
 - Wenn du einen Workflow vorschlägst, gib vollständige nodes und edges zurück.`;
 
+const contextSchema = z
+  .object({
+    currentPage: z.string().optional(),
+    locale: z.string().optional(),
+    theme: z.string().optional(),
+    patientCount: z.number().optional(),
+    activeWorkflows: z.number().optional(),
+    openRaten: z.number().optional(),
+    selectedPatient: z
+      .object({
+        id: z.string().optional(),
+        name: z.string().optional(),
+        behandlung: z.string().optional(),
+      })
+      .optional(),
+  })
+  .partial()
+  .optional();
+
+const guideSchema = z.object({
+  action: z.enum(["navigate", "highlight", "open_chat"]),
+  target: z.string().min(1),
+  explanation: z.string().min(1),
+});
+
 const requestSchema = z.object({
   sessionId: z.string().uuid().optional(),
   message: z.string().min(1, "Nachricht fehlt."),
+  mode: z.enum(["workflow", "assistant"]).optional(),
+  context: contextSchema,
   currentWorkflow: z
     .object({
       nodes: z.array(z.unknown()),
@@ -243,34 +294,35 @@ const storedSessionMessageSchema = z.object({
 type StoredSessionMessage = z.infer<typeof storedSessionMessageSchema>;
 
 function formatUserMessage(input: z.infer<typeof requestSchema>) {
-  if (!input.currentWorkflow) {
-    return input.message;
+  const parts: string[] = [input.message];
+
+  if (input.mode) {
+    parts.push("", `Modus: ${input.mode}`);
   }
 
-  return [
-    input.message,
-    "",
-    "Aktueller Workflow im Editor:",
-    JSON.stringify(input.currentWorkflow, null, 2),
-  ].join("\n");
+  if (input.context && Object.keys(input.context).length > 0) {
+    parts.push("", "App-Kontext:", JSON.stringify(input.context, null, 2));
+  }
+
+  if (input.currentWorkflow) {
+    parts.push("", "Aktueller Workflow im Editor:", JSON.stringify(input.currentWorkflow, null, 2));
+  }
+
+  return parts.join("\n");
 }
 
 function summarizeAssistantPayload(
   payload:
     | ({ type: "question" } & z.infer<typeof clarificationSchema>)
     | ({ type: "proposal" } & z.infer<typeof proposalSchema>)
+    | ({ type: "guide" } & z.infer<typeof guideSchema>)
 ) {
-  if (payload.type === "question") {
-    return payload.question;
-  }
-
+  if (payload.type === "question") return payload.question;
+  if (payload.type === "guide") return `${payload.explanation} (${payload.action}: ${payload.target})`;
   return [
     payload.rationale,
     "",
-    JSON.stringify({
-      nodes: payload.nodes,
-      edges: payload.edges,
-    }),
+    JSON.stringify({ nodes: payload.nodes, edges: payload.edges }),
   ].join("\n");
 }
 
@@ -417,10 +469,33 @@ export async function POST(request: Request) {
                   properties: {
                     question: {
                       type: "string",
-                      description: "Rückfrage auf Deutsch",
+                      description: "Rückfrage in der Sprache des Benutzers",
                     },
                   },
                   required: ["question"],
+                },
+              },
+              {
+                name: "guide_user",
+                description: "Führt den Benutzer visuell durch die App — navigiert zu einer Seite oder hebt ein UI-Element hervor.",
+                input_schema: {
+                  type: "object" as const,
+                  properties: {
+                    action: {
+                      type: "string",
+                      enum: ["navigate", "highlight", "open_chat"],
+                      description: "Was gemacht werden soll",
+                    },
+                    target: {
+                      type: "string",
+                      description: "Bei navigate: Pfad (z.B. /patienten). Bei highlight: CSS-Selektor (z.B. [data-nav=\"zahlungen\"]).",
+                    },
+                    explanation: {
+                      type: "string",
+                      description: "Kurzer freundlicher Hinweis was der Benutzer dort findet.",
+                    },
+                  },
+                  required: ["action", "target", "explanation"],
                 },
               },
             ],
@@ -436,7 +511,8 @@ export async function POST(request: Request) {
 
         let payload:
           | ({ type: "question" } & z.infer<typeof clarificationSchema>)
-          | ({ type: "proposal" } & z.infer<typeof proposalSchema>);
+          | ({ type: "proposal" } & z.infer<typeof proposalSchema>)
+          | ({ type: "guide" } & z.infer<typeof guideSchema>);
 
         if (toolUse?.type === "tool_use" && toolUse.name === "ask_clarification") {
           const parsedTool = clarificationSchema.safeParse(toolUse.input);
@@ -445,6 +521,22 @@ export async function POST(request: Request) {
           }
           payload = { type: "question", ...parsedTool.data };
           sendSse(controller, { type: "question", text: parsedTool.data.question }, "final");
+        } else if (toolUse?.type === "tool_use" && toolUse.name === "guide_user") {
+          const parsedTool = guideSchema.safeParse(toolUse.input);
+          if (!parsedTool.success) {
+            throw new Error("Die Navigations-Anweisung ist ungültig.");
+          }
+          payload = { type: "guide", ...parsedTool.data };
+          sendSse(
+            controller,
+            {
+              type: "guide",
+              action: parsedTool.data.action,
+              target: parsedTool.data.target,
+              explanation: parsedTool.data.explanation,
+            },
+            "final"
+          );
         } else if (toolUse?.type === "tool_use" && toolUse.name === "propose_workflow") {
           const parsedTool = proposalSchema.safeParse(toolUse.input);
           if (!parsedTool.success) {

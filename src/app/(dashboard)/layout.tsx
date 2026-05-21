@@ -21,6 +21,8 @@ import {
   Upload,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
+import { ICuraWidget } from "@/components/icura/ICuraWidget";
+import { ICuraHighlight } from "@/components/icura/ICuraHighlight";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
 
@@ -96,6 +98,7 @@ export default function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
+                data-nav={item.href.slice(1)}
                 className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
               >
                 <Icon size={18} />
@@ -181,6 +184,9 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
+
+      <ICuraWidget />
+      <ICuraHighlight />
     </div>
   );
 }
