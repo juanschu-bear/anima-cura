@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,15 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 export default function PatientenPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const stored = window.sessionStorage.getItem("ac-patient-search");
+    if (stored) {
+      setSearch(stored);
+      window.sessionStorage.removeItem("ac-patient-search");
+    }
+  }, []);
+
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const { patienten, totalCount, loading, refetch } = usePatienten(search);

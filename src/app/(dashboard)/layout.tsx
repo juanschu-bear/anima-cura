@@ -17,6 +17,7 @@ import {
   Sun,
   Languages,
   Search,
+  Zap,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { useRouter } from "next/navigation";
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/ratenplan", icon: CalendarRange, labelDe: "Ratenpläne", labelEn: "Installments" },
   { href: "/mahnwesen", icon: AlertTriangle, labelDe: "Mahnwesen", labelEn: "Dunning" },
   { href: "/quartal", icon: BarChart3, labelDe: "Quartalsbericht", labelEn: "Quarterly" },
+  { href: "/automatisierungen", icon: Zap, labelDe: "Automatisierungen", labelEn: "Automations" },
   { href: "/einstellungen", icon: Settings, labelDe: "Einstellungen", labelEn: "Settings" },
 ];
 
@@ -129,7 +131,10 @@ export default function DashboardLayout({
                 placeholder={isGerman ? "Patient suchen..." : "Search patient..."}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
-                    router.push(`/patienten?q=${encodeURIComponent((e.target as HTMLInputElement).value.trim())}`);
+                    const val = (e.target as HTMLInputElement).value.trim();
+                    window.sessionStorage.setItem("ac-patient-search", val);
+                    router.push("/patienten");
+                    (e.target as HTMLInputElement).value = "";
                   }
                 }}
               />
