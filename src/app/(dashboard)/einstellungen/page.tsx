@@ -11,6 +11,65 @@ type JsonRecord = Record<string, any>;
 export default function EinstellungenPage() {
   const { locale, theme } = useAppStore();
   const isGerman = locale === "de";
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState(false);
+
+  const ADMIN_PW = "ms13sr06?!";
+
+  if (!unlocked) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="w-full max-w-sm rounded-2xl border p-8 text-center" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)", boxShadow: "var(--ac-shadow)" }}>
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: "var(--ac-surface-muted)" }}>
+            <Settings size={24} style={{ color: "var(--ac-text-mute)" }} />
+          </div>
+          <h2 className="text-xl font-bold" style={{ color: "var(--ac-text)" }}>
+            {isGerman ? "Einstellungen" : "Settings"}
+          </h2>
+          <p className="mt-2 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+            {isGerman ? "Bitte Admin-Passwort eingeben" : "Please enter admin password"}
+          </p>
+          <input
+            type="password"
+            className="input mt-4"
+            placeholder="••••••••"
+            value={pwInput}
+            onChange={(e) => { setPwInput(e.target.value); setPwError(false); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (pwInput === ADMIN_PW) setUnlocked(true);
+                else setPwError(true);
+              }
+            }}
+            autoFocus
+          />
+          {pwError && (
+            <p className="mt-2 text-sm" style={{ color: "var(--ac-danger)" }}>
+              {isGerman ? "Falsches Passwort" : "Wrong password"}
+            </p>
+          )}
+          <button
+            className="btn-primary mt-4 w-full"
+            onClick={() => {
+              if (pwInput === ADMIN_PW) setUnlocked(true);
+              else setPwError(true);
+            }}
+          >
+            {isGerman ? "Entsperren" : "Unlock"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <EinstellungenContent />;
+}
+
+function EinstellungenContent() {
+  const { locale, theme } = useAppStore();
+  const isGerman = locale === "de";
+  const ADMIN_PW = "ms13sr06?!";
   const { settings, loading, updateSetting } = useEinstellungen();
   const { connections, refetch: refetchConnections } = useBankConnections();
   const [saving, setSaving] = useState<string | null>(null);

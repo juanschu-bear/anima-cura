@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
 
   const startTime = Date.now();
   const results: Record<string, unknown> = {};
-  const appUrl = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.EXT_PUBLIC_APP_URL ||
+    "https://anima-cura.vercel.app";
 
   if (process.env.IVORIS_SYNC_ENABLED === "true") {
     try {
@@ -57,6 +60,15 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     results.dunning = { error: String(e) };
+  }
+
+  try {
+    const executeRes = await fetch(`${appUrl}/api/workflows/execute-all`, {
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+    });
+    results.workflows = executeRes.ok ? await executeRes.json() : { error: `HTTP ${executeRes.status}` };
+  } catch (e) {
+    results.workflows = { error: String(e) };
   }
 
   results.duration_ms = Date.now() - startTime;
