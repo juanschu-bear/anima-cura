@@ -4,8 +4,11 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { Modal, StatusBadge } from "@/components/ui";
+import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 export default function RatenplanPage() {
+  const { locale } = useAppStore();
   const [plaene, setPlaene] = useState<any[]>([]);
   const [patienten, setPatienten] = useState<any[]>([]);
   const [ratenByPlan, setRatenByPlan] = useState<Record<string, any[]>>({});
@@ -62,7 +65,7 @@ export default function RatenplanPage() {
 
   async function createRatenplan() {
     if (!form.patient_id || form.gesamtbetrag <= 0 || form.anzahl_raten <= 0) {
-      setHint("Bitte Patient, Gesamtbetrag und Anzahl Raten korrekt ausfuellen.");
+      setHint(t("rateplans.fillRequired", locale));
       return;
     }
 
@@ -86,7 +89,7 @@ export default function RatenplanPage() {
 
     if (planError || !plan?.id) {
       setSaving(false);
-      setHint(planError?.message || "Ratenplan konnte nicht erstellt werden.");
+      setHint(planError?.message || t("rateplans.createError", locale));
       return;
     }
 
@@ -106,7 +109,7 @@ export default function RatenplanPage() {
     const { error: ratesError } = await supabase.from("raten").insert(rates);
     setSaving(false);
     if (ratesError) {
-      setHint(ratesError.message || "Raten konnten nicht erstellt werden.");
+      setHint(ratesError.message || t("rateplans.ratesError", locale));
       return;
     }
 
@@ -118,7 +121,7 @@ export default function RatenplanPage() {
       start_datum: new Date().toISOString().slice(0, 10),
       rhythmus: "monatlich",
     });
-    setHint("Ratenplan erstellt.");
+    setHint(t("rateplans.created", locale));
     fetchData();
   }
 
@@ -142,11 +145,11 @@ export default function RatenplanPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">Ratenplan</h1>
-          <p className="mt-1 text-sm text-praxis-400">{plaene.length} aktive Pläne</p>
+          <h1 className="text-[34px] font-extrabold tracking-tight text-praxis-800">{t("rateplans.title", locale)}</h1>
+          <p className="mt-1 text-sm text-praxis-400">{plaene.length} {t("rateplans.activePlans", locale)}</p>
         </div>
         <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus size={16} /> Neuer Ratenplan
+          <Plus size={16} /> {t("rateplans.newPlan", locale)}
         </button>
       </div>
 
@@ -167,18 +170,18 @@ export default function RatenplanPage() {
       {selectedPlan && (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <Metric label="Monatliche Rate" value={`${Number(selectedPlan.rate_betrag || 0).toLocaleString("de-DE")}€`} />
+            <Metric label={t("rateplans.monthlyRate", locale)} value={`${Number(selectedPlan.rate_betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} />
             <Metric
-              label="Bezahlt"
+              label={t("rateplans.paid", locale)}
               value={`${done} / ${Math.max(selectedPlan.anzahl_raten || 0, 1)}`}
-              sub={`${Math.round((done / Math.max(selectedPlan.anzahl_raten || 1, 1)) * 100)}% abgeschlossen`}
+              sub={`${Math.round((done / Math.max(selectedPlan.anzahl_raten || 1, 1)) * 100)}% ${t("rateplans.completed", locale)}`}
             />
-            <Metric label="Restschuld" value={`${rest.toLocaleString("de-DE")}€`} accent />
-            <Metric label="Status" value={<StatusBadge status={status} />} />
+            <Metric label={t("rateplans.remainingDebt", locale)} value={`${rest.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} accent />
+            <Metric label={t("rateplans.status", locale)} value={<StatusBadge status={status} />} />
           </div>
 
           <div className="stat-card">
-            <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">Alle Raten</h3>
+            <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{t("rateplans.allRates", locale)}</h3>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9">
               {selectedRates.map((rate: any) => (
                 <div
@@ -191,12 +194,12 @@ export default function RatenplanPage() {
                       : "border-surface-200 bg-white"
                   }`}
                 >
-                  <p className="text-sm font-semibold text-praxis-700">Rate {rate.rate_nummer}</p>
+                  <p className="text-sm font-semibold text-praxis-700">{t("rateplans.rate", locale)} {rate.rate_nummer}</p>
                   <p className="mt-1 text-2xl font-extrabold leading-none tracking-tight text-praxis-800">
-                    {Number(rate.betrag || 0).toLocaleString("de-DE")}€
+                    {Number(rate.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€
                   </p>
                   <p className="mt-2 text-xs text-praxis-400">
-                    {new Date(rate.faellig_am).toLocaleDateString("de-DE", { month: "short", year: "2-digit" })}
+                    {new Date(rate.faellig_am).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE", { month: "short", year: "2-digit" })}
                   </p>
                 </div>
               ))}
@@ -205,12 +208,12 @@ export default function RatenplanPage() {
         </>
       )}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Neuen Ratenplan anlegen">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={t("rateplans.createTitle", locale)}>
         <div className="space-y-3">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-praxis-500">Patient *</span>
+            <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.patient", locale)} *</span>
             <select className="input" value={form.patient_id} onChange={(e) => setForm((prev) => ({ ...prev, patient_id: e.target.value }))}>
-              <option value="">Bitte wählen</option>
+              <option value="">{t("rateplans.selectPatient", locale)}</option>
               {patienten.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nachname}, {p.vorname}
@@ -221,26 +224,26 @@ export default function RatenplanPage() {
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Gesamtbetrag (€) *</span>
+              <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.totalAmount", locale)} *</span>
               <input type="number" className="input" value={form.gesamtbetrag} onChange={(e) => setForm((prev) => ({ ...prev, gesamtbetrag: Number(e.target.value) }))} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Anzahl Raten *</span>
+              <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.numberOfRates", locale)} *</span>
               <input type="number" className="input" value={form.anzahl_raten} onChange={(e) => setForm((prev) => ({ ...prev, anzahl_raten: Number(e.target.value) }))} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Startdatum *</span>
+              <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.startDate", locale)} *</span>
               <input type="date" className="input" value={form.start_datum} onChange={(e) => setForm((prev) => ({ ...prev, start_datum: e.target.value }))} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Rhythmus</span>
+              <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.rhythm", locale)}</span>
               <select className="input" value={form.rhythmus} onChange={(e) => setForm((prev) => ({ ...prev, rhythmus: e.target.value }))}>
-                <option value="monatlich">Monatlich</option>
-                <option value="quartalsweise">Quartalsweise</option>
+                <option value="monatlich">{t("rateplans.monthly", locale)}</option>
+                <option value="quartalsweise">{t("rateplans.quarterly", locale)}</option>
               </select>
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-medium text-praxis-500">Behandlungstyp (Info)</span>
+              <span className="mb-1 block text-xs font-medium text-praxis-500">{t("rateplans.treatmentType", locale)}</span>
               <select className="input" disabled>
                 {["Kassenbehandlung", "Privatbehandlung", "Zusatzleistung"].map((type) => (
                   <option key={type}>{type}</option>
@@ -249,11 +252,11 @@ export default function RatenplanPage() {
             </label>
           </div>
 
-          <p className="text-xs text-praxis-400">Geplante Rate: {form.anzahl_raten > 0 ? (form.gesamtbetrag / form.anzahl_raten).toFixed(2) : "0.00"} €</p>
+          <p className="text-xs text-praxis-400">{t("rateplans.plannedRate", locale)}: {form.anzahl_raten > 0 ? (form.gesamtbetrag / form.anzahl_raten).toFixed(2) : "0.00"} €</p>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Abbrechen</button>
-            <button className="btn-primary" onClick={createRatenplan} disabled={saving}>{saving ? "Speichere..." : "Ratenplan erstellen"}</button>
+            <button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>{t("common.cancel", locale)}</button>
+            <button className="btn-primary" onClick={createRatenplan} disabled={saving}>{saving ? t("rateplans.creating", locale) : t("rateplans.create", locale)}</button>
           </div>
         </div>
       </Modal>

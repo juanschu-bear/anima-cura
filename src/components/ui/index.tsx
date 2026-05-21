@@ -2,6 +2,8 @@
 
 import { ReactNode, useState } from "react";
 import { X, ChevronDown } from "lucide-react";
+import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 // ─── Stat Card ──────────────────────────────────────────────
 export function StatCard({
@@ -34,7 +36,7 @@ export function StatCard({
             {label}
           </p>
           <p className={`text-2xl font-bold mt-1 ${variantColors[variant]}`}>
-            {typeof value === "number" ? value.toLocaleString("de-DE") : value}
+            {typeof value === "number" ? value.toLocaleString() : value}
             {suffix && <span className="text-base font-medium ml-1">{suffix}</span>}
           </p>
           {trend && (
@@ -66,34 +68,37 @@ export function Badge({
 
 // ─── Status Badge (mit Kontext) ─────────────────────────────
 export function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { variant: "success" | "warning" | "danger" | "info" | "neutral"; label: string }> = {
-    bezahlt:     { variant: "success", label: "Bezahlt" },
-    offen:       { variant: "info",    label: "Offen" },
-    überfällig:  { variant: "danger",  label: "Überfällig" },
-    teilbezahlt: { variant: "warning", label: "Teilbezahlt" },
-    storniert:   { variant: "neutral", label: "Storniert" },
-    auto:        { variant: "success", label: "automatisch" },
-    manuell:     { variant: "info",    label: "manuell" },
-    abweichung:  { variant: "warning", label: "abweichung" },
-    unklar:      { variant: "neutral",  label: "unklar" },
-    ignoriert:   { variant: "neutral", label: "Ignoriert" },
-    aktiv:       { variant: "success", label: "Aktiv" },
-    abgeschlossen: { variant: "neutral", label: "Abgeschlossen" },
-    pausiert:    { variant: "warning", label: "Pausiert" },
-    geplant:     { variant: "info",    label: "Geplant" },
-    versendet:   { variant: "success", label: "Versendet" },
-    connected:   { variant: "success", label: "Verbunden" },
-    disconnected:{ variant: "danger",  label: "Getrennt" },
-    update_required: { variant: "warning", label: "Update nötig" },
-    pünktlich:   { variant: "success", label: "Pünktlich" },
-    verzug:      { variant: "danger", label: "Verzug" },
-    karenz:      { variant: "warning", label: "Karenz" },
-    stufe1:      { variant: "warning", label: "Stufe 1" },
-    eskalation:  { variant: "danger", label: "Eskalation" },
+  const { locale } = useAppStore();
+  const variants: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
+    bezahlt: "success",
+    offen: "info",
+    überfällig: "danger",
+    teilbezahlt: "warning",
+    storniert: "neutral",
+    auto: "success",
+    manuell: "info",
+    abweichung: "warning",
+    unklar: "neutral",
+    ignoriert: "neutral",
+    aktiv: "success",
+    abgeschlossen: "neutral",
+    pausiert: "warning",
+    geplant: "info",
+    versendet: "success",
+    connected: "success",
+    disconnected: "danger",
+    update_required: "warning",
+    pünktlich: "success",
+    verzug: "danger",
+    karenz: "warning",
+    stufe1: "warning",
+    eskalation: "danger",
   };
 
-  const c = config[status] || { variant: "neutral" as const, label: status };
-  return <Badge variant={c.variant}>{c.label}</Badge>;
+  const variant = variants[status] || "neutral";
+  const key = `status.${status}`;
+  const label = t(key, locale) === key ? status : t(key, locale);
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 // ─── Modal ──────────────────────────────────────────────────

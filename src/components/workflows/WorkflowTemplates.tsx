@@ -2,15 +2,19 @@
 
 import { FileText, Mail, AlertTriangle, GitBranch, Sparkles } from "lucide-react";
 import type { Workflow } from "./types";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/hooks/useAppStore";
+
+type Locale = "de" | "en";
 
 function nid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function emptyWorkflow(): Workflow {
+function emptyWorkflow(locale: Locale): Workflow {
   return {
     id: nid(),
-    name: "Neuer Workflow",
+    name: t("workflow.new", locale),
     description: "",
     active: false,
     updatedAt: new Date().toISOString(),
@@ -26,11 +30,11 @@ function emptyWorkflow(): Workflow {
   };
 }
 
-function zahlungserinnerung(): Workflow {
+function zahlungserinnerung(locale: Locale): Workflow {
   return {
     id: nid(),
-    name: "Zahlungserinnerung",
-    description: "Freundliche Erinnerung bei 6 Tagen Verzug",
+    name: t("templates.reminder.name", locale),
+    description: t("templates.reminder.desc", locale),
     active: false,
     updatedAt: new Date().toISOString(),
     nodes: [
@@ -72,11 +76,11 @@ function zahlungserinnerung(): Workflow {
   };
 }
 
-function eskalation(): Workflow {
+function eskalation(locale: Locale): Workflow {
   return {
     id: nid(),
-    name: "Eskalationspipeline",
-    description: "Stufenweise Eskalation nach Anzahl überfälliger Tage",
+    name: t("templates.escalation.name", locale),
+    description: t("templates.escalation.desc", locale),
     active: false,
     updatedAt: new Date().toISOString(),
     nodes: [
@@ -99,11 +103,11 @@ function eskalation(): Workflow {
   };
 }
 
-function ruecklast(): Workflow {
+function ruecklast(locale: Locale): Workflow {
   return {
     id: nid(),
-    name: "Rücklastschrift-Alert",
-    description: "Alert + Eskalation + Patient informieren",
+    name: t("templates.chargeback.name", locale),
+    description: t("templates.chargeback.desc", locale),
     active: false,
     updatedAt: new Date().toISOString(),
     nodes: [
@@ -124,36 +128,38 @@ function ruecklast(): Workflow {
   };
 }
 
-export const TEMPLATES = [
-  {
-    id: "empty",
-    icon: FileText,
-    name: "Leerer Workflow",
-    description: "Starte mit einem leeren Canvas und einem Trigger-Node.",
-    build: emptyWorkflow,
-  },
-  {
-    id: "zahlungserinnerung",
-    icon: Mail,
-    name: "Zahlungserinnerung",
-    description: "6 Tage überfällig → wenn E-Mail vorhanden → Erinnerungs-Mail.",
-    build: zahlungserinnerung,
-  },
-  {
-    id: "eskalation",
-    icon: GitBranch,
-    name: "Eskalationspipeline",
-    description: "Tägliche Prüfung verteilt Patienten auf Mahnstufen 1, 2, 3.",
-    build: eskalation,
-  },
-  {
-    id: "ruecklast",
-    icon: AlertTriangle,
-    name: "Rücklastschrift-Alert",
-    description: "Rücklastschrift → Alert + Eskalation + E-Mail an Patient.",
-    build: ruecklast,
-  },
-];
+export function getTemplates(locale: Locale) {
+  return [
+    {
+      id: "empty",
+      icon: FileText,
+      name: t("templates.empty.name", locale),
+      description: t("templates.empty.desc", locale),
+      build: emptyWorkflow,
+    },
+    {
+      id: "zahlungserinnerung",
+      icon: Mail,
+      name: t("templates.reminder.name", locale),
+      description: t("templates.reminder.desc", locale),
+      build: zahlungserinnerung,
+    },
+    {
+      id: "eskalation",
+      icon: GitBranch,
+      name: t("templates.escalation.name", locale),
+      description: t("templates.escalation.desc", locale),
+      build: eskalation,
+    },
+    {
+      id: "ruecklast",
+      icon: AlertTriangle,
+      name: t("templates.chargeback.name", locale),
+      description: t("templates.chargeback.desc", locale),
+      build: ruecklast,
+    },
+  ];
+}
 
 export function WorkflowTemplatePicker({
   onPick,
@@ -162,6 +168,8 @@ export function WorkflowTemplatePicker({
   onPick: (w: Workflow) => void;
   onClose: () => void;
 }) {
+  const { locale } = useAppStore();
+  const templates = getTemplates(locale);
   return (
     <div className="wf-modal-backdrop" onClick={onClose}>
       <div className="wf-modal" onClick={(e) => e.stopPropagation()}>
@@ -169,20 +177,20 @@ export function WorkflowTemplatePicker({
           <div className="flex items-center gap-2">
             <Sparkles size={18} style={{ color: "var(--ac-primary)" }} />
             <h2 className="text-[18px] font-bold" style={{ color: "var(--ac-text)" }}>
-              Neuer Workflow
+              {t("templates.modalTitle", locale)}
             </h2>
           </div>
           <p className="text-sm" style={{ color: "var(--ac-text-soft)" }}>
-            Wähle einen Startpunkt — alles kann frei angepasst werden.
+            {t("templates.modalSubtitle", locale)}
           </p>
         </div>
         <div className="wf-modal-grid">
-          {TEMPLATES.map((tpl) => {
+          {templates.map((tpl) => {
             const Icon = tpl.icon;
             return (
               <button
                 key={tpl.id}
-                onClick={() => onPick(tpl.build())}
+                onClick={() => onPick(tpl.build(locale))}
                 className="wf-template-card"
                 type="button"
               >

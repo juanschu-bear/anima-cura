@@ -5,12 +5,12 @@ import { useBankConnections, useEinstellungen } from "@/hooks/useData";
 import { Save, Settings, Landmark, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useAppStore } from "@/hooks/useAppStore";
+import { t } from "@/lib/i18n";
 
 type JsonRecord = Record<string, any>;
 
 export default function EinstellungenPage() {
-  const { locale, theme } = useAppStore();
-  const isGerman = locale === "de";
+  const { locale } = useAppStore();
   const [unlocked, setUnlocked] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
@@ -25,10 +25,10 @@ export default function EinstellungenPage() {
             <Settings size={24} style={{ color: "var(--ac-text-mute)" }} />
           </div>
           <h2 className="text-xl font-bold" style={{ color: "var(--ac-text)" }}>
-            {isGerman ? "Einstellungen" : "Settings"}
+            {t("settings.title", locale)}
           </h2>
           <p className="mt-2 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-            {isGerman ? "Bitte Admin-Passwort eingeben" : "Please enter admin password"}
+            {t("settings.enterPassword", locale)}
           </p>
           <input
             type="password"
@@ -46,7 +46,7 @@ export default function EinstellungenPage() {
           />
           {pwError && (
             <p className="mt-2 text-sm" style={{ color: "var(--ac-danger)" }}>
-              {isGerman ? "Falsches Passwort" : "Wrong password"}
+              {t("settings.wrongPassword", locale)}
             </p>
           )}
           <button
@@ -56,7 +56,7 @@ export default function EinstellungenPage() {
               else setPwError(true);
             }}
           >
-            {isGerman ? "Entsperren" : "Unlock"}
+            {t("settings.unlock", locale)}
           </button>
         </div>
       </div>
@@ -68,7 +68,6 @@ export default function EinstellungenPage() {
 
 function EinstellungenContent() {
   const { locale, theme } = useAppStore();
-  const isGerman = locale === "de";
   const ADMIN_PW = "ms13sr06?!";
   const { settings, loading, updateSetting } = useEinstellungen();
   const { connections, refetch: refetchConnections } = useBankConnections();
@@ -129,9 +128,9 @@ function EinstellungenContent() {
     setHint("");
     try {
       await updateSetting(key, value);
-      setHint("Einstellungen gespeichert.");
+      setHint(t("settings.saved", locale));
     } catch {
-      setHint("Speichern fehlgeschlagen. Bitte erneut versuchen.");
+      setHint(t("settings.saveError", locale));
     } finally {
       setSaving(null);
     }
@@ -144,35 +143,29 @@ function EinstellungenContent() {
       const res = await fetch("/api/finapi/transactions", { method: "POST" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
-        setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
+        setHint(t("settings.syncFailed", locale));
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
-        setHint(
-          isGerman
-            ? `Bank-Sync erfolgreich: ${imported} neue Buchungen importiert.`
-            : `Bank sync successful: ${imported} new bookings imported.`
-        );
+        setHint(t("settings.syncSuccess", locale, { imported }));
       }
       refetchConnections();
     } catch {
-      setHint(isGerman ? "Bank-Sync fehlgeschlagen." : "Bank sync failed.");
+      setHint(t("settings.syncFailed", locale));
     } finally {
       setSyncing(false);
     }
   }
 
   if (loading) {
-    return <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>Einstellungen werden geladen…</p>;
+    return <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>{t("settings.loading", locale)}</p>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="ac-page-title">Einstellungen</h1>
+        <h1 className="ac-page-title">{t("settings.title", locale)}</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-          {isGerman
-            ? "Regeln fuer Matching, Mahnungen und Benachrichtigungen."
-            : "Rules for matching, reminders, and notifications."}
+          {t("settings.subtitle", locale)}
         </p>
       </div>
 
@@ -197,19 +190,19 @@ function EinstellungenContent() {
           color: "var(--ac-text-soft)",
         }}
       >
-        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{isGerman ? "Betriebslogik in der Praxis" : "Operational logic in practice"}</p>
+        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{t("settings.opsLogic", locale)}</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>{isGerman ? "Mahn-Pipeline wird aus überfälligen Raten automatisch berechnet (Karenz, Stufe 1, Stufe 2, Eskalation)." : "Dunning pipeline is automatically derived from overdue installments."}</li>
-          <li>{isGerman ? "Benachrichtigungen/E-Mails steuerst du hier unter „Benachrichtigungen“." : "Notification and email automation is configured in the notifications section below."}</li>
-          <li>{isGerman ? "Bankkonto-Anbindung läuft über finAPI. Bankdaten werden in der Bankverbindung gepflegt." : "Bank account integration runs through finAPI and is managed in bank connections."}</li>
-          <li>{isGerman ? "Rollen & Rechte sind aktuell als Startset hinterlegt und können als nächster Schritt detailliert ausgebaut werden." : "Roles and permissions are currently a starter setup and can be expanded next."}</li>
+          <li>{t("settings.opsLogic.bullet1", locale)}</li>
+          <li>{t("settings.opsLogic.bullet2", locale)}</li>
+          <li>{t("settings.opsLogic.bullet3", locale)}</li>
+          <li>{t("settings.opsLogic.bullet4", locale)}</li>
         </ul>
       </section>
 
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
           <Landmark size={16} />
-          <h2 className="ac-section-title">{isGerman ? "Bankverbindung" : "Bank connection"}</h2>
+          <h2 className="ac-section-title">{t("settings.bankConnection", locale)}</h2>
         </div>
         <div className="space-y-3">
           {connections.map((conn) => (
@@ -224,27 +217,27 @@ function EinstellungenContent() {
             >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-2 text-sm">
-                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Anbieter" : "Provider"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{t("settings.provider", locale)}</p>
                   <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.provider || "finAPI Access"}</p>
-                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Bank" : "Bank"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{t("settings.bank", locale)}</p>
                   <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.bank_name}</p>
-                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Letzter Sync" : "Last sync"}</p>
-                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.last_sync ? new Date(conn.last_sync).toLocaleString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{t("settings.lastSync", locale)}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.last_sync ? new Date(conn.last_sync).toLocaleString(locale === "en" ? "en-GB" : "de-DE") : "—"}</p>
                 </div>
                 <div className="space-y-2 text-sm">
-                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "Status" : "Status"}</p>
-                  <p className="font-semibold text-[#5a8d3a]">● {conn.status === "connected" ? (isGerman ? "Verbunden" : "Connected") : (isGerman ? "Update nötig" : "Update required")}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{t("settings.bankStatus", locale)}</p>
+                  <p className="font-semibold text-[#5a8d3a]">● {conn.status === "connected" ? t("settings.connected", locale) : t("settings.updateRequired", locale)}</p>
                   <p style={{ color: "var(--ac-text-mute)" }}>IBAN</p>
                   <p className="font-mono font-semibold" style={{ color: "var(--ac-text)" }}>{conn.iban || "—"}</p>
-                  <p style={{ color: "var(--ac-text-mute)" }}>{isGerman ? "TAN-Erneuerung" : "TAN renewal"}</p>
-                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(isGerman ? "de-DE" : "en-GB") : "—"}</p>
+                  <p style={{ color: "var(--ac-text-mute)" }}>{t("settings.tanRenewal", locale)}</p>
+                  <p className="font-semibold" style={{ color: "var(--ac-text)" }}>{conn.tan_renewal_date ? new Date(conn.tan_renewal_date).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE") : "—"}</p>
                 </div>
               </div>
             </div>
           ))}
           {connections.length === 0 && (
             <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>
-              {isGerman ? "Noch keine Bankverbindung hinterlegt." : "No bank connection configured yet."}
+              {t("settings.noBankConn", locale)}
             </p>
           )}
         </div>
@@ -253,7 +246,7 @@ function EinstellungenContent() {
             <button
               className="btn-primary inline-flex items-center gap-2"
               onClick={async () => {
-                const pw = prompt(isGerman ? "Admin-Passwort eingeben:" : "Enter admin password:");
+                const pw = prompt(t("settings.enterAdminPw", locale));
                 if (!pw) return;
                 setSyncing(true);
                 setHint("");
@@ -265,7 +258,7 @@ function EinstellungenContent() {
                   });
                   const data = await res.json();
                   if (!data.ok) {
-                    setHint(data.error || "Fehler beim Verbinden");
+                    setHint(data.error || t("settings.connectError", locale));
                     setSyncing(false);
                     return;
                   }
@@ -279,17 +272,17 @@ function EinstellungenContent() {
               disabled={syncing}
             >
               <Landmark size={14} />
-              {syncing ? (isGerman ? "Verbinde…" : "Connecting…") : isGerman ? "Bankkonto verbinden" : "Connect bank account"}
+              {syncing ? t("settings.connecting", locale) : t("settings.connectBank", locale)}
             </button>
           )}
           {connections.length > 0 && (
             <button className="btn-primary inline-flex items-center gap-2" onClick={runBankSync} disabled={syncing}>
               <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-              {syncing ? (isGerman ? "Synchronisiere…" : "Syncing…") : isGerman ? "Bank-Sync starten" : "Start bank sync"}
+              {syncing ? t("payments.syncing", locale) : t("settings.startBankSync", locale)}
             </button>
           )}
           <Link href="/zahlungen" className="btn-secondary inline-flex items-center gap-2">
-            {isGerman ? "Zu Zahlungseingängen" : "Open payments"}
+            {t("settings.toPayments", locale)}
           </Link>
         </div>
       </section>
@@ -297,26 +290,26 @@ function EinstellungenContent() {
       <section className="stat-card space-y-4">
         <div className="flex items-center gap-2" style={{ color: "var(--ac-text-soft)" }}>
           <Settings size={16} />
-          <h2 className="ac-section-title">Mahnfristen</h2>
+          <h2 className="ac-section-title">{t("settings.dunningPeriods", locale)}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <NumberField
-            label="Karenz (Tage)"
+            label={t("settings.gracePeriod", locale)}
             value={mahnfristen.karenz_tage ?? 5}
             onChange={(v) => (mahnfristen.karenz_tage = v)}
           />
           <NumberField
-            label="Stufe 1 ab Tag"
+            label={t("settings.stage1From", locale)}
             value={mahnfristen.stufe1_ab_tag ?? 6}
             onChange={(v) => (mahnfristen.stufe1_ab_tag = v)}
           />
           <NumberField
-            label="Stufe 2 ab Tag"
+            label={t("settings.stage2From", locale)}
             value={mahnfristen.stufe2_ab_tag ?? 21}
             onChange={(v) => (mahnfristen.stufe2_ab_tag = v)}
           />
           <NumberField
-            label="Eskalation ab Tag"
+            label={t("settings.escalationFrom", locale)}
             value={mahnfristen.eskalation_ab_tag ?? 42}
             onChange={(v) => (mahnfristen.eskalation_ab_tag = v)}
           />
@@ -324,20 +317,20 @@ function EinstellungenContent() {
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="ac-section-title">Matching</h2>
+        <h2 className="ac-section-title">{t("settings.matching", locale)}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NumberField
-            label="Mindestscore"
+            label={t("settings.minScore", locale)}
             value={matching.min_score ?? 70}
             onChange={(v) => (matching.min_score = v)}
           />
           <NumberField
-            label="Auto-Freigabe ab"
+            label={t("settings.autoApproveFrom", locale)}
             value={matching.auto_approve_score ?? 90}
             onChange={(v) => (matching.auto_approve_score = v)}
           />
           <NumberField
-            label="Fuzzy-Schwelle (%)"
+            label={t("settings.fuzzyThreshold", locale)}
             value={Math.round((matching.fuzzy_threshold ?? 0.7) * 100)}
             onChange={(v) => (matching.fuzzy_threshold = v / 100)}
           />
@@ -345,28 +338,28 @@ function EinstellungenContent() {
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="ac-section-title">Benachrichtigungen</h2>
+        <h2 className="ac-section-title">{t("settings.notifications", locale)}</h2>
         <div className="space-y-2">
           <Toggle
-            label="Automatische E-Mail-Mahnungen"
+            label={t("settings.autoEmail", locale)}
             checked={!!benachrichtigungen.auto_email}
             onChange={(v) => (benachrichtigungen.auto_email = v)}
             theme={theme}
           />
           <Toggle
-            label="Automatische Brief-Mahnungen"
+            label={t("settings.autoLetter", locale)}
             checked={!!benachrichtigungen.auto_brief}
             onChange={(v) => (benachrichtigungen.auto_brief = v)}
             theme={theme}
           />
           <Toggle
-            label="Sabine-Briefing aktiv"
+            label={t("settings.sabineBriefing", locale)}
             checked={!!benachrichtigungen.sabine_briefing}
             onChange={(v) => (benachrichtigungen.sabine_briefing = v)}
             theme={theme}
           />
           <Toggle
-            label="Eskalation an Praxisleitung"
+            label={t("settings.mariaEsc", locale)}
             checked={!!benachrichtigungen.maria_eskalation}
             onChange={(v) => (benachrichtigungen.maria_eskalation = v)}
             theme={theme}
@@ -375,17 +368,17 @@ function EinstellungenContent() {
       </section>
 
       <section className="stat-card space-y-4">
-        <h2 className="ac-section-title">{isGerman ? "Benutzerrechte" : "User permissions"}</h2>
+        <h2 className="ac-section-title">{t("settings.userPerms", locale)}</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr style={{ background: "var(--ac-surface-muted)" }}>
-                <th className="table-header text-left">{isGerman ? "Benutzer" : "User"}</th>
-                <th className="table-header text-left">{isGerman ? "Rolle" : "Role"}</th>
-                <th className="table-header text-left">{isGerman ? "Zahlungen" : "Payments"}</th>
-                <th className="table-header text-left">{isGerman ? "Mahnwesen" : "Dunning"}</th>
-                <th className="table-header text-left">{isGerman ? "Einstellungen" : "Settings"}</th>
-                <th className="table-header text-left">{isGerman ? "Passwort" : "Password"}</th>
+                <th className="table-header text-left">{t("settings.user", locale)}</th>
+                <th className="table-header text-left">{t("settings.role", locale)}</th>
+                <th className="table-header text-left">{t("settings.permPayments", locale)}</th>
+                <th className="table-header text-left">{t("settings.permDunning", locale)}</th>
+                <th className="table-header text-left">{t("settings.permSettings", locale)}</th>
+                <th className="table-header text-left">{t("settings.password", locale)}</th>
                 <th className="table-header text-left"></th>
               </tr>
             </thead>
@@ -397,9 +390,9 @@ function EinstellungenContent() {
                   </td>
                   <td className="table-cell">
                     <select className="input text-sm" value={user.role} onChange={(e) => updateUser(idx, "role", e.target.value)}>
-                      <option value="admin">Admin</option>
-                      <option value="verwaltung">{isGerman ? "Verwaltung" : "Office"}</option>
-                      <option value="lesezugriff">{isGerman ? "Lesezugriff" : "Read-only"}</option>
+                      <option value="admin">{t("settings.admin", locale)}</option>
+                      <option value="verwaltung">{t("settings.office", locale)}</option>
+                      <option value="lesezugriff">{t("settings.readOnly", locale)}</option>
                     </select>
                   </td>
                   <td className="table-cell text-center">
@@ -417,7 +410,7 @@ function EinstellungenContent() {
                   <td className="table-cell">
                     {idx > 0 && (
                       <button className="text-xs text-accent-coral hover:underline" onClick={() => removeUser(idx)}>
-                        {isGerman ? "Entfernen" : "Remove"}
+                        {t("common.remove", locale)}
                       </button>
                     )}
                   </td>
@@ -429,7 +422,7 @@ function EinstellungenContent() {
             className="mt-3 btn-secondary inline-flex items-center gap-1.5 text-sm"
             onClick={addUser}
           >
-            + {isGerman ? "Benutzer hinzufügen" : "Add user"}
+            + {t("settings.addUser", locale)}
           </button>
         </div>
       </section>
@@ -445,7 +438,7 @@ function EinstellungenContent() {
           }}
         >
           <Save size={14} />
-          {isGerman ? "Einstellungen speichern" : "Save settings"}
+          {t("settings.saveSettings", locale)}
         </button>
       </div>
     </div>

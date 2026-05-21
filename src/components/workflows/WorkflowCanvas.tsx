@@ -33,6 +33,8 @@ import {
   Clock,
 } from "lucide-react";
 
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/hooks/useAppStore";
 import { TriggerNode } from "./nodes/TriggerNode";
 import { ConditionNode } from "./nodes/ConditionNode";
 import { ActionEmailNode } from "./nodes/ActionEmailNode";
@@ -57,16 +59,20 @@ const nodeTypes = {
   action_wait: ActionWaitNode,
 };
 
-const PALETTE: { kind: NodeKind; label: string; icon: any; accent: string }[] = [
-  { kind: "trigger", label: "Trigger", icon: Zap, accent: "#c8942d" },
-  { kind: "condition", label: "Bedingung", icon: GitBranch, accent: "#3b6fb8" },
-  { kind: "action_wait", label: "Warten", icon: Clock, accent: "#6b7d99" },
-  { kind: "action_email", label: "E-Mail", icon: Mail, accent: "#5f9339" },
-  { kind: "action_whatsapp", label: "WhatsApp", icon: MessageCircle, accent: "#3f9772" },
-  { kind: "action_alert", label: "Alert", icon: AlertTriangle, accent: "#cb4f56" },
-  { kind: "action_mahnstufe", label: "Mahnstufe", icon: ArrowUpRight, accent: "#d27130" },
-  { kind: "action_scoring", label: "Scoring", icon: TrendingDown, accent: "#7a52d6" },
-];
+type PaletteItem = { kind: NodeKind; label: string; icon: any; accent: string };
+
+function buildPalette(locale: "de" | "en"): PaletteItem[] {
+  return [
+    { kind: "trigger", label: t("palette.trigger", locale), icon: Zap, accent: "#c8942d" },
+    { kind: "condition", label: t("palette.condition", locale), icon: GitBranch, accent: "#3b6fb8" },
+    { kind: "action_wait", label: t("palette.wait", locale), icon: Clock, accent: "#6b7d99" },
+    { kind: "action_email", label: t("palette.email", locale), icon: Mail, accent: "#5f9339" },
+    { kind: "action_whatsapp", label: t("palette.whatsapp", locale), icon: MessageCircle, accent: "#3f9772" },
+    { kind: "action_alert", label: t("palette.alert", locale), icon: AlertTriangle, accent: "#cb4f56" },
+    { kind: "action_mahnstufe", label: t("palette.mahnstufe", locale), icon: ArrowUpRight, accent: "#d27130" },
+    { kind: "action_scoring", label: t("palette.scoring", locale), icon: TrendingDown, accent: "#7a52d6" },
+  ];
+}
 
 function defaultDataFor(kind: NodeKind): any {
   switch (kind) {
@@ -98,20 +104,23 @@ interface Props {
 }
 
 function CanvasInner({ initialNodes, initialEdges, onChange, isDark, workflowId }: Props) {
+  const { locale } = useAppStore();
   const [nodes, setNodes] = useState<Node[]>(initialNodes as Node[]);
   const [edges, setEdges] = useState<Edge[]>(initialEdges as Edge[]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const { statuses: runtimeStatuses, activeRun } = useRealtimeRun(workflowId || null);
 
+  const PALETTE = useMemo(() => buildPalette(locale), [locale]);
+
   // Merge runtime status into node data so node components can light up.
   const nodesWithStatus = useMemo(() => {
-    if (!runtimeStatuses || Object.keys(runtimeStatuses).length === 0) return nodes;
     return nodes.map((n) => {
-      const rs = runtimeStatuses[n.id];
-      if (!rs) return n;
-      return { ...n, data: { ...(n.data as any), __runtimeStatus: rs } } as Node;
+      const rs = runtimeStatuses?.[n.id];
+      const baseData = { ...(n.data as any), __locale: locale };
+      if (rs) baseData.__runtimeStatus = rs;
+      return { ...n, data: baseData } as Node;
     });
-  }, [nodes, runtimeStatuses]);
+  }, [nodes, runtimeStatuses, locale]);
 
   const pushChange = useCallback(
     (n: Node[], e: Edge[]) => {
@@ -215,8 +224,8 @@ function CanvasInner({ initialNodes, initialEdges, onChange, isDark, workflowId 
     <div className={`wf-canvas-wrap ${selectedNode ? "wf-canvas-with-panel" : ""}`} data-theme={isDark ? "dark" : "light"}>
       <aside className="wf-palette">
         <div className="wf-palette-head">
-          <span>Nodes</span>
-          <span className="wf-palette-hint">klicken zum Hinzufügen</span>
+          <span>{t("palette.title", locale)}</span>
+          <span className="wf-palette-hint">{t("palette.hint", locale)}</span>
         </div>
         <div className="wf-palette-list">
           {PALETTE.map((p) => {

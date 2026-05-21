@@ -15,6 +15,8 @@ interface BaseNodeProps {
   showOutput?: boolean;
   branching?: boolean;
   runtimeStatus?: "running" | "success" | "failed" | "skipped" | "dry_run";
+  branchTrueLabel?: string;
+  branchFalseLabel?: string;
 }
 
 export function BaseNode({
@@ -29,6 +31,8 @@ export function BaseNode({
   showOutput = true,
   branching = false,
   runtimeStatus,
+  branchTrueLabel = "erfüllt",
+  branchFalseLabel = "sonst",
 }: BaseNodeProps) {
   return (
     <div
@@ -81,8 +85,8 @@ export function BaseNode({
             className="wf-handle wf-handle-false"
             style={{ top: "76%" }}
           />
-          <span className="wf-branch-label wf-branch-true">erfüllt</span>
-          <span className="wf-branch-label wf-branch-false">sonst</span>
+          <span className="wf-branch-label wf-branch-true">{branchTrueLabel}</span>
+          <span className="wf-branch-label wf-branch-false">{branchFalseLabel}</span>
         </>
       )}
     </div>

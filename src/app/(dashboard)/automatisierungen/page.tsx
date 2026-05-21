@@ -27,6 +27,7 @@ import { pushVersion } from "@/components/workflows/storage";
 import { TestRunDialog } from "@/components/workflows/TestRunDialog";
 import { VersionHistoryDrawer } from "@/components/workflows/VersionHistoryDrawer";
 import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflows/types";
+import { t } from "@/lib/i18n";
 
 const SETTING_KEY = "workflows";
 
@@ -76,7 +77,6 @@ const SEED: Workflow[] = [
 export default function AutomatisierungenPage() {
   const { theme, locale } = useAppStore();
   const isDark = theme === "dark";
-  const isGerman = locale === "de";
 
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -147,13 +147,13 @@ export default function AutomatisierungenPage() {
         .upsert({ key: SETTING_KEY, value: next }, { onConflict: "key" });
       if (error) {
         console.error("[workflows] persist failed", error);
-        setPersistError(error.message || "Speichern fehlgeschlagen");
+        setPersistError(error.message || t("workflow.persistError", locale));
       } else {
         setPersistError(null);
       }
     } catch (err: any) {
       console.error("[workflows] persist threw", err);
-      setPersistError(err?.message || "Speichern fehlgeschlagen");
+      setPersistError(err?.message || t("workflow.persistError", locale));
     }
   }
 
@@ -208,9 +208,9 @@ export default function AutomatisierungenPage() {
 
   async function saveAndClose() {
     if (editing) {
-      await pushVersion(editing.id, editing, "Manuelles Speichern");
+      await pushVersion(editing.id, editing, t("workflow.manualSave", locale));
     }
-    setSaveHint("Workflow gespeichert");
+    setSaveHint(t("workflow.saved", locale));
     setTimeout(() => setSaveHint(""), 1800);
     setEditingId(null);
   }
@@ -223,7 +223,7 @@ export default function AutomatisierungenPage() {
       name: snapshot.name || editing.name,
       description: snapshot.description,
     });
-    setSaveHint("Version wiederhergestellt");
+    setSaveHint(t("workflow.versionRestored", locale));
     setTimeout(() => setSaveHint(""), 1800);
   }
 
@@ -245,7 +245,7 @@ export default function AutomatisierungenPage() {
       <div className="wf-editor-shell">
         <div className="wf-editor-topbar">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={saveAndClose} className="wf-iconbtn" aria-label="Zurück">
+            <button onClick={saveAndClose} className="wf-iconbtn" aria-label={t("common.back", locale)}>
               <ChevronLeft size={18} />
             </button>
             <div className="min-w-0">
@@ -253,13 +253,13 @@ export default function AutomatisierungenPage() {
                 value={editing.name}
                 onChange={(e) => updateWorkflow(editing.id, { name: e.target.value })}
                 className="wf-title-input"
-                placeholder="Workflow-Name"
+                placeholder={t("workflow.namePlaceholder", locale)}
               />
               <input
                 value={editing.description || ""}
                 onChange={(e) => updateWorkflow(editing.id, { description: e.target.value })}
                 className="wf-subtitle-input"
-                placeholder="Kurze Beschreibung …"
+                placeholder={t("workflow.descPlaceholder", locale)}
               />
             </div>
           </div>
@@ -269,24 +269,24 @@ export default function AutomatisierungenPage() {
               type="button"
               onClick={() => setShowTest(true)}
               className="wf-secondary-btn"
-              title="Test-Run starten"
+              title={t("workflow.startTestRun", locale)}
             >
-              <Beaker size={14} /> Test
+              <Beaker size={14} /> {t("workflow.test", locale)}
             </button>
             <Link
               href={`/automatisierungen/${editing.id}/runs`}
               className="wf-secondary-btn"
-              title="Verlauf öffnen"
+              title={t("workflow.viewHistory", locale)}
             >
-              <Activity size={14} /> Verlauf
+              <Activity size={14} /> {t("common.history", locale)}
             </Link>
             <button
               type="button"
               onClick={() => setShowHistory(true)}
               className="wf-secondary-btn"
-              title="Versionsverlauf"
+              title={t("workflow.versionHistory", locale)}
             >
-              <History size={14} /> Versionen
+              <History size={14} /> {t("common.versions", locale)}
             </button>
 
             <span className="wf-topbar-divider" />
@@ -301,16 +301,16 @@ export default function AutomatisierungenPage() {
               <span className="wf-toggle-label">
                 {editing.active ? (
                   <>
-                    <span className="wf-pulse" /> Aktiv
+                    <span className="wf-pulse" /> {t("common.active", locale)}
                   </>
                 ) : (
-                  "Inaktiv"
+                  t("common.inactive", locale)
                 )}
               </span>
             </button>
 
             <button onClick={saveAndClose} className="wf-primary-btn">
-              <Save size={14} /> Speichern
+              <Save size={14} /> {t("common.save", locale)}
             </button>
           </div>
         </div>
@@ -349,30 +349,28 @@ export default function AutomatisierungenPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight" style={{ color: "var(--ac-text)" }}>
-            {isGerman ? "Automatisierungen" : "Automations"}
+            {t("workflow.title", locale)}
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-            {isGerman
-              ? "Visueller Workflow-Builder — verbinde Trigger, Bedingungen und Aktionen zu intelligenten Abläufen."
-              : "Visual workflow builder — connect triggers, conditions and actions."}
+            {t("workflow.subtitle", locale)}
           </p>
         </div>
         <button onClick={() => setShowTemplates(true)} className="wf-primary-btn wf-primary-btn-lg">
-          <Plus size={16} /> {isGerman ? "Neuer Workflow" : "New Workflow"}
+          <Plus size={16} /> {t("workflow.new", locale)}
         </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <KpiCard icon={Zap} label={isGerman ? "Aktive Workflows" : "Active workflows"} value={String(activeCount)} hint={`${workflows.length} ${isGerman ? "insgesamt" : "total"}`} accent="var(--ac-primary)" />
-        <KpiCard icon={Activity} label={isGerman ? "Ausführungen heute" : "Runs today"} value={String(runsToday)} hint={isGerman ? "letzte 24 h" : "last 24 h"} accent="#5f9339" />
-        <KpiCard icon={AlertOctagon} label={isGerman ? "Fehler heute" : "Errors today"} value={String(errorsToday)} hint={errorsToday === 0 ? (isGerman ? "alles stabil" : "all stable") : (isGerman ? "Eingriff prüfen" : "needs review")} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} />
+        <KpiCard icon={Zap} label={t("workflow.activeCount", locale)} value={String(activeCount)} hint={`${workflows.length} ${t("workflow.totalCount", locale)}`} accent="var(--ac-primary)" />
+        <KpiCard icon={Activity} label={t("workflow.runsToday", locale)} value={String(runsToday)} hint={t("workflow.last24h", locale)} accent="#5f9339" />
+        <KpiCard icon={AlertOctagon} label={t("workflow.errorsToday", locale)} value={String(errorsToday)} hint={errorsToday === 0 ? t("workflow.stable", locale) : t("workflow.needsReview", locale)} accent={errorsToday === 0 ? "#5f9339" : "#cb4f56"} />
       </div>
 
       {persistError && (
         <div className="wf-persist-error">
           <AlertOctagon size={14} />
           <div>
-            <strong>{isGerman ? "Speichern fehlgeschlagen" : "Save failed"}</strong>
+            <strong>{t("workflow.persistError", locale)}</strong>
             <span>{persistError}</span>
           </div>
         </div>
@@ -382,13 +380,13 @@ export default function AutomatisierungenPage() {
         <div className="wf-search">
           <Search size={14} />
           <input
-            placeholder={isGerman ? "Workflows durchsuchen …" : "Search workflows …"}
+            placeholder={t("workflow.searchPlaceholder", locale)}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
-          {filtered.length} {isGerman ? "Workflows" : "workflows"}
+          {filtered.length} {t("workflow.workflows", locale)}
         </div>
       </div>
 
@@ -396,10 +394,10 @@ export default function AutomatisierungenPage() {
         {filtered.length === 0 && (
           <div className="wf-empty">
             <Sparkles size={20} style={{ color: "var(--ac-primary)" }} />
-            <h3>{isGerman ? "Noch keine Workflows" : "No workflows yet"}</h3>
-            <p>{isGerman ? "Lege deinen ersten Workflow an — wähle eine Vorlage oder starte mit einem leeren Canvas." : "Create your first workflow — pick a template or start blank."}</p>
+            <h3>{t("workflow.emptyTitle", locale)}</h3>
+            <p>{t("workflow.emptyDesc", locale)}</p>
             <button onClick={() => setShowTemplates(true)} className="wf-primary-btn">
-              <Plus size={14} /> {isGerman ? "Workflow erstellen" : "Create workflow"}
+              <Plus size={14} /> {t("workflow.create", locale)}
             </button>
           </div>
         )}
@@ -407,7 +405,7 @@ export default function AutomatisierungenPage() {
         {filtered.map((w) => {
           const nodeCount = w.nodes.length;
           const triggerNode = w.nodes.find((n) => n.type === "trigger");
-          const triggerLabel = triggerSummary(triggerNode);
+          const triggerLabel = triggerSummary(triggerNode, locale);
           return (
             <div key={w.id} className="wf-card" onClick={() => setEditingId(w.id)} role="button" tabIndex={0}>
               <div className="wf-card-left">
@@ -417,15 +415,15 @@ export default function AutomatisierungenPage() {
                     <h3 className="wf-card-title">{w.name}</h3>
                     {w.active && (
                       <span className="wf-badge wf-badge-on">
-                        <span className="wf-pulse" /> Aktiv
+                        <span className="wf-pulse" /> {t("common.active", locale)}
                       </span>
                     )}
                   </div>
                   {w.description && <p className="wf-card-desc">{w.description}</p>}
                   <div className="wf-card-meta">
                     <span className="wf-meta-chip"><Zap size={11} /> {triggerLabel}</span>
-                    <span className="wf-meta-chip"><CircleDot size={11} /> {nodeCount} {nodeCount === 1 ? "Node" : "Nodes"}</span>
-                    <span className="wf-meta-chip"><Activity size={11} /> {w.runsToday ?? 0} heute</span>
+                    <span className="wf-meta-chip"><CircleDot size={11} /> {nodeCount} {nodeCount === 1 ? t("common.node", locale) : t("common.nodes", locale)}</span>
+                    <span className="wf-meta-chip"><Activity size={11} /> {w.runsToday ?? 0} {t("common.today", locale)}</span>
                   </div>
                 </div>
               </div>
@@ -434,7 +432,7 @@ export default function AutomatisierungenPage() {
                 <Link
                   href={`/automatisierungen/${w.id}/runs`}
                   className="wf-iconbtn"
-                  title={isGerman ? "Verlauf öffnen" : "View history"}
+                  title={t("workflow.viewHistory", locale)}
                 >
                   <History size={15} />
                 </Link>
@@ -443,7 +441,7 @@ export default function AutomatisierungenPage() {
                   onClick={() => updateWorkflow(w.id, { active: !w.active })}
                   className={`wf-toggle wf-toggle-sm ${w.active ? "wf-toggle-on" : ""}`}
                   aria-pressed={w.active}
-                  title={w.active ? "Deaktivieren" : "Aktivieren"}
+                  title={w.active ? t("common.deactivate", locale) : t("common.activate", locale)}
                 >
                   <span className="wf-toggle-dot" />
                 </button>
@@ -459,16 +457,16 @@ export default function AutomatisierungenPage() {
                   {menuOpenId === w.id && (
                     <div className="wf-menu" onMouseLeave={() => setMenuOpenId(null)}>
                       <button onClick={() => { setEditingId(w.id); setMenuOpenId(null); }}>
-                        <Power size={13} /> Öffnen
+                        <Power size={13} /> {t("common.open", locale)}
                       </button>
                       <Link href={`/automatisierungen/${w.id}/runs`} className="block">
-                        <History size={13} /> Verlauf
+                        <History size={13} /> {t("common.history", locale)}
                       </Link>
                       <button onClick={() => duplicateWorkflow(w.id)}>
-                        <Copy size={13} /> Duplizieren
+                        <Copy size={13} /> {t("common.duplicate", locale)}
                       </button>
                       <button onClick={() => deleteWorkflow(w.id)} className="wf-menu-danger">
-                        <Trash2 size={13} /> Löschen
+                        <Trash2 size={13} /> {t("common.delete", locale)}
                       </button>
                     </div>
                   )}
@@ -515,19 +513,19 @@ function KpiCard({
   );
 }
 
-function triggerSummary(node: WorkflowNode | undefined): string {
-  if (!node) return "Kein Trigger";
+function triggerSummary(node: WorkflowNode | undefined, locale: string): string {
+  if (!node) return t("workflow.noTrigger", locale);
   const d: any = node.data || {};
   switch (d.event) {
     case "rate_overdue":
-      return `Rate ${d.days ?? "?"} Tage überfällig`;
+      return t("workflow.rateOverdueShort", locale, { days: d.days ?? "?" });
     case "rate_returned":
-      return "Rücklastschrift erkannt";
+      return t("workflow.rateReturned", locale);
     case "daily_at":
-      return `Täglich ${d.time || "06:00"}`;
+      return t("workflow.dailyShort", locale, { time: d.time || "06:00" });
     case "scoring_below":
-      return `Scoring < ${d.threshold ?? 80}%`;
+      return t("workflow.scoringBelow", locale, { threshold: d.threshold ?? 80 });
     default:
-      return "Trigger";
+      return t("workflow.triggerLabel", locale);
   }
 }

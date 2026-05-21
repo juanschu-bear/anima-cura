@@ -18,6 +18,8 @@ import type {
   RunStatus,
 } from "./types";
 import { insertRun } from "./storage";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/hooks/useAppStore";
 
 interface PatientLite {
   id: string;
@@ -73,7 +75,7 @@ function evalCondition(field: string, op: string, value: any, ctx: any): boolean
   }
 }
 
-function describe(node: any, ctx: any): { output: any; status: RunStatus; error?: string } {
+function describe(node: any, ctx: any, locale: "de" | "en" = "de"): { output: any; status: RunStatus; error?: string } {
   const d = node.data || {};
   switch (node.type) {
     case "trigger":
@@ -84,7 +86,7 @@ function describe(node: any, ctx: any): { output: any; status: RunStatus; error?
     }
     case "action_email":
       if (!ctx.patient.email)
-        return { output: null, status: "failed", error: "Patient hat keine E-Mail-Adresse" };
+        return { output: null, status: "failed", error: t("workflow.testrun.noPatientEmail", locale) };
       return {
         output: {
           to: ctx.patient.email,
@@ -115,6 +117,7 @@ function describe(node: any, ctx: any): { output: any; status: RunStatus; error?
 }
 
 export function TestRunDialog({ workflow, patients, onClose }: Props) {
+  const { locale } = useAppStore();
   const [patientId, setPatientId] = useState<string>("__dummy__");
   const [steps, setSteps] = useState<WorkflowRunStep[]>([]);
   const [running, setRunning] = useState(false);
@@ -166,7 +169,7 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
       await new Promise((r) => setTimeout(r, 280));
 
       const startedAt = new Date().toISOString();
-      const result = describe(node, ctx);
+      const result = describe(node, ctx, locale);
       const step: WorkflowRunStep = {
         node_id: node.id,
         kind: node.type as any,
@@ -236,14 +239,14 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
             <div className="flex items-center gap-2">
               <Beaker size={18} style={{ color: "var(--ac-primary)" }} />
               <h2 className="text-[18px] font-bold" style={{ color: "var(--ac-text)" }}>
-                Test-Run
+                {t("workflow.testrun.title", locale)}
               </h2>
             </div>
             <p className="text-sm mt-1" style={{ color: "var(--ac-text-soft)" }}>
-              Simuliert den Workflow mit Beispieldaten — verschickt nichts an Patienten.
+              {t("workflow.testrun.desc", locale)}
             </p>
           </div>
-          <button onClick={onClose} className="wf-iconbtn" aria-label="Schließen">
+          <button onClick={onClose} className="wf-iconbtn" aria-label={t("common.close", locale)}>
             <X size={16} />
           </button>
         </div>
@@ -251,17 +254,17 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
         <div className="wf-testrun-body">
           <div className="wf-testrun-controls">
             <label className="wf-field" style={{ flex: 1 }}>
-              <span className="wf-field-label">Test-Patient</span>
+              <span className="wf-field-label">{t("workflow.testrun.testPatient", locale)}</span>
               <select
                 className="input"
                 value={patientId}
                 onChange={(e) => setPatientId(e.target.value)}
                 disabled={running}
               >
-                <option value="__dummy__">Dummy-Patient (Maria Musterpatient)</option>
+                <option value="__dummy__">{t("workflow.testrun.dummy", locale)}</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.vorname} {p.nachname} {p.email ? "" : "(keine E-Mail)"}
+                    {p.vorname} {p.nachname} {p.email ? "" : t("workflow.testrun.noEmail", locale)}
                   </option>
                 ))}
               </select>
@@ -274,7 +277,7 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
               className="wf-primary-btn"
               style={{ alignSelf: "flex-end" }}
             >
-              <PlayCircle size={14} /> {running ? "Läuft …" : "Test starten"}
+              <PlayCircle size={14} /> {running ? t("workflow.testrun.running", locale) : t("workflow.testrun.start", locale)}
             </button>
           </div>
 
@@ -287,12 +290,12 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
                 <span className="opacity-70">mail</span> {patient.email}
               </span>
             )}
-            <span className="wf-meta-chip">Mahnstufe 1 · Scoring 82 · 12 Tage überfällig</span>
+            <span className="wf-meta-chip">{t("workflow.testrun.stageBadge", locale)}</span>
           </div>
 
           <div className="wf-testrun-steps">
             {steps.length === 0 && !running && (
-              <p className="wf-empty-inline">Noch nicht gelaufen. Klicke „Test starten".</p>
+              <p className="wf-empty-inline">{t("workflow.testrun.notRun", locale)}</p>
             )}
             {steps.map((s, idx) => {
               const icon =
@@ -321,7 +324,7 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
             {running && (
               <div className="wf-testrun-step wf-testrun-running">
                 <Clock size={14} className="animate-spin-slow" style={{ color: "var(--ac-warning)" }} />
-                <span>Schritt läuft …</span>
+                <span>{t("workflow.testrun.stepRunning", locale)}</span>
               </div>
             )}
           </div>
@@ -340,9 +343,9 @@ export function TestRunDialog({ workflow, patients, onClose }: Props) {
               }}
             >
               {finalStatus === "success" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-              <strong>{finalStatus === "success" ? "Test erfolgreich" : "Test mit Fehler beendet"}</strong>
+              <strong>{finalStatus === "success" ? t("workflow.testrun.summarySuccess", locale) : t("workflow.testrun.summaryFailed", locale)}</strong>
               <span style={{ marginLeft: "auto", fontSize: 12, opacity: 0.8 }}>
-                Gespeichert als Dry-Run im Verlauf
+                {t("workflow.testrun.savedAs", locale)}
               </span>
             </div>
           )}
