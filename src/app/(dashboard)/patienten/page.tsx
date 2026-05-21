@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
@@ -31,8 +31,7 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 
 export default function PatientenPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [search, setSearch] = useState(searchParams?.get("q") || "");
+  const [search, setSearch] = useState("");
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const { patienten, totalCount, loading, refetch } = usePatienten(search);
