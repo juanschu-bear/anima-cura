@@ -14,6 +14,7 @@ interface BaseNodeProps {
   showInput?: boolean;
   showOutput?: boolean;
   branching?: boolean;
+  runtimeStatus?: "running" | "success" | "failed" | "skipped" | "dry_run";
 }
 
 export function BaseNode({
@@ -27,6 +28,7 @@ export function BaseNode({
   showInput = true,
   showOutput = true,
   branching = false,
+  runtimeStatus,
 }: BaseNodeProps) {
   return (
     <div
@@ -38,7 +40,13 @@ export function BaseNode({
         } as any
       }
       data-selected={selected ? "true" : "false"}
+      data-runtime={runtimeStatus || "idle"}
     >
+      {runtimeStatus && (
+        <span className={`wf-node-runtime wf-node-runtime-${runtimeStatus}`}>
+          {runtimeStatus === "running" ? "●" : runtimeStatus === "success" ? "✓" : runtimeStatus === "failed" ? "✕" : "·"}
+        </span>
+      )}
       {showInput && (
         <Handle type="target" position={Position.Left} className="wf-handle wf-handle-in" />
       )}

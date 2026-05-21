@@ -52,6 +52,7 @@ export function NodeConfigPanel({ node, onClose, onChange, onDelete }: Props) {
         {node.type === "action_alert" && <AlertForm data={data} patch={patch} />}
         {node.type === "action_mahnstufe" && <MahnstufeForm data={data} patch={patch} />}
         {node.type === "action_scoring" && <ScoringForm data={data} patch={patch} />}
+        {node.type === "action_wait" && <WaitForm data={data} patch={patch} />}
 
         {(node.type === "action_email" || node.type === "action_whatsapp" || node.type === "action_alert") && (
           <div className="wf-vars">
@@ -113,6 +114,7 @@ const TITLES: Record<NodeKind, string> = {
   action_alert: "Alert auslösen",
   action_mahnstufe: "Mahnstufe ändern",
   action_scoring: "Scoring anpassen",
+  action_wait: "Warten",
 };
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -266,6 +268,33 @@ function MahnstufeForm({ data, patch }: any) {
           <option value="3">Stufe 3 — Letzte Mahnung</option>
           <option value="eskalation">Eskalation (Inkasso)</option>
         </select>
+      </Field>
+    </div>
+  );
+}
+
+function WaitForm({ data, patch }: any) {
+  return (
+    <div className="wf-form">
+      <Field label="Wartezeit">
+        <div className="grid grid-cols-[1fr_1.4fr] gap-2">
+          <input
+            type="number"
+            min={1}
+            className="input"
+            value={data.amount ?? 1}
+            onChange={(e) => patch({ amount: Number(e.target.value) })}
+          />
+          <select
+            className="input"
+            value={data.unit || "days"}
+            onChange={(e) => patch({ unit: e.target.value })}
+          >
+            <option value="minutes">Minuten</option>
+            <option value="hours">Stunden</option>
+            <option value="days">Tage</option>
+          </select>
+        </div>
       </Field>
     </div>
   );

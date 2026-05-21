@@ -15,11 +15,17 @@ import {
   Trash2,
   Copy,
   Power,
+  History,
+  Beaker,
 } from "lucide-react";
+import Link from "next/link";
 import { useAppStore } from "@/hooks/useAppStore";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { WorkflowTemplatePicker } from "@/components/workflows/WorkflowTemplates";
+import { pushVersion } from "@/components/workflows/storage";
+import { TestRunDialog } from "@/components/workflows/TestRunDialog";
+import { VersionHistoryDrawer } from "@/components/workflows/VersionHistoryDrawer";
 import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflows/types";
 
 const SETTING_KEY = "workflows";
@@ -74,6 +80,9 @@ export default function AutomatisierungenPage() {
 
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [showTest, setShowTest] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [patients, setPatients] = useState<any[]>([]);
   const [persistError, setPersistError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -112,6 +121,21 @@ export default function AutomatisierungenPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data } = await supabase
+          .from("patienten")
+          .select("id, vorname, nachname, email, kasse")
+          .limit(50);
+        if (data) setPatients(data);
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   async function persist(next: Workflow[]) {
@@ -182,10 +206,25 @@ export default function AutomatisierungenPage() {
     updateWorkflow(id, { nodes, edges });
   }
 
-  function saveAndClose() {
+  async function saveAndClose() {
+    if (editing) {
+      await pushVersion(editing.id, editing, "Manuelles Speichern");
+    }
     setSaveHint("Workflow gespeichert");
     setTimeout(() => setSaveHint(""), 1800);
     setEditingId(null);
+  }
+
+  function restoreVersion(snapshot: Workflow) {
+    if (!editing) return;
+    updateWorkflow(editing.id, {
+      nodes: snapshot.nodes || [],
+      edges: snapshot.edges || [],
+      name: snapshot.name || editing.name,
+      description: snapshot.description,
+    });
+    setSaveHint("Version wiederhergestellt");
+    setTimeout(() => setSaveHint(""), 1800);
   }
 
   const editing = useMemo(() => workflows.find((w) => w.id === editingId) || null, [workflows, editingId]);
@@ -225,7 +264,33 @@ export default function AutomatisierungenPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowTest(true)}
+              className="wf-secondary-btn"
+              title="Test-Run starten"
+            >
+              <Beaker size={14} /> Test
+            </button>
+            <Link
+              href={`/automatisierungen/${editing.id}/runs`}
+              className="wf-secondary-btn"
+              title="Verlauf öffnen"
+            >
+              <Activity size={14} /> Verlauf
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowHistory(true)}
+              className="wf-secondary-btn"
+              title="Versionsverlauf"
+            >
+              <History size={14} /> Versionen
+            </button>
+
+            <span className="wf-topbar-divider" />
+
             <button
               type="button"
               onClick={() => updateWorkflow(editing.id, { active: !editing.active })}
@@ -254,11 +319,27 @@ export default function AutomatisierungenPage() {
 
         <WorkflowCanvas
           key={editing.id}
+          workflowId={editing.id}
           initialNodes={editing.nodes}
           initialEdges={editing.edges}
           onChange={(n, e) => handleCanvasChange(editing.id, n, e)}
           isDark={isDark}
         />
+
+        {showTest && (
+          <TestRunDialog
+            workflow={editing}
+            patients={patients}
+            onClose={() => setShowTest(false)}
+          />
+        )}
+        {showHistory && (
+          <VersionHistoryDrawer
+            workflow={editing}
+            onClose={() => setShowHistory(false)}
+            onRestore={restoreVersion}
+          />
+        )}
       </div>
     );
   }
@@ -350,6 +431,13 @@ export default function AutomatisierungenPage() {
               </div>
 
               <div className="wf-card-right" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/automatisierungen/${w.id}/runs`}
+                  className="wf-iconbtn"
+                  title={isGerman ? "Verlauf öffnen" : "View history"}
+                >
+                  <History size={15} />
+                </Link>
                 <button
                   type="button"
                   onClick={() => updateWorkflow(w.id, { active: !w.active })}
@@ -373,6 +461,9 @@ export default function AutomatisierungenPage() {
                       <button onClick={() => { setEditingId(w.id); setMenuOpenId(null); }}>
                         <Power size={13} /> Öffnen
                       </button>
+                      <Link href={`/automatisierungen/${w.id}/runs`} className="block">
+                        <History size={13} /> Verlauf
+                      </Link>
                       <button onClick={() => duplicateWorkflow(w.id)}>
                         <Copy size={13} /> Duplizieren
                       </button>

@@ -30,6 +30,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   TrendingDown,
+  Clock,
 } from "lucide-react";
 
 import { TriggerNode } from "./nodes/TriggerNode";
@@ -39,7 +40,9 @@ import { ActionWhatsAppNode } from "./nodes/ActionWhatsAppNode";
 import { ActionAlertNode } from "./nodes/ActionAlertNode";
 import { ActionMahnstufeNode } from "./nodes/ActionMahnstufeNode";
 import { ActionScoringNode } from "./nodes/ActionScoringNode";
+import { ActionWaitNode } from "./nodes/ActionWaitNode";
 import { NodeConfigPanel } from "./NodeConfigPanel";
+import { useRealtimeRun } from "./useRealtimeRun";
 import type { NodeKind, WorkflowEdge, WorkflowNode } from "./types";
 
 const nodeTypes = {
@@ -50,11 +53,13 @@ const nodeTypes = {
   action_alert: ActionAlertNode,
   action_mahnstufe: ActionMahnstufeNode,
   action_scoring: ActionScoringNode,
+  action_wait: ActionWaitNode,
 };
 
 const PALETTE: { kind: NodeKind; label: string; icon: any; accent: string }[] = [
   { kind: "trigger", label: "Trigger", icon: Zap, accent: "#c8942d" },
   { kind: "condition", label: "Bedingung", icon: GitBranch, accent: "#3b6fb8" },
+  { kind: "action_wait", label: "Warten", icon: Clock, accent: "#6b7d99" },
   { kind: "action_email", label: "E-Mail", icon: Mail, accent: "#5f9339" },
   { kind: "action_whatsapp", label: "WhatsApp", icon: MessageCircle, accent: "#3f9772" },
   { kind: "action_alert", label: "Alert", icon: AlertTriangle, accent: "#cb4f56" },
@@ -78,6 +83,8 @@ function defaultDataFor(kind: NodeKind): any {
       return { stufe: 1 };
     case "action_scoring":
       return { delta: -5 };
+    case "action_wait":
+      return { amount: 1, unit: "days" };
   }
 }
 
@@ -86,12 +93,24 @@ interface Props {
   initialEdges: WorkflowEdge[];
   onChange?: (nodes: WorkflowNode[], edges: WorkflowEdge[]) => void;
   isDark: boolean;
+  workflowId?: string;
 }
 
-function CanvasInner({ initialNodes, initialEdges, onChange, isDark }: Props) {
+function CanvasInner({ initialNodes, initialEdges, onChange, isDark, workflowId }: Props) {
   const [nodes, setNodes] = useState<Node[]>(initialNodes as Node[]);
   const [edges, setEdges] = useState<Edge[]>(initialEdges as Edge[]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const { statuses: runtimeStatuses, activeRun } = useRealtimeRun(workflowId || null);
+
+  // Merge runtime status into node data so node components can light up.
+  const nodesWithStatus = useMemo(() => {
+    if (!runtimeStatuses || Object.keys(runtimeStatuses).length === 0) return nodes;
+    return nodes.map((n) => {
+      const rs = runtimeStatuses[n.id];
+      if (!rs) return n;
+      return { ...n, data: { ...(n.data as any), __runtimeStatus: rs } } as Node;
+    });
+  }, [nodes, runtimeStatuses]);
 
   const pushChange = useCallback(
     (n: Node[], e: Edge[]) => {
@@ -222,7 +241,7 @@ function CanvasInner({ initialNodes, initialEdges, onChange, isDark }: Props) {
 
       <div className="wf-canvas">
         <ReactFlow
-          nodes={nodes}
+          nodes={nodesWithStatus}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -267,6 +286,7 @@ function CanvasInner({ initialNodes, initialEdges, onChange, isDark }: Props) {
                 action_alert: "#cb4f56",
                 action_mahnstufe: "#d27130",
                 action_scoring: "#7a52d6",
+                action_wait: "#6b7d99",
               };
               return map[n.type as string] || "#9caac0";
             }}

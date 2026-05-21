@@ -29,6 +29,7 @@ export function TriggerNode({ data, selected }: NodeProps) {
       subtitle={subtitle}
       selected={selected}
       showInput={false}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }

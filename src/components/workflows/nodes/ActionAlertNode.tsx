@@ -26,6 +26,7 @@ export function ActionAlertNode({ data, selected }: NodeProps) {
       title="Alert auslösen"
       subtitle={subtitle}
       selected={selected}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }

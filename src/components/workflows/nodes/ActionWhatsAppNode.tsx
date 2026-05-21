@@ -20,6 +20,7 @@ export function ActionWhatsAppNode({ data, selected }: NodeProps) {
       title="WhatsApp senden"
       subtitle={subtitle}
       selected={selected}
+      runtimeStatus={(data as any)?.__runtimeStatus}
     />
   );
 }
