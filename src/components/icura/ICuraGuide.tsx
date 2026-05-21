@@ -290,7 +290,7 @@ export default function ICuraGuide() {
         style={{
           position: "fixed",
           bottom: 24,
-          right: 24,
+          right: 88,
           zIndex: 99999,
           width: 56,
           height: 56,
@@ -320,7 +320,7 @@ export default function ICuraGuide() {
           style={{
             position: "fixed",
             bottom: 92,
-            right: 24,
+            right: 88,
             zIndex: 99999,
             width: 380,
             maxHeight: 540,
