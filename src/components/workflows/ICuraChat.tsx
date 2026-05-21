@@ -11,8 +11,15 @@ import {
   Loader2,
   Wand2,
   AlertCircle,
+  Mail,
+  MessageCircle,
+  GitBranch,
+  Bell,
+  TrendingDown,
+  ArrowUpRight,
+  Zap,
 } from "lucide-react";
-import type { Workflow, WorkflowEdge, WorkflowNode } from "./types";
+import { NODE_KINDS, type Workflow, WorkflowEdge, WorkflowNode } from "./types";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/hooks/useAppStore";
 
@@ -38,6 +45,184 @@ interface Props {
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function stripMarkdown(text: string) {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\r/g, "")
+    .trim();
+}
+
+function parseSsePayload(raw: string) {
+  const events: Array<{ event: string | null; data: any }> = [];
+  let currentEvent: string | null = null;
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (line.startsWith("event:")) {
+      currentEvent = line.slice(6).trim();
+      continue;
+    }
+
+    if (line.startsWith("data:")) {
+      try {
+        events.push({
+          event: currentEvent,
+          data: JSON.parse(line.slice(5).trim()),
+        });
+      } catch {
+        // ignore invalid chunks
+      }
+      continue;
+    }
+
+    if (line.trim() === "") {
+      currentEvent = null;
+    }
+  }
+
+  return events.findLast((item) => item.event === "final")?.data ?? events.at(-1)?.data ?? null;
+}
+
+function defaultPosition(index: number) {
+  const col = index % 3;
+  const row = Math.floor(index / 3);
+  return { x: 80 + col * 320, y: 120 + row * 180 };
+}
+
+function normalizeProposal(proposal: Message["proposal"]): Message["proposal"] {
+  if (!proposal) {
+    return proposal;
+  }
+
+  const nodes = proposal.nodes.map((node, index) => {
+    const data = (node.data || {}) as Record<string, any>;
+    const nextNode: WorkflowNode = {
+      ...node,
+      position:
+        node.position && typeof node.position.x === "number" && typeof node.position.y === "number"
+          ? node.position
+          : defaultPosition(index),
+      data: { ...data },
+    } as WorkflowNode;
+
+    if (node.type === "trigger") {
+      const eventMap: Record<string, string> = {
+        rate_ueberfaellig: "rate_overdue",
+        ruecklastschrift: "rate_returned",
+        taeglicher_cron: "daily_at",
+        scoring_kritisch: "scoring_below",
+      };
+      nextNode.data = {
+        ...data,
+        event: eventMap[String(data.event)] || data.event || "rate_overdue",
+        days: data.delayDays ?? data.days,
+        time: data.cronTime ?? data.time,
+        threshold: data.threshold,
+      };
+    }
+
+    if (node.type === "condition") {
+      const fieldMap: Record<string, string> = {
+        email: "email_vorhanden",
+        kasse: "patiententyp",
+      };
+      const operatorMap: Record<string, string> = {
+        equals: "eq",
+        exists: "is_true",
+      };
+      nextNode.data = {
+        ...data,
+        field: fieldMap[String(data.field)] || data.field,
+        operator: operatorMap[String(data.operator)] || data.operator,
+      };
+    }
+
+    if (node.type === "action_email") {
+      nextNode.data = {
+        ...data,
+        recipient: data.to ?? data.recipient ?? "patient",
+        subject: data.subject || "",
+        body: data.body || "",
+      };
+    }
+
+    if (node.type === "action_whatsapp") {
+      nextNode.data = {
+        ...data,
+        message: data.message || "",
+      };
+    }
+
+    if (node.type === "action_alert") {
+      const severityMap: Record<string, string> = {
+        warnung: "warn",
+        kritisch: "critical",
+      };
+      const recipientMap: Record<string, string> = {
+        alle: "team",
+      };
+      nextNode.data = {
+        ...data,
+        severity: severityMap[String(data.severity)] || data.severity || "warn",
+        recipient: recipientMap[String(data.recipient)] || data.recipient || "team",
+      };
+    }
+
+    if (node.type === "action_mahnstufe") {
+      nextNode.data = {
+        ...data,
+        stufe:
+          data.action === "increase"
+            ? data.targetStufe ?? 1
+            : data.targetStufe ?? data.stufe ?? 1,
+      };
+    }
+
+    if (node.type === "action_scoring") {
+      const points = Number(data.points ?? 0);
+      nextNode.data = {
+        ...data,
+        delta: data.action === "decrease" ? -Math.abs(points) : points,
+      };
+    }
+
+    return nextNode;
+  });
+
+  return {
+    rationale: stripMarkdown(proposal.rationale),
+    nodes,
+    edges: proposal.edges,
+  };
+}
+
+function proposalIcon(type: WorkflowNode["type"]) {
+  const size = 13;
+  switch (type) {
+    case "trigger":
+      return <Zap size={size} />;
+    case "condition":
+      return <GitBranch size={size} />;
+    case "action_email":
+      return <Mail size={size} />;
+    case "action_whatsapp":
+      return <MessageCircle size={size} />;
+    case "action_alert":
+      return <Bell size={size} />;
+    case "action_mahnstufe":
+      return <ArrowUpRight size={size} />;
+    case "action_scoring":
+      return <TrendingDown size={size} />;
+    default:
+      return <Wand2 size={size} />;
+  }
 }
 
 export function ICuraChat({ workflow, onApplyProposal }: Props) {
@@ -90,10 +275,6 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         body: JSON.stringify({
           message: trimmed,
           sessionId: sessionId || undefined,
-          history: messages
-            .filter((m) => !m.pending && !m.error)
-            .slice(-12)
-            .map((m) => ({ role: m.role, content: m.text })),
           currentWorkflow: {
             nodes: workflow.nodes,
             edges: workflow.edges,
@@ -112,37 +293,36 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
         throw new Error(t("chat.error.serverStatus", locale, { status: res.status }));
       }
 
-      const text = await res.text();
-      // Parse SSE response: extract JSON from "data: {...}" lines
-      let data: any;
-      const lines = text.split("\n");
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            data = JSON.parse(line.slice(6));
-          } catch {
-            // skip non-JSON data lines
-          }
-        }
-      }
+      const raw = await res.text();
+      const data = parseSsePayload(raw);
       if (!data) {
-        // Fallback: try parsing entire response as JSON
-        try { data = JSON.parse(text); } catch {
+        try {
+          JSON.parse(raw);
+        } catch {
           throw new Error(t("chat.error.parse", locale));
         }
       }
       let response: Message;
       if (data.type === "proposal") {
+        const normalizedProposal = normalizeProposal({
+          rationale: data.rationale || t("chat.proposal.default", locale),
+          nodes: data.nodes || [],
+          edges: data.edges || [],
+        });
         response = {
           id: uid(),
           role: "assistant",
-          text: data.rationale || t("chat.proposal.default", locale),
-          proposal: { rationale: data.rationale || "", nodes: data.nodes || [], edges: data.edges || [] },
+          text: normalizedProposal?.rationale || t("chat.proposal.default", locale),
+          proposal: normalizedProposal,
         };
       } else if (data.type === "question") {
-        response = { id: uid(), role: "assistant", text: data.text || t("chat.proposal.clarify", locale) };
+        response = {
+          id: uid(),
+          role: "assistant",
+          text: stripMarkdown(data.text || data.question || t("chat.proposal.clarify", locale)),
+        };
       } else if (typeof data.text === "string") {
-        response = { id: uid(), role: "assistant", text: data.text };
+        response = { id: uid(), role: "assistant", text: stripMarkdown(data.text) };
       } else {
         response = { id: uid(), role: "assistant", text: t("chat.error.unexpected", locale) };
       }
@@ -218,19 +398,19 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
                     <span className="icura-error">
                       <AlertCircle size={12} /> {m.text}
                     </span>
-                  ) : (
-                    <span className="icura-text">{renderMarkdown(m.text)}</span>
-                  )}
-
-                  {m.proposal && (
+                  ) : m.proposal ? (
                     <div className="icura-proposal">
                       <div className="icura-proposal-head">
                         <Wand2 size={12} /> {t("chat.proposal.head", locale, { count: m.proposal.nodes.length })}
                       </div>
+                      <p className="icura-proposal-rationale">{stripMarkdown(m.proposal.rationale)}</p>
                       <ul className="icura-proposal-list">
-                        {m.proposal.nodes.map((n, i) => (
-                          <li key={i}>
-                            <span className="icura-proposal-kind">{n.type}</span>
+                        {m.proposal.nodes.map((n) => (
+                          <li key={n.id}>
+                            <span className="icura-proposal-kind">
+                              {proposalIcon(n.type)}
+                              {NODE_KINDS[n.type]?.label || n.type}
+                            </span>
                             {nodeSummary(n, locale)}
                           </li>
                         ))}
@@ -241,9 +421,11 @@ export function ICuraChat({ workflow, onApplyProposal }: Props) {
                         style={{ marginTop: 10, padding: "7px 12px", fontSize: 12 }}
                         type="button"
                       >
-                        <Check size={12} /> {t("common.apply", locale)}
+                        <Check size={12} /> {locale === "de" ? "Übernehmen" : "Apply"}
                       </button>
                     </div>
+                  ) : (
+                    <span className="icura-text">{renderMarkdown(stripMarkdown(m.text))}</span>
                   )}
                 </div>
               </div>

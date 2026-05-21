@@ -75,8 +75,16 @@ User: "Eskalation: erst E-Mail, dann nach 21 Tagen formelle Mahnung"
 
 WICHTIG:
 - Nutze nur die beiden Tools ask_clarification oder propose_workflow.
-- Wenn Informationen fehlen, stelle genau eine Rückfrage mit ask_clarification.
-- Wenn genug Informationen vorliegen, liefere den vollständigen Workflow mit propose_workflow.
+- Bevorzuge IMMER propose_workflow. Fülle fehlende Details mit sinnvollen Defaults statt Rückfragen.
+- Frage nur dann mit ask_clarification nach, wenn die Kernabsicht des Users völlig unklar ist und du sonst keinen brauchbaren Workflow bauen könntest.
+- Maximal 1 Rückfrage pro Konversation.
+- Wenn der User eine Automatisierungsidee, ein Timing, einen Kanal oder eine Bedingung nennt, reicht das fast immer schon für propose_workflow.
+- Nutze sinnvolle Defaults:
+  - rate_ueberfaellig standardmäßig nach 6 Tagen, wenn keine Zahl genannt ist
+  - E-Mail-Erinnerungen standardmäßig freundlich, kurz und in Sie-Form
+  - Falls Kommunikation an Patienten geht, füge standardmäßig eine Bedingung für vorhandene E-Mail hinzu
+  - Für mehrstufige Erinnerungen oder Multichannel-Workflows darfst du ohne Rückfrage sinnvolle Standardtexte und Reihenfolgen wählen
+- Wenn der User auf eine frühere Nachricht Bezug nimmt, nutze den bisherigen Gesprächskontext und verbessere den bestehenden Vorschlag statt neu zu starten.
 - Node-IDs müssen eindeutig sein.
 - Edges müssen auf existierende Node-IDs verweisen.
 - Wenn du einen Workflow vorschlägst, gib vollständige nodes und edges zurück.`;
@@ -261,10 +269,11 @@ function summarizeAssistantPayload(
     | ({ type: "proposal" } & z.infer<typeof proposalSchema>)
 ) {
   if (payload.type === "question") {
-    return payload.question;
+    return `[assistant-question]\n${payload.question}`;
   }
 
   return [
+    "[assistant-proposal]",
     payload.rationale,
     "",
     JSON.stringify({
@@ -346,6 +355,15 @@ function toolSchemaForAnthropic(): Tool["input_schema"] {
   };
 }
 
+function countClarificationQuestions(messages: StoredSessionMessage[]) {
+  return messages.filter(
+    (message) =>
+      message.role === "assistant" &&
+      (message.content.startsWith("[assistant-question]") ||
+        (!message.content.startsWith("[assistant-proposal]") && !message.content.includes('"nodes"')))
+  ).length;
+}
+
 const encoder = new TextEncoder();
 
 function sendSse(controller: ReadableStreamDefaultController<Uint8Array>, data: unknown, event?: string) {
@@ -381,6 +399,7 @@ export async function POST(request: Request) {
   const existingMessages = body.sessionId ? await loadSessionMessages(body.sessionId) : [];
   const userMessage = formatUserMessage(body);
   const nextMessages = [...existingMessages, { role: "user" as const, content: userMessage }];
+  const clarificationCount = countClarificationQuestions(existingMessages);
   const anthropicMessages = nextMessages.slice(-8).map<MessageParam>((message) => ({
     role: message.role,
     content: message.content,
@@ -406,23 +425,28 @@ export async function POST(request: Request) {
             tools: [
               {
                 name: "propose_workflow",
-                description: "Schlägt einen kompletten Workflow vor mit Nodes und Edges",
+                description: "Schlägt bevorzugt einen kompletten Workflow vor. Nutze sinnvolle Defaults statt Rückfragen und liefere immer nodes und edges.",
                 input_schema: toolSchemaForAnthropic(),
               },
-              {
-                name: "ask_clarification",
-                description: "Stellt NUR eine Rückfrage wenn absolut kritische Informationen fehlen. Bevorzuge IMMER einen Workflow-Vorschlag mit sinnvollen Defaults statt Rückfragen. Maximal 1 Rückfrage pro Konversation.",
-                input_schema: {
-                  type: "object" as const,
-                  properties: {
-                    question: {
-                      type: "string",
-                      description: "Rückfrage auf Deutsch",
+              ...(clarificationCount === 0
+                ? [
+                    {
+                      name: "ask_clarification",
+                      description:
+                        "Stellt NUR eine Rückfrage wenn absolut kritische Informationen fehlen. Verwende dieses Tool nur, wenn kein sinnvoller Workflow mit Defaults möglich ist. Maximal 1 Rückfrage pro Konversation.",
+                      input_schema: {
+                        type: "object" as const,
+                        properties: {
+                          question: {
+                            type: "string",
+                            description: "Kurze Rückfrage in der Sprache des Benutzers",
+                          },
+                        },
+                        required: ["question"],
+                      },
                     },
-                  },
-                  required: ["question"],
-                },
-              },
+                  ]
+                : []),
             ],
           })
           .on("text", (textDelta) => {
@@ -495,6 +519,7 @@ export async function POST(request: Request) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "Content-Type": "text/event-stream; charset=utf-8",
+      "Access-Control-Expose-Headers": "X-Session-Id",
       "X-Session-Id": sessionId,
     },
   });
