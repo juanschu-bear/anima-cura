@@ -422,6 +422,7 @@ samp {
   gap: 10px;
 }
 .wf-card {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -587,10 +588,10 @@ samp {
 
 /* Menu */
 .wf-menu {
+  z-index: 99999;
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 50;
   min-width: 170px;
   padding: 6px;
   border-radius: 12px;
@@ -706,7 +707,6 @@ samp {
   background: color-mix(in srgb, var(--ac-success) 14%, var(--ac-surface));
   border: 1px solid color-mix(in srgb, var(--ac-success) 40%, var(--ac-border));
   box-shadow: var(--ac-shadow);
-  z-index: 50;
   animation: wf-toast-in 0.25s ease-out;
 }
 @keyframes wf-toast-in {
@@ -1848,6 +1848,7 @@ body::after {
 
 /* ── Workflow cards: hover lift with iris glow ────────────── */
 .wf-card {
+  position: relative;
   transition:
     transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
     border-color 0.25s ease,
