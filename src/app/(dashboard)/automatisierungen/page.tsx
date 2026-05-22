@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Zap,
@@ -484,6 +485,7 @@ const NODE_KIND_ACCENT: Record<string, string> = {
 };
 
 function PortalWorkflowCard({ workflow: w, index, triggerLabel, nodeCount, locale, menuOpen, onClick, onToggleMenu, onCloseMenu, onToggleActive, onDuplicate, onDelete, onOpen }: any) {
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const ref = useTilt<HTMLDivElement>(4);
   return (
     <div
@@ -550,13 +552,14 @@ function PortalWorkflowCard({ workflow: w, index, triggerLabel, nodeCount, local
           <div className="relative">
             <button
               type="button"
+              ref={menuBtnRef}
               onClick={onToggleMenu}
               className="wf-iconbtn"
             >
               <MoreHorizontal size={16} />
             </button>
-            {menuOpen && (
-              <div className="wf-menu" onMouseLeave={onCloseMenu}>
+            {menuOpen && typeof document !== "undefined" && createPortal(
+              <PortalMenu btnRef={menuBtnRef} onClose={onCloseMenu}>
                 <button onClick={onOpen}>
                   <Power size={13} /> {t("common.open", locale)}
                 </button>
@@ -569,7 +572,8 @@ function PortalWorkflowCard({ workflow: w, index, triggerLabel, nodeCount, local
                 <button onClick={onDelete} className="wf-menu-danger">
                   <Trash2 size={13} /> {t("common.delete", locale)}
                 </button>
-              </div>
+              </PortalMenu>,
+              document.body
             )}
           </div>
         </div>
@@ -593,4 +597,35 @@ function triggerSummary(node: WorkflowNode | undefined, locale: string): string 
     default:
       return t("workflow.triggerLabel", locale);
   }
+}
+
+function PortalMenu({ btnRef, onClose, children }: { btnRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void; children: React.ReactNode }) {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.right - 170 });
+    }
+  }, [btnRef]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose, btnRef]);
+
+  return (
+    <div
+      className="wf-menu"
+      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999 }}
+      onMouseLeave={onClose}
+    >
+      {children}
+    </div>
+  );
 }
