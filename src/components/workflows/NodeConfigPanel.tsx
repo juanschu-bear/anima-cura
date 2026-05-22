@@ -142,12 +142,22 @@ function TriggerForm({ data, patch, locale }: any) {
           <option value="rate_returned">{t("config.triggerOption.rateReturned", locale)}</option>
           <option value="daily_at">{t("config.triggerOption.dailyAt", locale)}</option>
           <option value="scoring_below">{t("config.triggerOption.scoringBelow", locale)}</option>
+          <option value="before_due">{t("config.triggerOption.beforeDue", locale)}</option>
+          <option value="holiday">{t("config.triggerOption.holiday", locale)}</option>
+          <option value="patient_birthday">{t("config.triggerOption.patientBirthday", locale)}</option>
+          <option value="new_patient">{t("config.triggerOption.newPatient", locale)}</option>
+          <option value="treatment_complete">{t("config.triggerOption.treatmentComplete", locale)}</option>
         </select>
       </Field>
 
       {data.event === "rate_overdue" && (
         <Field label={t("config.daysOverdue", locale)}>
           <input type="number" min={0} className="input" value={data.days ?? 6} onChange={(e) => patch({ days: Number(e.target.value) })} />
+        </Field>
+      )}
+      {data.event === "before_due" && (
+        <Field label={t("config.daysBeforeDue", locale)}>
+          <input type="number" min={0} className="input" value={data.days ?? 2} onChange={(e) => patch({ days: Number(e.target.value) })} />
         </Field>
       )}
       {data.event === "daily_at" && (
@@ -158,6 +168,23 @@ function TriggerForm({ data, patch, locale }: any) {
       {data.event === "scoring_below" && (
         <Field label={t("config.thresholdPct", locale)}>
           <input type="number" min={0} max={100} className="input" value={data.threshold ?? 80} onChange={(e) => patch({ threshold: Number(e.target.value) })} />
+        </Field>
+      )}
+      {data.event === "holiday" && (
+        <>
+          <Field label={t("config.daysBeforeHoliday", locale)}>
+            <input type="number" min={0} className="input" value={data.days_before ?? 2} onChange={(e) => patch({ days_before: Number(e.target.value) })} />
+          </Field>
+          <Field label={t("config.region", locale)}>
+            <select className="input" value={data.region || "sachsen"} onChange={(e) => patch({ region: e.target.value })}>
+              <option value="sachsen">{t("config.region.saxony", locale)}</option>
+            </select>
+          </Field>
+        </>
+      )}
+      {data.event === "patient_birthday" && (
+        <Field label={t("config.daysBeforeBirthday", locale)}>
+          <input type="number" min={0} className="input" value={data.days_before ?? 0} onChange={(e) => patch({ days_before: Number(e.target.value) })} />
         </Field>
       )}
     </div>

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_id  TEXT NOT NULL,                            -- matches Workflow.id (string)
   patient_id   UUID REFERENCES patienten(id) ON DELETE SET NULL,
-  trigger_kind TEXT NOT NULL,                            -- "rate_overdue" | "rate_returned" | …
+  trigger_kind TEXT NOT NULL,                            -- "rate_overdue" | "before_due" | "holiday" | "patient_birthday" | …
   status       TEXT NOT NULL DEFAULT 'running'
                  CHECK (status IN ('running','success','failed','skipped','dry_run')),
   started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -14,7 +14,12 @@ export type TriggerEvent =
   | "rate_overdue"
   | "rate_returned"
   | "daily_at"
-  | "scoring_below";
+  | "scoring_below"
+  | "before_due"
+  | "holiday"
+  | "patient_birthday"
+  | "new_patient"
+  | "treatment_complete";
 
 export type ConditionField =
   | "mahnstufe"
@@ -34,6 +39,8 @@ export type EmailRecipient =
 export interface TriggerData {
   event: TriggerEvent;
   days?: number;
+  days_before?: number;
+  region?: string;
   time?: string;
   threshold?: number;
 }
@@ -169,6 +176,8 @@ export const TEMPLATE_VARIABLES: { key: string; label: string }[] = [
   { key: "{{faellig_am}}", label: "Fälligkeitsdatum" },
   { key: "{{mahnstufe}}", label: "Aktuelle Mahnstufe" },
   { key: "{{scoring}}", label: "Aktueller Scoring-Wert" },
+  { key: "{{holiday_name}}", label: "Name des Feiertags" },
+  { key: "{{holiday_date}}", label: "Datum des Feiertags" },
   { key: "{{praxis_name}}", label: "Praxis Dr. Maria Schubert" },
   { key: "{{praxis_iban}}", label: "IBAN der Praxis" },
 ];

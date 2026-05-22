@@ -587,12 +587,24 @@ function triggerSummary(node: WorkflowNode | undefined, locale: string): string 
   switch (d.event) {
     case "rate_overdue":
       return t("workflow.rateOverdueShort", locale, { days: d.days ?? "?" });
+    case "before_due":
+      return t("workflow.beforeDueShort", locale, { days: d.days ?? "?" });
     case "rate_returned":
       return t("workflow.rateReturned", locale);
     case "daily_at":
       return t("workflow.dailyShort", locale, { time: d.time || "06:00" });
     case "scoring_below":
       return t("workflow.scoringBelow", locale, { threshold: d.threshold ?? 80 });
+    case "holiday":
+      return t("workflow.holidayShort", locale, { days: d.days_before ?? 2 });
+    case "patient_birthday":
+      return d.days_before
+        ? t("workflow.birthdayBeforeShort", locale, { days: d.days_before })
+        : t("workflow.birthdayShort", locale);
+    case "new_patient":
+      return t("workflow.newPatientShort", locale);
+    case "treatment_complete":
+      return t("workflow.treatmentCompleteShort", locale);
     default:
       return t("workflow.triggerLabel", locale);
   }

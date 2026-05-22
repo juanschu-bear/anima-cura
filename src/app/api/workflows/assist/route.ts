@@ -16,8 +16,18 @@ Du hilfst beim Erstellen von Automationen. Antworte immer auf Deutsch.
 VERFÜGBARE NODE-TYPEN:
 
 1. trigger — Auslöser
-   Events: "rate_ueberfaellig", "ruecklastschrift", "taeglicher_cron", "scoring_kritisch"
-   Data: { event: string, delayDays?: number, threshold?: number, cronTime?: string }
+   Events: "rate_overdue", "rate_returned", "daily_at", "scoring_below", "before_due", "holiday", "patient_birthday", "new_patient", "treatment_complete"
+   Data: { event: string, days?: number, days_before?: number, threshold?: number, time?: string, region?: string }
+   Trigger-Details:
+   - rate_overdue: Rate ist X Tage überfällig. Data: { event: "rate_overdue", days: number }
+   - before_due: Rate wird in X Tagen fällig. Data: { event: "before_due", days: number }
+   - rate_returned: Rücklastschrift erkannt. Data: { event: "rate_returned" }
+   - daily_at: täglicher Cron um Uhrzeit. Data: { event: "daily_at", time: "06:00" }
+   - scoring_below: Scoring fällt unter Schwelle. Data: { event: "scoring_below", threshold: number }
+   - holiday: Feiertag in Sachsen in X Tagen. Data: { event: "holiday", days_before: number, region: "sachsen" }
+   - patient_birthday: Patientengeburtstag, optional X Tage vorher. Data: { event: "patient_birthday", days_before: number }
+   - new_patient: neuer Patient aus IVORIS oder manuell angelegt. Data: { event: "new_patient" }
+   - treatment_complete: letzte Rate bezahlt, Behandlung/Ratenplan abgeschlossen. Data: { event: "treatment_complete" }
 
 2. condition — Bedingung
    Data: { field: string, operator: "equals"|"gt"|"lt"|"contains"|"exists", value: string }
@@ -51,14 +61,14 @@ FEW-SHOT BEISPIELE:
 Beispiel 1 — Einfacher Trigger:
 User: "Erstell eine Erinnerung wenn eine Rate 7 Tage überfällig ist"
 → propose_workflow mit:
-  - Node: trigger (rate_ueberfaellig, delayDays: 7)
+  - Node: trigger (rate_overdue, days: 7)
   - Node: action_email (an Patient, freundliche Erinnerung)
   - Edge: trigger → action_email
 
 Beispiel 2 — Mit Bedingung:
 User: "E-Mail-Erinnerung aber nur wenn der Patient eine E-Mail hat"
 → propose_workflow mit:
-  - Node: trigger (rate_ueberfaellig, delayDays: 6)
+  - Node: trigger (rate_overdue, days: 6)
   - Node: condition (field: "email", operator: "exists")
   - Node: action_email
   - Edges: trigger → condition → action_email
@@ -66,9 +76,9 @@ User: "E-Mail-Erinnerung aber nur wenn der Patient eine E-Mail hat"
 Beispiel 3 — Verzweigung:
 User: "Eskalation: erst E-Mail, dann nach 21 Tagen formelle Mahnung"
 → propose_workflow mit:
-  - Node: trigger (rate_ueberfaellig, delayDays: 6)
+  - Node: trigger (rate_overdue, days: 6)
   - Node: action_email (freundliche Erinnerung)
-  - Node: trigger2 (rate_ueberfaellig, delayDays: 21)
+  - Node: trigger2 (rate_overdue, days: 21)
   - Node: action_email2 (formelle Mahnung)
   - Node: action_mahnstufe (increase)
   - Edges: trigger → action_email, trigger2 → action_email2 → action_mahnstufe
@@ -114,10 +124,33 @@ const nodeBaseSchema = z.object({
 const triggerNodeSchema = nodeBaseSchema.extend({
   type: z.literal("trigger"),
   data: z.object({
-    event: z.enum(["rate_ueberfaellig", "ruecklastschrift", "taeglicher_cron", "scoring_kritisch"]),
+    event: z.enum([
+      "rate_overdue",
+      "rate_returned",
+      "daily_at",
+      "scoring_below",
+      "before_due",
+      "holiday",
+      "patient_birthday",
+      "new_patient",
+      "treatment_complete",
+      "rate_ueberfaellig",
+      "ruecklastschrift",
+      "taeglicher_cron",
+      "scoring_kritisch",
+      "rate_faellig_bald",
+      "feiertag",
+      "patientengeburtstag",
+      "neuer_patient",
+      "behandlung_abgeschlossen",
+    ]),
+    days: z.number().int().nonnegative().optional(),
     delayDays: z.number().int().nonnegative().optional(),
+    days_before: z.number().int().nonnegative().optional(),
     threshold: z.number().optional(),
     cronTime: z.string().optional(),
+    time: z.string().optional(),
+    region: z.string().optional(),
   }),
 });
 

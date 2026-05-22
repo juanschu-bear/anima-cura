@@ -55,6 +55,7 @@ type ExecutionContext = {
   patient: Record<string, unknown> | null;
   rate: Record<string, unknown> | null;
   triggerEvent: string;
+  triggerPayload?: Record<string, unknown>;
 };
 
 type ExecutionStep = {
@@ -70,13 +71,32 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 function normalizeTriggerEvent(event: string | undefined) {
   switch (event) {
     case "rate_overdue":
+    case "rate_ueberfaellig":
       return "rate_ueberfaellig";
     case "rate_returned":
+    case "ruecklastschrift":
       return "ruecklastschrift";
     case "daily_at":
+    case "taeglicher_cron":
       return "taeglicher_cron";
     case "scoring_below":
+    case "scoring_kritisch":
       return "scoring_kritisch";
+    case "before_due":
+    case "rate_faellig_bald":
+      return "rate_faellig_bald";
+    case "holiday":
+    case "feiertag":
+      return "feiertag";
+    case "patient_birthday":
+    case "patientengeburtstag":
+      return "patientengeburtstag";
+    case "new_patient":
+    case "neuer_patient":
+      return "neuer_patient";
+    case "treatment_complete":
+    case "behandlung_abgeschlossen":
+      return "behandlung_abgeschlossen";
     default:
       return event || "unbekannt";
   }
@@ -114,7 +134,8 @@ function firstNumber(...values: unknown[]) {
 function templateContext(
   patient: Record<string, unknown> | null,
   rate: Record<string, unknown> | null,
-  praxisIban: string
+  praxisIban: string,
+  triggerPayload: Record<string, unknown> = {}
 ) {
   return {
     patient_name: patient ? `${firstString(patient.vorname)} ${firstString(patient.nachname)}`.trim() : "{{patient_name}}",
@@ -127,6 +148,10 @@ function templateContext(
       : "{{faellig_am}}",
     mahnstufe: String(firstNumber(rate?.mahnstufe) ?? 0),
     scoring: String(firstNumber(patient?.scoring) ?? ""),
+    holiday_name: firstString(triggerPayload.holiday_name, triggerPayload.name) || "{{holiday_name}}",
+    holiday_date: triggerPayload.holiday_date
+      ? new Date(String(triggerPayload.holiday_date)).toLocaleDateString("de-DE")
+      : "{{holiday_date}}",
     praxis_name: PRACTICE_NAME,
     praxis_iban: praxisIban,
   };
@@ -144,6 +169,84 @@ function computeDaysOverdue(rate: Record<string, unknown> | null) {
   const dueDate = new Date(String(rate.faellig_am));
   const diff = Date.now() - dueDate.getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function dateOnly(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateOnly(value: unknown) {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+function sameMonthDay(left: Date, right: Date) {
+  return left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+}
+
+function saxonDayOfRepentance(year: number) {
+  const date = new Date(year, 10, 23);
+  do {
+    date.setDate(date.getDate() - 1);
+  } while (date.getDay() !== 3);
+  return date;
+}
+
+function getEasterSunday(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function saxonHolidays(year: number) {
+  const easter = getEasterSunday(year);
+  return [
+    { name: "Neujahr", date: new Date(year, 0, 1) },
+    { name: "Karfreitag", date: addDays(easter, -2) },
+    { name: "Ostermontag", date: addDays(easter, 1) },
+    { name: "Tag der Arbeit", date: new Date(year, 4, 1) },
+    { name: "Christi Himmelfahrt", date: addDays(easter, 39) },
+    { name: "Pfingstmontag", date: addDays(easter, 50) },
+    { name: "Tag der Deutschen Einheit", date: new Date(year, 9, 3) },
+    { name: "Reformationstag", date: new Date(year, 9, 31) },
+    { name: "Buß- und Bettag", date: saxonDayOfRepentance(year) },
+    { name: "1. Weihnachtsfeiertag", date: new Date(year, 11, 25) },
+    { name: "2. Weihnachtsfeiertag", date: new Date(year, 11, 26) },
+  ];
+}
+
+function findSaxonHoliday(targetDate: Date) {
+  return saxonHolidays(targetDate.getFullYear()).find((holiday) => dateOnly(holiday.date) === dateOnly(targetDate)) || null;
 }
 
 function evaluateCondition(node: WorkflowNode, context: ExecutionContext) {
@@ -215,6 +318,30 @@ async function loadPraxisIban() {
   return DEFAULT_IBAN;
 }
 
+async function loadNewPatientCutoff() {
+  const candidates = [
+    await readSettingValue("ivoris_last_sync"),
+    await readSettingValue("last_ivoris_sync"),
+    await readSettingValue("workflow_last_sync"),
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && !Number.isNaN(new Date(value).getTime())) {
+      return new Date(value);
+    }
+    if (value && typeof value === "object") {
+      const raw = (value as { last_sync?: unknown; synced_at?: unknown; timestamp?: unknown }).last_sync
+        ?? (value as { synced_at?: unknown }).synced_at
+        ?? (value as { timestamp?: unknown }).timestamp;
+      if (typeof raw === "string" && !Number.isNaN(new Date(raw).getTime())) {
+        return new Date(raw);
+      }
+    }
+  }
+
+  return startOfToday();
+}
+
 function mapAlertSeverity(value: string) {
   switch (value) {
     case "critical":
@@ -238,13 +365,19 @@ function mapAlertRecipient(value: string) {
   }
 }
 
-async function createWorkflowRun(workflowId: string, triggerEvent: string) {
+async function createWorkflowRun(
+  workflowId: string,
+  triggerEvent: string,
+  context: ExecutionContext
+) {
   const db = createServerClient();
   const payload = {
     workflow_id: workflowId,
-    status: "pending",
-    trigger_event: triggerEvent,
+    patient_id: context.patient?.id ?? null,
+    status: "running",
+    trigger_kind: triggerEvent,
     started_at: new Date().toISOString(),
+    trigger_payload: context.triggerPayload ?? {},
   };
 
   const { data, error } = await db.from("workflow_runs").insert(payload).select("id").single();
@@ -257,10 +390,16 @@ async function createWorkflowRun(workflowId: string, triggerEvent: string) {
 
 async function finishWorkflowRun(runId: string, payload: Record<string, unknown>) {
   const db = createServerClient();
+  const result = payload.result && typeof payload.result === "object"
+    ? (payload.result as Record<string, unknown>)
+    : {};
+
   const { error } = await db
     .from("workflow_runs")
     .update({
-      ...payload,
+      status: payload.status,
+      steps: result.steps ?? payload.steps ?? [],
+      error: payload.error ?? null,
       finished_at: new Date().toISOString(),
     })
     .eq("id", runId);
@@ -339,6 +478,17 @@ async function resolveCandidateContext(workflow: StoredWorkflow, triggerEventOve
     } satisfies ExecutionContext;
   }
 
+  if (
+    event === "rate_faellig_bald" ||
+    event === "feiertag" ||
+    event === "patientengeburtstag" ||
+    event === "neuer_patient" ||
+    event === "behandlung_abgeschlossen"
+  ) {
+    const contexts = await resolveBatchContexts(workflow);
+    return contexts[0] || null;
+  }
+
   return null;
 }
 
@@ -366,31 +516,161 @@ export async function resolveBatchContexts(workflow: StoredWorkflow): Promise<Ex
     return [{ patient: null, rate: null, triggerEvent: event }];
   }
 
-  if (event !== "rate_ueberfaellig") {
-    return [];
-  }
-
-  const delayDays = firstNumber(data.delayDays, data.days) ?? 0;
-  const limitDate = new Date();
-  limitDate.setDate(limitDate.getDate() - delayDays);
-
   const db = createServerClient();
-  const { data: rates, error } = await db
-    .from("raten")
-    .select("*, patients!inner(*)")
-    .in("status", ["offen", "ueberfaellig", "überfällig"])
-    .lte("faellig_am", limitDate.toISOString().slice(0, 10))
-    .order("faellig_am", { ascending: true });
 
-  if (error) {
-    throw new Error(`Überfällige Raten konnten nicht geladen werden: ${error.message}`);
+  if (event === "rate_ueberfaellig") {
+    const delayDays = firstNumber(data.delayDays, data.days) ?? 0;
+    const limitDate = addDays(startOfToday(), -delayDays);
+
+    const { data: rates, error } = await db
+      .from("raten")
+      .select("*, patients!inner(*)")
+      .in("status", ["offen", "ueberfaellig", "überfällig"])
+      .lte("faellig_am", dateOnly(limitDate))
+      .order("faellig_am", { ascending: true });
+
+    if (error) {
+      throw new Error(`Überfällige Raten konnten nicht geladen werden: ${error.message}`);
+    }
+
+    return (rates || []).map((rate) => ({
+      patient: (rate as Record<string, unknown>).patients as Record<string, unknown>,
+      rate: rate as Record<string, unknown>,
+      triggerEvent: event,
+    }));
   }
 
-  return (rates || []).map((rate) => ({
-    patient: (rate as Record<string, unknown>).patients as Record<string, unknown>,
-    rate: rate as Record<string, unknown>,
-    triggerEvent: event,
-  }));
+  if (event === "rate_faellig_bald") {
+    const days = firstNumber(data.days, data.delayDays) ?? 2;
+    const targetDate = addDays(startOfToday(), days);
+    const { data: rates, error } = await db
+      .from("raten")
+      .select("*, patients!inner(*)")
+      .in("status", ["offen", "teilbezahlt"])
+      .eq("faellig_am", dateOnly(targetDate))
+      .order("faellig_am", { ascending: true });
+
+    if (error) {
+      throw new Error(`Fällige Raten konnten nicht geladen werden: ${error.message}`);
+    }
+
+    return (rates || []).map((rate) => ({
+      patient: (rate as Record<string, unknown>).patients as Record<string, unknown>,
+      rate: rate as Record<string, unknown>,
+      triggerEvent: event,
+    }));
+  }
+
+  if (event === "feiertag") {
+    const daysBefore = firstNumber(data.days_before, data.days) ?? 2;
+    const targetDate = addDays(startOfToday(), daysBefore);
+    const holiday = findSaxonHoliday(targetDate);
+    if (!holiday) return [];
+
+    const { data: patients, error } = await db
+      .from("patients")
+      .select("*")
+      .order("nachname", { ascending: true });
+
+    if (error) {
+      throw new Error(`Patienten konnten für Feiertags-Trigger nicht geladen werden: ${error.message}`);
+    }
+
+    return (patients || []).map((patient) => ({
+      patient: patient as Record<string, unknown>,
+      rate: null,
+      triggerEvent: event,
+      triggerPayload: {
+        holiday_name: holiday.name,
+        holiday_date: dateOnly(holiday.date),
+        region: firstString(data.region) || "sachsen",
+      },
+    }));
+  }
+
+  if (event === "patientengeburtstag") {
+    const daysBefore = firstNumber(data.days_before, data.days) ?? 0;
+    const targetDate = addDays(startOfToday(), daysBefore);
+    const { data: patients, error } = await db
+      .from("patients")
+      .select("*")
+      .not("geburtsdatum", "is", null);
+
+    if (error) {
+      throw new Error(`Geburtstage konnten nicht geladen werden: ${error.message}`);
+    }
+
+    return (patients || [])
+      .filter((patient) => {
+        const birthDate = parseDateOnly((patient as Record<string, unknown>).geburtsdatum);
+        return birthDate ? sameMonthDay(birthDate, targetDate) : false;
+      })
+      .map((patient) => ({
+        patient: patient as Record<string, unknown>,
+        rate: null,
+        triggerEvent: event,
+      }));
+  }
+
+  if (event === "neuer_patient") {
+    const cutoff = await loadNewPatientCutoff();
+    const { data: patients, error } = await db
+      .from("patients")
+      .select("*")
+      .gte("created_at", cutoff.toISOString())
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new Error(`Neue Patienten konnten nicht geladen werden: ${error.message}`);
+    }
+
+    return (patients || []).map((patient) => ({
+      patient: patient as Record<string, unknown>,
+      rate: null,
+      triggerEvent: event,
+    }));
+  }
+
+  if (event === "behandlung_abgeschlossen") {
+    const today = dateOnly(startOfToday());
+    const { data: paidToday, error } = await db
+      .from("raten")
+      .select("*, patients!inner(*)")
+      .eq("status", "bezahlt")
+      .eq("bezahlt_am", today)
+      .order("bezahlt_am", { ascending: true });
+
+    if (error) {
+      throw new Error(`Abgeschlossene Raten konnten nicht geladen werden: ${error.message}`);
+    }
+
+    const contexts: ExecutionContext[] = [];
+    for (const rate of paidToday || []) {
+      const planId = String((rate as Record<string, unknown>).ratenplan_id || "");
+      if (!planId) continue;
+
+      const { count, error: openError } = await db
+        .from("raten")
+        .select("id", { count: "exact", head: true })
+        .eq("ratenplan_id", planId)
+        .in("status", ["offen", "ueberfaellig", "überfällig", "teilbezahlt"]);
+
+      if (openError) {
+        throw new Error(`Ratenplan-Abschluss konnte nicht geprüft werden: ${openError.message}`);
+      }
+
+      if ((count ?? 0) === 0) {
+        contexts.push({
+          patient: (rate as Record<string, unknown>).patients as Record<string, unknown>,
+          rate: rate as Record<string, unknown>,
+          triggerEvent: event,
+        });
+      }
+    }
+    return contexts;
+  }
+
+  return [];
 }
 
 export async function executeStoredWorkflow(
@@ -415,10 +695,10 @@ export async function executeStoredWorkflow(
   }
 
   const triggerEvent = runtimeContext.triggerEvent;
-  const runId = await createWorkflowRun(workflow.id, triggerEvent);
+  const runId = await createWorkflowRun(workflow.id, triggerEvent, runtimeContext);
   const steps: ExecutionStep[] = [];
   const praxisIban = await loadPraxisIban();
-  const replacements = templateContext(runtimeContext.patient, runtimeContext.rate, praxisIban);
+  const replacements = templateContext(runtimeContext.patient, runtimeContext.rate, praxisIban, runtimeContext.triggerPayload);
 
   try {
     let currentNode: WorkflowNode | undefined = triggerNode;
