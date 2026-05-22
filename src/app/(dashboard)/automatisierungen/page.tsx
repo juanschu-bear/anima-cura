@@ -601,6 +601,7 @@ function triggerSummary(node: WorkflowNode | undefined, locale: string): string 
 
 function PortalMenu({ btnRef, onClose, children }: { btnRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void; children: React.ReactNode }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (btnRef.current) {
@@ -611,9 +612,10 @@ function PortalMenu({ btnRef, onClose, children }: { btnRef: React.RefObject<HTM
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+      const target = e.target as Node;
+      if (menuRef.current && menuRef.current.contains(target)) return;
+      if (btnRef.current && btnRef.current.contains(target)) return;
+      onClose();
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -621,9 +623,9 @@ function PortalMenu({ btnRef, onClose, children }: { btnRef: React.RefObject<HTM
 
   return (
     <div
+      ref={menuRef}
       className="wf-menu"
       style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999 }}
-      
     >
       {children}
     </div>
