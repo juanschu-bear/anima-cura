@@ -115,7 +115,7 @@ export default function DashboardLayout({
               ES
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Dr. Elena Schubert</p>
+              <p className={`text-sm font-medium truncate ${theme === "dark" ? "text-white" : "text-praxis-800"}`}>Dr. Maria Schubert</p>
               <p className={`text-xs ${theme === "dark" ? "text-white/60" : "text-praxis-400"}`}>{t("header.practiceOwner", locale)}</p>
             </div>
             <button className={`${theme === "dark" ? "text-white/65 hover:text-white" : "text-praxis-400 hover:text-praxis-600"} transition-colors`}>

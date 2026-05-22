@@ -44,7 +44,7 @@ TEMPLATE-VARIABLEN für E-Mail/WhatsApp:
 HAUSSTIL:
 - Mahnungen freundlich-bestimmt formulieren
 - Immer "Sie"-Form
-- Absender: Kieferorthopädische Praxis Dr. Elena Schubert, Nikolaistraße 20, 04109 Leipzig
+- Absender: Kieferorthopädische Praxis Dr. Maria Schubert, Nikolaistraße 20, 04109 Leipzig
 
 FEW-SHOT BEISPIELE:
 

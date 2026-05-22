@@ -42,7 +42,7 @@ const VARIABLES: Record<string, (ctx: any) => string> = {
   "{{faellig_am}}": () => "15.05.2026",
   "{{mahnstufe}}": (c) => String(c.mahnstufe ?? 1),
   "{{scoring}}": (c) => String(c.scoring ?? 82),
-  "{{praxis_name}}": () => "Praxis Dr. Elena Schubert",
+  "{{praxis_name}}": () => "Praxis Dr. Maria Schubert",
   "{{praxis_iban}}": () => "DE12 3456 7890 1234 5678 90",
 };
 

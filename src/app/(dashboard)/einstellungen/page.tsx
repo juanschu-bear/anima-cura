@@ -83,7 +83,7 @@ function EinstellungenContent() {
   }
 
   const [users, setUsers] = useState<UserEntry[]>([
-    { name: "Dr. Elena Schubert", role: "admin", password: "", permissions: { zahlungen: true, mahnwesen: true, einstellungen: true } },
+    { name: "Dr. Maria Schubert", role: "admin", password: "", permissions: { zahlungen: true, mahnwesen: true, einstellungen: true } },
     { name: "Sabine (Verwaltung)", role: "verwaltung", password: "", permissions: { zahlungen: true, mahnwesen: true, einstellungen: false } },
     { name: "Empfang", role: "lesezugriff", password: "", permissions: { zahlungen: false, mahnwesen: false, einstellungen: false } },
   ]);

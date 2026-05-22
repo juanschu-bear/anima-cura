@@ -169,6 +169,6 @@ export const TEMPLATE_VARIABLES: { key: string; label: string }[] = [
   { key: "{{faellig_am}}", label: "Fälligkeitsdatum" },
   { key: "{{mahnstufe}}", label: "Aktuelle Mahnstufe" },
   { key: "{{scoring}}", label: "Aktueller Scoring-Wert" },
-  { key: "{{praxis_name}}", label: "Praxis Dr. Elena Schubert" },
+  { key: "{{praxis_name}}", label: "Praxis Dr. Maria Schubert" },
   { key: "{{praxis_iban}}", label: "IBAN der Praxis" },
 ];

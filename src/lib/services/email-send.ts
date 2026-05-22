@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { createServerClient } from "@/lib/db/supabase";
 
-const PRACTICE_NAME = "Kieferorthopädische Praxis Dr. Elena Schubert";
+const PRACTICE_NAME = "Kieferorthopädische Praxis Dr. Maria Schubert";
 const DEFAULT_FROM = "praxis@anima-cura.app";
 const DEFAULT_IBAN = "DE XX XXXX XXXX XXXX XXXX XX";
 

@@ -5,7 +5,7 @@ import { sendEmail } from "@/lib/services/email-send";
 
 export const runtime = "nodejs";
 
-const PRACTICE_NAME = "Kieferorthopädische Praxis Dr. Elena Schubert";
+const PRACTICE_NAME = "Kieferorthopädische Praxis Dr. Maria Schubert";
 const DEFAULT_IBAN = "DE XX XXXX XXXX XXXX XXXX XX";
 
 const nodeSchema = z.object({
