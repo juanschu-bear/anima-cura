@@ -216,6 +216,10 @@ async function runCompanion(text: string, context: z.infer<typeof contextSchema>
         description: "Use this when the user wants to create or change a workflow. It should keep the spoken answer concise.",
         input_schema: proposeWorkflowSchemaInput(),
       },
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+      } as never,
     ],
   });
 
