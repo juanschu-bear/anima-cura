@@ -592,7 +592,7 @@ export default function ICuraVoiceCompanion() {
       <style jsx global>{`
         .icura-voice-root {
           position: fixed;
-          right: 88px;
+          right: 140px;
           bottom: 24px;
           z-index: 99999;
           pointer-events: none;
