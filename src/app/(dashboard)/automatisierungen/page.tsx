@@ -31,7 +31,6 @@ import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflow
 import { t } from "@/lib/i18n";
 import { AutomationPortalBackground } from "@/components/workflows/AutomationPortalBackground";
 import { useCountUp } from "@/components/workflows/useCountUp";
-import { useTilt } from "@/components/workflows/useTilt";
 
 const SETTING_KEY = "workflows";
 
@@ -456,7 +455,7 @@ export default function AutomatisierungenPage() {
 }
 
 function PortalKpi({ icon: Icon, label, value, hint, accent, gradient }: { icon: any; label: string; value: number; hint: string; accent: string; gradient: string }) {
-  const ref = useTilt<HTMLDivElement>(6);
+  const ref = useRef<HTMLDivElement>(null);
   const animated = useCountUp(value);
   return (
     <div ref={ref} className="portal-kpi" style={{ ["--kpi-accent" as any]: accent, ["--kpi-gradient" as any]: gradient } as any}>
@@ -486,7 +485,7 @@ const NODE_KIND_ACCENT: Record<string, string> = {
 
 function PortalWorkflowCard({ workflow: w, index, triggerLabel, nodeCount, locale, menuOpen, onClick, onToggleMenu, onCloseMenu, onToggleActive, onDuplicate, onDelete, onOpen }: any) {
   const menuBtnRef = useRef<HTMLButtonElement>(null);
-  const ref = useTilt<HTMLDivElement>(4);
+  const ref = useRef<HTMLDivElement>(null);
   return (
     <div
       ref={ref}
