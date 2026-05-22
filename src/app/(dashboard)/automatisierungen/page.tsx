@@ -623,7 +623,7 @@ function PortalMenu({ btnRef, onClose, children }: { btnRef: React.RefObject<HTM
     <div
       className="wf-menu"
       style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999 }}
-      onMouseLeave={onClose}
+      
     >
       {children}
     </div>
