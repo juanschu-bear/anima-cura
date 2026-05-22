@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { createPortal } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Zap,
