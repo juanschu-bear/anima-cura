@@ -144,8 +144,33 @@ async function executeQuery(action: QueryAction) {
         .maybeSingle();
 
       const workflows = data?.value || [];
-      const active = Array.isArray(workflows) ? workflows.filter((w: any) => w.active).length : 0;
-      return { total: Array.isArray(workflows) ? workflows.length : 0, active };
+      if (!Array.isArray(workflows)) return { total: 0, active: 0, workflows: [] };
+
+      const summary = workflows.map((w: any) => {
+        const triggerNode = w.nodes?.find((n: any) => n.type === "trigger");
+        const actionNodes = w.nodes?.filter((n: any) => n.type?.startsWith("action_")) || [];
+        const conditionNodes = w.nodes?.filter((n: any) => n.type === "condition") || [];
+
+        const triggerType = triggerNode?.data?.event || "unknown";
+        const triggerDays = triggerNode?.data?.days;
+
+        return {
+          name: w.name || "Unnamed workflow",
+          description: w.description || "",
+          active: w.active || false,
+          trigger: triggerType + (triggerDays ? ` (${triggerDays} days)` : ""),
+          node_count: w.nodes?.length || 0,
+          actions: actionNodes.map((a: any) => a.type?.replace("action_", "")),
+          conditions: conditionNodes.map((c: any) => c.data?.field || "unknown"),
+          runs_today: w.runsToday || 0,
+        };
+      });
+
+      return {
+        total: workflows.length,
+        active: workflows.filter((w: any) => w.active).length,
+        workflows: summary,
+      };
     }
 
     default:
