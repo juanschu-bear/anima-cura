@@ -4,6 +4,7 @@ import { getAccounts } from "@/lib/api/finapi-client";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
 const FINAPI_BASE = process.env.FINAPI_BASE_URL || "https://sandbox.finapi.io";
 const WEBFORM_BASE = FINAPI_BASE.includes("sandbox")

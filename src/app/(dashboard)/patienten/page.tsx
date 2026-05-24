@@ -8,6 +8,7 @@ import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { isReadOnlyRole } from "@/lib/auth";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 
@@ -33,7 +34,8 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 
 export default function PatientenPage() {
   const router = useRouter();
-  const { locale } = useAppStore();
+  const { authUser, locale } = useAppStore();
+  const readOnly = isReadOnlyRole(authUser?.role ?? "lesezugriff");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function PatientenPage() {
   });
 
   async function handleCreatePatient() {
+    if (readOnly) return;
     if (!form.vorname || !form.nachname || !form.geburtsdatum || !form.behandlung) {
       setErrorMsg(t("patients.fillRequired", locale));
       return;
@@ -103,6 +106,7 @@ export default function PatientenPage() {
   }
 
   async function handleIvorisSync() {
+    if (readOnly) return;
     setSyncing(true);
     setSyncHint(t("patients.syncMsg", locale));
     try {
@@ -132,13 +136,16 @@ export default function PatientenPage() {
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-praxis-800">{t("patients.title", locale)}</h1>
           <p className="mt-1 text-sm text-praxis-400">{totalCount} {t("patients.total", locale)} · {totalActive} {t("patients.withRatePlans", locale)}</p>
+          {readOnly ? (
+            <p className="mt-2 text-xs text-praxis-500">{t("auth.readOnlyMode", locale)}</p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing}>
+          <button className="btn-secondary gap-2" onClick={handleIvorisSync} disabled={syncing || readOnly}>
             <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
             {syncing ? t("patients.syncing", locale) : t("patients.ivorisSync", locale)}
           </button>
-          <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)}>
+          <button className="btn-primary gap-2" onClick={() => setCreateOpen(true)} disabled={readOnly}>
             <Plus size={16} /> {t("patients.newPatient", locale)}
           </button>
         </div>

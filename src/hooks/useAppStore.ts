@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { AuthenticatedAppUser } from "@/lib/auth";
 import type { Alert, Patient, Rate, Transaktion } from "@/lib/types";
 
 interface AppState {
@@ -20,6 +21,10 @@ interface AppState {
   toggleTheme: () => void;
   locale: "de" | "en";
   setLocale: (locale: "de" | "en") => void;
+  authUser: AuthenticatedAppUser | null;
+  authReady: boolean;
+  setAuthUser: (user: AuthenticatedAppUser | null) => void;
+  setAuthReady: (ready: boolean) => void;
 
   // Search
   searchQuery: string;
@@ -52,6 +57,10 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({ theme: state.theme === "light" ? "dark" : "light" })),
   locale: "de",
   setLocale: (locale) => set({ locale }),
+  authUser: null,
+  authReady: false,
+  setAuthUser: (authUser) => set({ authUser }),
+  setAuthReady: (authReady) => set({ authReady }),
 
   searchQuery: "",
   setSearchQuery: (q) => set({ searchQuery: q }),

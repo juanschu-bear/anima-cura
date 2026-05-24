@@ -24,7 +24,7 @@ interface PraxisStats {
 
 export default function UebersichtPage() {
   const router = useRouter();
-  const { locale, theme } = useAppStore();
+  const { authUser, locale, theme } = useAppStore();
   const isDark = theme === "dark";
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
@@ -128,7 +128,7 @@ export default function UebersichtPage() {
       <div>
         <h1 className={`ac-page-title ${isDark ? "text-white" : ""}`}>{t("overview.title", locale)}</h1>
         <p className={`mt-1 text-sm ${isDark ? "text-[#b6c2d6]" : "text-praxis-400"}`}>
-          {t("overview.welcome", locale)}
+          {t("overview.welcome", locale, { name: authUser?.fullName || "Anima Cura" })}
         </p>
       </div>
 

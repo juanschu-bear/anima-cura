@@ -1,4 +1,7 @@
+import { createBrowserClient as createSupabaseBrowserClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+
+let browserClient: ReturnType<typeof createSupabaseBrowserClient> | null = null;
 
 // Server-side client (mit Service Role Key für Cron-Jobs und API-Routes)
 export function createServerClient() {
@@ -11,8 +14,13 @@ export function createServerClient() {
 
 // Browser-side client (mit Anon Key)
 export function createBrowserClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  if (!browserClient) {
+    browserClient = createSupabaseBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return browserClient;
 }
+
+export const createAdminClient = createServerClient;
