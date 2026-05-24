@@ -9,6 +9,12 @@ export interface AuthenticatedAppUser {
   role: AppRole;
 }
 
+export interface UserProfileRecord {
+  display_name?: string | null;
+  full_name?: string | null;
+  role?: string | null;
+}
+
 export interface DefaultAuthUser {
   email: string;
   password: string;
@@ -67,7 +73,9 @@ export function getUserRole(user: Pick<User, "app_metadata" | "user_metadata"> |
 
 export function getUserFullName(user: Pick<User, "email" | "user_metadata"> | null | undefined): string {
   const fromMetadata =
-    typeof user?.user_metadata?.full_name === "string"
+    typeof user?.user_metadata?.display_name === "string"
+      ? user.user_metadata.display_name
+      : typeof user?.user_metadata?.full_name === "string"
       ? user.user_metadata.full_name
       : typeof user?.user_metadata?.name === "string"
       ? user.user_metadata.name
@@ -85,6 +93,17 @@ export function buildAuthenticatedAppUser(user: User): AuthenticatedAppUser {
     fullName: getUserFullName(user),
     role: getUserRole(user) ?? "lesezugriff",
   };
+}
+
+export function getProfileDisplayName(profile: UserProfileRecord | null | undefined): string | null {
+  const value =
+    typeof profile?.display_name === "string" && profile.display_name.trim()
+      ? profile.display_name
+      : typeof profile?.full_name === "string" && profile.full_name.trim()
+      ? profile.full_name
+      : null;
+
+  return value ? value.trim() : null;
 }
 
 export function canAccessPath(role: AppRole, pathname: string): boolean {

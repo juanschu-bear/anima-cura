@@ -1,6 +1,12 @@
 import { cookies } from "next/headers";
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
-import { buildAuthenticatedAppUser, type AuthenticatedAppUser } from "@/lib/auth";
+import {
+  buildAuthenticatedAppUser,
+  extractAppRole,
+  getProfileDisplayName,
+  type AuthenticatedAppUser,
+  type UserProfileRecord,
+} from "@/lib/auth";
 
 type CookieMutation = {
   name: string;
@@ -39,5 +45,21 @@ export async function getAuthenticatedAppUser(): Promise<AuthenticatedAppUser | 
     data: { user },
   } = await supabase.auth.getUser();
 
-  return user ? buildAuthenticatedAppUser(user) : null;
+  if (!user) return null;
+
+  const authUser = buildAuthenticatedAppUser(user);
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("display_name, full_name, role")
+    .eq("id", user.id)
+    .maybeSingle<UserProfileRecord>();
+
+  const displayName = getProfileDisplayName(profile);
+  const profileRole = extractAppRole(profile?.role);
+
+  return {
+    ...authUser,
+    fullName: displayName ?? authUser.fullName,
+    role: profileRole ?? authUser.role,
+  };
 }

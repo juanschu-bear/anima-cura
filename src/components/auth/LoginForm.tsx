@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Languages, Loader2, LockKeyhole, Moon, Sun } from "lucide-react";
+import { Eye, EyeOff, Languages, Loader2, LockKeyhole, Moon, Sun } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/hooks/useAppStore";
@@ -15,6 +15,7 @@ export default function LoginForm() {
   const { locale, setLocale, setTheme, theme, toggleTheme } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const isGerman = locale === "de";
@@ -192,15 +193,26 @@ export default function LoginForm() {
                 <span className="mb-2 block text-sm font-medium">
                   {t("auth.password", locale)}
                 </span>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  className="input"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={passwordVisible ? "text" : "password"}
+                    autoComplete="current-password"
+                    className="input pr-11"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-praxis-400 transition-colors hover:text-praxis-600"
+                    onClick={() => setPasswordVisible((current) => !current)}
+                    title={passwordVisible ? t("auth.hidePassword", locale) : t("auth.showPassword", locale)}
+                    aria-label={passwordVisible ? t("auth.hidePassword", locale) : t("auth.showPassword", locale)}
+                  >
+                    {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </label>
 
               {error && (

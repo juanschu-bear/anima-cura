@@ -28,7 +28,11 @@ async function main() {
           password: defaultUser.password,
           email_confirm: true,
           app_metadata: { role: defaultUser.role },
-          user_metadata: { full_name: defaultUser.fullName, role: defaultUser.role },
+          user_metadata: {
+            display_name: defaultUser.fullName,
+            full_name: defaultUser.fullName,
+            role: defaultUser.role,
+          },
         }
       );
 
@@ -39,7 +43,11 @@ async function main() {
         password: defaultUser.password,
         email_confirm: true,
         app_metadata: { role: defaultUser.role },
-        user_metadata: { full_name: defaultUser.fullName, role: defaultUser.role },
+        user_metadata: {
+          display_name: defaultUser.fullName,
+          full_name: defaultUser.fullName,
+          role: defaultUser.role,
+        },
       });
 
       if (createError) throw createError;
@@ -62,8 +70,15 @@ async function main() {
     .map((user) => ({
       id: user.id,
       email: user.email ?? "",
+      display_name:
+        (user.user_metadata?.display_name as string | undefined) ??
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        user.email?.split("@")[0] ??
+        "Anima Cura",
       full_name:
         (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.display_name as string | undefined) ??
         (user.user_metadata?.name as string | undefined) ??
         user.email?.split("@")[0] ??
         "Anima Cura",

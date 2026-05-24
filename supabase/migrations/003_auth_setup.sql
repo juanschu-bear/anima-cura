@@ -5,11 +5,15 @@
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
+  display_name TEXT,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'verwaltung', 'lesezugriff')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE user_profiles
+ADD COLUMN IF NOT EXISTS display_name TEXT;
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
@@ -91,6 +95,7 @@ BEGIN
         'role', p_role
       ),
       jsonb_build_object(
+        'display_name', p_full_name,
         'full_name', p_full_name,
         'role', p_role
       ),
@@ -123,6 +128,7 @@ BEGIN
         'role', p_role
       ),
       raw_user_meta_data = jsonb_build_object(
+        'display_name', p_full_name,
         'full_name', p_full_name,
         'role', p_role
       ),
@@ -167,15 +173,17 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.handle_auth_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, email, full_name, role)
+  INSERT INTO public.user_profiles (id, email, display_name, full_name, role)
   VALUES (
     NEW.id,
     COALESCE(NEW.email, ''),
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(COALESCE(NEW.email, ''), '@', 1)),
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(COALESCE(NEW.email, ''), '@', 1)),
     COALESCE(NEW.raw_app_meta_data->>'role', 'lesezugriff')
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
+    display_name = EXCLUDED.display_name,
     full_name = EXCLUDED.full_name,
     role = EXCLUDED.role,
     updated_at = NOW();
@@ -253,10 +261,11 @@ SELECT public.ensure_default_auth_user(
   'Empfang'
 );
 
-INSERT INTO public.user_profiles (id, email, full_name, role)
+INSERT INTO public.user_profiles (id, email, display_name, full_name, role)
 SELECT
   u.id,
   u.email,
+  COALESCE(u.raw_user_meta_data->>'display_name', u.raw_user_meta_data->>'full_name', 'Anima Cura'),
   COALESCE(u.raw_user_meta_data->>'full_name', 'Anima Cura'),
   COALESCE(u.raw_app_meta_data->>'role', 'lesezugriff')
 FROM auth.users u
@@ -268,6 +277,7 @@ WHERE u.email IN (
 ON CONFLICT (id) DO UPDATE
 SET
   email = EXCLUDED.email,
+  display_name = EXCLUDED.display_name,
   full_name = EXCLUDED.full_name,
   role = EXCLUDED.role,
   updated_at = NOW();
