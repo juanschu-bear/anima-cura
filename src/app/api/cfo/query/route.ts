@@ -273,7 +273,8 @@ async function executeQuery(action: QueryAction) {
 
       const { error } = await supabase
         .from("einstellungen")
-        .upsert({ key: "workflows", value: workflows });
+        .update({ value: workflows })
+        .eq("key", "workflows");
 
       if (error) return { error: error.message };
       return { success: true, workflow: wfName, nodes: nodes.length, status: "created but inactive — activate when ready" };
