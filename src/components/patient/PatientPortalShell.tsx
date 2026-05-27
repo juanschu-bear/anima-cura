@@ -21,7 +21,7 @@ interface Msg { id: string; sender_type: string; sender_name: string | null; tex
 interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; created_at: string }
 interface Doc { id: string; name: string; typ: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
-interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string }
+interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
@@ -75,7 +75,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         if (i === 4) setNotifs(j.benachrichtigungen || []);
         if (i === 5) setDocs(j.dokumente || []);
         if (i === 6) setTipps(j.tipps || []);
-        if (i === 7) setPays(j.zahlungen || []);
+        if (i === 7) setPays([...(j.ueberfaellige || []), ...(j.zahlungen || [])]);
       } catch { /* ignore */ }
     }
     setLoading(false);
@@ -383,7 +383,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ flex: 1 }}>
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
-              <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)}</div>
+              <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)} ({Math.floor((Date.now() - new Date(rp.ueberfaellig.faellig_am).getTime()) / 864e5)} {lang === "en" ? "days" : lang === "es" ? "días" : "Tage"})</div>
             </div>
             <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
               <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
@@ -414,18 +414,30 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div>
           <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>{t("progress.history", lang)}</p></div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "2px 18px" }}>
-            {pays.map((p, i) => (
+            {pays.map((p, i) => {
+              const isOverdueRate = p.status === "überfällig";
+              const daysLate = p.bezahlt_am && p.faellig_am ? Math.floor((new Date(p.bezahlt_am).getTime() - new Date(p.faellig_am).getTime()) / 864e5) : 0;
+              const wasLate = daysLate > 3;
+              const daysSinceOverdue = isOverdueRate ? Math.floor((Date.now() - new Date(p.faellig_am).getTime()) / 864e5) : 0;
+              const iconBg = isOverdueRate ? (dk ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)") : wasLate ? (dk ? "rgba(251,191,36,0.12)" : "rgba(251,191,36,0.06)") : (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)");
+              const iconColor = isOverdueRate ? red : wasLate ? warn : grn;
+              const iconSymbol = isOverdueRate ? "!" : wasLate ? "!" : "✓";
+              const amountColor = isOverdueRate ? red : wasLate ? warn : grn;
+              const lateLabel = lang === "en" ? "days late" : lang === "es" ? "días de retraso" : "Tage verspätet";
+              const overdueLabel = lang === "en" ? "days overdue" : lang === "es" ? "días vencidos" : "Tage überfällig";
+              return (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>✓</div>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: iconBg, color: iconColor }}>{iconSymbol}</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{t("progress.monthlyRate", lang)}</div>
-                    <div style={{ fontSize: 11, color: muted }}>{fmtDateL(p.bezahlt_am, lang)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{t("progress.monthlyRate", lang)}{wasLate && !isOverdueRate ? <span style={{ fontSize: 10, fontWeight: 600, color: warn, marginLeft: 6 }}>+{daysLate} {lateLabel}</span> : null}{isOverdueRate ? <span style={{ fontSize: 10, fontWeight: 600, color: red, marginLeft: 6 }}>{daysSinceOverdue} {overdueLabel}</span> : null}</div>
+                    <div style={{ fontSize: 11, color: muted }}>{isOverdueRate ? fmtDateL(p.faellig_am, lang) : fmtDateL(p.bezahlt_am, lang)}</div>
                   </div>
                 </div>
-                <span style={{ ...hd, fontSize: 15, fontWeight: 700, color: grn }}>{p.betrag} €</span>
+                <span style={{ ...hd, fontSize: 15, fontWeight: 700, color: amountColor }}>{p.betrag} €</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
