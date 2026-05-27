@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/db/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export interface AuthenticatedPatient {
@@ -8,10 +9,13 @@ export interface AuthenticatedPatient {
   name: string;
 }
 
-/**
- * Authenticate a patient from the request context.
- * Returns the patient info or null if not a patient.
- */
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
 export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | null> {
   const supabase = createServerClient();
 
@@ -21,9 +25,10 @@ export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | 
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const serviceClient = getServiceClient();
+  const { data: profile } = await serviceClient
     .from("user_profiles")
-    .select("role, patient_id, display_name, full_name")
+    .select("role, patient_id, display_name")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -33,14 +38,10 @@ export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | 
     userId: user.id,
     patientId: profile.patient_id,
     email: user.email ?? "",
-    name: profile.display_name || profile.full_name || "Patient",
+    name: profile.display_name || "Patient",
   };
 }
 
-/**
- * Require patient auth - returns patient or 401 response.
- * Use in API routes: const patient = await requirePatient(); if (patient instanceof NextResponse) return patient;
- */
 export async function requirePatient(): Promise<AuthenticatedPatient | NextResponse> {
   const patient = await getAuthenticatedPatient();
   if (!patient) {
