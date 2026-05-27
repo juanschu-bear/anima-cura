@@ -45,6 +45,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [showIBAN, setShowIBAN] = useState(false);
   const [phaseDrawer, setPhaseDrawer] = useState<Phase | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<string | null>(null);
+  const [phaseAnswers, setPhaseAnswers] = useState<Record<string, string>>({});
+  const [loadingQuestion, setLoadingQuestion] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [rp, setRp] = useState<RpData | null>(null);
@@ -315,7 +317,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {phasen.map(ph => (
           <div key={ph.id} style={{ position: "relative", marginBottom: 20 }}>
             <div style={{ position: "absolute", left: -30, top: 8, width: 14, height: 14, borderRadius: "50%", background: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : (dk ? "#333" : "#e0d8cc"), boxShadow: ph.status === "aktiv" ? "0 0 10px " + purple + "40" : "none" }} />
-            <div onClick={() => { setPhaseDrawer(ph); setExpandedDetail(null); hapticMedium(); }} style={{ ...card, margin: 0, marginBottom: 0, cursor: "pointer" }}>
+            <div onClick={() => { setPhaseDrawer(ph); setExpandedDetail(null); setPhaseAnswers({}); hapticMedium(); }} style={{ ...card, margin: 0, marginBottom: 0, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <span style={{ ...hd, fontSize: 16, fontWeight: 700, color: fg }}>{ph.name}</span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : muted }}>
@@ -723,33 +725,65 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ padding: "0 24px 16px" }}>
                   <p style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>{info.summary}</p>
                 </motion.div>
-                {/* Expandable detail sections */}
-                {info.details.map((d, i) => (
-                  <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.06 }} style={{ margin: "0 24px 8px" }}>
-                    <button
-                      onClick={() => { setExpandedDetail(expandedDetail === d.title ? null : d.title); hapticLight(); }}
-                      style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderRadius: expandedDetail === d.title ? "14px 14px 0 0" : 14, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderBottom: expandedDetail === d.title ? "none" : undefined, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{d.title}</span>
-                      <motion.span animate={{ rotate: expandedDetail === d.title ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ fontSize: 12, color: muted }}>▼</motion.span>
-                    </button>
-                    <AnimatePresence>
-                      {expandedDetail === d.title && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.25 }}
-                          style={{ overflow: "hidden", borderRadius: "0 0 14px 14px", background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderTop: "none" }}
-                        >
-                          <div style={{ padding: "14px 16px" }}>
-                            <p style={{ fontSize: 13, lineHeight: 1.65, color: soft }}>{d.content}</p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                ))}
+                {/* Interactive detail buttons - Claude answers inline */}
+                {info.details.map((d, i) => {
+                  const answerKey = phaseDrawer.name + "::" + d.title;
+                  const answer = phaseAnswers[answerKey];
+                  const isLoading = loadingQuestion === answerKey;
+                  const askClaude = async () => {
+                    if (answer || isLoading) { setExpandedDetail(expandedDetail === d.title ? null : d.title); return; }
+                    setExpandedDetail(d.title);
+                    setLoadingQuestion(answerKey);
+                    hapticMedium();
+                    try {
+                      const res = await fetch("/api/patient/phase-explain", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ phase_name: phaseDrawer.name, question: d.title, lang }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setPhaseAnswers(prev => ({ ...prev, [answerKey]: data.answer }));
+                      }
+                    } catch {}
+                    setLoadingQuestion(null);
+                  };
+                  return (
+                    <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.06 }} style={{ margin: "0 24px 8px" }}>
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={askClaude}
+                        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderRadius: expandedDetail === d.title ? "14px 14px 0 0" : 14, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderBottom: expandedDetail === d.title ? "none" : undefined, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                      >
+                        <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{d.title}</span>
+                        <motion.span animate={{ rotate: expandedDetail === d.title ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ fontSize: 12, color: muted }}>{answer ? "▼" : "→"}</motion.span>
+                      </motion.button>
+                      <AnimatePresence>
+                        {expandedDetail === d.title && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            style={{ overflow: "hidden", borderRadius: "0 0 14px 14px", background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderTop: "none" }}
+                          >
+                            <div style={{ padding: "14px 16px" }}>
+                              {isLoading ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, animation: "pulse 1.4s infinite" }} />
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, animation: "pulse 1.4s infinite 0.2s" }} />
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, animation: "pulse 1.4s infinite 0.4s" }} />
+                                  <span style={{ fontSize: 12, color: muted, marginLeft: 4 }}>iCura denkt nach...</span>
+                                </div>
+                              ) : answer ? (
+                                <p style={{ fontSize: 13, lineHeight: 1.65, color: soft }}>{answer}</p>
+                              ) : null}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
                 {/* Phase tips from DB */}
                 {tipps.length > 0 && phaseDrawer.status === "aktiv" && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ padding: "8px 24px 24px" }}>
