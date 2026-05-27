@@ -1,5 +1,5 @@
+import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export interface AuthenticatedPatient {
@@ -9,15 +9,9 @@ export interface AuthenticatedPatient {
   name: string;
 }
 
-function getServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
 export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | null> {
-  const supabase = createServerClient();
+  // SSR client with cookies - reads the user session
+  const supabase = createServerComponentClient();
 
   const {
     data: { user },
@@ -25,7 +19,8 @@ export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | 
 
   if (!user) return null;
 
-  const serviceClient = getServiceClient();
+  // Service role client - bypasses RLS for profile lookup
+  const serviceClient = createServerClient();
   const { data: profile } = await serviceClient
     .from("user_profiles")
     .select("role, patient_id, display_name")
