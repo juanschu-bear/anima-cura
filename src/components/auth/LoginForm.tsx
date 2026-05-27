@@ -64,6 +64,18 @@ export default function LoginForm() {
       return;
     }
 
+    // Block patient accounts from praxis login
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const role = authUser.app_metadata?.role || authUser.user_metadata?.role;
+      if (role === "patient") {
+        await supabase.auth.signOut();
+        setError("Dieses Konto ist ein Patienten-Zugang. Bitte nutzen Sie das Patientenportal.");
+        setLoading(false);
+        return;
+      }
+    }
+
     window.localStorage.setItem("ac-last-activity", String(Date.now()));
     router.replace(nextPath);
     router.refresh();
