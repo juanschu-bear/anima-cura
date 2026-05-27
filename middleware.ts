@@ -19,6 +19,10 @@ const DASHBOARD_MATCHERS = [
   "/einstellungen",
 ];
 
+const PATIENT_MATCHERS = [
+  "/patient/portal",
+];
+
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
     .getAll()
@@ -30,6 +34,12 @@ function hasSupabaseAuthCookie(request: NextRequest) {
 
 function isDashboardPath(pathname: string) {
   return DASHBOARD_MATCHERS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+}
+
+function isPatientPath(pathname: string) {
+  return PATIENT_MATCHERS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
 }
@@ -71,10 +81,19 @@ export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const isDashboard = isDashboardPath(pathname);
 
+  const isPatient = isPatientPath(pathname);
+
+  // Redirect logged-in praxis users away from praxis login
   if (pathname === "/login" && user) {
     return NextResponse.redirect(new URL("/uebersicht", request.url));
   }
 
+  // Redirect logged-in patient users away from patient login
+  if (pathname === "/patient/login" && user) {
+    return NextResponse.redirect(new URL("/patient/portal", request.url));
+  }
+
+  // Protect dashboard routes
   if (isDashboard && !hasSupabaseAuthCookie(request)) {
     const loginUrl = new URL("/login", request.url);
     const nextPath = `${pathname}${search}`;
@@ -93,9 +112,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Protect patient portal routes
+  if (isPatient && !hasSupabaseAuthCookie(request)) {
+    return NextResponse.redirect(new URL("/patient/login", request.url));
+  }
+
+  if (isPatient && !user) {
+    return NextResponse.redirect(new URL("/patient/login", request.url));
+  }
+
   return response;
 }
 
 export const config = {
   matcher: ["/login", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
+  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };

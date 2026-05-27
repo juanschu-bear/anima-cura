@@ -33,17 +33,17 @@ async function executeQuery(action: QueryAction) {
   switch (action.type) {
 
     case "overview": {
-      const { count: totalPatients } = await supabase.from("patients").select("*", { count: "exact", head: true });
-      const { data: insuranceData } = await supabase.from("patients").select("versicherung_status");
+      const { count: totalPatients } = await getSupabase().from("patients").select("*", { count: "exact", head: true });
+      const { data: insuranceData } = await getSupabase().from("patients").select("versicherung_status");
       const insurance: Record<string, number> = {};
       insuranceData?.forEach((p: any) => {
         const key = p.versicherung_status || "Unbekannt";
         insurance[key] = (insurance[key] || 0) + 1;
       });
-      const { count: withEmail } = await supabase.from("patients").select("*", { count: "exact", head: true }).neq("email", "");
-      const { count: withMobile } = await supabase.from("patients").select("*", { count: "exact", head: true }).neq("mobiltelefon", "");
-      const { count: ratenplaene } = await supabase.from("ratenplaene").select("*", { count: "exact", head: true });
-      const { count: offeneRaten } = await supabase.from("ratenplaene").select("*", { count: "exact", head: true }).eq("status", "offen");
+      const { count: withEmail } = await getSupabase().from("patients").select("*", { count: "exact", head: true }).neq("email", "");
+      const { count: withMobile } = await getSupabase().from("patients").select("*", { count: "exact", head: true }).neq("mobiltelefon", "");
+      const { count: ratenplaene } = await getSupabase().from("ratenplaene").select("*", { count: "exact", head: true });
+      const { count: offeneRaten } = await getSupabase().from("ratenplaene").select("*", { count: "exact", head: true }).eq("status", "offen");
 
       return {
         total_patients: totalPatients || 0,
@@ -300,13 +300,13 @@ async function executeQuery(action: QueryAction) {
       let email = "";
       let fullName = "";
       if (patientId) {
-        const { data } = await supabase.from("patients").select("email, vorname, nachname").eq("id", patientId).maybeSingle();
+        const { data } = await getSupabase().from("patients").select("email, vorname, nachname").eq("id", patientId).maybeSingle();
         email = data?.email || "";
         fullName = `${data?.vorname || ""} ${data?.nachname || ""}`.trim();
       } else if (patientName) {
         const parts = patientName.split(/[,\s]+/).filter(Boolean);
         if (parts.length >= 1) {
-          const { data } = await supabase.from("patients").select("email, vorname, nachname").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
+          const { data } = await getSupabase().from("patients").select("email, vorname, nachname").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
           email = data?.email || "";
           fullName = `${data?.vorname || ""} ${data?.nachname || ""}`.trim();
         }
@@ -338,7 +338,7 @@ async function executeQuery(action: QueryAction) {
       if (!id && patientName) {
         const parts = patientName.split(/[,\s]+/).filter(Boolean);
         if (parts.length >= 1) {
-          const { data } = await supabase.from("patients").select("id").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
+          const { data } = await getSupabase().from("patients").select("id").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
           id = data?.id;
         }
       }
