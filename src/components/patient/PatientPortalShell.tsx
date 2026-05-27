@@ -75,9 +75,19 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     const text = msgInput.trim();
     if (!text) return;
     setMsgInput("");
+    // Optimistically add patient message
+    const tempId = "temp-" + Date.now();
+    setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);
     try {
-      const res = await fetch("/api/patient/nachrichten", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-      if (res.ok) { const d = await res.json(); if (d.nachricht) setMsgs(prev => [...prev, d.nachricht]); }
+      const res = await fetch("/api/patient/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.icura_response) {
+          setMsgs(prev => [...prev, d.icura_response]);
+        } else if (d.fallback) {
+          setMsgs(prev => [...prev, { id: "fb-" + Date.now(), sender_type: "praxis", sender_name: "iCura", text: d.message || "Das Praxis-Team wurde benachrichtigt.", created_at: new Date().toISOString() }]);
+        }
+      }
     } catch { /* ignore */ }
   };
 
