@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
+import { t, langLabels, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -34,6 +35,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("home");
   const [dk, setDk] = useState(true);
+  const [lang, setLang] = useState<Lang>("de");
   const [loading, setLoading] = useState(true);
   const [nOpen, setNOpen] = useState(false);
   const [popup, setPopup] = useState<Badge | null>(null);
@@ -145,7 +147,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: bg, fontFamily: "'DM Sans', sans-serif" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", ...hd, margin: "0 auto 16px" }}>A</div>
-          <p style={{ color: muted, fontSize: 14 }}>Wird geladen...</p>
+          <p style={{ color: muted, fontSize: 14 }}>{t("loading", lang)}</p>
         </div>
         <style>{fontCss}</style>
       </div>
@@ -159,9 +161,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#fff", ...hd }}>A</div>
         <span style={{ ...hd, fontSize: 22, fontWeight: 700, color: fg }}>Anima Cura</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={() => { setDk(!dk); hapticLight(); }} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, background: btnBg, color: soft }}>{dk ? "☀️" : "🌙"}</button>
-        <button onClick={() => { setNOpen(!nOpen); hapticLight(); }} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, position: "relative", background: btnBg }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)") }}>
+          {(["de", "en", "es"] as Lang[]).map(l => (
+            <button key={l} onClick={() => { setLang(l); hapticLight(); }} style={{ padding: "6px 8px", fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", background: lang === l ? grn : "transparent", color: lang === l ? "#fff" : muted }}>{langLabels[l]}</button>
+          ))}
+        </div>
+        <button onClick={() => { setDk(!dk); hapticLight(); }} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, background: btnBg, color: soft }}>{dk ? "☀️" : "🌙"}</button>
+        <button onClick={() => { setNOpen(!nOpen); hapticLight(); }} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, position: "relative", background: btnBg }}>
           🔔
           {unread > 0 && <span style={{ position: "absolute", top: -2, right: -2, width: 18, height: 18, borderRadius: "50%", background: red, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>}
         </button>
@@ -174,7 +181,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     <div style={{ margin: "16px 20px 0", padding: "16px 18px", borderRadius: 16, display: "flex", gap: 14, alignItems: "flex-start", background: dk ? "rgba(80,20,15,0.4)" : "rgba(220,80,70,0.06)", border: "1px solid " + (dk ? "rgba(200,60,50,0.25)" : "rgba(200,60,50,0.12)") }}>
       <div style={{ width: 28, height: 28, borderRadius: "50%", background: dk ? "rgba(200,50,40,0.3)" : "rgba(200,50,40,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: red, flexShrink: 0 }}>!</div>
       <div style={{ fontSize: 14, lineHeight: 1.55, color: dk ? "#d4b0a8" : "#7a4a42" }}>
-        <strong>Hinweis:</strong> Es gibt eine kleine Verzögerung bei Ihrer letzten Rate. Bitte prüfen Sie dies kurz im Fortschritt-Reiter, damit Ihr Verlauf reibungslos weitergeht.
+        <strong>{t("hint.title", lang)}</strong> {t("hint.text", lang)}
       </div>
     </div>
   ) : null;
@@ -199,7 +206,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const Nav = (
     <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, display: "flex", justifyContent: "center", padding: "0 0 12px", pointerEvents: "none" }}>
       <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", gap: 2, padding: "8px 12px", borderRadius: 22, maxWidth: 380, width: "calc(100% - 48px)", pointerEvents: "auto", background: dk ? "rgba(10,10,10,0.75)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), boxShadow: dk ? "0 8px 32px rgba(0,0,0,0.4)" : "0 8px 32px rgba(0,0,0,0.08)" }}>
-        {([["home", "Start", "🏠"], ["journey", "Verlauf", "🕐"], ["progress", "Fortschritt", "€"], ["chat", "Chat", "💬"], ["more", "Mehr", "⋯"]] as [Tab, string, string][]).map(([id, label, icon]) => {
+        {([["home", "nav.start", "🏠"], ["journey", "nav.journey", "🕐"], ["progress", "nav.progress", "€"], ["chat", "nav.chat", "💬"], ["more", "nav.more", "⋯"]] as [Tab, string, string][]).map(([id, labelKey, icon]) => {
           const isActive = tab === id;
           return (
             <motion.button
@@ -217,7 +224,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 />
               )}
               <span style={{ fontSize: id === "progress" ? 18 : 16, fontFamily: id === "progress" ? "'Fraunces', serif" : "inherit", fontWeight: id === "progress" ? 700 : 400 }}>{icon}</span>
-              <span>{label}</span>
+              <span>{t(labelKey, lang)}</span>
             </motion.button>
           );
         })}
@@ -232,14 +239,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {HintBanner}
       {NotifsDD}
       <div style={{ padding: "16px 20px 0" }}>
-        <p style={{ fontSize: 13, color: muted }}>Willkommen zurück</p>
-        <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>Hallo, {firstName}</h1>
+        <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
+        <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
       </div>
       <div style={{ ...card, margin: "16px 20px 14px", background: dk ? "rgba(74,222,128,0.04)" : "rgba(34,197,94,0.03)", border: "1px solid " + (dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)") }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <div>
-            <div style={{ ...lb, color: grn, marginBottom: 4 }}>Aktuelle Phase</div>
-            <div style={{ ...hd, fontSize: 19, fontWeight: 700, color: fg }}>{activePhase ? activePhase.name : "Keine Phase"}</div>
+            <div style={{ ...lb, color: grn, marginBottom: 4 }}>{t("home.currentPhase", lang)}</div>
+            <div style={{ ...hd, fontSize: 19, fontWeight: 700, color: fg }}>{activePhase ? activePhase.name : t("home.noPhase", lang)}</div>
           </div>
           {activePhase && <span style={{ padding: "4px 11px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>Phase {activePhase.reihenfolge}/{phasen.length}</span>}
         </div>
@@ -251,7 +258,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
-          {[["Investiert", pct + "%", grn], ["Nächste Rate", dl > 0 ? dl + "T" : "Heute", fg], ["Raten", (rp ? rp.raten_bezahlt : 0) + "/" + (rp ? rp.raten_gesamt : 0), fg]].map(([l, v, c], i) => (
+          {[[t("home.invested", lang), pct + "%", grn], [t("home.nextRate", lang), dl > 0 ? dl + "T" : t("home.today", lang), fg], [t("home.rates", lang), (rp ? rp.raten_bezahlt : 0) + "/" + (rp ? rp.raten_gesamt : 0), fg]].map(([l, v, c], i) => (
             <div key={i} style={{ flex: 1, borderRadius: 12, padding: "12px 8px", textAlign: "center", background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + border }}>
               <div style={{ ...lb, marginBottom: 3 }}>{l as string}</div>
               <div style={{ ...hd, fontSize: 20, fontWeight: 800, color: c as string }}>{v as string}</div>
@@ -262,7 +269,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {badges.length > 0 && (
         <div style={{ padding: "0 20px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ ...hd, fontSize: 15, fontWeight: 700, color: fg }}>Erfolge</span>
+            <span style={{ ...hd, fontSize: 15, fontWeight: 700, color: fg }}>{t("home.achievements", lang)}</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: muted }}>{badges.filter(b => b.freigeschaltet).length}/{badges.length}</span>
           </div>
           <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
@@ -278,16 +285,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 20px", marginBottom: 14 }}>
         <div onClick={() => { setTab("chat"); hapticMedium(); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)" }}>💬</div>
-          <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>Nachricht</div><div style={{ fontSize: 12, color: muted }}>an die Praxis</div></div>
+          <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>{t("home.message", lang)}</div><div style={{ fontSize: 12, color: muted }}>{t("home.toPractice", lang)}</div></div>
         </div>
         <div onClick={() => { setTab("more"); hapticMedium(); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: dk ? "rgba(167,139,250,0.08)" : "rgba(124,58,237,0.06)" }}>📄</div>
-          <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>Dokumente</div><div style={{ fontSize: 12, color: muted }}>Verträge & Pläne</div></div>
+          <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>{t("home.documents", lang)}</div><div style={{ fontSize: 12, color: muted }}>{t("home.contractsPlans", lang)}</div></div>
         </div>
       </div>
       {tipps.length > 0 && (
         <div style={{ margin: "0 20px 14px", borderRadius: 14, padding: 16, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: warn, marginBottom: 6 }}>💡 Tipp für deine Phase</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: warn, marginBottom: 6 }}>💡 {t("home.phaseTip", lang)}</div>
           <div style={{ fontSize: 13, lineHeight: 1.6, color: soft }}>{tipps[0].text}</div>
         </div>
       )}
@@ -300,8 +307,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {Header}
       {HintBanner}
       <div style={{ padding: "16px 20px 0" }}>
-        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>Verlauf</h1>
-        <p style={{ fontSize: 13, color: muted, marginBottom: 22 }}>Deine Behandlungsreise</p>
+        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("journey.title", lang)}</h1>
+        <p style={{ fontSize: 13, color: muted, marginBottom: 22 }}>{t("journey.subtitle", lang)}</p>
       </div>
       <div style={{ position: "relative", paddingLeft: 36, margin: "0 20px" }}>
         <div style={{ position: "absolute", left: 13, top: 8, bottom: 8, width: 2, borderRadius: 2, background: dk ? "#252525" : "#e0d8cc" }} />
@@ -323,7 +330,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </div>
       {tipps.length > 0 && (
         <div style={{ padding: "12px 20px 0" }}>
-          <p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 12, color: fg }}>Pflegetipps</p>
+          <p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 12, color: fg }}>{t("journey.careTips", lang)}</p>
           {tipps.map(t => (
             <div key={t.id} style={{ borderRadius: 14, padding: 16, marginBottom: 10, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
               <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: fg }}>{t.titel}</p>
@@ -343,8 +350,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {Header}
       {HintBanner}
       <div style={{ padding: "16px 20px 0" }}>
-        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>Dein Fortschritt</h1>
-        <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>Du bist auf einem tollen Weg</p>
+        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("progress.title", lang)}</h1>
+        <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{t("progress.subtitle", lang)}</p>
       </div>
       <div style={{ textAlign: "center", padding: "0 20px 8px" }}>
         <div style={{ position: "relative", width: 200, height: 200, margin: "0 auto" }}>
@@ -355,40 +362,40 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </svg>
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
             <span style={{ ...hd, fontSize: 44, fontWeight: 800, color: fg }}>{pct}%</span>
-            <span style={{ ...lb, color: grn, marginTop: 2 }}>INVESTIERT</span>
+            <span style={{ ...lb, color: grn, marginTop: 2 }}>{t("progress.invested", lang)}</span>
           </div>
         </div>
       </div>
       <div style={{ ...card, margin: "8px 20px 14px", display: "flex", padding: 18 }}>
-        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: grn }}>{fmtEuro(rp ? rp.investiert : 0)}</div><div style={{ ...lb, marginTop: 2 }}>Investiert</div></div>
+        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: grn }}>{fmtEuro(rp ? rp.investiert : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.investedLabel", lang)}</div></div>
         <div style={{ width: 1, background: border }} />
-        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp ? rp.offen_betrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>Offen</div></div>
+        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp ? rp.offen_betrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.open", lang)}</div></div>
         <div style={{ width: 1, background: border }} />
-        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp && rp.plan ? rp.plan.gesamtbetrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>Gesamt</div></div>
+        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp && rp.plan ? rp.plan.gesamtbetrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.total", lang)}</div></div>
       </div>
       {isOverdue && rp && rp.ueberfaellig && (
         <div>
           <div style={{ ...card, margin: "0 20px 14px", display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ ...lb, color: red, marginBottom: 4 }}>RATE ÜBERFÄLLIG</div>
+              <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
-              <div style={{ fontSize: 13, color: muted }}>Seit {fmtShort(rp.ueberfaellig.faellig_am)}</div>
+              <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShort(rp.ueberfaellig.faellig_am)}</div>
             </div>
             <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
               <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
               <div style={{ width: 28, height: 1, background: dk ? "#444" : "#d0c8bc", margin: "4px 0" }} />
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: muted }}>VON {rp.raten_gesamt}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: muted }}>{t("progress.of", lang)} {rp.raten_gesamt}</div>
             </div>
           </div>
           <div style={{ margin: "0 20px 14px" }}>
-            <button onClick={() => { hapticStrong(); setShowIBAN(true); }} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Jetzt ausgleichen</button>
+            <button onClick={() => { hapticStrong(); setShowIBAN(true); }} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("progress.payNow", lang)}</button>
           </div>
         </div>
       )}
       {!isOverdue && rp && rp.naechste_rate && (
         <div style={{ ...card, margin: "0 20px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ ...lb, color: dl <= 5 ? warn : muted, marginBottom: 4 }}>Nächste Rate</div>
+            <div style={{ ...lb, color: dl <= 5 ? warn : muted, marginBottom: 4 }}>{t("progress.nextPayment", lang)}</div>
             <div style={{ ...hd, fontSize: 26, fontWeight: 800, color: fg }}>{rp.naechste_rate.betrag} €</div>
             <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>{fmtDate(rp.naechste_rate.faellig_am)}</div>
           </div>
@@ -401,14 +408,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       )}
       {pays.length > 0 && (
         <div>
-          <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>Historie</p></div>
+          <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>{t("progress.history", lang)}</p></div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "2px 18px" }}>
             {pays.map((p, i) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>✓</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>Monatsrate</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{t("progress.monthlyRate", lang)}</div>
                     <div style={{ fontSize: 11, color: muted }}>{fmtDate(p.bezahlt_am)}</div>
                   </div>
                 </div>
@@ -425,10 +432,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const ChatTab = (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 90px)" }}>
       <div style={{ padding: "18px 20px 14px" }}>
-        <h1 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg }}>Praxis Chat</h1>
+        <h1 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg }}>{t("chat.title", lang)}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: grn, display: "inline-block" }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>Praxis Dr. Schubert</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>{t("chat.practice", lang)}</span>
         </div>
       </div>
       <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
@@ -449,18 +456,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite" }} />
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite 0.2s" }} />
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite 0.4s" }} />
-                <span style={{ fontSize: 12, color: muted, marginLeft: 6 }}>schreibt gerade...</span>
+                <span style={{ fontSize: 12, color: muted, marginLeft: 6 }}>{t("chat.typing", lang)}</span>
               </div>
             </div>
           </div>
         )}
       </div>
       <div style={{ padding: "8px 18px", display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 500, background: dk ? "rgba(100,80,200,0.05)" : "rgba(100,80,200,0.03)", borderTop: "1px solid " + (dk ? "rgba(100,80,200,0.08)" : "rgba(100,80,200,0.06)"), color: purple }}>
-        🤖 iCura beantwortet häufige Fragen sofort.
+        🤖 {t("chat.icuraNote", lang)}
       </div>
       <div style={{ padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, background: dk ? "rgba(0,0,0,0.95)" : "rgba(245,241,235,0.95)" }}>
         <button style={{ width: 42, height: 42, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, border: "none", background: dk ? "#141414" : "#e8e2d8" }}>🎤</button>
-        <input value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendMsg(); }} placeholder="Nachricht schreiben..." style={{ flex: 1, padding: "11px 16px", borderRadius: 24, fontSize: 14, outline: "none", fontFamily: "inherit", background: dk ? "#141414" : "#fff", border: "1px solid " + border, color: fg }} />
+        <input value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendMsg(); }} placeholder={t("chat.placeholder", lang)} style={{ flex: 1, padding: "11px 16px", borderRadius: 24, fontSize: 14, outline: "none", fontFamily: "inherit", background: dk ? "#141414" : "#fff", border: "1px solid " + border, color: fg }} />
         <button onClick={sendMsg} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#fff", background: msgInput.trim() ? "#22c55e" : btnBg, transition: "background 0.2s" }}>↑</button>
       </div>
     </div>
@@ -471,9 +478,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     <div>
       {Header}
       <div style={{ padding: "16px 20px 0" }}>
-        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 16, color: fg }}>Mehr</h1>
+        <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 16, color: fg }}>{t("more.title", lang)}</h1>
       </div>
-      {docs.length > 0 && <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 10, color: fg }}>Dokumente</p></div>}
+      {docs.length > 0 && <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 10, color: fg }}>{t("more.documents", lang)}</p></div>}
       {docs.map(d => (
         <div key={d.id} onClick={() => { setDocDrawer(d); hapticMedium(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -485,16 +492,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       ))}
       <div style={{ borderRadius: 18, padding: 28, margin: "18px 20px", textAlign: "center", background: dk ? "rgba(100,80,200,0.06)" : "rgba(100,80,200,0.04)", border: "1px solid " + (dk ? "rgba(100,80,200,0.12)" : "rgba(100,80,200,0.08)") }}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>🎥</div>
-        <h3 style={{ ...hd, fontSize: 17, fontWeight: 700, marginBottom: 6, color: fg }}>Beratungsgespräch</h3>
-        <p style={{ fontSize: 13, lineHeight: 1.5, color: soft, marginBottom: 18 }}>Fragen zu deinem Ratenplan? Starte ein Videogespräch mit unserem Praxisberater.</p>
-        <button onClick={async () => { hapticMedium(); try { await fetch("/api/patient/nachrichten", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Ich hätte gerne ein Beratungsgespräch zu meinem Ratenplan. Können Sie mir einen Termin vorschlagen?" }) }); } catch {} setTab("chat"); }} style={{ border: "none", borderRadius: 14, padding: "14px 32px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#7c3aed" }}>Gespräch anfragen</button>
+        <h3 style={{ ...hd, fontSize: 17, fontWeight: 700, marginBottom: 6, color: fg }}>{t("more.consult", lang)}</h3>
+        <p style={{ fontSize: 13, lineHeight: 1.5, color: soft, marginBottom: 18 }}>{t("more.consultText", lang)}</p>
+        <button onClick={async () => { hapticMedium(); try { await fetch("/api/patient/nachrichten", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Ich hätte gerne ein Beratungsgespräch zu meinem Ratenplan. Können Sie mir einen Termin vorschlagen?" }) }); } catch {} setTab("chat"); }} style={{ border: "none", borderRadius: 14, padding: "14px 32px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#7c3aed" }}>{t("more.requestConsult", lang)}</button>
       </div>
       <div style={{ ...card, margin: "0 20px 14px" }}>
-        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: fg }}>Über diese App</p>
-        <p style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>Anima Cura Patientenportal — Praxis Dr. Maria Schubert, Leipzig.</p>
+        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: fg }}>{t("more.aboutApp", lang)}</p>
+        <p style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>{t("more.aboutText", lang)}</p>
       </div>
       <div style={{ padding: "0 20px 16px", textAlign: "center" }}>
-        <button onClick={logout} style={{ background: "none", border: "1px solid " + border, borderRadius: 10, padding: "8px 20px", color: muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>Abmelden</button>
+        <button onClick={logout} style={{ background: "none", border: "1px solid " + border, borderRadius: 10, padding: "8px 20px", color: muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>{t("more.logout", lang)}</button>
         <p style={{ fontSize: 12, color: dk ? "#444" : "#ccc" }}>Datenschutz · Impressum · Kontakt</p>
       </div>
     </div>
@@ -542,9 +549,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{popup.titel}</h3>
             <p style={{ fontSize: 14, color: soft, marginBottom: 18 }}>{popup.beschreibung}</p>
             {popup.freigeschaltet
-              ? <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "rgba(74,222,128,0.1)", color: grn }}>Freigeschaltet ✓</span>
-              : <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: muted }}>Noch nicht erreicht</span>}
-            <button onClick={() => setPopup(null)} style={{ display: "block", margin: "18px auto 0", background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", color: soft }}>Schließen</button>
+              ? <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "rgba(74,222,128,0.1)", color: grn }}>{t("badge.unlocked", lang)}</span>
+              : <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: muted }}>{t("badge.locked", lang)}</span>}
+            <button onClick={() => setPopup(null)} style={{ display: "block", margin: "18px auto 0", background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", color: soft }}>{t("doc.close", lang)}</button>
           </div>
         </div>
       )}
@@ -582,7 +589,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15, duration: 0.3 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: grn, marginBottom: 4 }}>{docDrawer.typ.charAt(0).toUpperCase() + docDrawer.typ.slice(1)}</div>
                   <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg }}>{docDrawer.name}</h3>
-                  <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>Hochgeladen am {fmtDate(docDrawer.hochgeladen_am)}</p>
+                  <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>{t("doc.uploadedOn", lang)} {fmtDate(docDrawer.hochgeladen_am)}</p>
                 </motion.div>
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setDocDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
               </div>
@@ -788,12 +795,12 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
               </div>
               <div style={{ padding: "4px 24px 8px" }}>
-                <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg, marginBottom: 4 }}>Offene Rate ausgleichen</h3>
-                <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>Bitte überweise den offenen Betrag an folgende Bankverbindung:</p>
+                <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg, marginBottom: 4 }}>{t("iban.title", lang)}</h3>
+                <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{t("iban.subtitle", lang)}</p>
               </div>
               <div style={{ margin: "0 24px", borderRadius: 16, padding: 20, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)") }}>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Empfänger</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>{t("iban.recipient", lang)}</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>Praxis Dr. Maria Schubert</div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
@@ -805,11 +812,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   <div style={{ fontSize: 15, fontWeight: 700, color: fg, fontFamily: "monospace" }}>COBADEFFXXX</div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Betrag</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>{t("iban.amount", lang)}</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: red, ...hd }}>{rp && rp.ueberfaellig ? rp.ueberfaellig.betrag.toFixed(2).replace(".", ",") : "150,00"} €</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Verwendungszweck</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>{t("iban.reference", lang)}</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>Rate {firstName} {patientName.split(" ").pop()}</div>
                 </div>
               </div>
