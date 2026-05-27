@@ -635,10 +635,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Phase Detail Drawer */}
       <AnimatePresence>
         {phaseDrawer && (() => {
-          const phaseInfo: Record<string, { emoji: string; summary: string; details: { title: string; content: string }[] }> = {
+          const phaseInfo: Record<string, { emoji: string; summary: string; fokus?: string; details: { title: string; content: string }[] }> = {
             "Initialuntersuchung": {
               emoji: "🔍",
               summary: "Der erste Schritt deiner Behandlung. Hier werden alle wichtigen Daten erhoben: digitale Scans, Fotos, Röntgenbilder. Daraus entsteht dein individueller Behandlungsplan.",
+              fokus: "Alle Unterlagen und Befunde für die Behandlungsplanung zusammentragen. Falls du noch offene Fragen hast, ist jetzt der beste Zeitpunkt sie zu stellen.",
               details: [
                 { title: "Was passiert genau?", content: "Bei der Erstuntersuchung werden 3D-Scans deiner Zähne gemacht, dazu Fotos von Gesicht und Zähnen aus verschiedenen Winkeln. Falls nötig wird ein Röntgenbild angefertigt. Anhand dieser Daten plant die Kieferorthopädin den genauen Ablauf deiner Behandlung." },
                 { title: "Wie lange dauert das?", content: "Der Termin dauert etwa 45 bis 60 Minuten. Die Auswertung und Planerstellung braucht dann nochmal ein paar Tage. Beim Folgetermin wird dir der Behandlungsplan vorgestellt." },
@@ -649,6 +650,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             "Aligner Set 1-11": {
               emoji: "🦷",
               summary: "Los geht's! Deine ersten Aligner-Schienen sind da. In dieser Phase gewöhnen sich deine Zähne an die Bewegung und die ersten größeren Korrekturen finden statt.",
+              fokus: "Gewöhne dich an das konsequente Tragen der Schienen. 20-22 Stunden pro Tag sind ideal. Die erste Woche ist die schwierigste, danach wird es Routine.",
               details: [
                 { title: "Was passiert genau?", content: "Du bekommst deine ersten Aligner-Schienen. Jede Schiene trägst du etwa 1-2 Wochen, dann wechselst du zur nächsten. Jede Schiene bewegt deine Zähne ein kleines Stückchen weiter. Die Schienen sind fast unsichtbar und herausnehmbar." },
                 { title: "Wie lange dauert das?", content: "Bei einem Wechsel alle 10-14 Tage dauert diese Phase etwa 3 bis 5 Monate. Regelmäßige Kontrollen finden alle 6-8 Wochen statt." },
@@ -660,6 +662,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             "Aligner Set 12-24": {
               emoji: "✨",
               summary: "Die zweite Hälfte deiner Aligner-Behandlung. Jetzt geht es um Feinjustierung: Rotationen im Oberkiefer, Bisslage optimieren, letzte Korrekturen.",
+              fokus: "Achte in dieser Phase besonders auf die Kaumuskelspannung. Leichte Massagen helfen bei erstem Druckgefühl in den ersten Tagen nach einem Schienenwechsel.",
               details: [
                 { title: "Was passiert genau?", content: "Die Aligner in dieser Phase arbeiten an den feineren Details. Kleine Rotationen werden korrigiert, die Verzahnung von Ober- und Unterkiefer wird optimiert. Eventuell werden Attachments (kleine zahnfarbene Erhebungen) auf einzelne Zähne geklebt um die Bewegung präziser zu steuern." },
                 { title: "Attachments", content: "Falls du Attachments bekommst: Das sind kleine Composit-Knöpfe die auf den Zahn geklebt werden. Sie sind zahnfarben und fallen kaum auf. Sie helfen dem Aligner besser zu greifen. Am Ende der Behandlung werden sie rückstandslos entfernt." },
@@ -670,6 +673,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             "Retainer & Abschluss": {
               emoji: "🛡️",
               summary: "Geschafft! Die aktive Behandlung ist abgeschlossen. Jetzt geht es darum dein Ergebnis langfristig zu stabilisieren.",
+              fokus: "Trage deinen Retainer konsequent. In den ersten Monaten jede Nacht, danach nach Absprache. Deine Zähne wollen sich zurückbewegen, der Retainer verhindert das.",
               details: [
                 { title: "Was passiert genau?", content: "Du bekommst einen festsitzenden Retainer (dünner Draht hinter den Frontzähnen) und eine herausnehmbare Retainer-Schiene. Der feste Retainer bleibt dauerhaft und ist von außen unsichtbar. Die Schiene trägst du nachts." },
                 { title: "Trageschema", content: "Erste 6 Monate: Schiene jede Nacht tragen. Danach nach Empfehlung 3-4 Nächte pro Woche. Der festsitzende Retainer arbeitet rund um die Uhr und braucht keine Aufmerksamkeit außer guter Pflege." },
@@ -723,6 +727,26 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ padding: "0 24px 16px" }}>
                   <p style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>{info.summary}</p>
                 </motion.div>
+                {/* Aktueller Fokus - shown for active phase */}
+                {phaseDrawer.status === "aktiv" && info.fokus && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ margin: "0 24px 16px", padding: "16px", borderRadius: 14, background: dk ? "rgba(74,222,128,0.05)" : "rgba(34,197,94,0.04)", border: "1px solid " + (dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)") }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>🎯</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Current focus" : lang === "es" ? "Enfoque actual" : "Aktueller Fokus"}</span>
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{info.fokus}</p>
+                  </motion.div>
+                )}
+                {/* Pflege-Tipp - shown if tips exist */}
+                {tipps.length > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} style={{ margin: "0 24px 16px", padding: "16px", borderRadius: 14, background: dk ? "rgba(251,191,36,0.04)" : "rgba(234,179,80,0.04)", border: "1px solid " + (dk ? "rgba(251,191,36,0.1)" : "rgba(234,179,80,0.08)") }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>💡</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Care tip" : lang === "es" ? "Consejo de cuidado" : "Pflege-Tipp"}</span>
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{tipps[0].text}</p>
+                  </motion.div>
+                )}
                 {/* Interactive detail buttons - Claude answers inline */}
                 {info.details.map((d, i) => {
                   const answerKey = phaseDrawer.name + "::" + d.title;
@@ -773,7 +797,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                                   <span style={{ fontSize: 12, color: muted, marginLeft: 4 }}>iCura denkt nach...</span>
                                 </div>
                               ) : answer ? (
-                                <p style={{ fontSize: 13, lineHeight: 1.65, color: soft }}>{answer}</p>
+                                <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#fff", flexShrink: 0, marginTop: 2 }}>A</div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: grn, marginBottom: 4 }}>iCura</div>
+                                    <p style={{ fontSize: 13, lineHeight: 1.7, color: soft, margin: 0 }}>{answer}</p>
+                                  </div>
+                                </div>
                               ) : null}
                             </div>
                           </motion.div>
@@ -782,18 +812,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     </motion.div>
                   );
                 })}
-                {/* Phase tips from DB */}
-                {tipps.length > 0 && phaseDrawer.status === "aktiv" && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ padding: "8px 24px 24px" }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: warn, marginBottom: 8 }}>💡 Tipps für diese Phase</p>
-                    {tipps.map(t => (
-                      <div key={t.id} style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 6, background: dk ? "rgba(251,191,36,0.04)" : "rgba(234,179,80,0.04)", border: "1px solid " + (dk ? "rgba(251,191,36,0.08)" : "rgba(234,179,80,0.08)") }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: fg, marginBottom: 2 }}>{t.titel}</p>
-                        <p style={{ fontSize: 12, lineHeight: 1.5, color: soft }}>{t.text}</p>
-                      </div>
-                    ))}
-                  </motion.div>
-                )}
                 <div style={{ height: 20 }} />
               </motion.div>
             </motion.div>
