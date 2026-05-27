@@ -36,6 +36,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [nOpen, setNOpen] = useState(false);
   const [popup, setPopup] = useState<Badge | null>(null);
   const [msgInput, setMsgInput] = useState("");
+  const [typing, setTyping] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [rp, setRp] = useState<RpData | null>(null);
@@ -69,15 +70,15 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab]);
+  useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab, typing]);
 
   const sendMsg = async () => {
     const text = msgInput.trim();
     if (!text) return;
     setMsgInput("");
-    // Optimistically add patient message
     const tempId = "temp-" + Date.now();
     setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);
+    setTyping(true);
     try {
       const res = await fetch("/api/patient/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       if (res.ok) {
@@ -89,6 +90,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         }
       }
     } catch { /* ignore */ }
+    setTyping(false);
   };
 
   const logout = async () => { const sb = createBrowserClient(); await sb.auth.signOut(); router.replace("/patient/login"); router.refresh(); };
@@ -401,6 +403,19 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
         ))}
+        {typing && (
+          <div style={{ display: "flex", marginBottom: 10, justifyContent: "flex-start" }}>
+            <div style={{ padding: "14px 18px", borderRadius: 20, borderBottomLeftRadius: 4, background: cardBg, border: "1px solid " + border }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: grn, marginBottom: 4 }}>iCura</div>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite" }} />
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite 0.2s" }} />
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: grn, opacity: 0.6, animation: "pulse 1.4s infinite 0.4s" }} />
+                <span style={{ fontSize: 12, color: muted, marginLeft: 6 }}>schreibt gerade...</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ padding: "8px 18px", display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 500, background: dk ? "rgba(100,80,200,0.05)" : "rgba(100,80,200,0.03)", borderTop: "1px solid " + (dk ? "rgba(100,80,200,0.08)" : "rgba(100,80,200,0.06)"), color: purple }}>
         🤖 iCura beantwortet häufige Fragen sofort.
@@ -449,7 +464,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ═══ RENDER ═══
   return (
-    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: bg, color: fg, position: "relative" }}>
+    <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
+    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: bg, color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)" }}>
       <div style={{ paddingBottom: 90 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
@@ -471,7 +487,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         </div>
       )}
-      <style>{fontCss}</style>
+      <style>{fontCss}{`@keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }`}</style>
+    </div>
     </div>
   );
 }
