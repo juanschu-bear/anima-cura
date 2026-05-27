@@ -207,7 +207,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ── BOTTOM NAV ──
   const Nav = (
-    <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, display: "flex", justifyContent: "center", padding: "0 0 12px", pointerEvents: "none" }}>
+    <nav className="portal-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, display: "flex", justifyContent: "center", padding: "0 0 12px", pointerEvents: "none" }}>
       <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", gap: 2, padding: "8px 12px", borderRadius: 22, maxWidth: 380, width: "calc(100% - 48px)", pointerEvents: "auto", background: dk ? "rgba(10,10,10,0.75)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), boxShadow: dk ? "0 8px 32px rgba(0,0,0,0.4)" : "0 8px 32px rgba(0,0,0,0.08)" }}>
         {([["home", "nav.start", "🏠"], ["journey", "nav.journey", "🕐"], ["progress", "nav.progress", "€"], ["chat", "nav.chat", "💬"], ["more", "nav.more", "⋯"]] as [Tab, string, string][]).map(([id, labelKey, icon]) => {
           const isActive = tab === id;
@@ -509,8 +509,34 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ═══ RENDER ═══
   return (
-    <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
-    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: dk ? "radial-gradient(ellipse at 30% 20%, #0a1a10 0%, #050505 40%, #030303 100%)" : "radial-gradient(ellipse at 30% 20%, #f0ece4 0%, #e8e2d8 40%, #dfd8cc 100%)", fontFamily: "'DM Sans', sans-serif" }}>
+      {/* Branding on desktop - left side */}
+      <div className="desktop-brand" style={{ position: "fixed", left: 60, top: "50%", transform: "translateY(-50%)", display: "none", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", ...hd }}>A</div>
+          <div>
+            <div style={{ ...hd, fontSize: 24, fontWeight: 800, color: dk ? "#f0f0f0" : "#1a1a1a" }}>Anima Cura</div>
+            <div style={{ fontSize: 12, color: dk ? "#666" : "#999", fontWeight: 500 }}>Patient Portal</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 13, color: dk ? "#444" : "#bbb", maxWidth: 220, lineHeight: 1.6 }}>
+          {lang === "en" ? "Your treatment companion. Track your progress, chat with iCura, manage your payments." : lang === "es" ? "Tu compañero de tratamiento. Sigue tu progreso, chatea con iCura, gestiona tus pagos." : "Dein Behandlungsbegleiter. Verfolge deinen Fortschritt, chatte mit iCura, verwalte deine Raten."}
+        </div>
+        <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#a78bfa" }} />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fbbf24" }} />
+        </div>
+      </div>
+      {/* Phone frame */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 430 }}>
+        {/* Phone bezel - only visible on desktop */}
+        <div className="phone-bezel" style={{ display: "none", position: "absolute", inset: -14, borderRadius: 46, border: dk ? "2px solid rgba(255,255,255,0.08)" : "2px solid rgba(0,0,0,0.06)", pointerEvents: "none", zIndex: 50 }} />
+        {/* Notch - only visible on desktop */}
+        <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: 140, height: 28, borderRadius: "0 0 18px 18px", background: dk ? "#0a0a0a" : "#e0d8cc", zIndex: 51, boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
+        </div>
+    <div className="phone-app-container" style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden", borderRadius: 0 }}>
       {/* Lava lamp animated gradient blobs - vivid, phase-colored */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         <motion.div
@@ -840,7 +866,29 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <style>{fontCss}{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
         @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+        @media (min-width: 768px) {
+          .desktop-brand { display: flex !important; }
+          .phone-bezel { display: block !important; }
+          .phone-notch { display: block !important; }
+        }
+        @media (min-width: 768px) {
+          .phone-app-container {
+            border-radius: 32px !important;
+            max-height: 88vh !important;
+            min-height: auto !important;
+            overflow-y: auto !important;
+          }
+          .phone-app-container::-webkit-scrollbar { width: 0; }
+          .portal-nav {
+            position: sticky !important;
+            bottom: 0 !important;
+            left: auto !important;
+            right: auto !important;
+            border-radius: 0 0 32px 32px !important;
+          }
+        }
       `}</style>
+    </div>
     </div>
     </div>
   );
