@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
-import { t, langLabels, type Lang } from "@/lib/patient-i18n";
+import { t, langLabels, translatePhase, translatePhaseButton, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -249,7 +249,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <div>
             <div style={{ ...lb, color: grn, marginBottom: 4 }}>{t("home.currentPhase", lang)}</div>
-            <div style={{ ...hd, fontSize: 19, fontWeight: 700, color: fg }}>{activePhase ? activePhase.name : t("home.noPhase", lang)}</div>
+            <div style={{ ...hd, fontSize: 19, fontWeight: 700, color: fg }}>{activePhase ? translatePhase(activePhase.name, lang).name : t("home.noPhase", lang)}</div>
           </div>
           {activePhase && <span style={{ padding: "4px 11px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>Phase {activePhase.reihenfolge}/{phasen.length}</span>}
         </div>
@@ -320,13 +320,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ position: "absolute", left: -30, top: 8, width: 14, height: 14, borderRadius: "50%", background: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : (dk ? "#333" : "#e0d8cc"), boxShadow: ph.status === "aktiv" ? "0 0 10px " + purple + "40" : "none" }} />
             <div onClick={() => { setPhaseDrawer(ph); setExpandedDetail(null); setPhaseAnswers({}); hapticMedium(); }} style={{ ...card, margin: 0, marginBottom: 0, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ ...hd, fontSize: 16, fontWeight: 700, color: fg }}>{ph.name}</span>
+                <span style={{ ...hd, fontSize: 16, fontWeight: 700, color: fg }}>{translatePhase(ph.name, lang).name}</span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : muted }}>
-                  {ph.status === "abgeschlossen" ? "✓ Abgeschlossen" : ph.status === "aktiv" ? "● Aktiv" : "Bald"}
+                  {ph.status === "abgeschlossen" ? t("journey.completed", lang) : ph.status === "aktiv" ? t("journey.active", lang) : t("journey.upcoming", lang)}
                 </span>
               </div>
               {ph.start_datum && <p style={{ fontSize: 12, color: muted, marginBottom: 6 }}>{fmtShortL(ph.start_datum, lang)}{ph.end_datum ? " — " + fmtShortL(ph.end_datum, lang) : " — " + t("journey.today", lang)}</p>}
-              {ph.beschreibung && <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{ph.beschreibung}</p>}
+              {ph.beschreibung && <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{translatePhase(ph.name, lang).beschreibung || ph.beschreibung}</p>}
             </div>
           </div>
         ))}
@@ -716,9 +716,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
                     <div style={{ fontSize: 36, marginBottom: 8 }}>{info.emoji}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: phaseDrawer.status === "abgeschlossen" ? grn : phaseDrawer.status === "aktiv" ? purple : muted, marginBottom: 4 }}>
-                      {phaseDrawer.status === "abgeschlossen" ? "Abgeschlossen" : phaseDrawer.status === "aktiv" ? "Aktive Phase" : "Kommende Phase"}
+                      {phaseDrawer.status === "abgeschlossen" ? t("phase.completed", lang) : phaseDrawer.status === "aktiv" ? t("phase.activePhase", lang) : t("phase.upcoming", lang)}
                     </div>
-                    <h3 style={{ ...hd, fontSize: 22, fontWeight: 800, color: fg }}>{phaseDrawer.name}</h3>
+                    <h3 style={{ ...hd, fontSize: 22, fontWeight: 800, color: fg }}>{translatePhase(phaseDrawer.name, lang).name}</h3>
                     {phaseDrawer.start_datum && <p style={{ fontSize: 12, color: muted, marginTop: 4 }}>{fmtDateL(phaseDrawer.start_datum, lang)}{phaseDrawer.end_datum ? " — " + fmtDateL(phaseDrawer.end_datum, lang) : " — " + t("journey.today", lang)}</p>}
                   </motion.div>
                   <motion.button whileTap={{ scale: 0.9 }} onClick={() => setPhaseDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
@@ -776,7 +776,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                         onClick={askClaude}
                         style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderRadius: expandedDetail === d.title ? "14px 14px 0 0" : 14, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderBottom: expandedDetail === d.title ? "none" : undefined, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
                       >
-                        <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{d.title}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{translatePhaseButton(d.title, lang)}</span>
                         <motion.span animate={{ rotate: expandedDetail === d.title ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ fontSize: 12, color: muted }}>{answer ? "▼" : "→"}</motion.span>
                       </motion.button>
                       <AnimatePresence>

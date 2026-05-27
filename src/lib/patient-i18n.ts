@@ -105,3 +105,51 @@ export function t(key: string, lang: Lang): string {
 }
 
 export const langLabels: Record<Lang, string> = { de: "DE", en: "EN", es: "ES" };
+
+// Phase name + description mapping (DB values are German, this translates them)
+const phaseMap: Record<string, Record<Lang, { name: string; beschreibung: string }>> = {
+  "Initialuntersuchung": {
+    de: { name: "Initialuntersuchung", beschreibung: "Abdrücke, Scans und Behandlungsplanung." },
+    en: { name: "Initial examination", beschreibung: "Impressions, scans and treatment planning." },
+    es: { name: "Exploración inicial", beschreibung: "Impresiones, escaneos y planificación del tratamiento." },
+  },
+  "Aligner Set 1-11": {
+    de: { name: "Aligner Set 1-11", beschreibung: "Erste Bewegungsphase, Gewöhnung an die Schienen." },
+    en: { name: "Aligner Set 1-11", beschreibung: "First movement phase, getting used to the aligners." },
+    es: { name: "Alineadores Set 1-11", beschreibung: "Primera fase de movimiento, adaptación a las férulas." },
+  },
+  "Aligner Set 12-24": {
+    de: { name: "Aligner Set 12-24", beschreibung: "Feinjustierung der Rotationen im Oberkiefer." },
+    en: { name: "Aligner Set 12-24", beschreibung: "Fine-tuning rotations in the upper jaw." },
+    es: { name: "Alineadores Set 12-24", beschreibung: "Ajuste fino de las rotaciones en el maxilar superior." },
+  },
+  "Retainer & Abschluss": {
+    de: { name: "Retainer & Abschluss", beschreibung: "Stabilisierung des Ergebnisses." },
+    en: { name: "Retainer & completion", beschreibung: "Stabilizing the results." },
+    es: { name: "Retenedor y finalización", beschreibung: "Estabilización del resultado." },
+  },
+};
+
+export function translatePhase(deName: string, lang: Lang): { name: string; beschreibung: string } {
+  return phaseMap[deName]?.[lang] ?? { name: deName, beschreibung: "" };
+}
+
+// Phase detail button labels
+const phaseButtonMap: Record<string, Record<Lang, string>> = {
+  "Was passiert genau?": { de: "Was passiert genau?", en: "What exactly happens?", es: "¿Qué sucede exactamente?" },
+  "Wie lange dauert das?": { de: "Wie lange dauert das?", en: "How long does it take?", es: "¿Cuánto tiempo tarda?" },
+  "Was du beachten solltest": { de: "Was du beachten solltest", en: "What you should know", es: "Lo que debes tener en cuenta" },
+  "Ergebnis": { de: "Ergebnis", en: "Result", es: "Resultado" },
+  "Tragezeit": { de: "Tragezeit", en: "Wearing time", es: "Tiempo de uso" },
+  "Tipps für den Alltag": { de: "Tipps für den Alltag", en: "Everyday tips", es: "Consejos para el día a día" },
+  "Fortschritte": { de: "Fortschritte", en: "Progress", es: "Avances" },
+  "Attachments": { de: "Attachments", en: "Attachments", es: "Attachments" },
+  "Aktueller Fokus": { de: "Aktueller Fokus", en: "Current focus", es: "Enfoque actual" },
+  "Trageschema": { de: "Trageschema", en: "Wearing schedule", es: "Esquema de uso" },
+  "Pflege": { de: "Pflege", en: "Care", es: "Cuidado" },
+  "Dein Ergebnis": { de: "Dein Ergebnis", en: "Your result", es: "Tu resultado" },
+};
+
+export function translatePhaseButton(deTitle: string, lang: Lang): string {
+  return phaseButtonMap[deTitle]?.[lang] ?? deTitle;
+}
