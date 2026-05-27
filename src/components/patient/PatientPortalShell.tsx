@@ -24,9 +24,10 @@ interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
-const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
-const fmtShort = (d: string) => { try { return new Date(d).toLocaleDateString("de-DE", { day: "numeric", month: "short" }); } catch { return d; } };
-const fmtTime = (d: string) => { try { return new Date(d).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); } catch { return d; } };
+const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
+const fmtDateL = (d: string, l: string) => { try { return new Date(d).toLocaleDateString(getLocale(l), { day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
+const fmtShortL = (d: string, l: string) => { try { return new Date(d).toLocaleDateString(getLocale(l), { day: "numeric", month: "short" }); } catch { return d; } };
+const fmtTimeL = (d: string, l: string) => { try { return new Date(d).toLocaleTimeString(getLocale(l), { hour: "2-digit", minute: "2-digit" }); } catch { return d; } };
 const fmtEuro = (n: number) => n.toLocaleString("de-DE") + " €";
 const daysTill = (d: string) => Math.max(0, Math.ceil((new Date(d).getTime() - Date.now()) / 864e5));
 const docIc: Record<string, string> = { kostenplan: "📋", vertrag: "📝", ratenzahlung: "📝", datenschutz: "🔒", sonstiges: "📄" };
@@ -197,7 +198,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: fg }}>{n.titel}</div>
             <div style={{ fontSize: 12, color: soft, lineHeight: 1.5 }}>{n.text}</div>
-            <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{fmtDate(n.created_at)}</div>
+            <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{fmtDateL(n.created_at, lang)}</div>
           </div>
         </div>
       ))}
@@ -324,7 +325,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   {ph.status === "abgeschlossen" ? "✓ Abgeschlossen" : ph.status === "aktiv" ? "● Aktiv" : "Bald"}
                 </span>
               </div>
-              {ph.start_datum && <p style={{ fontSize: 12, color: muted, marginBottom: 6 }}>{fmtShort(ph.start_datum)}{ph.end_datum ? " — " + fmtShort(ph.end_datum) : " — heute"}</p>}
+              {ph.start_datum && <p style={{ fontSize: 12, color: muted, marginBottom: 6 }}>{fmtShortL(ph.start_datum, lang)}{ph.end_datum ? " — " + fmtShortL(ph.end_datum, lang) : " — " + t("journey.today", lang)}</p>}
               {ph.beschreibung && <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{ph.beschreibung}</p>}
             </div>
           </div>
@@ -381,7 +382,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ flex: 1 }}>
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
-              <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShort(rp.ueberfaellig.faellig_am)}</div>
+              <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)}</div>
             </div>
             <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
               <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
@@ -399,7 +400,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div>
             <div style={{ ...lb, color: dl <= 5 ? warn : muted, marginBottom: 4 }}>{t("progress.nextPayment", lang)}</div>
             <div style={{ ...hd, fontSize: 26, fontWeight: 800, color: fg }}>{rp.naechste_rate.betrag} €</div>
-            <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>{fmtDate(rp.naechste_rate.faellig_am)}</div>
+            <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>{fmtDateL(rp.naechste_rate.faellig_am, lang)}</div>
           </div>
           <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
             <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
@@ -418,7 +419,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>✓</div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{t("progress.monthlyRate", lang)}</div>
-                    <div style={{ fontSize: 11, color: muted }}>{fmtDate(p.bezahlt_am)}</div>
+                    <div style={{ fontSize: 11, color: muted }}>{fmtDateL(p.bezahlt_am, lang)}</div>
                   </div>
                 </div>
                 <span style={{ ...hd, fontSize: 15, fontWeight: 700, color: grn }}>{p.betrag} €</span>
@@ -446,7 +447,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ maxWidth: "78%", padding: "12px 16px", fontSize: 14, lineHeight: 1.5, borderRadius: 20, ...(m.sender_type === "patient" ? { background: "#22c55e", color: "#fff", borderBottomRightRadius: 4 } : { background: cardBg, color: fg, border: "1px solid " + border, borderBottomLeftRadius: 4 }) }}>
               {m.sender_name && m.sender_type === "praxis" && <div style={{ fontSize: 11, fontWeight: 700, color: grn, marginBottom: 3 }}>{m.sender_name}</div>}
               {m.text}
-              <div style={{ fontSize: 10, marginTop: 3, textAlign: "right" as const, color: m.sender_type === "patient" ? "rgba(255,255,255,0.5)" : muted }}>{fmtTime(m.created_at)}</div>
+              <div style={{ fontSize: 10, marginTop: 3, textAlign: "right" as const, color: m.sender_type === "patient" ? "rgba(255,255,255,0.5)" : muted }}>{fmtTimeL(m.created_at, lang)}</div>
             </div>
           </div>
         ))}
@@ -463,9 +464,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
         )}
-      </div>
-      <div style={{ padding: "8px 18px", display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 500, background: dk ? "rgba(100,80,200,0.05)" : "rgba(100,80,200,0.03)", borderTop: "1px solid " + (dk ? "rgba(100,80,200,0.08)" : "rgba(100,80,200,0.06)"), color: purple }}>
-        🤖 {t("chat.icuraNote", lang)}
       </div>
       <div style={{ padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, background: dk ? "rgba(0,0,0,0.95)" : "rgba(245,241,235,0.95)" }}>
         <button style={{ width: 42, height: 42, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, border: "none", background: dk ? "#141414" : "#e8e2d8" }}>🎤</button>
@@ -487,7 +485,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div key={d.id} onClick={() => { setDocDrawer(d); hapticMedium(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 20 }}>{docIc[d.typ] || "📄"}</span>
-            <div><div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{d.name}</div><div style={{ fontSize: 11, color: muted }}>{fmtDate(d.hochgeladen_am)}</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{d.name}</div><div style={{ fontSize: 11, color: muted }}>{fmtDateL(d.hochgeladen_am, lang)}</div></div>
           </div>
           <span style={{ fontSize: 16, color: muted }}>↗</span>
         </div>
@@ -591,7 +589,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15, duration: 0.3 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: grn, marginBottom: 4 }}>{docDrawer.typ.charAt(0).toUpperCase() + docDrawer.typ.slice(1)}</div>
                   <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg }}>{docDrawer.name}</h3>
-                  <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>{t("doc.uploadedOn", lang)} {fmtDate(docDrawer.hochgeladen_am)}</p>
+                  <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>{t("doc.uploadedOn", lang)} {fmtDateL(docDrawer.hochgeladen_am, lang)}</p>
                 </motion.div>
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setDocDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
               </div>
@@ -717,7 +715,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                       {phaseDrawer.status === "abgeschlossen" ? "Abgeschlossen" : phaseDrawer.status === "aktiv" ? "Aktive Phase" : "Kommende Phase"}
                     </div>
                     <h3 style={{ ...hd, fontSize: 22, fontWeight: 800, color: fg }}>{phaseDrawer.name}</h3>
-                    {phaseDrawer.start_datum && <p style={{ fontSize: 12, color: muted, marginTop: 4 }}>{fmtDate(phaseDrawer.start_datum)}{phaseDrawer.end_datum ? " — " + fmtDate(phaseDrawer.end_datum) : " — heute"}</p>}
+                    {phaseDrawer.start_datum && <p style={{ fontSize: 12, color: muted, marginTop: 4 }}>{fmtDateL(phaseDrawer.start_datum, lang)}{phaseDrawer.end_datum ? " — " + fmtDateL(phaseDrawer.end_datum, lang) : " — " + t("journey.today", lang)}</p>}
                   </motion.div>
                   <motion.button whileTap={{ scale: 0.9 }} onClick={() => setPhaseDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
                 </div>
