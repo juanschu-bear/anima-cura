@@ -194,13 +194,31 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ── BOTTOM NAV ──
   const Nav = (
-    <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, display: "flex", justifyContent: "space-around", padding: "8px 0 24px", zIndex: 100, background: dk ? "rgba(0,0,0,0.95)" : "rgba(245,241,235,0.95)", borderTop: "1px solid " + border, backdropFilter: "blur(20px)" }}>
-      {([["home", "Start", "🏠"], ["journey", "Verlauf", "🕐"], ["progress", "Fortschritt", "€"], ["chat", "Chat", "💬"], ["more", "Mehr", "⋯"]] as [Tab, string, string][]).map(([id, label, icon]) => (
-        <button key={id} onClick={() => { setTab(id); hapticLight(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", color: tab === id ? grn : navInactive, fontSize: 10, fontWeight: 600, fontFamily: "inherit" }}>
-          <span style={{ fontSize: id === "progress" ? 18 : 16, fontFamily: id === "progress" ? "'Fraunces', serif" : "inherit", fontWeight: id === "progress" ? 700 : 400 }}>{icon}</span>
-          <span>{label}</span>
-        </button>
-      ))}
+    <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, display: "flex", justifyContent: "center", padding: "0 0 12px", pointerEvents: "none" }}>
+      <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", gap: 2, padding: "8px 12px", borderRadius: 22, maxWidth: 380, width: "calc(100% - 48px)", pointerEvents: "auto", background: dk ? "rgba(10,10,10,0.75)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), boxShadow: dk ? "0 8px 32px rgba(0,0,0,0.4)" : "0 8px 32px rgba(0,0,0,0.08)" }}>
+        {([["home", "Start", "🏠"], ["journey", "Verlauf", "🕐"], ["progress", "Fortschritt", "€"], ["chat", "Chat", "💬"], ["more", "Mehr", "⋯"]] as [Tab, string, string][]).map(([id, label, icon]) => {
+          const isActive = tab === id;
+          return (
+            <motion.button
+              key={id}
+              onClick={() => { setTab(id); hapticLight(); }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.9 }}
+              style={{ position: "relative", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 16px", fontSize: 10, fontWeight: 600, fontFamily: "inherit", color: isActive ? grn : navInactive, transition: "color 0.3s", zIndex: 2 }}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="navBlob"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  style={{ position: "absolute", inset: 2, borderRadius: 16, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.08)", zIndex: -1 }}
+                />
+              )}
+              <span style={{ fontSize: id === "progress" ? 18 : 16, fontFamily: id === "progress" ? "'Fraunces', serif" : "inherit", fontWeight: id === "progress" ? 700 : 400 }}>{icon}</span>
+              <span>{label}</span>
+            </motion.button>
+          );
+        })}
+      </div>
     </nav>
   );
 
