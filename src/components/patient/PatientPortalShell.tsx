@@ -115,8 +115,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // Theme colors - improved contrast
   const bg = dk ? "#000" : "#f5f1eb";
   const fg = dk ? "#f0f0f0" : "#1a1a1a";
-  const cardBg = dk ? "#141414" : "#fff";
-  const border = dk ? "#252525" : "#e0d8cc";
+  const cardBg = dk ? "rgba(20,20,20,0.7)" : "rgba(255,255,255,0.8)";
+  const border = dk ? "rgba(255,255,255,0.06)" : "#e0d8cc";
   const muted = dk ? "#777" : "#888";
   const soft = dk ? "#999" : "#555";
   const grn = dk ? "#4ade80" : "#22c55e";
@@ -128,7 +128,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   const hd: React.CSSProperties = { fontFamily: "'Fraunces', serif" };
   const lb: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: muted };
-  const card: React.CSSProperties = { borderRadius: 18, padding: 22, marginBottom: 14, background: cardBg, border: "1px solid " + border };
+  const card: React.CSSProperties = { borderRadius: 18, padding: 22, marginBottom: 14, background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" };
 
   if (loading) {
     return (
@@ -475,12 +475,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ RENDER ═══
   return (
     <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
-    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: bg, color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-      {/* Animated gradient blobs - shift color based on treatment phase */}
+    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+      {/* Bold animated gradient blobs - Gemini style, phase-colored */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", top: -80, right: -60, background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.07 : 0.05}) 0%, transparent 70%)`, animation: "blobDrift1 20s ease-in-out infinite", filter: "blur(40px)" }} />
-        <div style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", bottom: "20%", left: -50, background: `radial-gradient(circle, rgba(${blobC.b},${dk ? 0.06 : 0.04}) 0%, transparent 70%)`, animation: "blobDrift2 25s ease-in-out infinite", filter: "blur(40px)" }} />
-        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", top: "45%", right: "5%", background: `radial-gradient(circle, rgba(${blobC.c},${dk ? 0.05 : 0.03}) 0%, transparent 70%)`, animation: "blobDrift3 18s ease-in-out infinite", filter: "blur(40px)" }} />
+        {/* Large primary blob - top area */}
+        <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", top: -150, left: -100, background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.2 : 0.08}) 0%, rgba(${blobC.a},${dk ? 0.08 : 0.03}) 40%, transparent 70%)`, animation: "blobDrift1 20s ease-in-out infinite", filter: "blur(30px)" }} />
+        {/* Secondary blob - mid-left */}
+        <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", top: "30%", right: -120, background: `radial-gradient(circle, rgba(${blobC.b},${dk ? 0.15 : 0.06}) 0%, rgba(${blobC.b},${dk ? 0.06 : 0.02}) 40%, transparent 70%)`, animation: "blobDrift2 25s ease-in-out infinite", filter: "blur(30px)" }} />
+        {/* Third blob - bottom */}
+        <div style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", bottom: -100, left: -80, background: `radial-gradient(circle, rgba(${blobC.c},${dk ? 0.18 : 0.07}) 0%, rgba(${blobC.c},${dk ? 0.07 : 0.03}) 40%, transparent 70%)`, animation: "blobDrift3 18s ease-in-out infinite", filter: "blur(30px)" }} />
+        {/* Accent blob - small, bright, moves more */}
+        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", top: "55%", left: "20%", background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.12 : 0.05}) 0%, transparent 60%)`, animation: "blobDrift4 15s ease-in-out infinite", filter: "blur(20px)" }} />
       </div>
       <div style={{ position: "relative", zIndex: 1, paddingBottom: 90 }}>
         {tab === "home" && HomeTab}
@@ -505,9 +510,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       )}
       <style>{fontCss}{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
-        @keyframes blobDrift1 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(-20px, 30px) scale(1.05); } 66% { transform: translate(15px, -15px) scale(0.95); } }
-        @keyframes blobDrift2 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(25px, -20px) scale(1.08); } 66% { transform: translate(-15px, 25px) scale(0.92); } }
-        @keyframes blobDrift3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-18px, 20px) scale(1.1); } }
+        @keyframes blobDrift1 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(30px, 40px) scale(1.1); } 50% { transform: translate(-20px, 60px) scale(0.95); } 75% { transform: translate(15px, 20px) scale(1.05); } 100% { transform: translate(0, 0) scale(1); } }
+        @keyframes blobDrift2 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(-35px, -25px) scale(1.08); } 50% { transform: translate(20px, -40px) scale(0.92); } 75% { transform: translate(-10px, 15px) scale(1.04); } 100% { transform: translate(0, 0) scale(1); } }
+        @keyframes blobDrift3 { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(25px, -30px) scale(1.12); } 66% { transform: translate(-30px, 20px) scale(0.9); } 100% { transform: translate(0, 0) scale(1); } }
+        @keyframes blobDrift4 { 0% { transform: translate(0, 0) scale(1); opacity: 0.8; } 25% { transform: translate(40px, -20px) scale(1.15); opacity: 1; } 50% { transform: translate(-15px, 35px) scale(0.85); opacity: 0.6; } 75% { transform: translate(25px, 10px) scale(1.1); opacity: 0.9; } 100% { transform: translate(0, 0) scale(1); opacity: 0.8; } }
       `}</style>
     </div>
     </div>
