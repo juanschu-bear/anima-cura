@@ -7,6 +7,7 @@ import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import PatientPortalAdmin from "@/components/patient/PatientPortalAdmin";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -236,6 +237,11 @@ export default function PatientDetailPage() {
           </table>
         </div>
       </div>
+
+      <PatientPortalAdmin
+        patientId={patient.id}
+        patientName={`${patient.vorname} ${patient.nachname}`}
+      />
     </div>
   );
 }
