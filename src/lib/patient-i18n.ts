@@ -153,3 +153,46 @@ const phaseButtonMap: Record<string, Record<Lang, string>> = {
 export function translatePhaseButton(deTitle: string, lang: Lang): string {
   return phaseButtonMap[deTitle]?.[lang] ?? deTitle;
 }
+
+// Badge translations
+const badgeMap: Record<string, Record<Lang, { titel: string; beschreibung: string }>> = {
+  "3 Monate pünktlich": {
+    de: { titel: "3 Monate pünktlich", beschreibung: "Drei Raten ohne Verzögerung" },
+    en: { titel: "3 months on time", beschreibung: "Three payments without delay" },
+    es: { titel: "3 meses puntual", beschreibung: "Tres cuotas sin retraso" },
+  },
+  "6 Monate pünktlich": {
+    de: { titel: "6 Monate pünktlich", beschreibung: "Sechs Raten ohne Verzögerung" },
+    en: { titel: "6 months on time", beschreibung: "Six payments without delay" },
+    es: { titel: "6 meses puntual", beschreibung: "Seis cuotas sin retraso" },
+  },
+  "12 Monate pünktlich": {
+    de: { titel: "12 Monate pünktlich", beschreibung: "Zwölf Raten ohne Verzögerung" },
+    en: { titel: "12 months on time", beschreibung: "Twelve payments without delay" },
+    es: { titel: "12 meses puntual", beschreibung: "Doce cuotas sin retraso" },
+  },
+  "Halbzeit!": {
+    de: { titel: "Halbzeit!", beschreibung: "Mehr als 50% investiert" },
+    en: { titel: "Halfway!", beschreibung: "More than 50% invested" },
+    es: { titel: "¡Mitad de camino!", beschreibung: "Más del 50% invertido" },
+  },
+  "Phase 1 geschafft": {
+    de: { titel: "Phase 1 geschafft", beschreibung: "Erste Behandlungsphase abgeschlossen" },
+    en: { titel: "Phase 1 complete", beschreibung: "First treatment phase completed" },
+    es: { titel: "Fase 1 completada", beschreibung: "Primera fase de tratamiento completada" },
+  },
+  "Zielgerade": {
+    de: { titel: "Zielgerade", beschreibung: "75% investiert" },
+    en: { titel: "Home stretch", beschreibung: "75% invested" },
+    es: { titel: "Recta final", beschreibung: "75% invertido" },
+  },
+  "Geschafft!": {
+    de: { titel: "Geschafft!", beschreibung: "Behandlung komplett" },
+    en: { titel: "Done!", beschreibung: "Treatment complete" },
+    es: { titel: "¡Logrado!", beschreibung: "Tratamiento completo" },
+  },
+};
+
+export function translateBadge(deTitel: string, lang: Lang): { titel: string; beschreibung: string } {
+  return badgeMap[deTitel]?.[lang] ?? { titel: deTitel, beschreibung: "" };
+}

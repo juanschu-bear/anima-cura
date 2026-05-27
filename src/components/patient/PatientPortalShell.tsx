@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
-import { t, langLabels, translatePhase, translatePhaseButton, type Lang } from "@/lib/patient-i18n";
+import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -279,7 +279,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             {badges.map(b => (
               <div key={b.id} onClick={() => { setPopup(b); hapticLight(); }} style={{ minWidth: 76, padding: "14px 8px", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", background: cardBg, border: "1px solid " + border, opacity: b.freigeschaltet ? 1 : 0.3 }}>
                 <span style={{ fontSize: 28 }}>{b.icon}</span>
-                <span style={{ fontSize: 9, fontWeight: 600, textAlign: "center", lineHeight: 1.2, color: soft }}>{b.titel}</span>
+                <span style={{ fontSize: 9, fontWeight: 600, textAlign: "center", lineHeight: 1.2, color: soft }}>{translateBadge(b.titel, lang).titel}</span>
               </div>
             ))}
           </div>
@@ -546,8 +546,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div onClick={() => setPopup(null)} style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
           <div onClick={e => e.stopPropagation()} style={{ borderRadius: 24, padding: "36px 28px", textAlign: "center", maxWidth: 300, width: "100%", background: cardBg, border: "1px solid " + border }}>
             <span style={{ fontSize: 56, display: "block", marginBottom: 16 }}>{popup.icon}</span>
-            <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{popup.titel}</h3>
-            <p style={{ fontSize: 14, color: soft, marginBottom: 18 }}>{popup.beschreibung}</p>
+            <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{translateBadge(popup.titel, lang).titel}</h3>
+            <p style={{ fontSize: 14, color: soft, marginBottom: 18 }}>{translateBadge(popup.titel, lang).beschreibung || popup.beschreibung}</p>
             {popup.freigeschaltet
               ? <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "rgba(74,222,128,0.1)", color: grn }}>{t("badge.unlocked", lang)}</span>
               : <span style={{ display: "inline-block", padding: "5px 16px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: muted }}>{t("badge.locked", lang)}</span>}
