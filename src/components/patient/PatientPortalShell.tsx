@@ -104,15 +104,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const dl = rp && rp.naechste_rate ? daysTill(rp.naechste_rate.faellig_am) : 99;
   const pct = rp ? rp.prozent : 0;
 
-  // Phase-based blob colors
-  const phaseColors: Record<string, { a: string; b: string; c: string }> = {
-    "Nivellierung":    { a: "74,222,128", b: "56,189,248", c: "52,211,153" },   // green-cyan
-    "Lückenschluss":   { a: "167,139,250", b: "74,222,128", c: "96,165,250" },  // purple-green
-    "Feineinstellung": { a: "251,191,36", b: "167,139,250", c: "244,114,182" }, // gold-purple-pink
-    "Retainer":        { a: "56,189,248", b: "129,140,248", c: "74,222,128" },  // blue-indigo-green
+  // Phase-based blob colors - hex values for Framer Motion color transitions
+  const getPhaseColors = () => {
+    const name = activePhase?.name || "";
+    switch (name) {
+      case "Nivellierung":    return { c1: "#4ade80", c2: "#38bdf8", c3: "#34d399" };
+      case "Lückenschluss":   return { c1: "#a78bfa", c2: "#4ade80", c3: "#60a5fa" };
+      case "Feineinstellung": return { c1: "#fbbf24", c2: "#a78bfa", c3: "#f472b6" };
+      case "Retainer":        return { c1: "#38bdf8", c2: "#818cf8", c3: "#4ade80" };
+      default:                return { c1: "#4ade80", c2: "#60a5fa", c3: "#a78bfa" };
+    }
   };
-  const phaseName = activePhase?.name || "";
-  const blobC = phaseColors[phaseName] || { a: "74,222,128", b: "96,165,250", c: "167,139,250" };
+  const { c1, c2, c3 } = getPhaseColors();
 
   // Theme colors - improved contrast
   const bg = dk ? "#000" : "#f5f1eb";
@@ -478,16 +481,23 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   return (
     <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
     <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-      {/* Bold animated gradient blobs - Gemini style, phase-colored */}
+      {/* Framer Motion animated gradient blobs - phase-colored, Gemini style */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        {/* Large primary blob - top area */}
-        <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", top: -150, left: -100, background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.2 : 0.08}) 0%, rgba(${blobC.a},${dk ? 0.08 : 0.03}) 40%, transparent 70%)`, animation: "blobDrift1 20s ease-in-out infinite", filter: "blur(30px)" }} />
-        {/* Secondary blob - mid-left */}
-        <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", top: "30%", right: -120, background: `radial-gradient(circle, rgba(${blobC.b},${dk ? 0.15 : 0.06}) 0%, rgba(${blobC.b},${dk ? 0.06 : 0.02}) 40%, transparent 70%)`, animation: "blobDrift2 25s ease-in-out infinite", filter: "blur(30px)" }} />
-        {/* Third blob - bottom */}
-        <div style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", bottom: -100, left: -80, background: `radial-gradient(circle, rgba(${blobC.c},${dk ? 0.18 : 0.07}) 0%, rgba(${blobC.c},${dk ? 0.07 : 0.03}) 40%, transparent 70%)`, animation: "blobDrift3 18s ease-in-out infinite", filter: "blur(30px)" }} />
-        {/* Accent blob - small, bright, moves more */}
-        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", top: "55%", left: "20%", background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.12 : 0.05}) 0%, transparent 60%)`, animation: "blobDrift4 15s ease-in-out infinite", filter: "blur(20px)" }} />
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, 60, 0], backgroundColor: [c1, c2, c1] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", top: -120, left: -80, opacity: dk ? 0.08 : 0.05, filter: "blur(80px)" }}
+        />
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], x: [0, -70, 0], y: [0, 80, 0], backgroundColor: [c2, c3, c2] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", top: "35%", right: -100, opacity: dk ? 0.07 : 0.04, filter: "blur(80px)" }}
+        />
+        <motion.div
+          animate={{ scale: [1, 1.25, 1], x: [0, 60, 0], y: [0, -50, 0], backgroundColor: [c3, c1, c3] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", bottom: -150, left: -60, opacity: dk ? 0.09 : 0.05, filter: "blur(80px)" }}
+        />
       </div>
       <div style={{ position: "relative", zIndex: 1, paddingBottom: 90 }}>
         {tab === "home" && HomeTab}
@@ -589,12 +599,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </AnimatePresence>
       <style>{fontCss}{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
-        @keyframes blobDrift1 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(30px, 40px) scale(1.1); } 50% { transform: translate(-20px, 60px) scale(0.95); } 75% { transform: translate(15px, 20px) scale(1.05); } 100% { transform: translate(0, 0) scale(1); } }
-        @keyframes blobDrift2 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(-35px, -25px) scale(1.08); } 50% { transform: translate(20px, -40px) scale(0.92); } 75% { transform: translate(-10px, 15px) scale(1.04); } 100% { transform: translate(0, 0) scale(1); } }
-        @keyframes blobDrift3 { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(25px, -30px) scale(1.12); } 66% { transform: translate(-30px, 20px) scale(0.9); } 100% { transform: translate(0, 0) scale(1); } }
-        @keyframes blobDrift4 { 0% { transform: translate(0, 0) scale(1); opacity: 0.8; } 25% { transform: translate(40px, -20px) scale(1.15); opacity: 1; } 50% { transform: translate(-15px, 35px) scale(0.85); opacity: 0.6; } 75% { transform: translate(25px, 10px) scale(1.1); opacity: 0.9; } 100% { transform: translate(0, 0) scale(1); opacity: 0.8; } }
-        @keyframes slideUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
-        @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
         @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
       `}</style>
     </div>
