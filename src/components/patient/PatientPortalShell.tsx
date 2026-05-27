@@ -110,14 +110,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const getPhaseColors = () => {
     const name = activePhase?.name || "";
     switch (name) {
-      case "Nivellierung":    return { c1: "#4ade80", c2: "#38bdf8", c3: "#34d399" };
-      case "Lückenschluss":   return { c1: "#a78bfa", c2: "#4ade80", c3: "#60a5fa" };
-      case "Feineinstellung": return { c1: "#fbbf24", c2: "#a78bfa", c3: "#f472b6" };
-      case "Retainer":        return { c1: "#38bdf8", c2: "#818cf8", c3: "#4ade80" };
-      default:                return { c1: "#4ade80", c2: "#60a5fa", c3: "#a78bfa" };
+      case "Nivellierung":    return { c1: "#4ade80", c2: "#38bdf8", c3: "#34d399", c4: "#a78bfa", c5: "#fbbf24" };
+      case "Lückenschluss":   return { c1: "#a78bfa", c2: "#4ade80", c3: "#60a5fa", c4: "#f472b6", c5: "#34d399" };
+      case "Feineinstellung": return { c1: "#fbbf24", c2: "#a78bfa", c3: "#f472b6", c4: "#4ade80", c5: "#38bdf8" };
+      case "Retainer":        return { c1: "#38bdf8", c2: "#818cf8", c3: "#4ade80", c4: "#fbbf24", c5: "#a78bfa" };
+      default:                return { c1: "#4ade80", c2: "#60a5fa", c3: "#a78bfa", c4: "#f472b6", c5: "#fbbf24" };
     }
   };
-  const { c1, c2, c3 } = getPhaseColors();
+  const { c1, c2, c3, c4, c5 } = getPhaseColors();
 
   // Theme colors - improved contrast
   const bg = dk ? "#000" : "#f5f1eb";
@@ -483,22 +483,27 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   return (
     <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
     <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-      {/* Framer Motion animated gradient blobs - phase-colored, Gemini style */}
+      {/* Lava lamp animated gradient blobs - vivid, phase-colored */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         <motion.div
-          animate={{ scale: [1, 1.2, 1], x: [0, 80, 0], y: [0, 60, 0], backgroundColor: [c1, c2, c1] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", top: -120, left: -80, opacity: dk ? 0.08 : 0.05, filter: "blur(80px)" }}
+          animate={{ scale: [1, 1.3, 1.1, 1], x: [0, 100, -30, 0], y: [0, 80, 40, 0], backgroundColor: [c1, c2, c4, c1] }}
+          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", top: -180, left: -120, opacity: dk ? 0.2 : 0.06, filter: "blur(60px)" }}
         />
         <motion.div
-          animate={{ scale: [1, 1.15, 1], x: [0, -70, 0], y: [0, 80, 0], backgroundColor: [c2, c3, c2] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", top: "35%", right: -100, opacity: dk ? 0.07 : 0.04, filter: "blur(80px)" }}
+          animate={{ scale: [1, 1.2, 0.9, 1], x: [0, -80, 50, 0], y: [0, 100, -30, 0], backgroundColor: [c2, c3, c5, c2] }}
+          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", top: "30%", right: -140, opacity: dk ? 0.18 : 0.05, filter: "blur(60px)" }}
         />
         <motion.div
-          animate={{ scale: [1, 1.25, 1], x: [0, 60, 0], y: [0, -50, 0], backgroundColor: [c3, c1, c3] }}
-          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", bottom: -150, left: -60, opacity: dk ? 0.09 : 0.05, filter: "blur(80px)" }}
+          animate={{ scale: [1, 1.25, 1.05, 1], x: [0, 70, -40, 0], y: [0, -60, 30, 0], backgroundColor: [c3, c5, c1, c3] }}
+          transition={{ duration: 32, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 550, height: 550, borderRadius: "50%", bottom: -200, left: -100, opacity: dk ? 0.22 : 0.06, filter: "blur(60px)" }}
+        />
+        <motion.div
+          animate={{ scale: [1, 1.4, 1, 1.2, 1], x: [0, -50, 60, -20, 0], y: [0, 40, -30, 50, 0], backgroundColor: [c4, c1, c3, c5, c4] }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", top: "50%", left: "10%", opacity: dk ? 0.15 : 0.04, filter: "blur(50px)" }}
         />
       </div>
       <div style={{ position: "relative", zIndex: 1, paddingBottom: 90 }}>
