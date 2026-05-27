@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
+import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -80,6 +81,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     setMsgInput("");
     const tempId = "temp-" + Date.now();
     setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);
+    hapticSuccess();
     setTyping(true);
     try {
       const res = await fetch("/api/patient/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
@@ -155,8 +157,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <span style={{ ...hd, fontSize: 22, fontWeight: 700, color: fg }}>Anima Cura</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={() => setDk(!dk)} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, background: btnBg, color: soft }}>{dk ? "☀️" : "🌙"}</button>
-        <button onClick={() => setNOpen(!nOpen)} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, position: "relative", background: btnBg }}>
+        <button onClick={() => { setDk(!dk); hapticLight(); }} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, background: btnBg, color: soft }}>{dk ? "☀️" : "🌙"}</button>
+        <button onClick={() => { setNOpen(!nOpen); hapticLight(); }} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, position: "relative", background: btnBg }}>
           🔔
           {unread > 0 && <span style={{ position: "absolute", top: -2, right: -2, width: 18, height: 18, borderRadius: "50%", background: red, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>}
         </button>
@@ -194,7 +196,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const Nav = (
     <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, display: "flex", justifyContent: "space-around", padding: "8px 0 24px", zIndex: 100, background: dk ? "rgba(0,0,0,0.95)" : "rgba(245,241,235,0.95)", borderTop: "1px solid " + border, backdropFilter: "blur(20px)" }}>
       {([["home", "Start", "🏠"], ["journey", "Verlauf", "🕐"], ["progress", "Fortschritt", "€"], ["chat", "Chat", "💬"], ["more", "Mehr", "⋯"]] as [Tab, string, string][]).map(([id, label, icon]) => (
-        <button key={id} onClick={() => setTab(id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", color: tab === id ? grn : navInactive, fontSize: 10, fontWeight: 600, fontFamily: "inherit" }}>
+        <button key={id} onClick={() => { setTab(id); hapticLight(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", color: tab === id ? grn : navInactive, fontSize: 10, fontWeight: 600, fontFamily: "inherit" }}>
           <span style={{ fontSize: id === "progress" ? 18 : 16, fontFamily: id === "progress" ? "'Fraunces', serif" : "inherit", fontWeight: id === "progress" ? 700 : 400 }}>{icon}</span>
           <span>{label}</span>
         </button>
@@ -244,7 +246,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
           <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
             {badges.map(b => (
-              <div key={b.id} onClick={() => setPopup(b)} style={{ minWidth: 76, padding: "14px 8px", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", background: cardBg, border: "1px solid " + border, opacity: b.freigeschaltet ? 1 : 0.3 }}>
+              <div key={b.id} onClick={() => { setPopup(b); hapticLight(); }} style={{ minWidth: 76, padding: "14px 8px", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", background: cardBg, border: "1px solid " + border, opacity: b.freigeschaltet ? 1 : 0.3 }}>
                 <span style={{ fontSize: 28 }}>{b.icon}</span>
                 <span style={{ fontSize: 9, fontWeight: 600, textAlign: "center", lineHeight: 1.2, color: soft }}>{b.titel}</span>
               </div>
@@ -253,11 +255,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 20px", marginBottom: 14 }}>
-        <div onClick={() => setTab("chat")} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
+        <div onClick={() => { setTab("chat"); hapticMedium(); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)" }}>💬</div>
           <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>Nachricht</div><div style={{ fontSize: 12, color: muted }}>an die Praxis</div></div>
         </div>
-        <div onClick={() => setTab("more")} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
+        <div onClick={() => { setTab("more"); hapticMedium(); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: dk ? "rgba(167,139,250,0.08)" : "rgba(124,58,237,0.06)" }}>📄</div>
           <div><div style={{ fontSize: 14, fontWeight: 700, color: fg }}>Dokumente</div><div style={{ fontSize: 12, color: muted }}>Verträge & Pläne</div></div>
         </div>
@@ -358,7 +360,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
           <div style={{ margin: "0 20px 14px" }}>
-            <button style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Jetzt ausgleichen</button>
+            <button onClick={() => hapticStrong()} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Jetzt ausgleichen</button>
           </div>
         </div>
       )}
@@ -452,7 +454,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </div>
       {docs.length > 0 && <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 10, color: fg }}>Dokumente</p></div>}
       {docs.map(d => (
-        <div key={d.id} onClick={() => setDocDrawer(d)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
+        <div key={d.id} onClick={() => { setDocDrawer(d); hapticMedium(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 20 }}>{docIc[d.typ] || "📄"}</span>
             <div><div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{d.name}</div><div style={{ fontSize: 11, color: muted }}>{fmtDate(d.hochgeladen_am)}</div></div>
@@ -586,10 +588,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               </motion.div>
               {/* Action buttons */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.3 }} style={{ display: "flex", gap: 10, padding: "20px 24px 32px" }}>
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: fg, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <motion.button onClick={() => hapticMedium()} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: fg, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   📤 Teilen
                 </motion.button>
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <motion.button onClick={() => hapticSuccess()} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   ⬇ Herunterladen
                 </motion.button>
               </motion.div>
