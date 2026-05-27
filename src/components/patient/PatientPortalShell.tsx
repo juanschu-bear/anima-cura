@@ -41,6 +41,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [typing, setTyping] = useState(false);
   const [docDrawer, setDocDrawer] = useState<Doc | null>(null);
   const [showIBAN, setShowIBAN] = useState(false);
+  const [phaseDrawer, setPhaseDrawer] = useState<Phase | null>(null);
+  const [expandedDetail, setExpandedDetail] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [rp, setRp] = useState<RpData | null>(null);
@@ -111,10 +113,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const getPhaseColors = () => {
     const name = activePhase?.name || "";
     switch (name) {
-      case "Nivellierung":    return { c1: "#4ade80", c2: "#38bdf8", c3: "#34d399", c4: "#a78bfa", c5: "#fbbf24" };
-      case "Lückenschluss":   return { c1: "#a78bfa", c2: "#4ade80", c3: "#60a5fa", c4: "#f472b6", c5: "#34d399" };
-      case "Feineinstellung": return { c1: "#fbbf24", c2: "#a78bfa", c3: "#f472b6", c4: "#4ade80", c5: "#38bdf8" };
-      case "Retainer":        return { c1: "#38bdf8", c2: "#818cf8", c3: "#4ade80", c4: "#fbbf24", c5: "#a78bfa" };
+      case "Initialuntersuchung": return { c1: "#4ade80", c2: "#38bdf8", c3: "#34d399", c4: "#a78bfa", c5: "#fbbf24" };
+      case "Aligner Set 1-11":    return { c1: "#a78bfa", c2: "#4ade80", c3: "#60a5fa", c4: "#f472b6", c5: "#34d399" };
+      case "Aligner Set 12-24":   return { c1: "#fbbf24", c2: "#a78bfa", c3: "#f472b6", c4: "#4ade80", c5: "#38bdf8" };
+      case "Retainer & Abschluss": return { c1: "#38bdf8", c2: "#818cf8", c3: "#4ade80", c4: "#fbbf24", c5: "#a78bfa" };
       default:                return { c1: "#4ade80", c2: "#60a5fa", c3: "#a78bfa", c4: "#f472b6", c5: "#fbbf24" };
     }
   };
@@ -306,7 +308,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {phasen.map(ph => (
           <div key={ph.id} style={{ position: "relative", marginBottom: 20 }}>
             <div style={{ position: "absolute", left: -30, top: 8, width: 14, height: 14, borderRadius: "50%", background: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : (dk ? "#333" : "#e0d8cc"), boxShadow: ph.status === "aktiv" ? "0 0 10px " + purple + "40" : "none" }} />
-            <div style={{ ...card, margin: 0, marginBottom: 0 }}>
+            <div onClick={() => { setPhaseDrawer(ph); setExpandedDetail(null); hapticMedium(); }} style={{ ...card, margin: 0, marginBottom: 0, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <span style={{ ...hd, fontSize: 16, fontWeight: 700, color: fg }}>{ph.name}</span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: ph.status === "abgeschlossen" ? grn : ph.status === "aktiv" ? purple : muted }}>
@@ -622,6 +624,142 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+      {/* Phase Detail Drawer */}
+      <AnimatePresence>
+        {phaseDrawer && (() => {
+          const phaseInfo: Record<string, { emoji: string; summary: string; details: { title: string; content: string }[] }> = {
+            "Initialuntersuchung": {
+              emoji: "🔍",
+              summary: "Der erste Schritt deiner Behandlung. Hier werden alle wichtigen Daten erhoben: digitale Scans, Fotos, Röntgenbilder. Daraus entsteht dein individueller Behandlungsplan.",
+              details: [
+                { title: "Was passiert genau?", content: "Bei der Erstuntersuchung werden 3D-Scans deiner Zähne gemacht, dazu Fotos von Gesicht und Zähnen aus verschiedenen Winkeln. Falls nötig wird ein Röntgenbild angefertigt. Anhand dieser Daten plant die Kieferorthopädin den genauen Ablauf deiner Behandlung." },
+                { title: "Wie lange dauert das?", content: "Der Termin dauert etwa 45 bis 60 Minuten. Die Auswertung und Planerstellung braucht dann nochmal ein paar Tage. Beim Folgetermin wird dir der Behandlungsplan vorgestellt." },
+                { title: "Was du beachten solltest", content: "Keine besondere Vorbereitung nötig. Am besten vorher gründlich Zähne putzen. Wenn du Fragen zum Behandlungsablauf hast, schreib sie dir vorher auf damit du nichts vergisst." },
+                { title: "Ergebnis", content: "Du bekommst einen klaren Plan mit allen Schritten, der voraussichtlichen Dauer und den Kosten. Danach weißt du genau was auf dich zukommt." },
+              ]
+            },
+            "Aligner Set 1-11": {
+              emoji: "🦷",
+              summary: "Los geht's! Deine ersten Aligner-Schienen sind da. In dieser Phase gewöhnen sich deine Zähne an die Bewegung und die ersten größeren Korrekturen finden statt.",
+              details: [
+                { title: "Was passiert genau?", content: "Du bekommst deine ersten Aligner-Schienen. Jede Schiene trägst du etwa 1-2 Wochen, dann wechselst du zur nächsten. Jede Schiene bewegt deine Zähne ein kleines Stückchen weiter. Die Schienen sind fast unsichtbar und herausnehmbar." },
+                { title: "Wie lange dauert das?", content: "Bei einem Wechsel alle 10-14 Tage dauert diese Phase etwa 3 bis 5 Monate. Regelmäßige Kontrollen finden alle 6-8 Wochen statt." },
+                { title: "Tragezeit", content: "Die Aligner sollten mindestens 20-22 Stunden am Tag getragen werden. Nur zum Essen und Zähneputzen rausnehmen. Je konsequenter du trägst, desto besser das Ergebnis und desto schneller bist du fertig." },
+                { title: "Tipps für den Alltag", content: "Gewöhne dir an die Aligner immer in der Box aufzubewahren wenn du sie rausnimmst. Trinke nichts Heißes oder Gefärbtes mit Alignern. Nach dem Essen kurz Zähne putzen bevor du sie wieder einsetzt. Die ersten 2-3 Tage mit einem neuen Set können sich die Zähne etwas empfindlich anfühlen." },
+                { title: "Fortschritte", content: "Schon nach den ersten Schienen wirst du Veränderungen bemerken. Besonders bei Engständen oder leichten Drehungen sieht man schnell Ergebnisse." },
+              ]
+            },
+            "Aligner Set 12-24": {
+              emoji: "✨",
+              summary: "Die zweite Hälfte deiner Aligner-Behandlung. Jetzt geht es um Feinjustierung: Rotationen im Oberkiefer, Bisslage optimieren, letzte Korrekturen.",
+              details: [
+                { title: "Was passiert genau?", content: "Die Aligner in dieser Phase arbeiten an den feineren Details. Kleine Rotationen werden korrigiert, die Verzahnung von Ober- und Unterkiefer wird optimiert. Eventuell werden Attachments (kleine zahnfarbene Erhebungen) auf einzelne Zähne geklebt um die Bewegung präziser zu steuern." },
+                { title: "Attachments", content: "Falls du Attachments bekommst: Das sind kleine Composit-Knöpfe die auf den Zahn geklebt werden. Sie sind zahnfarben und fallen kaum auf. Sie helfen dem Aligner besser zu greifen. Am Ende der Behandlung werden sie rückstandslos entfernt." },
+                { title: "Aktueller Fokus", content: "Achte in dieser Phase besonders auf die Kaumuskelspannung. Leichte Massagen helfen bei erstem Druckgefühl in den ersten Tagen. Die Feinarbeit kann sich manchmal langsamer anfühlen, aber die Details machen den Unterschied." },
+                { title: "Fortschritte", content: "Dein Lächeln nimmt immer mehr seine finale Form an. Vergleiche mal ein Foto vom Anfang mit jetzt. Die Veränderung ist oft beeindruckender als man im Alltag wahrnimmt." },
+              ]
+            },
+            "Retainer & Abschluss": {
+              emoji: "🛡️",
+              summary: "Geschafft! Die aktive Behandlung ist abgeschlossen. Jetzt geht es darum dein Ergebnis langfristig zu stabilisieren.",
+              details: [
+                { title: "Was passiert genau?", content: "Du bekommst einen festsitzenden Retainer (dünner Draht hinter den Frontzähnen) und eine herausnehmbare Retainer-Schiene. Der feste Retainer bleibt dauerhaft und ist von außen unsichtbar. Die Schiene trägst du nachts." },
+                { title: "Trageschema", content: "Erste 6 Monate: Schiene jede Nacht tragen. Danach nach Empfehlung 3-4 Nächte pro Woche. Der festsitzende Retainer arbeitet rund um die Uhr und braucht keine Aufmerksamkeit außer guter Pflege." },
+                { title: "Pflege", content: "Den festsitzenden Retainer täglich mit Zahnseide reinigen, am besten mit einem Floss-Threader. Die Schiene morgens mit kaltem Wasser und einer weichen Zahnbürste reinigen. Niemals heißes Wasser verwenden, das verformt den Kunststoff." },
+                { title: "Dein Ergebnis", content: "Deine Zähne stehen jetzt so wie geplant. Der Retainer ist deine Versicherung dass das so bleibt. Komm weiterhin zu den Nachsorgeterminen, damit wir sicherstellen dass alles stabil bleibt." },
+              ]
+            },
+          };
+          const info = phaseInfo[phaseDrawer.name] || {
+            emoji: "📋",
+            summary: phaseDrawer.beschreibung || "Details zu dieser Phase.",
+            details: [{ title: "Info", content: "Sprich mit deinem Praxisteam für mehr Details zu dieser Phase." }],
+          };
+          return (
+            <motion.div
+              key="phase-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPhaseDrawer(null)}
+              style={{ position: "fixed", inset: 0, zIndex: 215, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                drag="y"
+                dragConstraints={{ top: 0 }}
+                dragElastic={0.1}
+                onDragEnd={(_e, i) => { if (i.offset.y > 100 || i.velocity.y > 500) setPhaseDrawer(null); }}
+                onClick={e => e.stopPropagation()}
+                style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "90vh", overflowY: "auto", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") }}
+              >
+                <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", position: "sticky", top: 0 }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
+                </div>
+                {/* Phase header */}
+                <div style={{ padding: "4px 24px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+                    <div style={{ fontSize: 36, marginBottom: 8 }}>{info.emoji}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: phaseDrawer.status === "abgeschlossen" ? grn : phaseDrawer.status === "aktiv" ? purple : muted, marginBottom: 4 }}>
+                      {phaseDrawer.status === "abgeschlossen" ? "Abgeschlossen" : phaseDrawer.status === "aktiv" ? "Aktive Phase" : "Kommende Phase"}
+                    </div>
+                    <h3 style={{ ...hd, fontSize: 22, fontWeight: 800, color: fg }}>{phaseDrawer.name}</h3>
+                    {phaseDrawer.start_datum && <p style={{ fontSize: 12, color: muted, marginTop: 4 }}>{fmtDate(phaseDrawer.start_datum)}{phaseDrawer.end_datum ? " — " + fmtDate(phaseDrawer.end_datum) : " — heute"}</p>}
+                  </motion.div>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => setPhaseDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
+                </div>
+                {/* Summary */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ padding: "0 24px 16px" }}>
+                  <p style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>{info.summary}</p>
+                </motion.div>
+                {/* Expandable detail sections */}
+                {info.details.map((d, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.06 }} style={{ margin: "0 24px 8px" }}>
+                    <button
+                      onClick={() => { setExpandedDetail(expandedDetail === d.title ? null : d.title); hapticLight(); }}
+                      style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderRadius: expandedDetail === d.title ? "14px 14px 0 0" : 14, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderBottom: expandedDetail === d.title ? "none" : undefined, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{d.title}</span>
+                      <motion.span animate={{ rotate: expandedDetail === d.title ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ fontSize: 12, color: muted }}>▼</motion.span>
+                    </button>
+                    <AnimatePresence>
+                      {expandedDetail === d.title && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          style={{ overflow: "hidden", borderRadius: "0 0 14px 14px", background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"), borderTop: "none" }}
+                        >
+                          <div style={{ padding: "14px 16px" }}>
+                            <p style={{ fontSize: 13, lineHeight: 1.65, color: soft }}>{d.content}</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                ))}
+                {/* Phase tips from DB */}
+                {tipps.length > 0 && phaseDrawer.status === "aktiv" && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ padding: "8px 24px 24px" }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: warn, marginBottom: 8 }}>💡 Tipps für diese Phase</p>
+                    {tipps.map(t => (
+                      <div key={t.id} style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 6, background: dk ? "rgba(251,191,36,0.04)" : "rgba(234,179,80,0.04)", border: "1px solid " + (dk ? "rgba(251,191,36,0.08)" : "rgba(234,179,80,0.08)") }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: fg, marginBottom: 2 }}>{t.titel}</p>
+                        <p style={{ fontSize: 12, lineHeight: 1.5, color: soft }}>{t.text}</p>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+                <div style={{ height: 20 }} />
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
       {/* IBAN Payment Overlay */}
       <AnimatePresence>
