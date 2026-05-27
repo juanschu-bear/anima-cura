@@ -102,6 +102,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const dl = rp && rp.naechste_rate ? daysTill(rp.naechste_rate.faellig_am) : 99;
   const pct = rp ? rp.prozent : 0;
 
+  // Phase-based blob colors
+  const phaseColors: Record<string, { a: string; b: string; c: string }> = {
+    "Nivellierung":    { a: "74,222,128", b: "56,189,248", c: "52,211,153" },   // green-cyan
+    "Lückenschluss":   { a: "167,139,250", b: "74,222,128", c: "96,165,250" },  // purple-green
+    "Feineinstellung": { a: "251,191,36", b: "167,139,250", c: "244,114,182" }, // gold-purple-pink
+    "Retainer":        { a: "56,189,248", b: "129,140,248", c: "74,222,128" },  // blue-indigo-green
+  };
+  const phaseName = activePhase?.name || "";
+  const blobC = phaseColors[phaseName] || { a: "74,222,128", b: "96,165,250", c: "167,139,250" };
+
   // Theme colors - improved contrast
   const bg = dk ? "#000" : "#f5f1eb";
   const fg = dk ? "#f0f0f0" : "#1a1a1a";
@@ -465,8 +475,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ RENDER ═══
   return (
     <div style={{ minHeight: "100vh", background: dk ? "linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #080808 100%)" : "linear-gradient(135deg, #ebe5db 0%, #f5f1eb 50%, #ede7dd 100%)" }}>
-    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: bg, color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)" }}>
-      <div style={{ paddingBottom: 90 }}>
+    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: bg, color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+      {/* Animated gradient blobs - shift color based on treatment phase */}
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", top: -80, right: -60, background: `radial-gradient(circle, rgba(${blobC.a},${dk ? 0.07 : 0.05}) 0%, transparent 70%)`, animation: "blobDrift1 20s ease-in-out infinite", filter: "blur(40px)" }} />
+        <div style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", bottom: "20%", left: -50, background: `radial-gradient(circle, rgba(${blobC.b},${dk ? 0.06 : 0.04}) 0%, transparent 70%)`, animation: "blobDrift2 25s ease-in-out infinite", filter: "blur(40px)" }} />
+        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", top: "45%", right: "5%", background: `radial-gradient(circle, rgba(${blobC.c},${dk ? 0.05 : 0.03}) 0%, transparent 70%)`, animation: "blobDrift3 18s ease-in-out infinite", filter: "blur(40px)" }} />
+      </div>
+      <div style={{ position: "relative", zIndex: 1, paddingBottom: 90 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && ProgressTab}
@@ -487,7 +503,12 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         </div>
       )}
-      <style>{fontCss}{`@keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }`}</style>
+      <style>{fontCss}{`
+        @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+        @keyframes blobDrift1 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(-20px, 30px) scale(1.05); } 66% { transform: translate(15px, -15px) scale(0.95); } }
+        @keyframes blobDrift2 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(25px, -20px) scale(1.08); } 66% { transform: translate(-15px, 25px) scale(0.92); } }
+        @keyframes blobDrift3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-18px, 20px) scale(1.1); } }
+      `}</style>
     </div>
     </div>
   );
