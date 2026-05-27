@@ -44,6 +44,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [typing, setTyping] = useState(false);
   const [docDrawer, setDocDrawer] = useState<Doc | null>(null);
   const [showIBAN, setShowIBAN] = useState(false);
+  const [deviceSize, setDeviceSize] = useState<"phone" | "tablet">("phone");
   const [phaseDrawer, setPhaseDrawer] = useState<Phase | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<string | null>(null);
   const [phaseAnswers, setPhaseAnswers] = useState<Record<string, string>>({});
@@ -434,9 +435,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ CHAT TAB ═══
   const ChatTab = (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 90px)" }}>
-      <div style={{ padding: "18px 20px 14px" }}>
+      <div style={{ padding: "24px 20px 14px" }}>
         <h1 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg }}>{t("chat.title", lang)}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: grn, display: "inline-block" }} />
           <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>{t("chat.practice", lang)}</span>
         </div>
@@ -527,16 +528,23 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#a78bfa" }} />
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fbbf24" }} />
         </div>
+        <div className="desktop-brand" style={{ display: "none", gap: 6, marginTop: 24 }}>
+          {(["phone", "tablet"] as const).map(d => (
+            <button key={d} onClick={() => setDeviceSize(d)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: deviceSize === d ? (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)") : "transparent", color: deviceSize === d ? (dk ? "#f0f0f0" : "#1a1a1a") : (dk ? "#555" : "#aaa"), fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              {d === "phone" ? "Phone" : "Tablet"}
+            </button>
+          ))}
+        </div>
       </div>
       {/* Phone frame */}
-      <div style={{ position: "relative", width: "100%", maxWidth: 430 }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: deviceSize === "tablet" ? 620 : 430, transition: "max-width 0.4s ease" }}>
         {/* Phone bezel - only visible on desktop */}
         <div className="phone-bezel" style={{ display: "none", position: "absolute", inset: -14, borderRadius: 46, border: dk ? "2px solid rgba(255,255,255,0.08)" : "2px solid rgba(0,0,0,0.06)", pointerEvents: "none", zIndex: 50 }} />
         {/* Notch - only visible on desktop */}
-        <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: 140, height: 28, borderRadius: "0 0 18px 18px", background: dk ? "#0a0a0a" : "#e0d8cc", zIndex: 51, boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: deviceSize === "tablet" ? 180 : 140, height: 28, borderRadius: "0 0 18px 18px", background: dk ? "#0a0a0a" : "#e0d8cc", zIndex: 51, boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)", transition: "width 0.4s ease" }}>
           <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
         </div>
-    <div className="phone-app-container" style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden", borderRadius: 0 }}>
+    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 620 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
       {/* Lava lamp animated gradient blobs - vivid, phase-colored */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         <motion.div
@@ -560,7 +568,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", top: "50%", left: "10%", opacity: dk ? 0.15 : 0.04, filter: "blur(50px)" }}
         />
       </div>
-      <div style={{ position: "relative", zIndex: 1, paddingBottom: 90 }}>
+      <div style={{ position: "relative", zIndex: 1, paddingBottom: 10 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && ProgressTab}
