@@ -569,7 +569,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </div>
       {Nav}
       {popup && (
-        <div onClick={() => setPopup(null)} style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+        <div onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
           <div onClick={e => e.stopPropagation()} style={{ borderRadius: 24, padding: "36px 28px", textAlign: "center", maxWidth: 300, width: "100%", background: cardBg, border: "1px solid " + border }}>
             <span style={{ fontSize: 56, display: "block", marginBottom: 16 }}>{popup.icon}</span>
             <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{translateBadge(popup.titel, lang).titel}</h3>
@@ -591,7 +591,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={() => setDocDrawer(null)}
-            style={{ position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+            style={{ position: "absolute", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
           >
             <motion.div
               key="doc-sheet"
@@ -673,7 +673,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setPhaseDrawer(null)}
-              style={{ position: "fixed", inset: 0, zIndex: 215, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+              style={{ position: "absolute", inset: 0, zIndex: 215, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
             >
               <motion.div
                 initial={{ y: "100%" }}
@@ -806,7 +806,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowIBAN(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+            style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
           >
             <motion.div
               initial={{ y: "100%" }}
