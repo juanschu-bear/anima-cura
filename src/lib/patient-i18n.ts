@@ -196,3 +196,33 @@ const badgeMap: Record<string, Record<Lang, { titel: string; beschreibung: strin
 export function translateBadge(deTitel: string, lang: Lang): { titel: string; beschreibung: string } {
   return badgeMap[deTitel]?.[lang] ?? { titel: deTitel, beschreibung: "" };
 }
+
+// Phase detail content - summary, fokus, expandable sections
+type PhaseDetail = { emoji: string; summary: string; fokus?: string; details: { title: string }[] };
+
+const phaseContent: Record<string, Record<Lang, PhaseDetail>> = {
+  "Initialuntersuchung": {
+    de: { emoji: "🔍", summary: "Der erste Schritt deiner Behandlung. Hier werden alle wichtigen Daten erhoben: digitale Scans, Fotos, Röntgenbilder. Daraus entsteht dein individueller Behandlungsplan.", fokus: "Alle Unterlagen und Befunde für die Behandlungsplanung zusammentragen. Falls du noch offene Fragen hast, ist jetzt der beste Zeitpunkt sie zu stellen.", details: [{ title: "Was passiert genau?" }, { title: "Wie lange dauert das?" }, { title: "Was du beachten solltest" }, { title: "Ergebnis" }] },
+    en: { emoji: "🔍", summary: "The first step of your treatment. All important data is collected here: digital scans, photos, X-rays. From this, your individual treatment plan is created.", fokus: "Gather all documents and findings for treatment planning. If you have any open questions, now is the best time to ask them.", details: [{ title: "What exactly happens?" }, { title: "How long does it take?" }, { title: "What you should know" }, { title: "Result" }] },
+    es: { emoji: "🔍", summary: "El primer paso de tu tratamiento. Aquí se recopilan todos los datos importantes: escaneos digitales, fotos, radiografías. A partir de esto se crea tu plan de tratamiento individual.", fokus: "Reúne todos los documentos y hallazgos para la planificación del tratamiento. Si tienes preguntas pendientes, ahora es el mejor momento para hacerlas.", details: [{ title: "¿Qué sucede exactamente?" }, { title: "¿Cuánto tiempo tarda?" }, { title: "Lo que debes tener en cuenta" }, { title: "Resultado" }] },
+  },
+  "Aligner Set 1-11": {
+    de: { emoji: "🦷", summary: "Los geht's! Deine ersten Aligner-Schienen sind da. In dieser Phase gewöhnen sich deine Zähne an die Bewegung und die ersten größeren Korrekturen finden statt.", fokus: "Gewöhne dich an das konsequente Tragen der Schienen. 20-22 Stunden pro Tag sind ideal. Die erste Woche ist die schwierigste, danach wird es Routine.", details: [{ title: "Was passiert genau?" }, { title: "Wie lange dauert das?" }, { title: "Tragezeit" }, { title: "Tipps für den Alltag" }, { title: "Fortschritte" }] },
+    en: { emoji: "🦷", summary: "Here we go! Your first aligner trays are here. In this phase, your teeth get used to movement and the first major corrections take place.", fokus: "Get used to wearing the trays consistently. 20-22 hours per day is ideal. The first week is the hardest, after that it becomes routine.", details: [{ title: "What exactly happens?" }, { title: "How long does it take?" }, { title: "Wearing time" }, { title: "Everyday tips" }, { title: "Progress" }] },
+    es: { emoji: "🦷", summary: "¡Comenzamos! Tus primeras férulas de alineación están aquí. En esta fase, tus dientes se acostumbran al movimiento y se realizan las primeras correcciones importantes.", fokus: "Acostúmbrate a usar las férulas de forma constante. 20-22 horas al día es lo ideal. La primera semana es la más difícil, después se vuelve rutina.", details: [{ title: "¿Qué sucede exactamente?" }, { title: "¿Cuánto tiempo tarda?" }, { title: "Tiempo de uso" }, { title: "Consejos para el día a día" }, { title: "Avances" }] },
+  },
+  "Aligner Set 12-24": {
+    de: { emoji: "✨", summary: "Die zweite Hälfte deiner Aligner-Behandlung. Jetzt geht es um Feinjustierung: Rotationen im Oberkiefer, Bisslage optimieren, letzte Korrekturen.", fokus: "Achte in dieser Phase besonders auf die Kaumuskelspannung. Leichte Massagen helfen bei erstem Druckgefühl in den ersten Tagen nach einem Schienenwechsel.", details: [{ title: "Was passiert genau?" }, { title: "Attachments" }, { title: "Aktueller Fokus" }, { title: "Fortschritte" }] },
+    en: { emoji: "✨", summary: "The second half of your aligner treatment. Now it's about fine-tuning: rotations in the upper jaw, optimizing bite, final corrections.", fokus: "Pay special attention to jaw muscle tension in this phase. Gentle massages help with initial pressure feeling in the first days after switching trays.", details: [{ title: "What exactly happens?" }, { title: "Attachments" }, { title: "Current focus" }, { title: "Progress" }] },
+    es: { emoji: "✨", summary: "La segunda mitad de tu tratamiento con alineadores. Ahora se trata de ajuste fino: rotaciones en el maxilar superior, optimización de la mordida, correcciones finales.", fokus: "Presta especial atención a la tensión de los músculos de la mandíbula en esta fase. Los masajes suaves ayudan con la presión inicial en los primeros días después de cambiar de férula.", details: [{ title: "¿Qué sucede exactamente?" }, { title: "Attachments" }, { title: "Enfoque actual" }, { title: "Avances" }] },
+  },
+  "Retainer & Abschluss": {
+    de: { emoji: "🛡️", summary: "Geschafft! Die aktive Behandlung ist abgeschlossen. Jetzt geht es darum dein Ergebnis langfristig zu stabilisieren.", fokus: "Trage deinen Retainer konsequent. In den ersten Monaten jede Nacht, danach nach Absprache. Deine Zähne wollen sich zurückbewegen, der Retainer verhindert das.", details: [{ title: "Was passiert genau?" }, { title: "Trageschema" }, { title: "Pflege" }, { title: "Dein Ergebnis" }] },
+    en: { emoji: "🛡️", summary: "Done! The active treatment is complete. Now it's about stabilizing your result long-term.", fokus: "Wear your retainer consistently. Every night for the first months, then as agreed. Your teeth want to move back, the retainer prevents that.", details: [{ title: "What exactly happens?" }, { title: "Wearing schedule" }, { title: "Care" }, { title: "Your result" }] },
+    es: { emoji: "🛡️", summary: "¡Listo! El tratamiento activo está completo. Ahora se trata de estabilizar tu resultado a largo plazo.", fokus: "Usa tu retenedor de forma constante. Todas las noches durante los primeros meses, luego según lo acordado. Tus dientes quieren volver a moverse, el retenedor lo impide.", details: [{ title: "¿Qué sucede exactamente?" }, { title: "Esquema de uso" }, { title: "Cuidado" }, { title: "Tu resultado" }] },
+  },
+};
+
+export function getPhaseContent(deName: string, lang: Lang): PhaseDetail {
+  return phaseContent[deName]?.[lang] ?? phaseContent[deName]?.["de"] ?? { emoji: "📋", summary: "", details: [] };
+}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
-import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, type Lang } from "@/lib/patient-i18n";
+import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, getPhaseContent, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -261,7 +261,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
-          {[[t("home.invested", lang), pct + "%", grn], [t("home.nextRate", lang), dl > 0 ? dl + "T" : t("home.today", lang), fg], [t("home.rates", lang), (rp ? rp.raten_bezahlt : 0) + "/" + (rp ? rp.raten_gesamt : 0), fg]].map(([l, v, c], i) => (
+          {[[t("home.invested", lang), pct + "%", grn], [t("home.nextRate", lang), dl > 0 ? dl + (lang === "en" ? "D" : lang === "es" ? "D" : "T") : t("home.today", lang), fg], [t("home.rates", lang), (rp ? rp.raten_bezahlt : 0) + "/" + (rp ? rp.raten_gesamt : 0), fg]].map(([l, v, c], i) => (
             <div key={i} style={{ flex: 1, borderRadius: 12, padding: "12px 8px", textAlign: "center", background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + border }}>
               <div style={{ ...lb, marginBottom: 3 }}>{l as string}</div>
               <div style={{ ...hd, fontSize: 20, fontWeight: 800, color: c as string }}>{v as string}</div>
@@ -405,7 +405,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
             <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
             <div style={{ width: 28, height: 1, background: dk ? "#444" : "#d0c8bc", margin: "4px 0" }} />
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: muted }}>VON {rp.raten_gesamt}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: muted }}>{t("progress.of", lang)} {rp.raten_gesamt}</div>
           </div>
         </div>
       )}
@@ -635,58 +635,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Phase Detail Drawer */}
       <AnimatePresence>
         {phaseDrawer && (() => {
-          const phaseInfo: Record<string, { emoji: string; summary: string; fokus?: string; details: { title: string; content: string }[] }> = {
-            "Initialuntersuchung": {
-              emoji: "🔍",
-              summary: "Der erste Schritt deiner Behandlung. Hier werden alle wichtigen Daten erhoben: digitale Scans, Fotos, Röntgenbilder. Daraus entsteht dein individueller Behandlungsplan.",
-              fokus: "Alle Unterlagen und Befunde für die Behandlungsplanung zusammentragen. Falls du noch offene Fragen hast, ist jetzt der beste Zeitpunkt sie zu stellen.",
-              details: [
-                { title: "Was passiert genau?", content: "Bei der Erstuntersuchung werden 3D-Scans deiner Zähne gemacht, dazu Fotos von Gesicht und Zähnen aus verschiedenen Winkeln. Falls nötig wird ein Röntgenbild angefertigt. Anhand dieser Daten plant die Kieferorthopädin den genauen Ablauf deiner Behandlung." },
-                { title: "Wie lange dauert das?", content: "Der Termin dauert etwa 45 bis 60 Minuten. Die Auswertung und Planerstellung braucht dann nochmal ein paar Tage. Beim Folgetermin wird dir der Behandlungsplan vorgestellt." },
-                { title: "Was du beachten solltest", content: "Keine besondere Vorbereitung nötig. Am besten vorher gründlich Zähne putzen. Wenn du Fragen zum Behandlungsablauf hast, schreib sie dir vorher auf damit du nichts vergisst." },
-                { title: "Ergebnis", content: "Du bekommst einen klaren Plan mit allen Schritten, der voraussichtlichen Dauer und den Kosten. Danach weißt du genau was auf dich zukommt." },
-              ]
-            },
-            "Aligner Set 1-11": {
-              emoji: "🦷",
-              summary: "Los geht's! Deine ersten Aligner-Schienen sind da. In dieser Phase gewöhnen sich deine Zähne an die Bewegung und die ersten größeren Korrekturen finden statt.",
-              fokus: "Gewöhne dich an das konsequente Tragen der Schienen. 20-22 Stunden pro Tag sind ideal. Die erste Woche ist die schwierigste, danach wird es Routine.",
-              details: [
-                { title: "Was passiert genau?", content: "Du bekommst deine ersten Aligner-Schienen. Jede Schiene trägst du etwa 1-2 Wochen, dann wechselst du zur nächsten. Jede Schiene bewegt deine Zähne ein kleines Stückchen weiter. Die Schienen sind fast unsichtbar und herausnehmbar." },
-                { title: "Wie lange dauert das?", content: "Bei einem Wechsel alle 10-14 Tage dauert diese Phase etwa 3 bis 5 Monate. Regelmäßige Kontrollen finden alle 6-8 Wochen statt." },
-                { title: "Tragezeit", content: "Die Aligner sollten mindestens 20-22 Stunden am Tag getragen werden. Nur zum Essen und Zähneputzen rausnehmen. Je konsequenter du trägst, desto besser das Ergebnis und desto schneller bist du fertig." },
-                { title: "Tipps für den Alltag", content: "Gewöhne dir an die Aligner immer in der Box aufzubewahren wenn du sie rausnimmst. Trinke nichts Heißes oder Gefärbtes mit Alignern. Nach dem Essen kurz Zähne putzen bevor du sie wieder einsetzt. Die ersten 2-3 Tage mit einem neuen Set können sich die Zähne etwas empfindlich anfühlen." },
-                { title: "Fortschritte", content: "Schon nach den ersten Schienen wirst du Veränderungen bemerken. Besonders bei Engständen oder leichten Drehungen sieht man schnell Ergebnisse." },
-              ]
-            },
-            "Aligner Set 12-24": {
-              emoji: "✨",
-              summary: "Die zweite Hälfte deiner Aligner-Behandlung. Jetzt geht es um Feinjustierung: Rotationen im Oberkiefer, Bisslage optimieren, letzte Korrekturen.",
-              fokus: "Achte in dieser Phase besonders auf die Kaumuskelspannung. Leichte Massagen helfen bei erstem Druckgefühl in den ersten Tagen nach einem Schienenwechsel.",
-              details: [
-                { title: "Was passiert genau?", content: "Die Aligner in dieser Phase arbeiten an den feineren Details. Kleine Rotationen werden korrigiert, die Verzahnung von Ober- und Unterkiefer wird optimiert. Eventuell werden Attachments (kleine zahnfarbene Erhebungen) auf einzelne Zähne geklebt um die Bewegung präziser zu steuern." },
-                { title: "Attachments", content: "Falls du Attachments bekommst: Das sind kleine Composit-Knöpfe die auf den Zahn geklebt werden. Sie sind zahnfarben und fallen kaum auf. Sie helfen dem Aligner besser zu greifen. Am Ende der Behandlung werden sie rückstandslos entfernt." },
-                { title: "Aktueller Fokus", content: "Achte in dieser Phase besonders auf die Kaumuskelspannung. Leichte Massagen helfen bei erstem Druckgefühl in den ersten Tagen. Die Feinarbeit kann sich manchmal langsamer anfühlen, aber die Details machen den Unterschied." },
-                { title: "Fortschritte", content: "Dein Lächeln nimmt immer mehr seine finale Form an. Vergleiche mal ein Foto vom Anfang mit jetzt. Die Veränderung ist oft beeindruckender als man im Alltag wahrnimmt." },
-              ]
-            },
-            "Retainer & Abschluss": {
-              emoji: "🛡️",
-              summary: "Geschafft! Die aktive Behandlung ist abgeschlossen. Jetzt geht es darum dein Ergebnis langfristig zu stabilisieren.",
-              fokus: "Trage deinen Retainer konsequent. In den ersten Monaten jede Nacht, danach nach Absprache. Deine Zähne wollen sich zurückbewegen, der Retainer verhindert das.",
-              details: [
-                { title: "Was passiert genau?", content: "Du bekommst einen festsitzenden Retainer (dünner Draht hinter den Frontzähnen) und eine herausnehmbare Retainer-Schiene. Der feste Retainer bleibt dauerhaft und ist von außen unsichtbar. Die Schiene trägst du nachts." },
-                { title: "Trageschema", content: "Erste 6 Monate: Schiene jede Nacht tragen. Danach nach Empfehlung 3-4 Nächte pro Woche. Der festsitzende Retainer arbeitet rund um die Uhr und braucht keine Aufmerksamkeit außer guter Pflege." },
-                { title: "Pflege", content: "Den festsitzenden Retainer täglich mit Zahnseide reinigen, am besten mit einem Floss-Threader. Die Schiene morgens mit kaltem Wasser und einer weichen Zahnbürste reinigen. Niemals heißes Wasser verwenden, das verformt den Kunststoff." },
-                { title: "Dein Ergebnis", content: "Deine Zähne stehen jetzt so wie geplant. Der Retainer ist deine Versicherung dass das so bleibt. Komm weiterhin zu den Nachsorgeterminen, damit wir sicherstellen dass alles stabil bleibt." },
-              ]
-            },
-          };
-          const info = phaseInfo[phaseDrawer.name] || {
-            emoji: "📋",
-            summary: phaseDrawer.beschreibung || "Details zu dieser Phase.",
-            details: [{ title: "Info", content: "Sprich mit deinem Praxisteam für mehr Details zu dieser Phase." }],
-          };
+          const info = getPhaseContent(phaseDrawer.name, lang);
+          if (!info.summary) {
+            info.summary = translatePhase(phaseDrawer.name, lang).beschreibung || phaseDrawer.beschreibung || "";
+            if (!info.details.length) info.details = [{ title: lang === "en" ? "More info" : lang === "es" ? "Más información" : "Mehr Info" }];
+          }
           return (
             <motion.div
               key="phase-backdrop"
