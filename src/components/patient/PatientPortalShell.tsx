@@ -40,6 +40,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [msgInput, setMsgInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [docDrawer, setDocDrawer] = useState<Doc | null>(null);
+  const [showIBAN, setShowIBAN] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [rp, setRp] = useState<RpData | null>(null);
@@ -378,7 +379,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
           <div style={{ margin: "0 20px 14px" }}>
-            <button onClick={() => hapticStrong()} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Jetzt ausgleichen</button>
+            <button onClick={() => { hapticStrong(); setShowIBAN(true); }} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Jetzt ausgleichen</button>
           </div>
         </div>
       )}
@@ -484,7 +485,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div style={{ fontSize: 40, marginBottom: 10 }}>🎥</div>
         <h3 style={{ ...hd, fontSize: 17, fontWeight: 700, marginBottom: 6, color: fg }}>Beratungsgespräch</h3>
         <p style={{ fontSize: 13, lineHeight: 1.5, color: soft, marginBottom: 18 }}>Fragen zu deinem Ratenplan? Starte ein Videogespräch mit unserem Praxisberater.</p>
-        <button style={{ border: "none", borderRadius: 14, padding: "14px 32px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#7c3aed" }}>Gespräch anfragen</button>
+        <button onClick={async () => { hapticMedium(); try { await fetch("/api/patient/nachrichten", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Ich hätte gerne ein Beratungsgespräch zu meinem Ratenplan. Können Sie mir einen Termin vorschlagen?" }) }); } catch {} setTab("chat"); }} style={{ border: "none", borderRadius: 14, padding: "14px 32px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#7c3aed" }}>Gespräch anfragen</button>
       </div>
       <div style={{ ...card, margin: "0 20px 14px" }}>
         <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: fg }}>Über diese App</p>
@@ -611,13 +612,79 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               </motion.div>
               {/* Action buttons */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.3 }} style={{ display: "flex", gap: 10, padding: "20px 24px 32px" }}>
-                <motion.button onClick={() => hapticMedium()} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: fg, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <motion.button onClick={() => { hapticMedium(); if (navigator.share) { navigator.share({ title: docDrawer.name, text: docDrawer.name + " - Anima Cura Patientenportal" }).catch(() => {}); } }} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: fg, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   📤 Teilen
                 </motion.button>
-                <motion.button onClick={() => hapticSuccess()} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <motion.button onClick={() => { hapticSuccess(); if (docDrawer.file_url) { window.open(docDrawer.file_url, "_blank"); } }} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   ⬇ Herunterladen
                 </motion.button>
               </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* IBAN Payment Overlay */}
+      <AnimatePresence>
+        {showIBAN && (
+          <motion.div
+            key="iban-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowIBAN(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={0.1}
+              onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setShowIBAN(false); }}
+              onClick={e => e.stopPropagation()}
+              style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px" }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
+              </div>
+              <div style={{ padding: "4px 24px 8px" }}>
+                <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg, marginBottom: 4 }}>Offene Rate ausgleichen</h3>
+                <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>Bitte überweise den offenen Betrag an folgende Bankverbindung:</p>
+              </div>
+              <div style={{ margin: "0 24px", borderRadius: 16, padding: 20, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)") }}>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Empfänger</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>Praxis Dr. Maria Schubert</div>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>IBAN</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fg, fontFamily: "monospace", letterSpacing: "0.05em" }}>DE89 3704 0044 0532 0130 00</div>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>BIC</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fg, fontFamily: "monospace" }}>COBADEFFXXX</div>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Betrag</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: red, ...hd }}>{rp && rp.ueberfaellig ? rp.ueberfaellig.betrag.toFixed(2).replace(".", ",") : "150,00"} €</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>Verwendungszweck</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>Rate {firstName} {patientName.split(" ").pop()}</div>
+                </div>
+              </div>
+              <div style={{ padding: "20px 24px 32px" }}>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => { hapticSuccess(); if (navigator.clipboard) { navigator.clipboard.writeText("DE89 3704 0044 0532 0130 00").catch(() => {}); } }}
+                  style={{ width: "100%", padding: 16, borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}
+                >
+                  📋 IBAN kopieren
+                </motion.button>
+                <button onClick={() => setShowIBAN(false)} style={{ width: "100%", padding: 14, borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: muted, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Schließen</button>
+              </div>
             </motion.div>
           </motion.div>
         )}
