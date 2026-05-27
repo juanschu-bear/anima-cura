@@ -125,6 +125,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
   matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };

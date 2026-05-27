@@ -56,11 +56,7 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
 ];
 
 export function extractAppRole(value: unknown): AppRole | null {
-<<<<<<< HEAD
-  if (value === "admin" || value === "verwaltung" || value === "lesezugriff") {
-=======
   if (value === "admin" || value === "verwaltung" || value === "lesezugriff" || value === "patient") {
->>>>>>> 71e12fe (feat: add patient portal with 10 API endpoints, auth, login, 5-tab mobile UI + fix cfo/query build error)
     return value;
   }
   return null;
