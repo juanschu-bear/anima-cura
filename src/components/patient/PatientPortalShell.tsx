@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -37,6 +38,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [popup, setPopup] = useState<Badge | null>(null);
   const [msgInput, setMsgInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [docDrawer, setDocDrawer] = useState<Doc | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [rp, setRp] = useState<RpData | null>(null);
@@ -447,7 +449,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </div>
       {docs.length > 0 && <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 10, color: fg }}>Dokumente</p></div>}
       {docs.map(d => (
-        <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
+        <div key={d.id} onClick={() => setDocDrawer(d)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 20 }}>{docIc[d.typ] || "📄"}</span>
             <div><div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{d.name}</div><div style={{ fontSize: 11, color: muted }}>{fmtDate(d.hochgeladen_am)}</div></div>
@@ -508,12 +510,92 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         </div>
       )}
+      {/* Document Bottom Sheet Drawer - Framer Motion */}
+      <AnimatePresence>
+        {docDrawer && (
+          <motion.div
+            key="doc-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setDocDrawer(null)}
+            style={{ position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+          >
+            <motion.div
+              key="doc-sheet"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={0.1}
+              onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setDocDrawer(null); }}
+              onClick={e => e.stopPropagation()}
+              style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), borderBottom: "none", overflow: "hidden" }}
+            >
+              {/* Handle bar */}
+              <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", cursor: "grab" }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
+              </div>
+              {/* Header */}
+              <div style={{ padding: "4px 24px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15, duration: 0.3 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: grn, marginBottom: 4 }}>{docDrawer.typ.charAt(0).toUpperCase() + docDrawer.typ.slice(1)}</div>
+                  <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg }}>{docDrawer.name}</h3>
+                  <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>Hochgeladen am {fmtDate(docDrawer.hochgeladen_am)}</p>
+                </motion.div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setDocDrawer(null)} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: muted }}>✕</motion.button>
+              </div>
+              {/* Mock PDF Preview */}
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.35 }} style={{ margin: "0 24px", borderRadius: 16, padding: 24, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"), minHeight: 280 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 20 }}>📄</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: fg }}>{docDrawer.name}</div>
+                    <div style={{ fontSize: 11, color: muted }}>PDF · Praxis Dr. Schubert</div>
+                  </div>
+                </div>
+                {/* Skeleton wireframe lines with staggered entrance */}
+                {[100, 85, 92, 60, 88, 75, 95, 40].map((w, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, scaleX: 0.3 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ delay: 0.25 + i * 0.04, duration: 0.3 }} style={{ height: 8, borderRadius: 4, marginBottom: 10, width: w + "%", background: dk ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", transformOrigin: "left", animation: `skeletonPulse 2.5s ease-in-out infinite ${i * 0.12}s` }} />
+                ))}
+                {/* Skeleton signature area */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + (dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"), display: "flex", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ height: 6, width: 80, borderRadius: 3, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)", marginBottom: 6 }} />
+                    <div style={{ height: 6, width: 120, borderRadius: 3, background: dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }} />
+                  </div>
+                  <div style={{ width: 50, height: 50, borderRadius: 8, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 10, color: muted }}>Siegel</span>
+                  </div>
+                </motion.div>
+              </motion.div>
+              {/* Action buttons */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.3 }} style={{ display: "flex", gap: 10, padding: "20px 24px 32px" }}>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: "transparent", color: fg, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  📤 Teilen
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  ⬇ Herunterladen
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <style>{fontCss}{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
         @keyframes blobDrift1 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(30px, 40px) scale(1.1); } 50% { transform: translate(-20px, 60px) scale(0.95); } 75% { transform: translate(15px, 20px) scale(1.05); } 100% { transform: translate(0, 0) scale(1); } }
         @keyframes blobDrift2 { 0% { transform: translate(0, 0) scale(1); } 25% { transform: translate(-35px, -25px) scale(1.08); } 50% { transform: translate(20px, -40px) scale(0.92); } 75% { transform: translate(-10px, 15px) scale(1.04); } 100% { transform: translate(0, 0) scale(1); } }
         @keyframes blobDrift3 { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(25px, -30px) scale(1.12); } 66% { transform: translate(-30px, 20px) scale(0.9); } 100% { transform: translate(0, 0) scale(1); } }
         @keyframes blobDrift4 { 0% { transform: translate(0, 0) scale(1); opacity: 0.8; } 25% { transform: translate(40px, -20px) scale(1.15); opacity: 1; } 50% { transform: translate(-15px, 35px) scale(0.85); opacity: 0.6; } 75% { transform: translate(25px, 10px) scale(1.1); opacity: 0.9; } 100% { transform: translate(0, 0) scale(1); opacity: 0.8; } }
+        @keyframes slideUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
+        @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
       `}</style>
     </div>
     </div>
