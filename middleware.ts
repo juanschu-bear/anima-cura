@@ -15,6 +15,7 @@ const DASHBOARD_MATCHERS = [
   "/mahnwesen",
   "/quartal",
   "/berichte",
+  "/nachrichten",
   "/automatisierungen",
   "/import",
   "/einstellungen",
@@ -146,5 +147,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
+  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/nachrichten/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };

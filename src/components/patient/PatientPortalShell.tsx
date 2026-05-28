@@ -665,10 +665,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div style={{ padding: 16, borderRadius: 14, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), marginBottom: 12, fontSize: 13, lineHeight: 1.7, color: soft }}>
             <strong style={{ color: fg, fontSize: 14 }}>{lang === "en" ? "What we store:" : lang === "es" ? "Lo que almacenamos:" : "Was wir speichern:"}</strong><br/>
             {lang === "en"
-              ? "Name, treatment phases, payment data, chat messages, documents. All data stored encrypted on EU servers (Frankfurt, Germany). Only accessible to you and your practice team."
+              ? "Name, treatment phases, documents, invoices, chat messages. All data stored encrypted on EU servers (Frankfurt, Germany). Only accessible to you and your practice team. We do not process payments — we only provide your documents digitally."
               : lang === "es"
-              ? "Nombre, fases de tratamiento, datos de pago, mensajes de chat, documentos. Todos los datos almacenados encriptados en servidores de la UE (Frankfurt, Alemania)."
-              : "Name, Behandlungsphasen, Zahlungsdaten, Chat-Nachrichten, Dokumente. Alle Daten verschlüsselt auf EU-Servern gespeichert (Frankfurt, Deutschland). Nur für dich und dein Praxisteam zugänglich."}
+              ? "Nombre, fases de tratamiento, documentos, facturas, mensajes de chat. Todos los datos almacenados encriptados en servidores de la UE (Frankfurt, Alemania). No procesamos pagos — solo proporcionamos tus documentos digitalmente."
+              : "Name, Behandlungsphasen, Dokumente, Rechnungen, Chat-Nachrichten. Alle Daten verschlüsselt auf EU-Servern gespeichert (Frankfurt, Deutschland). Nur für dich und dein Praxisteam zugänglich. Wir verarbeiten keine Zahlungen — wir stellen dir deine Unterlagen digital bereit."}
           </div>
 
           {/* Your rights */}
@@ -708,7 +708,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 {consentCheck2 && <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>✓</span>}
               </div>
               <span style={{ fontSize: 13, color: fg, lineHeight: 1.5 }}>
-                {lang === "en" ? "I consent to the digital processing of my treatment and payment data within Anima Cura." : lang === "es" ? "Doy mi consentimiento para el tratamiento digital de mis datos dentro de Anima Cura." : "Ich willige in die digitale Verarbeitung meiner Behandlungs- und Zahlungsdaten innerhalb von Anima Cura ein."}
+                {lang === "en" ? "I consent to receiving my invoices, treatment documents and notifications digitally via the Anima Cura app." : lang === "es" ? "Doy mi consentimiento para recibir mis facturas, documentos de tratamiento y notificaciones digitalmente a través de Anima Cura." : "Ich bin einverstanden, meine Rechnungen, Behandlungsunterlagen und Benachrichtigungen digital über die Anima Cura App zu erhalten."}
               </span>
             </label>
             {isMinor && (
