@@ -158,7 +158,7 @@ export default function BerichtePage() {
   const visiblePosten = showAllPosten ? postenList : postenList.slice(0, 5);
 
   // For monthly view, show daily data
-  const chartData = zeitraum === "monat" ? (a.monatlich || []) : (a.monatlich || []);
+  const chartData = viewMode === "monat" ? (a.monatlich || []) : (a.monatlich || []);
 
   return (
     <div>
