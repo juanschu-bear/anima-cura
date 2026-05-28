@@ -13,6 +13,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.rateplans": { de: "Ratenpläne", en: "Installments" },
   "nav.dunning": { de: "Mahnwesen", en: "Dunning" },
   "nav.quarterly": { de: "Quartalsbericht", en: "Quarterly" },
+  "nav.reports": { de: "Berichte", en: "Reports" },
   "nav.automations": { de: "Automatisierungen", en: "Automations" },
   "nav.import": { de: "Datenimport", en: "Data Import" },
   "nav.settings": { de: "Einstellungen", en: "Settings" },
