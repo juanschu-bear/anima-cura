@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       sc.from("raten").select("id, betrag, faellig_am, status, bezahlt_am, mahnstufe, patient_id").gte("faellig_am", from).lte("faellig_am", to),
       sc.from("raten").select("id, betrag, faellig_am, patient_id, mahnstufe").eq("status", "überfällig"),
       sc.from("ratenplaene").select("id", { count: "exact", head: true }).eq("status", "aktiv"),
-      sc.from("raten").select("id, mahnstufe, faellig_am").gt("mahnstufe", 0).gte("faellig_am", from).lte("faellig_am", to),
+      sc.from("raten").select("id, mahnstufe, faellig_am, patient_id, betrag").gt("mahnstufe", 0).gte("faellig_am", from).lte("faellig_am", to),
     ]);
 
     const bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];
@@ -52,9 +52,15 @@ export async function GET(request: NextRequest) {
     bArr.forEach(r => { const m = r.bezahlt_am?.slice(0, 7); if (m) { if (!monatlich[m]) monatlich[m] = { einnahmen: 0, geplant: 0 }; monatlich[m].einnahmen += Number(r.bezahlt_betrag || r.betrag || 0); } });
     fArr.forEach(r => { const m = r.faellig_am?.slice(0, 7); if (m) { if (!monatlich[m]) monatlich[m] = { einnahmen: 0, geplant: 0 }; monatlich[m].geplant += Number(r.betrag || 0); } });
 
-    // Mahnstufen
+    // Mahnstufen with patient details
     const mahnstufen = { stufe1: 0, stufe2: 0, stufe3: 0 };
-    mArr.forEach(m => { if (m.mahnstufe === 1) mahnstufen.stufe1++; else if (m.mahnstufe === 2) mahnstufen.stufe2++; else if (m.mahnstufe >= 3) mahnstufen.stufe3++; });
+    const mahnDetails: { stufe: number; patient_id: string; betrag: number; faellig_am: string }[] = [];
+    mArr.forEach(m => {
+      if (m.mahnstufe === 1) mahnstufen.stufe1++;
+      else if (m.mahnstufe === 2) mahnstufen.stufe2++;
+      else if (m.mahnstufe >= 3) mahnstufen.stufe3++;
+      mahnDetails.push({ stufe: m.mahnstufe, patient_id: (m as any).patient_id || "", betrag: 0, faellig_am: m.faellig_am });
+    });
 
     // Forderungsalter (unter 30, 30-60, über 60 Tage)
     const now = Date.now();
@@ -69,10 +75,16 @@ export async function GET(request: NextRequest) {
 
     // Alle offene Posten (nicht nur top 5)
     const alleOffene = uArr.sort((a, b) => Number(b.betrag) - Number(a.betrag));
-    const patIds = Array.from(new Set(alleOffene.map(r => r.patient_id)));
-    const { data: patienten } = await sc.from("patients").select("id, vorname, nachname").in("id", patIds.length > 0 ? patIds : ["00000000-0000-0000-0000-000000000000"]);
+    const allPatIds = Array.from(new Set([...alleOffene.map(r => r.patient_id), ...mahnDetails.map(m => m.patient_id)].filter(Boolean)));
+    const { data: patienten } = await sc.from("patients").select("id, vorname, nachname").in("id", allPatIds.length > 0 ? allPatIds : ["00000000-0000-0000-0000-000000000000"]);
     const patMap: Record<string, string> = {};
     (patienten || []).forEach(p => { patMap[p.id] = `${p.nachname}, ${p.vorname}`; });
+
+    // Enrich mahnDetails with names and betrag
+    const mahnDetailsMapped = mahnDetails.map(m => {
+      const matchingRate = mArr.find(r => r.faellig_am === m.faellig_am && (r as any).patient_id === m.patient_id);
+      return { ...m, betrag: Number((matchingRate as any)?.betrag || 0), patient_name: patMap[m.patient_id] || "Unbekannt" };
+    });
 
     return {
       einnahmen, einnahmenProKopf, zahlungsquote, avgVerzoegerung, mahnquote,
@@ -80,7 +92,7 @@ export async function GET(request: NextRequest) {
       zahlendePatienten: uniquePatients.size,
       verteilung: { puenktlich, verspaetet, ueberfaellig: ueberfaelligCount, offen: offenCount },
       monatlich: Object.entries(monatlich).sort((a, b) => a[0].localeCompare(b[0])).map(([monat, data]) => ({ monat, ...data })),
-      mahnstufen, forderungsalter,
+      mahnstufen, mahnDetails: mahnDetailsMapped, forderungsalter,
       offenePostenListe: alleOffene.map(r => ({ id: r.id, betrag: Number(r.betrag), faellig_am: r.faellig_am, patient_name: patMap[r.patient_id] || "Unbekannt", patient_id: r.patient_id, mahnstufe: r.mahnstufe, tage: Math.floor((now - new Date(r.faellig_am).getTime()) / 864e5) })),
     };
   }

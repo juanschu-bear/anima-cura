@@ -248,14 +248,15 @@ export default function BerichtePage() {
         </motion.div>
 
         <motion.div {...anim(0.2)} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20, backdropFilter: dk ? "blur(20px)" : undefined }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: txtH }}>Mahnstufen</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={[{ name: "Stufe 1", count: a.mahnstufen.stufe1 }, { name: "Stufe 2", count: a.mahnstufen.stufe2 }, { name: "Stufe 3", count: a.mahnstufen.stufe3 }]}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: txtH }}>Mahnstufen</h3>
+          <p style={{ fontSize: 12, color: muted, marginBottom: 12 }}>Klick auf eine Stufe f{"\u00fc"}r Details</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={[{ name: "Stufe 1", count: a.mahnstufen.stufe1, stufe: 1 }, { name: "Stufe 2", count: a.mahnstufen.stufe2, stufe: 2 }, { name: "Stufe 3", count: a.mahnstufen.stufe3, stufe: 3 }]} onClick={(e: any) => { if (e?.activePayload?.[0]?.payload?.stufe) setPopup(`mahn-${e.activePayload[0].payload.stufe}`); }}>
               <CartesianGrid strokeDasharray="3 3" stroke={soft} />
               <XAxis dataKey="name" tick={{ fill: muted, fontSize: 12 }} />
               <YAxis tick={{ fill: muted, fontSize: 11 }} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number, name: string) => [`${val} Raten`, name]} labelStyle={{ color: dk ? "#f0f0f0" : "#333" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} name="Raten">{[ylw, orn, red].map((c, i) => <Cell key={i} fill={c} />)}</Bar>
+              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number) => [`${val} Raten`]} labelStyle={{ color: dk ? "#f0f0f0" : "#333" }} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} name="Raten" cursor="pointer">{[ylw, orn, red].map((c, i) => <Cell key={i} fill={c} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -318,6 +319,47 @@ export default function BerichtePage() {
           )}
         </motion.div>
       </div>
+
+      {/* Detail Popup */}
+      <AnimatePresence>
+        {popup && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPopup(null)} style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={e => e.stopPropagation()} style={{ background: dk ? "#1a1d2b" : "#fff", borderRadius: 20, border: `1px solid ${border}`, padding: 24, maxWidth: 500, width: "100%", maxHeight: "70vh", overflowY: "auto" }}>
+              {popup.startsWith("mahn-") && (() => {
+                const stufe = parseInt(popup.split("-")[1]);
+                const stufeColor = stufe === 1 ? ylw : stufe === 2 ? orn : red;
+                const details = (a.mahnDetails || []).filter((m: any) => m.stufe === stufe);
+                return (<>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: txtH, margin: 0 }}>Mahnstufe {stufe}</h3>
+                    <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"\u2715"}</button>
+                  </div>
+                  <div style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{details.length} Raten auf Mahnstufe {stufe}</div>
+                  {details.length === 0 ? <p style={{ color: muted, fontSize: 14 }}>Keine Eintr{"\u00e4"}ge</p> : details.map((m: any, i: number) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${dk ? "rgba(255,255,255,0.04)" : "#f0f0f0"}` : "none" }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: txtH }}>{m.patient_name}</div>
+                        <div style={{ fontSize: 11, color: muted }}>F{"\u00e4"}llig: {new Date(m.faellig_am).toLocaleDateString("de-DE")}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {m.betrag > 0 && <span style={{ fontSize: 15, fontWeight: 700, color: stufeColor }}>{fmtEur(m.betrag)}</span>}
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: `${stufeColor}20`, color: stufeColor }}>Stufe {stufe}</span>
+                      </div>
+                    </div>
+                  ))}
+                </>);
+              })()}
+              {popup === "plaene" && (<>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: txtH, margin: 0 }}>Aktive Ratenpl{"\u00e4"}ne</h3>
+                  <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"\u2715"}</button>
+                </div>
+                <div style={{ fontSize: 14, color: muted, textAlign: "center", padding: "30px 0" }}>{a.aktivePlaene} aktive Pl{"\u00e4"}ne</div>
+              </>)}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`@keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }`}</style>
     </div>
