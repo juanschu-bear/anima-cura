@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAlerts, useTransaktionen } from "@/hooks/useData";
 import { CardSkeleton, StatusBadge } from "@/components/ui";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
 import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert, Users, Stethoscope, Shield, CreditCard } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { t, tData } from "@/lib/i18n";
+import { motion } from "framer-motion";
 
 interface PraxisStats {
   totalPatienten: number;
@@ -141,28 +143,28 @@ export default function UebersichtPage() {
             <KpiCard
               icon={<Users size={18} />}
               label={t("overview.totalPatients", locale)}
-              value={String(stats?.totalPatienten || 0)}
+              value={<AnimatedNumber value={stats?.totalPatienten || 0} />}
               sub={`${stats?.mitEmail || 0} ${t("overview.withEmail", locale)} · ${stats?.mitTelefon || 0} ${t("overview.withPhone", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<Stethoscope size={18} />}
               label={t("overview.withTreatment", locale)}
-              value={String(stats?.behandlungVerteilung?.reduce((s, b) => s + b.value, 0) || 0)}
+              value={<AnimatedNumber value={stats?.behandlungVerteilung?.reduce((s, b) => s + b.value, 0) || 0} />}
               sub={`${stats?.behandlungVerteilung?.find(b => b.name === "Kein Status")?.value || 0} ${t("overview.withoutStatus", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<Shield size={18} />}
               label={t("overview.insurance", locale)}
-              value={`${stats?.kasseVerteilung?.find(k => k.name === "Gesetzlich")?.value || 0} ${t("insurance.gkv", locale)}`}
+              value={<><AnimatedNumber value={stats?.kasseVerteilung?.find(k => k.name === "Gesetzlich")?.value || 0} /> {t("insurance.gkv", locale)}</>}
               sub={`${stats?.kasseVerteilung?.find(k => k.name === "Privat")?.value || 0} ${t("overview.privatePatients", locale)}`}
               dark={isDark}
             />
             <KpiCard
               icon={<CreditCard size={18} />}
               label={t("overview.openInstallments", locale)}
-              value={stats?.offeneRaten ? String(stats.offeneRaten) : "—"}
+              value={stats?.offeneRaten ? <AnimatedNumber value={stats.offeneRaten} /> : "—"}
               sub={stats?.imMahnverfahren ? `${stats.imMahnverfahren} ${t("overview.inDunning", locale)}` : t("overview.noRatePlans", locale)}
               valueClass={stats?.offeneRaten ? "text-[#cb4a55]" : ""}
               dark={isDark}
@@ -325,20 +327,26 @@ function KpiCard({
 }: {
   icon?: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
   sub?: string;
   valueClass?: string;
   subClass?: string;
   dark?: boolean;
 }) {
   return (
-    <div className={`rounded-[16px] border px-6 py-5 shadow-card ${dark ? "border-white/12 bg-[#111824]" : "border-surface-200 bg-white"}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      whileHover={{ scale: 1.02, y: -2 }}
+      className={`rounded-[16px] border px-6 py-5 shadow-card cursor-default ${dark ? "border-white/12 bg-[#111824]" : "border-surface-200 bg-white"}`}
+    >
       <div className="flex items-center gap-2">
         {icon && <span className={dark ? "text-[#7b93b4]" : "text-[#8797ac]"}>{icon}</span>}
         <p className={`text-[14px] font-semibold ${dark ? "text-[#9fb2cd]" : "text-[#8797ac]"}`}>{label}</p>
       </div>
       <p className={`mt-2 text-[48px] leading-none font-bold tracking-tight ${dark ? "text-[#f2f6ff]" : "text-[#1f2f43]"} ${valueClass || ""}`}>{value}</p>
       {sub ? <p className={`mt-2 text-sm ${dark ? "text-[#a7b8cf]" : "text-[#7f8ea2]"} ${subClass || ""}`}>{sub}</p> : null}
-    </div>
+    </motion.div>
   );
 }

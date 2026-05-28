@@ -266,6 +266,49 @@ samp {
 :root[data-theme="dark"] .btn-primary:hover {
   background: #16a34a;
 }
+
+/* Dark mode rate cards */
+:root[data-theme="dark"] .rounded-xl.border-\[\#93d58f\].bg-\[\#eaf7e8\] {
+  background: rgba(74,222,128,0.08) !important;
+  border-color: rgba(74,222,128,0.2) !important;
+}
+:root[data-theme="dark"] .rounded-xl.border-accent-coral\/40.bg-accent-coral\/10 {
+  background: rgba(239,68,68,0.1) !important;
+  border-color: rgba(239,68,68,0.25) !important;
+}
+:root[data-theme="dark"] .rounded-xl.border-surface-200.bg-white {
+  background: rgba(255,255,255,0.03) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+
+/* Dark mode table */
+:root[data-theme="dark"] .table-cell {
+  color: #c4d1e3;
+  border-color: rgba(255,255,255,0.04);
+}
+:root[data-theme="dark"] tbody tr {
+  transition: background 0.15s ease;
+}
+:root[data-theme="dark"] tbody tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+/* Dark mode modal */
+:root[data-theme="dark"] [role="dialog"],
+:root[data-theme="dark"] .modal-content {
+  background: #12151e !important;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Dark mode select/input improvements */
+:root[data-theme="dark"] select.input {
+  background: rgba(20,22,35,0.8);
+  color: #f0f0f0;
+}
+:root[data-theme="dark"] select.input option {
+  background: #12151e;
+  color: #f0f0f0;
+}
 :root[data-theme="dark"] .btn-secondary {
   background: var(--ac-surface-muted);
   border-color: var(--ac-border);

@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/db/supabase";
 import { Modal, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { motion } from "framer-motion";
 
 export default function RatenplanPage() {
   const { locale } = useAppStore();
@@ -183,16 +184,23 @@ export default function RatenplanPage() {
           <div className="stat-card">
             <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">{t("rateplans.allRates", locale)}</h3>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9">
-              {selectedRates.map((rate: any) => (
-                <div
+              {selectedRates.map((rate: any, idx: number) => {
+                const isLate = rate.status === "bezahlt" && rate.bezahlt_am && rate.faellig_am && (new Date(rate.bezahlt_am).getTime() - new Date(rate.faellig_am).getTime()) > 3 * 864e5;
+                const cardClass = rate.status === "bezahlt"
+                  ? isLate
+                    ? "border-yellow-500/30 bg-yellow-500/8 dark:border-yellow-500/20 dark:bg-yellow-500/5"
+                    : "border-[#93d58f] bg-[#eaf7e8]"
+                  : rate.status === "überfällig"
+                  ? "border-accent-coral/40 bg-accent-coral/10"
+                  : "border-surface-200 bg-white";
+                return (
+                <motion.div
                   key={rate.id}
-                  className={`rounded-xl border p-3 ${
-                    rate.status === "bezahlt"
-                      ? "border-[#93d58f] bg-[#eaf7e8]"
-                      : rate.status === "überfällig"
-                      ? "border-accent-coral/40 bg-accent-coral/10"
-                      : "border-surface-200 bg-white"
-                  }`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.02, duration: 0.3 }}
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  className={`rounded-xl border p-3 cursor-default transition-shadow ${cardClass}`}
                 >
                   <p className="text-sm font-semibold text-praxis-700">{t("rateplans.rate", locale)} {rate.rate_nummer}</p>
                   <p className="mt-1 text-2xl font-extrabold leading-none tracking-tight text-praxis-800">
@@ -201,8 +209,10 @@ export default function RatenplanPage() {
                   <p className="mt-2 text-xs text-praxis-400">
                     {new Date(rate.faellig_am).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE", { month: "short", year: "2-digit" })}
                   </p>
-                </div>
-              ))}
+                  {isLate && <p className="mt-1 text-[10px] font-bold text-yellow-500">Verspätet</p>}
+                </motion.div>
+                );
+              })}
             </div>
           </div>
         </>

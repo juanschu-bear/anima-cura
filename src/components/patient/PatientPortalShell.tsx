@@ -737,16 +737,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{info.fokus}</p>
                   </motion.div>
                 )}
-                {/* Pflege-Tipp - shown if tips exist */}
-                {tipps.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} style={{ margin: "0 24px 16px", padding: "16px", borderRadius: 14, background: dk ? "rgba(251,191,36,0.04)" : "rgba(234,179,80,0.04)", border: "1px solid " + (dk ? "rgba(251,191,36,0.1)" : "rgba(234,179,80,0.08)") }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 16 }}>💡</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Care tip" : lang === "es" ? "Consejo de cuidado" : "Pflege-Tipp"}</span>
-                    </div>
-                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{translateTipp(tipps[0].text, lang)}</p>
-                  </motion.div>
-                )}
                 {/* Interactive detail buttons - Claude answers inline */}
                 {info.details.map((d, i) => {
                   const answerKey = phaseDrawer.name + "::" + d.title;
