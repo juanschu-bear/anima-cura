@@ -643,7 +643,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consentIsGuardian, setConsentIsGuardian] = useState(false);
 
   // Determine if patient is minor (from geburtsdatum in patient data, or assume adult if unknown)
-  const patientGeb = rp?.patient?.geburtsdatum;
+  const patientGeb = null;
   const isMinor = patientGeb ? (new Date().getFullYear() - new Date(patientGeb).getFullYear()) < 16 : false;
 
   if (!consentLoading && consent && !consent.datenschutz_akzeptiert) {
