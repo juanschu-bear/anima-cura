@@ -179,7 +179,6 @@ export default function PatientenPage() {
             <button onClick={() => setSearch("")} className={`text-xs font-bold ${isDark ? "text-white/50 hover:text-white" : "text-praxis-400 hover:text-praxis-700"}`}>✕</button>
           </div>
         )}
-        />
       </div>
 
       <div className={`rounded-card border shadow-card ${isDark ? "border-white/6 bg-[rgba(16,18,28,0.75)]" : "border-surface-200 bg-white"}`}>
