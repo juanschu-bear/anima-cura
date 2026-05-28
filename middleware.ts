@@ -14,6 +14,7 @@ const DASHBOARD_MATCHERS = [
   "/ratenplan",
   "/mahnwesen",
   "/quartal",
+  "/berichte",
   "/automatisierungen",
   "/import",
   "/einstellungen",
@@ -80,20 +81,40 @@ export async function middleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isDashboard = isDashboardPath(pathname);
-
   const isPatient = isPatientPath(pathname);
 
+  // If we have a user, check their role via user_profiles
+  let userRole: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    userRole = profile?.role || null;
+  }
+
   // Redirect logged-in praxis users away from praxis login
-  if (pathname === "/login" && user) {
+  if (pathname === "/login" && user && userRole && userRole !== "patient") {
     return NextResponse.redirect(new URL("/uebersicht", request.url));
   }
 
   // Redirect logged-in patient users away from patient login
-  if (pathname === "/patient/login" && user) {
+  if (pathname === "/patient/login" && user && userRole === "patient") {
     return NextResponse.redirect(new URL("/patient/portal", request.url));
   }
 
-  // Protect dashboard routes
+  // Patient trying to access dashboard -> redirect to patient portal
+  if (isDashboard && user && userRole === "patient") {
+    return NextResponse.redirect(new URL("/patient/portal", request.url));
+  }
+
+  // Praxis user trying to access patient portal -> redirect to dashboard
+  if (isPatient && user && userRole && userRole !== "patient") {
+    return NextResponse.redirect(new URL("/uebersicht", request.url));
+  }
+
+  // Protect dashboard routes - no auth
   if (isDashboard && !hasSupabaseAuthCookie(request)) {
     const loginUrl = new URL("/login", request.url);
     const nextPath = `${pathname}${search}`;
@@ -112,7 +133,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Protect patient portal routes
+  // Protect patient portal routes - no auth
   if (isPatient && !hasSupabaseAuthCookie(request)) {
     return NextResponse.redirect(new URL("/patient/login", request.url));
   }
@@ -125,5 +146,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
+  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };
