@@ -546,14 +546,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       </div>
       {/* Phone frame */}
-      <div style={{ position: "relative", width: "100%", maxWidth: deviceSize === "tablet" ? 620 : 430, transition: "max-width 0.4s ease" }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: deviceSize === "tablet" ? 720 : 430, transition: "max-width 0.4s ease" }}>
         {/* Phone bezel - only visible on desktop */}
         <div className="phone-bezel" style={{ display: "none", position: "absolute", inset: -14, borderRadius: 46, border: "2px solid rgba(255,255,255,0.08)", pointerEvents: "none", zIndex: 50 }} />
         {/* Notch - only visible on desktop */}
         <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: deviceSize === "tablet" ? 180 : 140, height: 28, borderRadius: "0 0 18px 18px", background: "#0a0a0a", zIndex: 51, boxShadow: "0 2px 8px rgba(0,0,0,0.3)", transition: "width 0.4s ease" }}>
           <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
         </div>
-    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 620 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
+    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 720 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
       {/* Lava lamp animated gradient blobs - warm ambient glow, corners lit, middle dark */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         {/* Top-left: warm green-teal glow */}
