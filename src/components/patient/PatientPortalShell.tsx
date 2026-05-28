@@ -59,6 +59,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
+  const [showAllPays, setShowAllPays] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const ep = ["ratenplan", "behandlung", "badges", "nachrichten", "benachrichtigungen", "dokumente", "tipps", "zahlungen"];
@@ -414,14 +415,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div>
           <div style={{ padding: "0 20px" }}><p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>{t("progress.history", lang)}</p></div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "2px 18px" }}>
-            {pays.map((p, i) => {
+            {(showAllPays ? pays : pays.slice(0, 6)).map((p, i) => {
               const isOverdueRate = p.status === "überfällig";
               const daysLate = p.bezahlt_am && p.faellig_am ? Math.floor((new Date(p.bezahlt_am).getTime() - new Date(p.faellig_am).getTime()) / 864e5) : 0;
               const wasLate = daysLate > 3;
               const daysSinceOverdue = isOverdueRate ? Math.floor((Date.now() - new Date(p.faellig_am).getTime()) / 864e5) : 0;
               const iconBg = isOverdueRate ? (dk ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)") : wasLate ? (dk ? "rgba(251,191,36,0.12)" : "rgba(251,191,36,0.06)") : (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)");
               const iconColor = isOverdueRate ? red : wasLate ? warn : grn;
-              const iconSymbol = isOverdueRate ? "!" : wasLate ? "!" : "✓";
+              const iconSymbol = isOverdueRate ? "!" : "✓";
               const amountColor = isOverdueRate ? red : wasLate ? warn : grn;
               const lateLabel = lang === "en" ? "days late" : lang === "es" ? "días de retraso" : "Tage verspätet";
               const overdueLabel = lang === "en" ? "days overdue" : lang === "es" ? "días vencidos" : "Tage überfällig";
@@ -439,6 +440,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               );
             })}
           </div>
+          {!showAllPays && pays.length > 6 && (
+            <div style={{ padding: "0 20px 14px", textAlign: "center" }}>
+              <button onClick={() => { setShowAllPays(true); hapticLight(); }} style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), background: "transparent", color: muted, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {lang === "en" ? "Load older" : lang === "es" ? "Cargar anteriores" : "Ältere laden"} ({pays.length - 6})
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
