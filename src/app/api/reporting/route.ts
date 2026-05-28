@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 5);
 
     // Patient-Namen für Top-Liste
-    const patientIds = [...new Set(topOffene.map(r => r.patient_id))];
+    const patientIds = Array.from(new Set(topOffene.map(r => r.patient_id)));
     const { data: patienten } = await serviceClient
       .from("patients")
       .select("id, vorname, nachname")
