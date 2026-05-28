@@ -44,40 +44,74 @@ function getYearOptions() {
   });
 }
 
-const fmtEur = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " \u20ac";
-const fmtMo = (m: string) => { const [, mo] = m.split("-"); return ["Jan","Feb","M\u00e4r","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"][parseInt(mo)-1]; };
+const fmtEur = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " €";
+const fmtMo = (m: string) => { const [, mo] = m.split("-"); return ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"][parseInt(mo)-1]; };
 const fmtDay = (d: string) => { const dt = new Date(d); return dt.getDate() + "." + (dt.getMonth()+1) + "."; };
 
 export default function BerichtePage() {
   const { theme } = useAppStore();
   const dk = theme === "dark";
-  const [zeitraum, setZeitraum] = useState<Zeitraum>("jahr");
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [viewMode, setViewMode] = useState<"jahr" | "quartal" | "monat">("jahr");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedQ, setSelectedQ] = useState(Math.floor(new Date().getMonth() / 3) + 1);
+  const [selectedM, setSelectedM] = useState(new Date().getMonth() + 1);
   const [vergleich, setVergleich] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAllPosten, setShowAllPosten] = useState(false);
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState<Zeitraum | false>(false);
+  const [dropdownOpen, setDropdownOpen] = useState<string | false>(false);
   const [popup, setPopup] = useState<string | null>(null);
 
-  const options = zeitraum === "monat" ? getMonthOptions() : zeitraum === "quartal" ? getQuarterOptions() : getYearOptions();
-  const selected = options[selectedIdx] || options[0];
-  const prevIdx = Math.min(selectedIdx + 1, options.length - 1);
-  const prev = options[prevIdx];
+  // Calculate date range based on selections
+  function getSelected() {
+    const now = new Date();
+    if (viewMode === "jahr") {
+      const bis = selectedYear === now.getFullYear() ? now.toISOString().slice(0, 10) : `${selectedYear}-12-31`;
+      return { von: `${selectedYear}-01-01`, bis, label: String(selectedYear) };
+    }
+    if (viewMode === "quartal") {
+      const sm = (selectedQ - 1) * 3;
+      const von = new Date(selectedYear, sm, 1);
+      const bis = selectedYear === now.getFullYear() && selectedQ === Math.floor(now.getMonth() / 3) + 1 ? now : new Date(selectedYear, sm + 3, 0);
+      return { von: von.toISOString().slice(0, 10), bis: bis.toISOString().slice(0, 10), label: `Q${selectedQ} ${selectedYear}` };
+    }
+    const von = new Date(selectedYear, selectedM - 1, 1);
+    const bis = selectedYear === now.getFullYear() && selectedM === now.getMonth() + 1 ? now : new Date(selectedYear, selectedM, 0);
+    const mNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+    return { von: von.toISOString().slice(0, 10), bis: bis.toISOString().slice(0, 10), label: `${mNames[selectedM - 1]} ${selectedYear}` };
+  }
+  function getPrevPeriod() {
+    if (viewMode === "jahr") {
+      const py = selectedYear - 1;
+      return { von: `${py}-01-01`, bis: `${py}-12-31`, label: String(py) };
+    }
+    if (viewMode === "quartal") {
+      let pq = selectedQ - 1, py = selectedYear;
+      if (pq < 1) { pq = 4; py--; }
+      const sm = (pq - 1) * 3;
+      return { von: new Date(py, sm, 1).toISOString().slice(0, 10), bis: new Date(py, sm + 3, 0).toISOString().slice(0, 10), label: `Q${pq} ${py}` };
+    }
+    let pm = selectedM - 1, py = selectedYear;
+    if (pm < 1) { pm = 12; py--; }
+    const mNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+    return { von: new Date(py, pm - 1, 1).toISOString().slice(0, 10), bis: new Date(py, pm, 0).toISOString().slice(0, 10), label: `${mNames[pm - 1]} ${py}` };
+  }
+
+  const selected = getSelected();
+  const prev = getPrevPeriod();
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ von: selected.von, bis: selected.bis });
-    if (vergleich && prev && prevIdx !== selectedIdx) { params.set("vergleich_von", prev.von); params.set("vergleich_bis", prev.bis); }
+    if (vergleich) { params.set("vergleich_von", prev.von); params.set("vergleich_bis", prev.bis); }
     const res = await fetch(`/api/reporting?${params}`);
     if (res.ok) { setData(await res.json()); setAiReport(""); }
     setLoading(false);
-  }, [zeitraum, selectedIdx, vergleich]);
+  }, [viewMode, selectedYear, selectedQ, selectedM, vergleich]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
-  useEffect(() => { setSelectedIdx(0); }, [zeitraum]);
 
   const generateAiReport = async () => {
     if (!data?.aktuell) return;
@@ -85,7 +119,7 @@ export default function BerichtePage() {
     try {
       const a = data.aktuell;
       const v = data.vergleich;
-      const prompt = `Du bist ein Finanzanalyst f\u00fcr eine Kieferorth\u00e4p\u00e4die-Praxis. Erstelle einen kurzen, professionellen Bericht (max 250 W\u00f6rter, auf Deutsch) f\u00fcr den Zeitraum ${selected.label}.\n\nDaten:\n- Einnahmen: ${fmtEur(a.einnahmen)} (${a.zahlendePatienten} zahlende Patienten, ${fmtEur(a.einnahmenProKopf)} \u00d8 pro Patient)\n- Zahlungsquote: ${a.zahlungsquote}%\n- \u00d8 Verz\u00f6gerung: ${a.avgVerzoegerung} Tage\n- Mahnquote: ${a.mahnquote}%\n- Aktive Ratenpl\u00e4ne: ${a.aktivePlaene}\n- Offene Posten: ${fmtEur(a.offenePosten)} (${a.offenePostenListe?.length || 0} \u00fcberf\u00e4llige Forderungen)\n- Forderungsalter: <30T: ${fmtEur(a.forderungsalter?.unter30?.betrag || 0)}, 30-60T: ${fmtEur(a.forderungsalter?.bis60?.betrag || 0)}, >60T: ${fmtEur(a.forderungsalter?.ueber60?.betrag || 0)}\n${v ? `- Vorperiode (${prev?.label}): Einnahmen ${fmtEur(v.einnahmen)}, Zahlungsquote ${v.zahlungsquote}%, Mahnquote ${v.mahnquote}%` : ""}\n\nStruktur: 1) Zusammenfassung (2 S\u00e4tze) 2) Highlights 3) Risiken 4) Empfehlungen. Kein Markdown, kein **, kein ##. Flie\u00dfender Text, professionell aber verst\u00e4ndlich. Absätze mit Leerzeilen.`;
+      const prompt = `Du bist ein Finanzanalyst für eine Kieferorthäpädie-Praxis. Erstelle einen kurzen, professionellen Bericht (max 250 Wörter, auf Deutsch) für den Zeitraum ${selected.label}.\n\nDaten:\n- Einnahmen: ${fmtEur(a.einnahmen)} (${a.zahlendePatienten} zahlende Patienten, ${fmtEur(a.einnahmenProKopf)} Ø pro Patient)\n- Zahlungsquote: ${a.zahlungsquote}%\n- Ø Verzögerung: ${a.avgVerzoegerung} Tage\n- Mahnquote: ${a.mahnquote}%\n- Aktive Ratenpläne: ${a.aktivePlaene}\n- Offene Posten: ${fmtEur(a.offenePosten)} (${a.offenePostenListe?.length || 0} überfällige Forderungen)\n- Forderungsalter: <30T: ${fmtEur(a.forderungsalter?.unter30?.betrag || 0)}, 30-60T: ${fmtEur(a.forderungsalter?.bis60?.betrag || 0)}, >60T: ${fmtEur(a.forderungsalter?.ueber60?.betrag || 0)}\n${v ? `- Vorperiode (${prev?.label}): Einnahmen ${fmtEur(v.einnahmen)}, Zahlungsquote ${v.zahlungsquote}%, Mahnquote ${v.mahnquote}%` : ""}\n\nStruktur: 1) Zusammenfassung (2 Sätze) 2) Highlights 3) Risiken 4) Empfehlungen. Kein Markdown, kein **, kein ##. Fließender Text, professionell aber verständlich. Absätze mit Leerzeilen.`;
       const res = await fetch("/api/ai-report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
       if (res.ok) { const j = await res.json(); setAiReport(j.reply || "Bericht konnte nicht generiert werden."); }
     } catch { setAiReport("Fehler bei der Berichterstellung."); }
@@ -132,31 +166,48 @@ export default function BerichtePage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 className="ac-page-title" style={{ marginBottom: 4 }}>Berichte</h1>
-          <p style={{ fontSize: 14, color: muted }}>{selected.label}{vergleich && v ? ` vs. ${prev?.label}` : ""} \u2014 Echtzeit-Daten</p>
+          <p style={{ fontSize: 14, color: muted }}>{selected.label}{vergleich && v ? ` vs. ${prev?.label}` : ""} — Echtzeit-Daten</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {/* Combined type + period dropdowns */}
-          {(["monat", "quartal", "jahr"] as Zeitraum[]).map(z => {
-            const opts = z === "monat" ? getMonthOptions() : z === "quartal" ? getQuarterOptions() : getYearOptions();
-            const isActive = zeitraum === z;
-            return (
-              <div key={z} style={{ position: "relative" }}>
-                <button onClick={() => { if (isActive) { setDropdownOpen(dropdownOpen === z ? false : z as any); } else { setZeitraum(z); setSelectedIdx(0); setDropdownOpen(false); } }} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${isActive ? grn : border}`, background: isActive ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: isActive ? grn : muted, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
-                  {isActive ? selected.label : z === "monat" ? "Monat" : z === "quartal" ? "Quartal" : "Jahr"}
-                  {isActive && <ChevronDown size={13} />}
-                </button>
-                {isActive && dropdownOpen === z && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 200, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
-                    {opts.map((o, i) => (
-                      <button key={i} onClick={() => { setSelectedIdx(i); setDropdownOpen(false); }} style={{ display: "block", width: "100%", padding: "8px 14px", borderRadius: 8, border: "none", background: i === selectedIdx ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: i === selectedIdx ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: i === selectedIdx ? 700 : 500, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+          {/* Year dropdown */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setDropdownOpen(dropdownOpen === "jahr" ? false : "jahr")} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${grn}`, background: dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+              {selectedYear} <ChevronDown size={13} />
+            </button>
+            {dropdownOpen === "jahr" && (
+              <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 120, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
+                {[2026, 2025, 2024].map(y => (
+                  <button key={y} onClick={() => { setSelectedYear(y); setViewMode("jahr"); setDropdownOpen(false); }} style={{ display: "block", width: "100%", padding: "8px 14px", borderRadius: 8, border: "none", background: selectedYear === y && viewMode === "jahr" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: selectedYear === y && viewMode === "jahr" ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: selectedYear === y ? 700 : 500, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>{y}</button>
+                ))}
               </div>
-            );
-          })}
+            )}
+          </div>
+          {/* Quartal dropdown */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setViewMode("quartal"); setDropdownOpen(dropdownOpen === "quartal" ? false : "quartal"); }} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${viewMode === "quartal" ? grn : border}`, background: viewMode === "quartal" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: viewMode === "quartal" ? grn : muted, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+              {viewMode === "quartal" ? `Q${selectedQ}` : "Quartal"} <ChevronDown size={13} />
+            </button>
+            {dropdownOpen === "quartal" && (
+              <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 100, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
+                {[1, 2, 3, 4].map(q => (
+                  <button key={q} onClick={() => { setSelectedQ(q); setViewMode("quartal"); setDropdownOpen(false); }} style={{ display: "block", width: "100%", padding: "8px 14px", borderRadius: 8, border: "none", background: selectedQ === q && viewMode === "quartal" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: selectedQ === q && viewMode === "quartal" ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: selectedQ === q ? 700 : 500, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>Q{q}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Monat dropdown */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setViewMode("monat"); setDropdownOpen(dropdownOpen === "monat" ? false : "monat"); }} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${viewMode === "monat" ? grn : border}`, background: viewMode === "monat" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: viewMode === "monat" ? grn : muted, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+              {viewMode === "monat" ? ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"][selectedM - 1] : "Monat"} <ChevronDown size={13} />
+            </button>
+            {dropdownOpen === "monat" && (
+              <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 140, boxShadow: "0 12px 40px rgba(0,0,0,0.3)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                {["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"].map((m, i) => (
+                  <button key={i} onClick={() => { setSelectedM(i + 1); setViewMode("monat"); setDropdownOpen(false); }} style={{ padding: "8px 10px", borderRadius: 8, border: "none", background: selectedM === i + 1 && viewMode === "monat" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: selectedM === i + 1 && viewMode === "monat" ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: selectedM === i + 1 ? 700 : 500, cursor: "pointer", textAlign: "center", fontFamily: "inherit" }}>{m}</button>
+                ))}
+              </div>
+            )}
+          </div>
           <div style={{ width: 1, height: 24, background: border, margin: "0 4px" }} />
           <button onClick={() => setVergleich(!vergleich)} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${vergleich ? prp : border}`, background: vergleich ? (dk ? "rgba(167,139,250,0.1)" : "rgba(139,92,246,0.06)") : "transparent", color: vergleich ? prp : muted, cursor: "pointer", fontFamily: "inherit" }}>
             <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{vergleich && prev ? `vs. ${prev.label}` : "Vergleich"}
@@ -171,7 +222,7 @@ export default function BerichtePage() {
       {aiReport && (
         <motion.div {...anim(0)} style={{ background: dk ? "rgba(74,222,128,0.04)" : "rgba(34,197,94,0.03)", border: `1px solid ${dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)"}`, borderRadius: 16, padding: 20, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={16} color={grn} /><span style={{ fontSize: 14, fontWeight: 700, color: txtH }}>AI-Analyse \u2014 {selected.label}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={16} color={grn} /><span style={{ fontSize: 14, fontWeight: 700, color: txtH }}>AI-Analyse — {selected.label}</span></div>
             <button onClick={() => setAiReport("")} style={{ background: "none", border: "none", cursor: "pointer", color: muted }}><X size={16} /></button>
           </div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: dk ? "#ccc" : "#444", margin: 0, whiteSpace: "pre-wrap" }}>{aiReport}</p>
@@ -181,22 +232,22 @@ export default function BerichtePage() {
       {/* KPI Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
         <KpiCard dk={dk} label="Einnahmen" value={a.einnahmen} fmt="eur" d={v ? delta(a.einnahmen, v.einnahmen) : null} good="up" i={0} />
-        <KpiCard dk={dk} label={"\u00d8 pro Patient"} value={a.einnahmenProKopf} fmt="eur" d={v ? delta(a.einnahmenProKopf, v.einnahmenProKopf) : null} good="up" i={1} sub={`${a.zahlendePatienten} zahlende Patienten`} />
+        <KpiCard dk={dk} label={"Ø pro Patient"} value={a.einnahmenProKopf} fmt="eur" d={v ? delta(a.einnahmenProKopf, v.einnahmenProKopf) : null} good="up" i={1} sub={`${a.zahlendePatienten} zahlende Patienten`} />
         <KpiCard dk={dk} label="Zahlungsquote" value={a.zahlungsquote} fmt="pct" d={v ? delta(a.zahlungsquote, v.zahlungsquote) : null} good="up" i={2} />
-        <KpiCard dk={dk} label={"\u00d8 Verz\u00f6gerung"} value={a.avgVerzoegerung} fmt="tage" d={v ? delta(a.avgVerzoegerung, v.avgVerzoegerung) : null} good="down" i={3} />
+        <KpiCard dk={dk} label={"Ø Verzögerung"} value={a.avgVerzoegerung} fmt="tage" d={v ? delta(a.avgVerzoegerung, v.avgVerzoegerung) : null} good="down" i={3} />
         <KpiCard dk={dk} label="Mahnquote" value={a.mahnquote} fmt="pct" d={v ? delta(a.mahnquote, v.mahnquote) : null} good="down" i={4} />
-        <KpiCard dk={dk} label="Aktive Pl\u00e4ne" value={a.aktivePlaene} fmt="num" i={5} onClick={() => setPopup("plaene")} clickable />
-        <KpiCard dk={dk} label={"Offene Forderungen"} value={a.offenePosten} fmt="eur" d={v ? delta(a.offenePosten, v.offenePosten) : null} good="down" i={6} accent sub={`${postenList.length} \u00fcberf\u00e4llige Raten`} />
-        <KpiCard dk={dk} label="Bezahlte Raten" value={a.bezahltCount} fmt="num" i={7} sub={`von ${a.faelligCount} f\u00e4llig`} />
+        <KpiCard dk={dk} label="Aktive Pläne" value={a.aktivePlaene} fmt="num" i={5} onClick={() => setPopup("plaene")} clickable />
+        <KpiCard dk={dk} label={"Offene Forderungen"} value={a.offenePosten} fmt="eur" d={v ? delta(a.offenePosten, v.offenePosten) : null} good="down" i={6} accent sub={`${postenList.length} überfällige Raten`} />
+        <KpiCard dk={dk} label="Bezahlte Raten" value={a.bezahltCount} fmt="num" i={7} sub={`von ${a.faelligCount} fällig`} />
       </div>
 
       {/* Forderungsalter */}
       {a.forderungsalter && (
         <motion.div {...anim(0.1)} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
           {[
-            { label: "< 30 Tage \u00fcberf\u00e4llig", ...a.forderungsalter.unter30, color: ylw },
-            { label: "30\u201360 Tage \u00fcberf\u00e4llig", ...a.forderungsalter.bis60, color: orn },
-            { label: "> 60 Tage \u00fcberf\u00e4llig", ...a.forderungsalter.ueber60, color: red },
+            { label: "< 30 Tage überfällig", ...a.forderungsalter.unter30, color: ylw },
+            { label: "30\u201360 Tage überfällig", ...a.forderungsalter.bis60, color: orn },
+            { label: "> 60 Tage überfällig", ...a.forderungsalter.ueber60, color: red },
           ].map((b, i) => (
             <div key={i} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: "14px 18px", backdropFilter: dk ? "blur(20px)" : undefined }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: b.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{b.label}</div>
@@ -217,7 +268,7 @@ export default function BerichtePage() {
               <CartesianGrid strokeDasharray="3 3" stroke={soft} />
               <XAxis dataKey="monat" tick={{ fill: muted, fontSize: 11 }} tickFormatter={fmtMo} />
               <YAxis tick={{ fill: muted, fontSize: 11 }} tickFormatter={yv => yv >= 1000 ? `${Math.round(yv / 1000)}k` : String(yv)} domain={[0, 'auto']} />
-              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number) => [fmtEur(val)]} labelFormatter={m => { const [y, mo] = m.split("-"); return ["Januar","Februar","M\u00e4rz","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"][parseInt(mo)-1] + " " + y; }} />
+              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number) => [fmtEur(val)]} labelFormatter={m => { const [y, mo] = m.split("-"); return ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"][parseInt(mo)-1] + " " + y; }} />
               <Area type="monotone" dataKey="einnahmen" stroke={grn} fill="url(#gG)" strokeWidth={2.5} name="Einnahmen" />
               <Line type="monotone" dataKey="geplant" stroke={muted} strokeDasharray="6 4" strokeWidth={1.5} dot={false} name="Geplant" />
             </AreaChart>
@@ -229,7 +280,7 @@ export default function BerichtePage() {
           <div style={{ position: "relative" }}>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={[{ name: "P\u00fcnktlich", value: a.verteilung.puenktlich }, { name: "Versp\u00e4tet", value: a.verteilung.verspaetet }, { name: "\u00dcberf\u00e4llig", value: a.verteilung.ueberfaellig }, { name: "Offen", value: a.verteilung.offen }].filter(d => d.value > 0)} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
+                <Pie data={[{ name: "Pünktlich", value: a.verteilung.puenktlich }, { name: "Verspätet", value: a.verteilung.verspaetet }, { name: "Überfällig", value: a.verteilung.ueberfaellig }, { name: "Offen", value: a.verteilung.offen }].filter(d => d.value > 0)} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
                   {[grn, ylw, red, gry].map((c, i) => <Cell key={i} fill={c} />)}
                 </Pie>
                 <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} />
@@ -241,7 +292,7 @@ export default function BerichtePage() {
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
-            {[{ l: "P\u00fcnktlich", c: grn, v: a.verteilung.puenktlich }, { l: "Versp\u00e4tet", c: ylw, v: a.verteilung.verspaetet }, { l: "\u00dcberf\u00e4llig", c: red, v: a.verteilung.ueberfaellig }, { l: "Offen", c: gry, v: a.verteilung.offen }].map(x => (
+            {[{ l: "Pünktlich", c: grn, v: a.verteilung.puenktlich }, { l: "Verspätet", c: ylw, v: a.verteilung.verspaetet }, { l: "Überfällig", c: red, v: a.verteilung.ueberfaellig }, { l: "Offen", c: gry, v: a.verteilung.offen }].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: muted }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: x.c }} />{x.l}: {x.v}</div>
             ))}
           </div>
@@ -249,7 +300,7 @@ export default function BerichtePage() {
 
         <motion.div {...anim(0.2)} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20, backdropFilter: dk ? "blur(20px)" : undefined }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: txtH }}>Mahnstufen</h3>
-          <p style={{ fontSize: 12, color: muted, marginBottom: 12 }}>Klick auf eine Stufe f{"\u00fc"}r Details</p>
+          <p style={{ fontSize: 12, color: muted, marginBottom: 12 }}>Klick auf eine Stufe f{"ü"}r Details</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={[{ name: "Stufe 1", count: a.mahnstufen.stufe1, stufe: 1 }, { name: "Stufe 2", count: a.mahnstufen.stufe2, stufe: 2 }, { name: "Stufe 3", count: a.mahnstufen.stufe3, stufe: 3 }]} onClick={(e: any) => { if (e?.activePayload?.[0]?.payload?.stufe) setPopup(`mahn-${e.activePayload[0].payload.stufe}`); }}>
               <CartesianGrid strokeDasharray="3 3" stroke={soft} />
@@ -266,7 +317,7 @@ export default function BerichtePage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         <motion.div {...anim(0.24)} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20, backdropFilter: dk ? "blur(20px)" : undefined }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: txtH }}>3-Monats-Prognose</h3>
-          <p style={{ fontSize: 12, color: muted, marginBottom: 16 }}>Erwarteter Eingang basierend auf f\u00e4lligen Raten</p>
+          <p style={{ fontSize: 12, color: muted, marginBottom: 16 }}>Erwarteter Eingang basierend auf fälligen Raten</p>
           {(data?.prognose || []).length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={160}>
@@ -289,23 +340,23 @@ export default function BerichtePage() {
                 ))}
               </div>
             </>
-          ) : <p style={{ fontSize: 14, color: muted, textAlign: "center", padding: "40px 0" }}>Keine offenen Raten in den n\u00e4chsten 3 Monaten</p>}
+          ) : <p style={{ fontSize: 14, color: muted, textAlign: "center", padding: "40px 0" }}>Keine offenen Raten in den nächsten 3 Monaten</p>}
         </motion.div>
 
         <motion.div {...anim(0.28)} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20, backdropFilter: dk ? "blur(20px)" : undefined }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: txtH, margin: 0 }}>Offene Forderungen</h3>
-            <span style={{ fontSize: 12, fontWeight: 600, color: red }}>{postenList.length} \u00fcberf\u00e4llige Raten \u2014 {fmtEur(a.offenePosten)}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: red }}>{postenList.length} überfällige Raten — {fmtEur(a.offenePosten)}</span>
           </div>
           {postenList.length === 0 ? (
-            <p style={{ fontSize: 14, color: muted, textAlign: "center", padding: "40px 0" }}>Keine \u00fcberf\u00e4lligen Forderungen</p>
+            <p style={{ fontSize: 14, color: muted, textAlign: "center", padding: "40px 0" }}>Keine überfälligen Forderungen</p>
           ) : (
             <>
               {visiblePosten.map((p: any, i: number) => (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${dk ? "rgba(255,255,255,0.04)" : "#f0f0f0"}` : "none" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: txtH, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.patient_name}</div>
-                    <div style={{ fontSize: 11, color: muted }}>{p.tage} Tage \u00fcberf\u00e4llig \u00b7 Mahnstufe {p.mahnstufe}</div>
+                    <div style={{ fontSize: 11, color: muted }}>{p.tage} Tage überfällig · Mahnstufe {p.mahnstufe}</div>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: red, marginLeft: 12 }}>{fmtEur(p.betrag)}</div>
                 </div>
@@ -332,14 +383,14 @@ export default function BerichtePage() {
                 return (<>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: txtH, margin: 0 }}>Mahnstufe {stufe}</h3>
-                    <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"\u2715"}</button>
+                    <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"✕"}</button>
                   </div>
                   <div style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{details.length} Raten auf Mahnstufe {stufe}</div>
-                  {details.length === 0 ? <p style={{ color: muted, fontSize: 14 }}>Keine Eintr{"\u00e4"}ge</p> : details.map((m: any, i: number) => (
+                  {details.length === 0 ? <p style={{ color: muted, fontSize: 14 }}>Keine Eintr{"ä"}ge</p> : details.map((m: any, i: number) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${dk ? "rgba(255,255,255,0.04)" : "#f0f0f0"}` : "none" }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: txtH }}>{m.patient_name}</div>
-                        <div style={{ fontSize: 11, color: muted }}>F{"\u00e4"}llig: {new Date(m.faellig_am).toLocaleDateString("de-DE")}</div>
+                        <div style={{ fontSize: 11, color: muted }}>F{"ä"}llig: {new Date(m.faellig_am).toLocaleDateString("de-DE")}</div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {m.betrag > 0 && <span style={{ fontSize: 15, fontWeight: 700, color: stufeColor }}>{fmtEur(m.betrag)}</span>}
@@ -351,10 +402,10 @@ export default function BerichtePage() {
               })()}
               {popup === "plaene" && (<>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, color: txtH, margin: 0 }}>Aktive Ratenpl{"\u00e4"}ne</h3>
-                  <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"\u2715"}</button>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: txtH, margin: 0 }}>Aktive Ratenpl{"ä"}ne</h3>
+                  <button onClick={() => setPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 18 }}>{"✕"}</button>
                 </div>
-                <div style={{ fontSize: 14, color: muted, textAlign: "center", padding: "30px 0" }}>{a.aktivePlaene} aktive Pl{"\u00e4"}ne</div>
+                <div style={{ fontSize: 14, color: muted, textAlign: "center", padding: "30px 0" }}>{a.aktivePlaene} aktive Pl{"ä"}ne</div>
               </>)}
             </motion.div>
           </motion.div>
@@ -376,7 +427,7 @@ function KpiCard({ dk, label, value, fmt, d, good, i, accent, sub, onClick, clic
   const txtH = dk ? "#f0f0f0" : "#1c3044";
   const isGood = d ? (good === "up" ? d.dir === "up" : d.dir === "down") : true;
   const fv = (n: number) => {
-    if (fmt === "eur") return n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " \u20ac";
+    if (fmt === "eur") return n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " €";
     if (fmt === "pct") return n + "%";
     if (fmt === "tage") return n + " Tage";
     return n.toLocaleString("de-DE");
@@ -388,7 +439,7 @@ function KpiCard({ dk, label, value, fmt, d, good, i, accent, sub, onClick, clic
       onClick={onClick}
       style={{ background: dk ? "rgba(16,18,28,0.75)" : "#fff", borderRadius: 14, border: `1px solid ${accent ? "rgba(239,68,68,0.2)" : border}`, padding: "16px 18px", cursor: clickable ? "pointer" : "default", backdropFilter: dk ? "blur(20px)" : undefined }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}{clickable && " \u2197"}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}{clickable && " ↗"}</div>
       <div style={{ fontSize: 28, fontWeight: 800, color: accent ? red : txtH, lineHeight: 1, marginBottom: d || sub ? 6 : 0, fontFamily: "'Fraunces', serif" }}>
         <AnimatedNumber value={value} formatFn={fv} />
       </div>
