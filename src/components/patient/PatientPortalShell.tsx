@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
-import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, getPhaseContent, type Lang } from "@/lib/patient-i18n";
+import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, getPhaseContent, translateTipp, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
@@ -300,7 +300,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {tipps.length > 0 && (
         <div style={{ margin: "0 20px 14px", borderRadius: 14, padding: 16, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: warn, marginBottom: 6 }}>💡 {t("home.phaseTip", lang)}</div>
-          <div style={{ fontSize: 13, lineHeight: 1.6, color: soft }}>{tipps[0].text}</div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: soft }}>{translateTipp(tipps[0].text, lang)}</div>
         </div>
       )}
     </div>
@@ -336,10 +336,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {tipps.length > 0 && (
         <div style={{ padding: "12px 20px 0" }}>
           <p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 12, color: fg }}>{t("journey.careTips", lang)}</p>
-          {tipps.map(t => (
-            <div key={t.id} style={{ borderRadius: 14, padding: 16, marginBottom: 10, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
-              <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: fg }}>{t.titel}</p>
-              <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{t.text}</p>
+          {tipps.map(tip => (
+            <div key={tip.id} style={{ borderRadius: 14, padding: 16, marginBottom: 10, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
+              <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: fg }}>{tip.titel}</p>
+              <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{translateTipp(tip.text, lang)}</p>
             </div>
           ))}
         </div>
@@ -565,27 +565,31 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
         </div>
     <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 620 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
-      {/* Lava lamp animated gradient blobs - vivid, phase-colored */}
+      {/* Lava lamp animated gradient blobs - warm ambient glow, corners lit, middle dark */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        {/* Top-left: warm green-teal glow */}
         <motion.div
-          animate={{ scale: [1, 1.3, 1.1, 1], x: [0, 100, -30, 0], y: [0, 80, 40, 0], backgroundColor: [c1, c2, c4, c1] }}
+          animate={{ scale: [1, 1.3, 1.1, 1], x: [0, 60, -20, 0], y: [0, 50, 20, 0], backgroundColor: [c1, c2, c4, c1] }}
           transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", top: -180, left: -120, opacity: dk ? 0.2 : 0.06, filter: "blur(60px)" }}
+          style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", top: -150, left: -150, opacity: dk ? 0.18 : 0.1, filter: "blur(80px)" }}
         />
+        {/* Bottom-right: warm amber-gold glow */}
         <motion.div
-          animate={{ scale: [1, 1.2, 0.9, 1], x: [0, -80, 50, 0], y: [0, 100, -30, 0], backgroundColor: [c2, c3, c5, c2] }}
-          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", top: "30%", right: -140, opacity: dk ? 0.18 : 0.05, filter: "blur(60px)" }}
+          animate={{ scale: [1, 1.2, 0.95, 1], x: [0, -50, 30, 0], y: [0, -40, 20, 0], backgroundColor: ["#fbbf24", c3, "#f97316", "#fbbf24"] }}
+          transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 450, height: 450, borderRadius: "50%", bottom: -100, right: -120, opacity: dk ? 0.14 : 0.08, filter: "blur(80px)" }}
         />
+        {/* Mid-right: subtle purple accent */}
         <motion.div
-          animate={{ scale: [1, 1.25, 1.05, 1], x: [0, 70, -40, 0], y: [0, -60, 30, 0], backgroundColor: [c3, c5, c1, c3] }}
-          transition={{ duration: 32, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 550, height: 550, borderRadius: "50%", bottom: -200, left: -100, opacity: dk ? 0.22 : 0.06, filter: "blur(60px)" }}
+          animate={{ scale: [1, 1.15, 1.05, 1], x: [0, -40, 25, 0], y: [0, 60, -30, 0], backgroundColor: [c5, c3, c1, c5] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 350, height: 350, borderRadius: "50%", top: "40%", right: -80, opacity: dk ? 0.12 : 0.06, filter: "blur(70px)" }}
         />
+        {/* Top-right: very subtle secondary */}
         <motion.div
-          animate={{ scale: [1, 1.4, 1, 1.2, 1], x: [0, -50, 60, -20, 0], y: [0, 40, -30, 50, 0], backgroundColor: [c4, c1, c3, c5, c4] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", top: "50%", left: "10%", opacity: dk ? 0.15 : 0.04, filter: "blur(50px)" }}
+          animate={{ scale: [1, 1.25, 1, 1.15, 1], x: [0, -30, 40, -15, 0], y: [0, 30, -20, 35, 0], backgroundColor: [c2, c4, c1, c3, c2] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", width: 280, height: 280, borderRadius: "50%", top: -60, right: -40, opacity: dk ? 0.1 : 0.05, filter: "blur(60px)" }}
         />
       </div>
       <div style={{ position: "relative", zIndex: 1, paddingBottom: 10 }}>
@@ -751,7 +755,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                       <span style={{ fontSize: 16 }}>💡</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Care tip" : lang === "es" ? "Consejo de cuidado" : "Pflege-Tipp"}</span>
                     </div>
-                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{tipps[0].text}</p>
+                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{translateTipp(tipps[0].text, lang)}</p>
                   </motion.div>
                 )}
                 {/* Interactive detail buttons - Claude answers inline */}

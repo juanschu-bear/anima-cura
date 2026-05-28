@@ -226,3 +226,56 @@ const phaseContent: Record<string, Record<Lang, PhaseDetail>> = {
 export function getPhaseContent(deName: string, lang: Lang): PhaseDetail {
   return phaseContent[deName]?.[lang] ?? phaseContent[deName]?.["de"] ?? { emoji: "📋", summary: "", details: [] };
 }
+
+// Pflegetipp text translations (DB values are German)
+const tippMap: Record<string, Record<Lang, string>> = {
+  "Nach dem Einsetzen der Brackets können die Zähne empfindlich sein. Weiche Nahrung wie Suppen und Joghurt helfen in den ersten Tagen.": {
+    de: "Nach dem Einsetzen der Brackets können die Zähne empfindlich sein. Weiche Nahrung wie Suppen und Joghurt helfen in den ersten Tagen.",
+    en: "After getting your brackets, teeth can be sensitive. Soft foods like soups and yogurt help in the first few days.",
+    es: "Después de colocar los brackets, los dientes pueden estar sensibles. Alimentos blandos como sopas y yogur ayudan en los primeros días.",
+  },
+  "Bei Druckstellen auf der Wangenschleimhaut hilft orthodontisches Wachs. Einfach ein kleines Stück auf den störenden Bracket drücken.": {
+    de: "Bei Druckstellen auf der Wangenschleimhaut hilft orthodontisches Wachs. Einfach ein kleines Stück auf den störenden Bracket drücken.",
+    en: "For pressure sores on the cheek lining, orthodontic wax helps. Just press a small piece onto the irritating bracket.",
+    es: "Para las llagas por presión en la mucosa, la cera ortodóntica ayuda. Solo presiona un pequeño trozo sobre el bracket que molesta.",
+  },
+  "Putze nach jeder Mahlzeit gründlich mit einer speziellen Bracket-Zahnbürste. Besonders die Bereiche um die Brackets herum brauchen Aufmerksamkeit.": {
+    de: "Putze nach jeder Mahlzeit gründlich mit einer speziellen Bracket-Zahnbürste. Besonders die Bereiche um die Brackets herum brauchen Aufmerksamkeit.",
+    en: "Brush thoroughly after every meal with a special bracket toothbrush. The areas around the brackets need particular attention.",
+    es: "Cepilla a fondo después de cada comida con un cepillo especial para brackets. Las áreas alrededor de los brackets necesitan atención especial.",
+  },
+  "Interdentalbürsten sind jetzt besonders wichtig. Nutze sie täglich, um Essensreste zwischen den Brackets zu entfernen.": {
+    de: "Interdentalbürsten sind jetzt besonders wichtig. Nutze sie täglich, um Essensreste zwischen den Brackets zu entfernen.",
+    en: "Interdental brushes are especially important now. Use them daily to remove food debris between brackets.",
+    es: "Los cepillos interdentales son especialmente importantes ahora. Úsalos diariamente para eliminar restos de comida entre los brackets.",
+  },
+  "Vermeide harte und klebrige Lebensmittel wie Nüsse, Karamell oder Kaugummi. Sie können Brackets lösen oder Drähte verbiegen.": {
+    de: "Vermeide harte und klebrige Lebensmittel wie Nüsse, Karamell oder Kaugummi. Sie können Brackets lösen oder Drähte verbiegen.",
+    en: "Avoid hard and sticky foods like nuts, caramel, or chewing gum. They can loosen brackets or bend wires.",
+    es: "Evita alimentos duros y pegajosos como nueces, caramelo o chicle. Pueden aflojar los brackets o doblar los alambres.",
+  },
+  "Trage deine Gummizüge konsequent wie besprochen. Sie sind entscheidend für die korrekte Bisslage.": {
+    de: "Trage deine Gummizüge konsequent wie besprochen. Sie sind entscheidend für die korrekte Bisslage.",
+    en: "Wear your rubber bands consistently as discussed. They are crucial for the correct bite position.",
+    es: "Usa tus elásticos de forma constante como se acordó. Son cruciales para la posición correcta de la mordida.",
+  },
+  "Halte deine Kontrolltermine zuverlässig ein. Versäumte Termine können die Behandlung um Wochen verlängern.": {
+    de: "Halte deine Kontrolltermine zuverlässig ein. Versäumte Termine können die Behandlung um Wochen verlängern.",
+    en: "Keep your check-up appointments reliably. Missed appointments can extend treatment by weeks.",
+    es: "Mantén tus citas de control de forma fiable. Las citas perdidas pueden alargar el tratamiento semanas.",
+  },
+  "Trage deinen Retainer jede Nacht. Ohne Retainer können sich die Zähne wieder verschieben.": {
+    de: "Trage deinen Retainer jede Nacht. Ohne Retainer können sich die Zähne wieder verschieben.",
+    en: "Wear your retainer every night. Without a retainer, teeth can shift back.",
+    es: "Usa tu retenedor cada noche. Sin retenedor, los dientes pueden moverse de nuevo.",
+  },
+  "Reinige den Retainer täglich mit einer weichen Zahnbürste. Kein heißes Wasser verwenden, das verformt den Kunststoff.": {
+    de: "Reinige den Retainer täglich mit einer weichen Zahnbürste. Kein heißes Wasser verwenden, das verformt den Kunststoff.",
+    en: "Clean your retainer daily with a soft toothbrush. Don't use hot water, it warps the plastic.",
+    es: "Limpia tu retenedor diariamente con un cepillo suave. No uses agua caliente, deforma el plástico.",
+  },
+};
+
+export function translateTipp(deText: string, lang: Lang): string {
+  return tippMap[deText]?.[lang] ?? deText;
+}
