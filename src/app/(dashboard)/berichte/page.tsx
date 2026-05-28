@@ -59,7 +59,7 @@ export default function BerichtePage() {
   const [showAllPosten, setShowAllPosten] = useState(false);
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState<Zeitraum | false>(false);
   const [popup, setPopup] = useState<string | null>(null);
 
   const options = zeitraum === "monat" ? getMonthOptions() : zeitraum === "quartal" ? getQuarterOptions() : getYearOptions();
@@ -135,26 +135,28 @@ export default function BerichtePage() {
           <p style={{ fontSize: 14, color: muted }}>{selected.label}{vergleich && v ? ` vs. ${prev?.label}` : ""} \u2014 Echtzeit-Daten</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {(["monat", "quartal", "jahr"] as Zeitraum[]).map(z => (
-            <button key={z} onClick={() => { setZeitraum(z); setDropdownOpen(false); }} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${zeitraum === z ? grn : border}`, background: zeitraum === z ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: zeitraum === z ? grn : muted, cursor: "pointer", fontFamily: "inherit" }}>
-              {z === "monat" ? "Monat" : z === "quartal" ? "Quartal" : "Jahr"}
-            </button>
-          ))}
-          {/* Period selector dropdown */}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setDropdownOpen(!dropdownOpen)} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.03)" : "#f8f8f8", color: txtH, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
-              {selected.label} <ChevronDown size={14} />
-            </button>
-            {dropdownOpen && (
-              <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 200, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
-                {options.map((o, i) => (
-                  <button key={i} onClick={() => { setSelectedIdx(i); setDropdownOpen(false); }} style={{ display: "block", width: "100%", padding: "8px 14px", borderRadius: 8, border: "none", background: i === selectedIdx ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: i === selectedIdx ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: i === selectedIdx ? 700 : 500, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
-                    {o.label}
-                  </button>
-                ))}
+          {/* Combined type + period dropdowns */}
+          {(["monat", "quartal", "jahr"] as Zeitraum[]).map(z => {
+            const opts = z === "monat" ? getMonthOptions() : z === "quartal" ? getQuarterOptions() : getYearOptions();
+            const isActive = zeitraum === z;
+            return (
+              <div key={z} style={{ position: "relative" }}>
+                <button onClick={() => { if (isActive) { setDropdownOpen(dropdownOpen === z ? false : z as any); } else { setZeitraum(z); setSelectedIdx(0); setDropdownOpen(false); } }} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${isActive ? grn : border}`, background: isActive ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: isActive ? grn : muted, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                  {isActive ? selected.label : z === "monat" ? "Monat" : z === "quartal" ? "Quartal" : "Jahr"}
+                  {isActive && <ChevronDown size={13} />}
+                </button>
+                {isActive && dropdownOpen === z && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 12, padding: 4, zIndex: 100, minWidth: 200, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
+                    {opts.map((o, i) => (
+                      <button key={i} onClick={() => { setSelectedIdx(i); setDropdownOpen(false); }} style={{ display: "block", width: "100%", padding: "8px 14px", borderRadius: 8, border: "none", background: i === selectedIdx ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: i === selectedIdx ? grn : (dk ? "#ccc" : "#444"), fontSize: 13, fontWeight: i === selectedIdx ? 700 : 500, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })}
           <div style={{ width: 1, height: 24, background: border, margin: "0 4px" }} />
           <button onClick={() => setVergleich(!vergleich)} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${vergleich ? prp : border}`, background: vergleich ? (dk ? "rgba(167,139,250,0.1)" : "rgba(139,92,246,0.06)") : "transparent", color: vergleich ? prp : muted, cursor: "pointer", fontFamily: "inherit" }}>
             <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{vergleich && prev ? `vs. ${prev.label}` : "Vergleich"}
@@ -215,7 +217,7 @@ export default function BerichtePage() {
               <CartesianGrid strokeDasharray="3 3" stroke={soft} />
               <XAxis dataKey="monat" tick={{ fill: muted, fontSize: 11 }} tickFormatter={fmtMo} />
               <YAxis tick={{ fill: muted, fontSize: 11 }} tickFormatter={yv => yv >= 1000 ? `${Math.round(yv / 1000)}k` : String(yv)} domain={[0, 'auto']} />
-              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13 }} formatter={(val: number) => [fmtEur(val)]} labelFormatter={m => { const [y, mo] = m.split("-"); return ["Januar","Februar","M\u00e4rz","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"][parseInt(mo)-1] + " " + y; }} />
+              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number) => [fmtEur(val)]} labelFormatter={m => { const [y, mo] = m.split("-"); return ["Januar","Februar","M\u00e4rz","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"][parseInt(mo)-1] + " " + y; }} />
               <Area type="monotone" dataKey="einnahmen" stroke={grn} fill="url(#gG)" strokeWidth={2.5} name="Einnahmen" />
               <Line type="monotone" dataKey="geplant" stroke={muted} strokeDasharray="6 4" strokeWidth={1.5} dot={false} name="Geplant" />
             </AreaChart>
@@ -230,7 +232,7 @@ export default function BerichtePage() {
                 <Pie data={[{ name: "P\u00fcnktlich", value: a.verteilung.puenktlich }, { name: "Versp\u00e4tet", value: a.verteilung.verspaetet }, { name: "\u00dcberf\u00e4llig", value: a.verteilung.ueberfaellig }, { name: "Offen", value: a.verteilung.offen }].filter(d => d.value > 0)} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
                   {[grn, ylw, red, gry].map((c, i) => <Cell key={i} fill={c} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13 }} />
+                <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
@@ -239,7 +241,7 @@ export default function BerichtePage() {
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
-            {[{ l: "P\u00fcnktlich", c: grn, v: a.verteilung.puenktlich }, { l: "Versp\u00e4tet", c: ylw, v: a.verteilung.verspaetet }, { l: "\u00dcberf\u00e4llig", c: red, v: a.verteilung.ueberfaellig }].map(x => (
+            {[{ l: "P\u00fcnktlich", c: grn, v: a.verteilung.puenktlich }, { l: "Versp\u00e4tet", c: ylw, v: a.verteilung.verspaetet }, { l: "\u00dcberf\u00e4llig", c: red, v: a.verteilung.ueberfaellig }, { l: "Offen", c: gry, v: a.verteilung.offen }].map(x => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: muted }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: x.c }} />{x.l}: {x.v}</div>
             ))}
           </div>
@@ -252,7 +254,7 @@ export default function BerichtePage() {
               <CartesianGrid strokeDasharray="3 3" stroke={soft} />
               <XAxis dataKey="name" tick={{ fill: muted, fontSize: 12 }} />
               <YAxis tick={{ fill: muted, fontSize: 11 }} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13 }} formatter={(val: number, name: string) => [`${val} Raten`, name]} />
+              <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number, name: string) => [`${val} Raten`, name]} labelStyle={{ color: dk ? "#f0f0f0" : "#333" }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]} name="Raten">{[ylw, orn, red].map((c, i) => <Cell key={i} fill={c} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -272,7 +274,7 @@ export default function BerichtePage() {
                   <CartesianGrid strokeDasharray="3 3" stroke={soft} />
                   <XAxis dataKey="monat" tick={{ fill: muted, fontSize: 11 }} tickFormatter={fmtMo} />
                   <YAxis tick={{ fill: muted, fontSize: 11 }} tickFormatter={yv => yv >= 1000 ? `${Math.round(yv / 1000)}k` : String(yv)} />
-                  <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13 }} formatter={(val: number) => [fmtEur(val)]} />
+                  <Tooltip contentStyle={{ background: dk ? "#1a1d2b" : "#fff", border: `1px solid ${border}`, borderRadius: 10, fontSize: 13, color: dk ? "#f0f0f0" : "#333" }} formatter={(val: number) => [fmtEur(val)]} />
                   <Area type="monotone" dataKey="erwartet" stroke={blu} fill="url(#bG)" strokeWidth={2.5} name="Erwartet" />
                 </AreaChart>
               </ResponsiveContainer>
