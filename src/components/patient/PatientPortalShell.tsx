@@ -333,6 +333,33 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         ))}
       </div>
+      {/* Tipps und Fokus für den Alltag */}
+      {(activePhase || tipps.length > 0) && (
+        <div style={{ padding: "20px 20px 80px" }}>
+          <h2 style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg, marginBottom: 14 }}>{lang === "en" ? "Tips & focus for everyday life" : lang === "es" ? "Consejos y enfoque para el día a día" : "Tipps und Fokus für den Alltag"}</h2>
+          {activePhase && (() => {
+            const content = getPhaseContent(activePhase.name, lang);
+            return content.fokus ? (
+              <div style={{ padding: 16, borderRadius: 14, marginBottom: 12, background: dk ? "rgba(74,222,128,0.05)" : "rgba(34,197,94,0.04)", border: "1px solid " + (dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)") }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 16 }}>🎯</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Current focus" : lang === "es" ? "Enfoque actual" : "Aktueller Fokus"}</span>
+                </div>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{content.fokus}</p>
+              </div>
+            ) : null;
+          })()}
+          {tipps.map(tip => (
+            <div key={tip.id} style={{ padding: 16, borderRadius: 14, marginBottom: 10, background: dk ? "rgba(251,191,36,0.04)" : "rgba(234,179,80,0.04)", border: "1px solid " + (dk ? "rgba(251,191,36,0.1)" : "rgba(234,179,80,0.08)") }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 14 }}>💡</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{tip.titel}</span>
+              </div>
+              <p style={{ fontSize: 13, lineHeight: 1.55, color: soft, margin: 0 }}>{translateTipp(tip.text, lang)}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -727,16 +754,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ padding: "0 24px 16px" }}>
                   <p style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>{info.summary}</p>
                 </motion.div>
-                {/* Aktueller Fokus - shown for active phase */}
-                {phaseDrawer.status === "aktiv" && info.fokus && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ margin: "0 24px 16px", padding: "16px", borderRadius: 14, background: dk ? "rgba(74,222,128,0.05)" : "rgba(34,197,94,0.04)", border: "1px solid " + (dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)") }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 16 }}>🎯</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{lang === "en" ? "Current focus" : lang === "es" ? "Enfoque actual" : "Aktueller Fokus"}</span>
-                    </div>
-                    <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{info.fokus}</p>
-                  </motion.div>
-                )}
                 {/* Interactive detail buttons - Claude answers inline */}
                 {info.details.map((d, i) => {
                   const answerKey = phaseDrawer.name + "::" + d.title;
