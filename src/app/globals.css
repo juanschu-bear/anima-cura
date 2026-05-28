@@ -35,9 +35,9 @@
   --ac-surface-muted: rgba(20,22,35,0.65);
   --ac-border: rgba(255,255,255,0.06);
   --ac-border-strong: rgba(255,255,255,0.12);
-  --ac-text: #f0f0f0;
-  --ac-text-soft: #999;
-  --ac-text-mute: #666;
+  --ac-text: #f2f4f8;
+  --ac-text-soft: #b8c4d6;
+  --ac-text-mute: #8898b0;
   --ac-primary: #4ade80;
   --ac-primary-ink: #4ade80;
   --ac-success: #4ade80;
