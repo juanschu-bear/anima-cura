@@ -309,6 +309,22 @@ samp {
   background: #12151e;
   color: #f0f0f0;
 }
+
+/* Dark mode praxis text color overrides - these Tailwind utilities are hardcoded light colors */
+:root[data-theme="dark"] .text-praxis-800 { color: #f0f4f8 !important; }
+:root[data-theme="dark"] .text-praxis-700 { color: #dce4ed !important; }
+:root[data-theme="dark"] .text-praxis-600 { color: #b8c9db !important; }
+:root[data-theme="dark"] .text-praxis-500 { color: #8ba8c4 !important; }
+:root[data-theme="dark"] .text-praxis-400 { color: #7b93b4 !important; }
+:root[data-theme="dark"] .text-praxis-300 { color: #5e7a99 !important; }
+:root[data-theme="dark"] .bg-praxis-100 { background-color: rgba(255,255,255,0.08) !important; }
+:root[data-theme="dark"] .bg-praxis-600 { background-color: rgba(255,255,255,0.12) !important; }
+:root[data-theme="dark"] .text-praxis-100 { color: #f0f4f8 !important; }
+:root[data-theme="dark"] .border-surface-200 { border-color: rgba(255,255,255,0.06) !important; }
+:root[data-theme="dark"] .bg-surface-50 { background-color: rgba(255,255,255,0.03) !important; }
+:root[data-theme="dark"] .bg-surface-50\/80 { background-color: rgba(255,255,255,0.04) !important; }
+:root[data-theme="dark"] .bg-white { background-color: rgba(16,18,28,0.75) !important; }
+:root[data-theme="dark"] .shadow-card { box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important; }
 :root[data-theme="dark"] .btn-secondary {
   background: var(--ac-surface-muted);
   border-color: var(--ac-border);
