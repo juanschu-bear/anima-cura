@@ -60,6 +60,47 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [showAllPays, setShowAllPays] = useState(false);
+  const [consent, setConsent] = useState<{ portal_nutzung: boolean; datenschutz_akzeptiert: boolean; digitaler_rechnungsempfang: boolean; push_benachrichtigungen: boolean } | null>(null);
+  const [consentLoading, setConsentLoading] = useState(true);
+  const [showDsgvo, setShowDsgvo] = useState(false);
+
+  // Check consent status
+  useEffect(() => {
+    fetch("/api/patient/consent").then(r => r.json()).then(j => {
+      setConsent(j.consent);
+      setConsentLoading(false);
+    }).catch(() => setConsentLoading(false));
+  }, []);
+
+  const acceptConsent = async (opts: { portal: boolean; rechnungen: boolean; push: boolean; datenschutz: boolean }) => {
+    const res = await fetch("/api/patient/consent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        portal_nutzung: opts.portal,
+        digitaler_rechnungsempfang: opts.rechnungen,
+        push_benachrichtigungen: opts.push,
+        datenschutz_akzeptiert: opts.datenschutz,
+      }),
+    });
+    if (res.ok) {
+      const j = await res.json();
+      setConsent(j.consent);
+    }
+  };
+
+  const exportData = async () => {
+    const res = await fetch("/api/patient/dsgvo");
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `anima-cura-datenexport-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     const ep = ["ratenplan", "behandlung", "badges", "nachrichten", "benachrichtigungen", "dokumente", "tipps", "zahlungen"];
@@ -537,12 +578,93 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: fg }}>{t("more.aboutApp", lang)}</p>
         <p style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>{t("more.aboutText", lang)}</p>
       </div>
-      <div style={{ padding: "0 20px 16px", textAlign: "center" }}>
+      {/* DSGVO Section */}
+      <div style={{ padding: "8px 20px 0" }}>
+        <p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 10, color: fg }}>{lang === "en" ? "Data & Privacy" : lang === "es" ? "Datos y Privacidad" : "Datenschutz & Rechte"}</p>
+      </div>
+      <div style={{ padding: "0 20px 8px" }}>
+        <button onClick={exportData} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, cursor: "pointer", background: cardBg, border: "1px solid " + border, fontFamily: "inherit", textAlign: "left" }}>
+          <span style={{ fontSize: 20 }}>📥</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Export my data" : lang === "es" ? "Exportar mis datos" : "Meine Daten exportieren"}</div>
+            <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Download all your data as JSON (Art. 15/20 GDPR)" : lang === "es" ? "Descarga todos tus datos (Art. 15/20 RGPD)" : "Alle Daten als JSON herunterladen (Art. 15/20 DSGVO)"}</div>
+          </div>
+          <span style={{ color: muted }}>↓</span>
+        </button>
+      </div>
+      <div style={{ padding: "0 20px 8px" }}>
+        <button onClick={() => setShowDsgvo(true)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, cursor: "pointer", background: cardBg, border: "1px solid " + border, fontFamily: "inherit", textAlign: "left" }}>
+          <span style={{ fontSize: 20 }}>📋</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Privacy Policy" : lang === "es" ? "Política de Privacidad" : "Datenschutzerklärung"}</div>
+            <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "How we handle your data" : lang === "es" ? "Cómo gestionamos tus datos" : "So gehen wir mit deinen Daten um"}</div>
+          </div>
+          <span style={{ color: muted }}>→</span>
+        </button>
+      </div>
+      <div style={{ padding: "0 20px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 14, background: cardBg, border: "1px solid " + border }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 20 }}>📧</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Digital invoices" : lang === "es" ? "Facturas digitales" : "Digitaler Rechnungsempfang"}</div>
+              <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Receive invoices in this app" : lang === "es" ? "Recibir facturas en esta app" : "Rechnungen in der App empfangen"}</div>
+            </div>
+          </div>
+          <button onClick={() => { const newVal = !consent?.digitaler_rechnungsempfang; acceptConsent({ portal: true, rechnungen: newVal, push: consent?.push_benachrichtigungen || false, datenschutz: true }); }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.digitaler_rechnungsempfang ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", position: "absolute", top: 3, left: consent?.digitaler_rechnungsempfang ? 23 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </div>
+      </div>
+      <div style={{ padding: "0 20px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 14, background: cardBg, border: "1px solid " + border }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 20 }}>🔔</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Push notifications" : lang === "es" ? "Notificaciones push" : "Push-Benachrichtigungen"}</div>
+              <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Get notified about due payments" : lang === "es" ? "Recibe alertas de pagos" : "Benachrichtigungen bei fälligen Raten"}</div>
+            </div>
+          </div>
+          <button onClick={() => { const newVal = !consent?.push_benachrichtigungen; acceptConsent({ portal: true, rechnungen: consent?.digitaler_rechnungsempfang || false, push: newVal, datenschutz: true }); }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.push_benachrichtigungen ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+            <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", position: "absolute", top: 3, left: consent?.push_benachrichtigungen ? 23 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </div>
+      </div>
+      <div style={{ padding: "0 20px 16px", textAlign: "center", marginTop: 8 }}>
         <button onClick={logout} style={{ background: "none", border: "1px solid " + border, borderRadius: 10, padding: "8px 20px", color: muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>{t("more.logout", lang)}</button>
-        <p style={{ fontSize: 12, color: dk ? "#444" : "#ccc" }}>Datenschutz · Impressum · Kontakt</p>
+        <p style={{ fontSize: 11, color: dk ? "#444" : "#ccc" }}>Anima Cura v1.0 · DSGVO-konform · EU-Server</p>
       </div>
     </div>
   );
+
+  // ═══ CONSENT GATE ═══
+  if (!consentLoading && consent && !consent.datenschutz_akzeptiert) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: dk ? "#030806" : "#f5f1eb", fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ maxWidth: 400, padding: 32, textAlign: "center" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: grn, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, color: "#fff", margin: "0 auto 20px", ...hd }}>A</div>
+          <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg, marginBottom: 8 }}>Willkommen bei Anima Cura</h1>
+          <p style={{ fontSize: 14, color: soft, lineHeight: 1.6, marginBottom: 24 }}>
+            {lang === "en" ? "Before you can use the patient portal, we need your consent for data processing." : lang === "es" ? "Antes de usar el portal, necesitamos tu consentimiento para el tratamiento de datos." : "Bevor du das Patientenportal nutzen kannst, benötigen wir deine Einwilligung zur Datenverarbeitung."}
+          </p>
+          <div style={{ textAlign: "left", marginBottom: 24 }}>
+            <div style={{ padding: 14, borderRadius: 12, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), marginBottom: 10, fontSize: 13, lineHeight: 1.6, color: soft }}>
+              <strong style={{ color: fg }}>{lang === "en" ? "What we store:" : lang === "es" ? "Lo que almacenamos:" : "Was wir speichern:"}</strong><br/>
+              {lang === "en" ? "Your name, treatment data, payment data, chat messages. Everything on EU servers (Frankfurt). Encrypted. Only accessible to you and your practice." : lang === "es" ? "Tu nombre, datos de tratamiento, datos de pago, mensajes de chat. Todo en servidores de la UE (Frankfurt). Encriptado. Solo accesible para ti y tu consulta." : "Dein Name, Behandlungsdaten, Zahlungsdaten, Chat-Nachrichten. Alles auf EU-Servern (Frankfurt). Verschlüsselt. Nur für dich und deine Praxis zugänglich."}
+            </div>
+            <div style={{ padding: 14, borderRadius: 12, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"), marginBottom: 10, fontSize: 13, lineHeight: 1.6, color: soft }}>
+              <strong style={{ color: fg }}>{lang === "en" ? "Your rights:" : lang === "es" ? "Tus derechos:" : "Deine Rechte:"}</strong><br/>
+              {lang === "en" ? "You can export all your data at any time, revoke your consent, or request complete deletion of your account. All under Settings > Data & Privacy." : lang === "es" ? "Puedes exportar todos tus datos en cualquier momento, revocar tu consentimiento o solicitar la eliminación de tu cuenta." : "Du kannst jederzeit alle Daten exportieren, deine Einwilligung widerrufen oder die vollständige Löschung deines Accounts beantragen. Alles unter Mehr > Datenschutz & Rechte."}
+            </div>
+          </div>
+          <button onClick={() => acceptConsent({ portal: true, rechnungen: false, push: false, datenschutz: true })} style={{ width: "100%", padding: "16px 32px", borderRadius: 14, border: "none", background: grn, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
+            {lang === "en" ? "I agree — continue" : lang === "es" ? "Acepto — continuar" : "Einverstanden — weiter"}
+          </button>
+          <p style={{ fontSize: 11, color: muted }}>{lang === "en" ? "You can revoke your consent at any time in settings." : lang === "es" ? "Puedes revocar tu consentimiento en cualquier momento." : "Du kannst deine Einwilligung jederzeit in den Einstellungen widerrufen."}</p>
+        </div>
+      </div>
+    );
+  }
 
   // ═══ RENDER ═══
   return (
