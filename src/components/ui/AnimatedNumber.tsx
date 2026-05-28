@@ -11,7 +11,7 @@ interface Props {
   style?: React.CSSProperties;
 }
 
-export default function AnimatedNumber({ value, duration = 1.2, formatFn, className, style }: Props) {
+export default function AnimatedNumber({ value, duration = 2.0, formatFn, className, style }: Props) {
   const motionValue = useMotionValue(0);
   const [display, setDisplay] = useState("0");
 

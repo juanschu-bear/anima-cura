@@ -34,7 +34,8 @@ function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
 
 export default function PatientenPage() {
   const router = useRouter();
-  const { authUser, locale } = useAppStore();
+  const { authUser, locale, theme } = useAppStore();
+  const isDark = theme === "dark";
   const readOnly = isReadOnlyRole(authUser?.role ?? "lesezugriff");
   const [search, setSearch] = useState("");
 
@@ -152,7 +153,7 @@ export default function PatientenPage() {
       </div>
 
       {syncHint && (
-        <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">
+        <div className={`rounded-lg border px-4 py-3 text-sm ${isDark ? "border-white/6 bg-white/3 text-white/70" : "border-surface-200 bg-white text-praxis-600"}`}>
           {syncHint}
         </div>
       )}
@@ -168,11 +169,11 @@ export default function PatientenPage() {
         />
       </div>
 
-      <div className="rounded-card border border-surface-200 bg-white shadow-card">
+      <div className={`rounded-card border shadow-card ${isDark ? "border-white/6 bg-[rgba(16,18,28,0.75)]" : "border-surface-200 bg-white"}`}>
         <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-surface-50">
+            <tr className={isDark ? "bg-white/3" : "bg-surface-50"}>
               <th className="table-header">{t("patients.patientHeader", locale)}</th>
               <th className="table-header">{t("patients.age", locale)}</th>
               <th className="table-header">{t("patients.insurance", locale)}</th>
@@ -203,7 +204,7 @@ export default function PatientenPage() {
               return (
                 <tr
                   key={p.id}
-                  className="cursor-pointer transition-colors hover:bg-surface-50/80"
+                  className={`cursor-pointer transition-colors ${isDark ? "hover:bg-white/3" : "hover:bg-surface-50/80"}`}
                   onClick={() => router.push(`/patienten/${p.id}`)}
                 >
                   <td className="table-cell">
