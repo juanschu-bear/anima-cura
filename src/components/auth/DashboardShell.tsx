@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
   BarChart3,
@@ -166,7 +167,15 @@ export default function DashboardShell({
                 href={item.href}
                 data-nav={item.href.slice(1)}
                 className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
+                style={{ position: "relative" }}
               >
+                {isActive && (
+                  <motion.div
+                    layoutId="sidebarActiveBlob"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    style={{ position: "absolute", inset: 0, borderRadius: 12, background: theme === "dark" ? "rgba(74,222,128,0.08)" : "var(--ac-sidebar-active-bg)", zIndex: -1 }}
+                  />
+                )}
                 <Icon size={18} />
                 {t(item.key, locale)}
               </Link>
@@ -279,7 +288,14 @@ export default function DashboardShell({
 
         <div className="ac-content flex-1 overflow-y-auto p-7">
           {hasAccess ? (
-            children
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              {children}
+            </motion.div>
           ) : (
             <AccessDenied
               locale={locale}

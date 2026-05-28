@@ -30,9 +30,9 @@
 }
 
 :root[data-theme="dark"] {
-  --ac-bg: #050806;
-  --ac-surface: rgba(20,20,20,0.7);
-  --ac-surface-muted: rgba(25,25,25,0.6);
+  --ac-bg: #080a12;
+  --ac-surface: rgba(16,18,28,0.75);
+  --ac-surface-muted: rgba(20,22,35,0.65);
   --ac-border: rgba(255,255,255,0.06);
   --ac-border-strong: rgba(255,255,255,0.12);
   --ac-text: #f0f0f0;
@@ -43,7 +43,7 @@
   --ac-success: #4ade80;
   --ac-warning: #fbbf24;
   --ac-danger: #ef4444;
-  --ac-sidebar-bg: rgba(8,10,8,0.95);
+  --ac-sidebar-bg: rgba(8,10,16,0.95);
   --ac-sidebar-border: rgba(255,255,255,0.04);
   --ac-sidebar-active-bg: rgba(74,222,128,0.08);
   --ac-sidebar-active-ink: #4ade80;
@@ -227,9 +227,9 @@ samp {
 
 :root[data-theme="dark"] body {
   background:
-    radial-gradient(800px 400px at 10% 0%, rgba(74,222,128,0.08), transparent 50%),
-    radial-gradient(800px 400px at 90% 100%, rgba(251,191,36,0.06), transparent 50%),
-    radial-gradient(600px 300px at 60% 40%, rgba(167,139,250,0.04), transparent 50%),
+    radial-gradient(800px 400px at 10% 0%, rgba(74,222,128,0.06), transparent 50%),
+    radial-gradient(800px 400px at 90% 100%, rgba(251,191,36,0.05), transparent 50%),
+    radial-gradient(600px 300px at 50% 50%, rgba(96,165,250,0.03), transparent 50%),
     var(--ac-bg);
 }
 :root[data-theme="dark"] .stat-card {
