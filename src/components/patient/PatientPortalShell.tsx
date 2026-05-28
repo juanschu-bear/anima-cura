@@ -333,17 +333,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         ))}
       </div>
-      {tipps.length > 0 && (
-        <div style={{ padding: "12px 20px 0" }}>
-          <p style={{ ...hd, fontSize: 15, fontWeight: 700, marginBottom: 12, color: fg }}>{t("journey.careTips", lang)}</p>
-          {tipps.map(tip => (
-            <div key={tip.id} style={{ borderRadius: 14, padding: 16, marginBottom: 10, background: dk ? "rgba(251,191,36,0.05)" : "rgba(234,179,80,0.05)", border: "1px solid " + (dk ? "rgba(251,191,36,0.12)" : "rgba(234,179,80,0.12)") }}>
-              <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: fg }}>{tip.titel}</p>
-              <p style={{ fontSize: 13, lineHeight: 1.55, color: soft }}>{translateTipp(tip.text, lang)}</p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 
@@ -530,17 +519,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ═══ RENDER ═══
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: dk ? "radial-gradient(ellipse at 30% 20%, #0a1a10 0%, #050505 40%, #030303 100%)" : "radial-gradient(ellipse at 30% 20%, #f0ece4 0%, #e8e2d8 40%, #dfd8cc 100%)", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(ellipse at 30% 20%, #0a1a10 0%, #050505 40%, #030303 100%)", fontFamily: "'DM Sans', sans-serif" }}>
       {/* Branding on desktop - left side */}
       <div className="desktop-brand" style={{ position: "fixed", left: 60, top: "50%", transform: "translateY(-50%)", display: "none", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", ...hd }}>A</div>
           <div>
-            <div style={{ ...hd, fontSize: 24, fontWeight: 800, color: dk ? "#f0f0f0" : "#1a1a1a" }}>Anima Cura</div>
-            <div style={{ fontSize: 12, color: dk ? "#666" : "#999", fontWeight: 500 }}>Patient Portal</div>
+            <div style={{ ...hd, fontSize: 24, fontWeight: 800, color: "#f0f0f0" }}>Anima Cura</div>
+            <div style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>Patient Portal</div>
           </div>
         </div>
-        <div style={{ fontSize: 13, color: dk ? "#444" : "#bbb", maxWidth: 220, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: "#555", maxWidth: 220, lineHeight: 1.6 }}>
           {lang === "en" ? "Your treatment companion. Track your progress, chat with iCura, manage your payments." : lang === "es" ? "Tu compañero de tratamiento. Sigue tu progreso, chatea con iCura, gestiona tus pagos." : "Dein Behandlungsbegleiter. Verfolge deinen Fortschritt, chatte mit iCura, verwalte deine Raten."}
         </div>
         <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
@@ -550,7 +539,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
         <div className="desktop-brand" style={{ display: "none", gap: 6, marginTop: 24 }}>
           {(["phone", "tablet"] as const).map(d => (
-            <button key={d} onClick={() => setDeviceSize(d)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), background: deviceSize === d ? (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)") : "transparent", color: deviceSize === d ? (dk ? "#f0f0f0" : "#1a1a1a") : (dk ? "#555" : "#aaa"), fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            <button key={d} onClick={() => setDeviceSize(d)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: deviceSize === d ? "rgba(255,255,255,0.06)" : "transparent", color: deviceSize === d ? "#f0f0f0" : "#555", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {d === "phone" ? "Phone" : "Tablet"}
             </button>
           ))}
@@ -559,12 +548,12 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Phone frame */}
       <div style={{ position: "relative", width: "100%", maxWidth: deviceSize === "tablet" ? 620 : 430, transition: "max-width 0.4s ease" }}>
         {/* Phone bezel - only visible on desktop */}
-        <div className="phone-bezel" style={{ display: "none", position: "absolute", inset: -14, borderRadius: 46, border: dk ? "2px solid rgba(255,255,255,0.08)" : "2px solid rgba(0,0,0,0.06)", pointerEvents: "none", zIndex: 50 }} />
+        <div className="phone-bezel" style={{ display: "none", position: "absolute", inset: -14, borderRadius: 46, border: "2px solid rgba(255,255,255,0.08)", pointerEvents: "none", zIndex: 50 }} />
         {/* Notch - only visible on desktop */}
-        <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: deviceSize === "tablet" ? 180 : 140, height: 28, borderRadius: "0 0 18px 18px", background: dk ? "#0a0a0a" : "#e0d8cc", zIndex: 51, boxShadow: dk ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)", transition: "width 0.4s ease" }}>
+        <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: deviceSize === "tablet" ? 180 : 140, height: 28, borderRadius: "0 0 18px 18px", background: "#0a0a0a", zIndex: 51, boxShadow: "0 2px 8px rgba(0,0,0,0.3)", transition: "width 0.4s ease" }}>
           <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
         </div>
-    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 620 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: dk ? "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)" : "0 0 80px rgba(0,0,0,0.08)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
+    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 620 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
       {/* Lava lamp animated gradient blobs - warm ambient glow, corners lit, middle dark */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         {/* Top-left: warm green-teal glow */}
