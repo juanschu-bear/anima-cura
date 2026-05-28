@@ -132,7 +132,7 @@ Struktur: 1) Zusammenfassung (2 Sätze) 2) Highlights 3) Risiken 4) Empfehlungen
           ))}
           <div style={{ width: 1, height: 24, background: border, margin: "0 4px" }} />
           <button onClick={() => setVergleich(!vergleich)} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${vergleich ? prp : border}`, background: vergleich ? (dk ? "rgba(167,139,250,0.1)" : "rgba(139,92,246,0.06)") : "transparent", color: vergleich ? prp : muted, cursor: "pointer", fontFamily: "inherit" }}>
-            <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Vergleich
+            <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{vergleich ? `vs. ${prevRange.label}` : "Vergleich"}
           </button>
           <button onClick={generateAiReport} disabled={aiLoading} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${border}`, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.04)", color: grn, cursor: "pointer", fontFamily: "inherit", opacity: aiLoading ? 0.5 : 1 }}>
             <Sparkles size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{aiLoading ? "Erstellt..." : "AI-Report"}
@@ -147,14 +147,14 @@ Struktur: 1) Zusammenfassung (2 Sätze) 2) Highlights 3) Risiken 4) Empfehlungen
             <Sparkles size={16} color={grn} />
             <span style={{ fontSize: 14, fontWeight: 700, color: txtH }}>AI-Analyse — {range.label}</span>
           </div>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: dk ? "#ccc" : "#444", margin: 0, whiteSpace: "pre-wrap" }}>{aiReport}</p>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: dk ? "#ccc" : "#444", margin: 0 }} dangerouslySetInnerHTML={{ __html: aiReport.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
         </motion.div>
       )}
 
       {/* KPI Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
         <KpiCard dk={dk} label="Einnahmen" value={a.einnahmen} fmt="eur" d={v ? delta(a.einnahmen, v.einnahmen) : null} good="up" i={0} />
-        <KpiCard dk={dk} label="Pro Kopf" value={a.einnahmenProKopf} fmt="eur" d={v ? delta(a.einnahmenProKopf, v.einnahmenProKopf) : null} good="up" i={1} sub={`${a.zahlendePatienten} Patienten`} />
+        <KpiCard dk={dk} label="Ø pro Patient" value={a.einnahmenProKopf} fmt="eur" d={v ? delta(a.einnahmenProKopf, v.einnahmenProKopf) : null} good="up" i={1} sub={`${a.zahlendePatienten} Patienten`} />
         <KpiCard dk={dk} label="Zahlungsquote" value={a.zahlungsquote} fmt="pct" d={v ? delta(a.zahlungsquote, v.zahlungsquote) : null} good="up" i={2} />
         <KpiCard dk={dk} label="Ø Verzögerung" value={a.avgVerzoegerung} fmt="tage" d={v ? delta(a.avgVerzoegerung, v.avgVerzoegerung) : null} good="down" i={3} />
         <KpiCard dk={dk} label="Mahnquote" value={a.mahnquote} fmt="pct" d={v ? delta(a.mahnquote, v.mahnquote) : null} good="down" i={4} />
