@@ -49,7 +49,13 @@ export default function PatientenPage() {
 
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
-  const { patienten, totalCount, loading, refetch } = usePatienten(search);
+  const { patienten: allPatienten, totalCount, loading, refetch } = usePatienten();
+  const patienten = search
+    ? allPatienten.filter((p: any) => {
+        const s = search.toLowerCase();
+        return (p.vorname || "").toLowerCase().includes(s) || (p.nachname || "").toLowerCase().includes(s);
+      })
+    : allPatienten;
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -163,9 +169,16 @@ export default function PatientenPage() {
         <input
           type="text"
           placeholder={t("patients.searchPlaceholder", locale)}
-          className="input pl-9"
+          className="input pl-9 pr-20"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            <span className={`text-xs font-semibold ${isDark ? "text-white/40" : "text-praxis-400"}`}>{patienten.length}</span>
+            <button onClick={() => setSearch("")} className={`text-xs font-bold ${isDark ? "text-white/50 hover:text-white" : "text-praxis-400 hover:text-praxis-700"}`}>✕</button>
+          </div>
+        )}
         />
       </div>
 
