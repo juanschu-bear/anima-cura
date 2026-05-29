@@ -66,6 +66,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consentCheck1, setConsentCheck1] = useState(false);
   const [consentCheck2, setConsentCheck2] = useState(false);
   const [consentIsGuardian, setConsentIsGuardian] = useState(false);
+  const [deactivatePopup, setDeactivatePopup] = useState<"rechnungen" | "push" | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   // Check consent status
   useEffect(() => {
@@ -95,13 +97,24 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const exportData = async () => {
     const res = await fetch("/api/patient/dsgvo");
     if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `anima-cura-datenexport-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const data = await res.json();
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Meine Daten - Anima Cura</title><style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#1a1a1a;line-height:1.6}h1{font-size:22px;border-bottom:2px solid #22c55e;padding-bottom:8px}h2{font-size:16px;margin-top:24px;color:#444}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{text-align:left;padding:6px 10px;border:1px solid #ddd;font-size:13px}th{background:#f5f5f5;font-weight:600}.meta{font-size:12px;color:#888;margin-bottom:20px}@media print{body{margin:20px}}</style></head><body>
+<h1>Meine Daten — Anima Cura</h1>
+<p class="meta">Exportiert am ${new Date().toLocaleDateString("de-DE")} um ${new Date().toLocaleTimeString("de-DE")} Uhr · Art. 15/20 DSGVO</p>
+<h2>Persönliche Daten</h2>
+<table>${data.persoenliche_daten ? Object.entries(data.persoenliche_daten).map(([k,v]) => `<tr><th>${k}</th><td>${v || "–"}</td></tr>`).join("") : "<tr><td>Keine Daten</td></tr>"}</table>
+<h2>Behandlungsphasen</h2>
+<table><tr><th>Phase</th><th>Status</th><th>Von</th><th>Bis</th></tr>${(data.behandlungsphasen||[]).map((p: any) => `<tr><td>${p.name}</td><td>${p.status}</td><td>${p.start_datum||"–"}</td><td>${p.end_datum||"–"}</td></tr>`).join("")}</table>
+<h2>Zahlungen</h2>
+<table><tr><th>Rate</th><th>Betrag</th><th>Fällig</th><th>Status</th><th>Bezahlt am</th></tr>${(data.ratenplaene||[]).flatMap((rp: any) => (rp.raten||[]).map((r: any) => `<tr><td>${r.rate_nummer}</td><td>${r.betrag} €</td><td>${r.faellig_am}</td><td>${r.status}</td><td>${r.bezahlt_am||"–"}</td></tr>`)).join("")}</table>
+<h2>Dokumente</h2>
+<table><tr><th>Name</th><th>Typ</th><th>Datum</th></tr>${(data.dokumente||[]).map((d: any) => `<tr><td>${d.name}</td><td>${d.typ}</td><td>${d.hochgeladen_am ? new Date(d.hochgeladen_am).toLocaleDateString("de-DE") : "–"}</td></tr>`).join("")}</table>
+<h2>Chat-Nachrichten</h2>
+<table><tr><th>Von</th><th>Nachricht</th><th>Datum</th></tr>${(data.chat_nachrichten||[]).map((m: any) => `<tr><td>${m.von}</td><td>${m.text}</td><td>${m.datum ? new Date(m.datum).toLocaleDateString("de-DE") : "–"}</td></tr>`).join("")}</table>
+<p class="meta" style="margin-top:30px;border-top:1px solid #ddd;padding-top:12px">Anima Cura Patientenportal · Praxis Dr. Maria Schubert · Daten auf EU-Servern (Frankfurt)</p>
+</body></html>`;
+      const w = window.open("", "_blank");
+      if (w) { w.document.write(html); w.document.close(); }
     }
   };
 
@@ -590,13 +603,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <span style={{ fontSize: 20 }}>📥</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Export my data" : lang === "es" ? "Exportar mis datos" : "Meine Daten exportieren"}</div>
-            <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Download all your data as JSON (Art. 15/20 GDPR)" : lang === "es" ? "Descarga todos tus datos (Art. 15/20 RGPD)" : "Alle Daten als JSON herunterladen (Art. 15/20 DSGVO)"}</div>
+            <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "View and print all your stored data (Art. 15/20 GDPR)" : lang === "es" ? "Ver e imprimir todos tus datos (Art. 15/20 RGPD)" : "Alle gespeicherten Daten einsehen und drucken (Art. 15/20 DSGVO)"}</div>
           </div>
           <span style={{ color: muted }}>↓</span>
         </button>
       </div>
       <div style={{ padding: "0 20px 8px" }}>
-        <button onClick={() => setShowDsgvo(true)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, cursor: "pointer", background: cardBg, border: "1px solid " + border, fontFamily: "inherit", textAlign: "left" }}>
+        <button onClick={() => setShowPrivacy(true)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, cursor: "pointer", background: cardBg, border: "1px solid " + border, fontFamily: "inherit", textAlign: "left" }}>
           <span style={{ fontSize: 20 }}>📋</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Privacy Policy" : lang === "es" ? "Política de Privacidad" : "Datenschutzerklärung"}</div>
@@ -614,7 +627,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Receive invoices in this app" : lang === "es" ? "Recibir facturas en esta app" : "Rechnungen in der App empfangen"}</div>
             </div>
           </div>
-          <button onClick={() => { const newVal = !consent?.digitaler_rechnungsempfang; acceptConsent({ portal: true, rechnungen: newVal, push: consent?.push_benachrichtigungen || false, datenschutz: true }); }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.digitaler_rechnungsempfang ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+          <button onClick={() => { if (consent?.digitaler_rechnungsempfang) { setDeactivatePopup("rechnungen"); } else { acceptConsent({ portal: true, rechnungen: true, push: consent?.push_benachrichtigungen || false, datenschutz: true }); } }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.digitaler_rechnungsempfang ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
             <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", position: "absolute", top: 3, left: consent?.digitaler_rechnungsempfang ? 23 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
           </button>
         </div>
@@ -628,7 +641,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Get notified about due payments" : lang === "es" ? "Recibe alertas de pagos" : "Benachrichtigungen bei fälligen Raten"}</div>
             </div>
           </div>
-          <button onClick={() => { const newVal = !consent?.push_benachrichtigungen; acceptConsent({ portal: true, rechnungen: consent?.digitaler_rechnungsempfang || false, push: newVal, datenschutz: true }); }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.push_benachrichtigungen ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+          <button onClick={() => { if (consent?.push_benachrichtigungen) { setDeactivatePopup("push"); } else { acceptConsent({ portal: true, rechnungen: consent?.digitaler_rechnungsempfang || false, push: true, datenschutz: true }); } }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.push_benachrichtigungen ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
             <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", position: "absolute", top: 3, left: consent?.push_benachrichtigungen ? 23 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
           </button>
         </div>
@@ -643,7 +656,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ CONSENT GATE ═══
 
   // Determine if patient is minor (from geburtsdatum in patient data, or assume adult if unknown)
-  const patientGeb = null;
+  const patientGeb = rp?.patient?.geburtsdatum;
   const isMinor = patientGeb ? (new Date().getFullYear() - new Date(patientGeb).getFullYear()) < 16 : false;
 
   if (!consentLoading && consent && !consent.datenschutz_akzeptiert) {
@@ -723,7 +736,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             )}
           </div>
 
-          <button disabled={!canAccept} onClick={() => acceptConsent({ portal: true, rechnungen: false, push: false, datenschutz: true })} style={{ width: "100%", padding: "16px 32px", borderRadius: 14, border: "none", background: canAccept ? grn : (dk ? "#333" : "#ddd"), color: canAccept ? "#fff" : muted, fontSize: 15, fontWeight: 700, cursor: canAccept ? "pointer" : "not-allowed", fontFamily: "inherit", marginBottom: 10, transition: "all 0.2s" }}>
+          <button disabled={!canAccept} onClick={() => acceptConsent({ portal: true, rechnungen: true, push: true, datenschutz: true })} style={{ width: "100%", padding: "16px 32px", borderRadius: 14, border: "none", background: canAccept ? grn : (dk ? "#333" : "#ddd"), color: canAccept ? "#fff" : muted, fontSize: 15, fontWeight: 700, cursor: canAccept ? "pointer" : "not-allowed", fontFamily: "inherit", marginBottom: 10, transition: "all 0.2s" }}>
             {lang === "en" ? "I agree — continue" : lang === "es" ? "Acepto — continuar" : "Einverstanden — weiter"}
           </button>
           <p style={{ fontSize: 11, color: muted, textAlign: "center" }}>
@@ -1082,6 +1095,77 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Deactivation Confirmation Popup */}
+      <AnimatePresence>
+        {deactivatePopup && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeactivatePopup(null)} style={{ position: "absolute", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} style={{ background: dk ? "#1a1d2b" : "#fff", borderRadius: 20, padding: 24, maxWidth: 360, width: "100%" }}>
+              <div style={{ fontSize: 28, textAlign: "center", marginBottom: 12 }}>{deactivatePopup === "push" ? "🔕" : "📭"}</div>
+              <h3 style={{ ...hd, fontSize: 18, fontWeight: 700, color: fg, textAlign: "center", marginBottom: 12 }}>
+                {deactivatePopup === "push"
+                  ? (lang === "en" ? "Disable notifications?" : lang === "es" ? "¿Desactivar notificaciones?" : "Benachrichtigungen deaktivieren?")
+                  : (lang === "en" ? "Disable digital invoices?" : lang === "es" ? "¿Desactivar facturas digitales?" : "Digitalen Rechnungsempfang deaktivieren?")}
+              </h3>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: soft, marginBottom: 20 }}>
+                {deactivatePopup === "push" ? (
+                  lang === "en" ? "Without push notifications you will need to check the app yourself for due payments, appointments and updates. No automatic reminders. Missed deadlines are your own responsibility."
+                  : lang === "es" ? "Sin notificaciones push, deberás revisar la app tú mismo. Sin recordatorios automáticos. Los plazos perdidos son tu responsabilidad."
+                  : "Ohne Push-Benachrichtigungen musst du selbständig in die App schauen, um fällige Raten, Termine und Neuigkeiten zu sehen. Keine automatischen Erinnerungen. Verpasste Fristen liegen in deiner eigenen Verantwortung."
+                ) : (
+                  lang === "en" ? "Without digital invoices you will receive your invoices only by mail. This causes delays of several days. Late payments due to delayed delivery are your own responsibility."
+                  : lang === "es" ? "Sin facturas digitales recibirás tus facturas solo por correo postal. Esto causa retrasos. Los pagos atrasados por entrega tardía son tu responsabilidad."
+                  : "Ohne digitalen Rechnungsempfang erhältst du deine Rechnungen ausschließlich per Post. Das verursacht Verzögerungen von mehreren Tagen. Verspätete Zahlungen aufgrund verspäteter Zustellung liegen in deiner eigenen Verantwortung."
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setDeactivatePopup(null)} style={{ flex: 1, padding: "12px 16px", borderRadius: 12, border: "none", background: grn, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  {lang === "en" ? "Keep active" : lang === "es" ? "Mantener activo" : "Aktiviert lassen"}
+                </button>
+                <button onClick={() => {
+                  if (deactivatePopup === "push") acceptConsent({ portal: true, rechnungen: consent?.digitaler_rechnungsempfang || false, push: false, datenschutz: true });
+                  else acceptConsent({ portal: true, rechnungen: false, push: consent?.push_benachrichtigungen || false, datenschutz: true });
+                  setDeactivatePopup(null);
+                }} style={{ flex: 1, padding: "12px 16px", borderRadius: 12, border: "1px solid " + (dk ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.2)"), background: "transparent", color: red, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {lang === "en" ? "Deactivate" : lang === "es" ? "Desactivar" : "Deaktivieren"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Privacy Policy Overlay */}
+      <AnimatePresence>
+        {showPrivacy && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "absolute", inset: 0, zIndex: 240, background: dk ? "#030806" : "#f5f1eb", overflowY: "auto" }}>
+            <div style={{ padding: "24px 20px 100px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h2 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg, margin: 0 }}>
+                  {lang === "en" ? "Privacy Policy" : lang === "es" ? "Política de Privacidad" : "Datenschutzerklärung"}
+                </h2>
+                <button onClick={() => setShowPrivacy(false)} style={{ background: "none", border: "none", cursor: "pointer", color: muted, fontSize: 22 }}>✕</button>
+              </div>
+              {[
+                { t: lang === "en" ? "Responsible Party" : lang === "es" ? "Responsable" : "Verantwortliche Stelle", c: lang === "en" ? "Dr. Maria Schubert, Orthodontic Practice, Leipzig. Contact: praxis@dr-schubert.de" : lang === "es" ? "Dra. Maria Schubert, Consulta de Ortodoncia, Leipzig." : "Dr. Maria Schubert, Kieferorthopädische Praxis, Leipzig. Kontakt: praxis@dr-schubert.de" },
+                { t: lang === "en" ? "What We Store" : lang === "es" ? "Qué almacenamos" : "Welche Daten werden gespeichert", c: lang === "en" ? "Name, date of birth, treatment phases, payment status (not payment processing), chat messages with iCura, documents provided by the practice, notification preferences." : lang === "es" ? "Nombre, fecha de nacimiento, fases de tratamiento, estado de pago, mensajes de chat, documentos, preferencias de notificación." : "Name, Geburtsdatum, Behandlungsphasen, Zahlungsstatus (keine Zahlungsverarbeitung), Chat-Nachrichten mit iCura, von der Praxis bereitgestellte Dokumente, Benachrichtigungseinstellungen." },
+                { t: lang === "en" ? "Legal Basis" : lang === "es" ? "Base jurídica" : "Rechtsgrundlage", c: lang === "en" ? "Processing is based on your consent (Art. 6(1)(a) GDPR) and the treatment contract (Art. 6(1)(b) GDPR). Health data processing is based on Art. 9(2)(a) GDPR (explicit consent)." : lang === "es" ? "El tratamiento se basa en tu consentimiento (Art. 6.1.a RGPD) y el contrato de tratamiento (Art. 6.1.b RGPD)." : "Die Verarbeitung erfolgt auf Grundlage deiner Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) und des Behandlungsvertrags (Art. 6 Abs. 1 lit. b DSGVO). Die Verarbeitung von Gesundheitsdaten erfolgt auf Basis deiner ausdrücklichen Einwilligung (Art. 9 Abs. 2 lit. a DSGVO)." },
+                { t: lang === "en" ? "Storage Location" : lang === "es" ? "Ubicación" : "Speicherort", c: lang === "en" ? "All data is stored encrypted on EU servers (Supabase, Frankfurt, Germany). Transfer outside the EU does not take place." : lang === "es" ? "Todos los datos se almacenan encriptados en servidores de la UE (Frankfurt, Alemania)." : "Alle Daten werden verschlüsselt auf EU-Servern gespeichert (Supabase, Frankfurt, Deutschland). Eine Übermittlung in Drittstaaten findet nicht statt." },
+                { t: lang === "en" ? "Your Rights" : lang === "es" ? "Tus derechos" : "Deine Rechte", c: lang === "en" ? "Right to access (Art. 15), right to rectification (Art. 16), right to erasure (Art. 17), right to data portability (Art. 20), right to withdraw consent at any time (Art. 7). All exercisable under More > Data & Privacy." : lang === "es" ? "Derecho de acceso (Art. 15), rectificación (Art. 16), supresión (Art. 17), portabilidad (Art. 20), revocación del consentimiento (Art. 7)." : "Auskunftsrecht (Art. 15), Recht auf Berichtigung (Art. 16), Recht auf Löschung (Art. 17), Recht auf Datenübertragbarkeit (Art. 20), Recht auf Widerruf der Einwilligung jederzeit mit Wirkung für die Zukunft (Art. 7). Alles ausübbar unter Mehr > Datenschutz & Rechte." },
+                { t: lang === "en" ? "Retention Period" : lang === "es" ? "Período de retención" : "Speicherdauer", c: lang === "en" ? "Data is stored for the duration of the treatment relationship. After deletion request, data is removed within 30 days. Anonymized payment data may be retained for 10 years due to legal accounting requirements." : lang === "es" ? "Los datos se conservan durante la relación de tratamiento. Después de solicitar la eliminación, los datos se eliminan en 30 días." : "Daten werden für die Dauer des Behandlungsverhältnisses gespeichert. Nach Löschungsantrag werden Daten innerhalb von 30 Tagen entfernt. Anonymisierte Zahlungsdaten können aufgrund gesetzlicher Aufbewahrungspflichten bis zu 10 Jahre gespeichert bleiben." },
+                { t: lang === "en" ? "Complaints" : lang === "es" ? "Reclamaciones" : "Beschwerderecht", c: lang === "en" ? "You have the right to file a complaint with the data protection authority (Art. 77 GDPR). Responsible authority: Sächsischer Datenschutzbeauftragter." : lang === "es" ? "Tienes derecho a presentar una queja ante la autoridad de protección de datos (Art. 77 RGPD)." : "Du hast das Recht, Beschwerde bei der zuständigen Datenschutzaufsichtsbehörde einzulegen (Art. 77 DSGVO). Zuständige Aufsichtsbehörde: Sächsischer Datenschutzbeauftragter." },
+              ].map((s, i) => (
+                <div key={i} style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: "1px solid " + (dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)") }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 6 }}>{s.t}</p>
+                  <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, margin: 0 }}>{s.c}</p>
+                </div>
+              ))}
+              <p style={{ fontSize: 11, color: muted, textAlign: "center", marginTop: 20 }}>Anima Cura v1.0 · Stand: Mai 2026</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style>{fontCss}{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
         @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
