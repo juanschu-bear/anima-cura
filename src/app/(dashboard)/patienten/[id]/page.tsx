@@ -301,6 +301,7 @@ function PatientMessages({ patientId, dark }: { patientId: string; dark: boolean
       )}
     </div>
   );
+}
 
 function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
