@@ -457,3 +457,4 @@ function KpiCard({ dk, label, value, fmt, d, good, i, accent, sub, onClick, clic
     </motion.div>
   );
 }
+// export fix
