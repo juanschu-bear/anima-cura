@@ -527,19 +527,35 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ═══ CHAT TAB ═══
   const ChatTab = (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 90px)" }}>
-      <div style={{ padding: "24px 20px 14px" }}>
-        <h1 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg }}>{t("chat.title", lang)}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: grn, display: "inline-block" }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>{t("chat.practice", lang)}</span>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 90px)", position: "relative" }}>
+      {/* Sticky header - never scrolls */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10, padding: "20px 20px 14px", background: dk ? "rgba(3,8,6,0.95)" : "rgba(245,241,235,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid " + border }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h1 style={{ ...hd, fontSize: 19, fontWeight: 800, color: fg, margin: 0 }}>{t("chat.title", lang)}</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: grn, display: "inline-block" }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>{t("chat.practice", lang)}</span>
+            </div>
+          </div>
+          <button onClick={() => { if (msgs.length > 0 && confirm(lang === "en" ? "Close this conversation and start a new one?" : lang === "es" ? "¿Cerrar esta conversación y empezar una nueva?" : "Diese Unterhaltung schließen und eine neue starten?")) { setMsgs([]); } }} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid " + border, background: "transparent", color: muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            {lang === "en" ? "New chat" : lang === "es" ? "Nuevo chat" : "Neuer Chat"}
+          </button>
         </div>
       </div>
+      {/* Messages area */}
       <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+        {msgs.length === 0 && !typing && (
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
+            <p style={{ fontSize: 15, fontWeight: 600, color: fg, marginBottom: 6 }}>{lang === "en" ? "Start a conversation" : lang === "es" ? "Inicia una conversación" : "Starte eine Unterhaltung"}</p>
+            <p style={{ fontSize: 13, color: muted, lineHeight: 1.5 }}>{lang === "en" ? "Ask iCura anything about your treatment, payments, or appointments." : lang === "es" ? "Pregunta a iCura sobre tu tratamiento, pagos o citas." : "Frag iCura alles zu deiner Behandlung, Zahlungen oder Terminen."}</p>
+          </div>
+        )}
         {msgs.map(m => (
           <div key={m.id} style={{ display: "flex", marginBottom: 10, justifyContent: m.sender_type === "patient" ? "flex-end" : "flex-start" }}>
             <div style={{ maxWidth: "78%", padding: "12px 16px", fontSize: 14, lineHeight: 1.5, borderRadius: 20, ...(m.sender_type === "patient" ? { background: "#22c55e", color: "#fff", borderBottomRightRadius: 4 } : { background: cardBg, color: fg, border: "1px solid " + border, borderBottomLeftRadius: 4 }) }}>
-              {m.sender_name && m.sender_type === "praxis" && <div style={{ fontSize: 11, fontWeight: 700, color: grn, marginBottom: 3 }}>{m.sender_name}</div>}
+              {m.sender_name && m.sender_type !== "patient" && <div style={{ fontSize: 11, fontWeight: 700, color: grn, marginBottom: 3 }}>{m.sender_name}</div>}
               {m.text}
               <div style={{ fontSize: 10, marginTop: 3, textAlign: "right" as const, color: m.sender_type === "patient" ? "rgba(255,255,255,0.5)" : muted }}>{fmtTimeL(m.created_at, lang)}</div>
             </div>
@@ -559,7 +575,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         )}
       </div>
-      <div style={{ padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, background: dk ? "rgba(0,0,0,0.95)" : "rgba(245,241,235,0.95)" }}>
+      {/* Fixed input bar */}
+      <div style={{ position: "sticky", bottom: 0, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, background: dk ? "rgba(3,8,6,0.98)" : "rgba(245,241,235,0.98)", backdropFilter: "blur(12px)" }}>
         <button style={{ width: 42, height: 42, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, border: "none", background: dk ? "#141414" : "#e8e2d8" }}>🎤</button>
         <input value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendMsg(); }} placeholder={t("chat.placeholder", lang)} style={{ flex: 1, padding: "11px 16px", borderRadius: 24, fontSize: 14, outline: "none", fontFamily: "inherit", background: dk ? "#141414" : "#fff", border: "1px solid " + border, color: fg }} />
         <button onClick={sendMsg} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#fff", background: msgInput.trim() ? "#22c55e" : btnBg, transition: "background 0.2s" }}>↑</button>
@@ -656,7 +673,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ CONSENT GATE ═══
 
   // Determine if patient is minor (from geburtsdatum in patient data, or assume adult if unknown)
-  const patientGeb = null;
+  const patientGeb = rp?.patient?.geburtsdatum;
   const isMinor = patientGeb ? (new Date().getFullYear() - new Date(patientGeb).getFullYear()) < 16 : false;
 
   if (!consentLoading && consent && !consent.datenschutz_akzeptiert) {

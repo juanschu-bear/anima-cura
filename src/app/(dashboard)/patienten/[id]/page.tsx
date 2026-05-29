@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
@@ -242,9 +243,64 @@ export default function PatientDetailPage() {
         patientId={patient.id}
         patientName={`${patient.vorname} ${patient.nachname}`}
       />
+
+      <PatientMessages patientId={patient.id} dark={theme === "dark"} />
     </div>
   );
 }
+
+function PatientMessages({ patientId, dark }: { patientId: string; dark: boolean }) {
+  const [messages, setMessages] = useState<{ id: string; sender: string; text: string; created_at: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/praxis/messages?patient_id=${patientId}`)
+      .then(r => r.json())
+      .then(j => { setMessages(j.messages || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [patientId]);
+
+  const muted = dark ? "#777" : "#999";
+  const txtH = dark ? "#f0f0f0" : "#1c3044";
+  const border = dark ? "rgba(255,255,255,0.06)" : "#e5e8ef";
+  const grn = "#4ade80";
+
+  return (
+    <div className={`rounded-[16px] border mt-6 ${dark ? "border-white/6 bg-[rgba(16,18,28,0.75)]" : "border-surface-200 bg-white"}`} style={{ overflow: "hidden" }}>
+      <button onClick={() => setExpanded(!expanded)} className="w-full" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", cursor: "pointer", background: "transparent", border: "none", fontFamily: "inherit" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <MessageSquare size={18} color={grn} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: txtH }}>Chat-Nachrichten</span>
+          {messages.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: dark ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)", color: grn }}>{messages.length}</span>}
+        </div>
+        <span style={{ color: muted, fontSize: 14 }}>{expanded ? "▲" : "▼"}</span>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 20px 16px", maxHeight: 400, overflowY: "auto" }}>
+          {loading ? (
+            <p style={{ color: muted, fontSize: 13, padding: "12px 0" }}>Laden...</p>
+          ) : messages.length === 0 ? (
+            <p style={{ color: muted, fontSize: 13, padding: "12px 0" }}>Keine Nachrichten vorhanden</p>
+          ) : messages.map((m, i) => {
+            const isPatient = m.sender === "patient";
+            const isIcura = m.sender === "icura";
+            return (
+              <div key={m.id} style={{ padding: "10px 0", borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isPatient ? "#60a5fa" : isIcura ? grn : "#a78bfa" }}>
+                    {isPatient ? "Patient" : isIcura ? "iCura" : "Praxis"}
+                  </span>
+                  <span style={{ fontSize: 10, color: muted }}>{new Date(m.created_at).toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <p style={{ fontSize: 13, lineHeight: 1.5, color: txtH, margin: 0 }}>{m.text}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
 function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
