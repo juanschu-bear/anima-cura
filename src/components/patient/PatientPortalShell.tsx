@@ -60,6 +60,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [showAllPays, setShowAllPays] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [chatArchive, setChatArchive] = useState<{msgs: any[]; firstText: string; date: string}[]>([]);
   const [consent, setConsent] = useState<{ portal_nutzung: boolean; datenschutz_akzeptiert: boolean; digitaler_rechnungsempfang: boolean; push_benachrichtigungen: boolean } | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
   const [showDsgvo, setShowDsgvo] = useState(false);
@@ -162,6 +164,21 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       }
     } catch { /* ignore */ }
     setTyping(false);
+  };
+
+  const openArchive = () => {
+    const grouped: {msgs: any[]; firstText: string; date: string}[] = [];
+    let current: any[] = [];
+    msgs.forEach((m, i) => {
+      if (i > 0) {
+        const gap = new Date(m.created_at).getTime() - new Date(msgs[i-1].created_at).getTime();
+        if (gap > 3600000) { if (current.length > 0) grouped.push({ msgs: [...current], firstText: current[0]?.text?.slice(0,50) || "Chat", date: current[0]?.created_at }); current = []; }
+      }
+      current.push(m);
+    });
+    if (current.length > 0) grouped.push({ msgs: [...current], firstText: current[0]?.text?.slice(0,50) || "Chat", date: current[0]?.created_at });
+    setChatArchive(grouped);
+    setShowArchive(true);
   };
 
   const logout = async () => { const sb = createBrowserClient(); await sb.auth.signOut(); router.replace("/patient/login"); router.refresh(); };
@@ -538,18 +555,32 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <span style={{ fontSize: 12, fontWeight: 600, color: grn }}>{t("chat.practice", lang)}</span>
             </div>
           </div>
-          <button onClick={() => { if (msgs.length > 0 && confirm(lang === "en" ? "Close this conversation and start a new one?" : lang === "es" ? "¿Cerrar esta conversación y empezar una nueva?" : "Diese Unterhaltung schließen und eine neue starten?")) { setMsgs([]); } }} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid " + border, background: "transparent", color: muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {lang === "en" ? "New chat" : lang === "es" ? "Nuevo chat" : "Neuer Chat"}
-          </button>
+          <div style={{ display: "flex", gap: 6 }}><button onClick={openArchive} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid " + border, background: showArchive ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.06)") : "transparent", color: showArchive ? grn : muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{lang === "en" ? "Archive" : "Archiv"}</button><button onClick={() => { setMsgs([]); setShowArchive(false); }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid " + border, background: "transparent", color: muted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{lang === "en" ? "New" : "Neu"}</button></div>
         </div>
       </div>
+      {showArchive ? (
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 12 }}>{lang === "en" ? "Past conversations" : "Vergangene Unterhaltungen"}</p>
+          {chatArchive.length === 0 ? (
+            <p style={{ color: muted, fontSize: 13 }}>{lang === "en" ? "No past conversations yet" : "Noch keine vergangenen Unterhaltungen"}</p>
+          ) : chatArchive.map((c, ci) => (
+            <button key={ci} onClick={() => { setMsgs(c.msgs); setShowArchive(false); }} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid " + border, background: "transparent", marginBottom: 8, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: fg, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }}>{c.firstText}</span>
+                <span style={{ fontSize: 11, color: muted }}>{c.msgs.length} Msg</span>
+              </div>
+              <span style={{ fontSize: 11, color: muted }}>{new Date(c.date).toLocaleDateString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       {/* Messages area */}
-      <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+      <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: showArchive ? "none" : undefined }}>
         {msgs.length === 0 && !typing && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
             <p style={{ fontSize: 15, fontWeight: 600, color: fg, marginBottom: 6 }}>{lang === "en" ? "Start a conversation" : lang === "es" ? "Inicia una conversación" : "Starte eine Unterhaltung"}</p>
-            <p style={{ fontSize: 13, color: muted, lineHeight: 1.5 }}>{lang === "en" ? "Ask iCura anything about your treatment, payments, or appointments." : lang === "es" ? "Pregunta a iCura sobre tu tratamiento, pagos o citas." : "Frag iCura alles zu deiner Behandlung, Zahlungen oder Terminen."}</p>
+            <p style={{ fontSize: 13, color: muted, lineHeight: 1.5 }}>{lang === "en" ? "Ask iCura about your treatment, installment plan and payments. For appointments use the Doctolib link under More." : lang === "es" ? "Pregunta a iCura sobre tu tratamiento, pagos o citas." : "Frag iCura alles zu deiner Behandlung, deinem Ratenplan und deinen Zahlungen. Für Termine nutze den Doctolib-Link unter Mehr."}</p>
           </div>
         )}
         {msgs.map(m => (
