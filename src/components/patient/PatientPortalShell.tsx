@@ -527,7 +527,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ═══ CHAT TAB ═══
   const ChatTab = (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 90px)", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 160px)", position: "relative" }}>
       {/* Sticky header - never scrolls */}
       <div style={{ position: "sticky", top: 0, zIndex: 10, padding: "20px 20px 14px", background: dk ? "rgba(3,8,6,0.95)" : "rgba(245,241,235,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid " + border }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -610,6 +610,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <div style={{ ...card, margin: "0 20px 14px" }}>
         <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: fg }}>{t("more.aboutApp", lang)}</p>
         <p style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>{t("more.aboutText", lang)}</p>
+      </div>
+      
+      {/* Doctolib */}
+      <div style={{ padding: "0 20px 8px" }}>
+        <a href="https://www.doctolib.de/kieferorthopadie/leipzig/maria-elena-schubert/booking/patient-insurance-sector?specialityId=1325&telehealth=false&placeId=practice-270296&source=profile" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, background: cardBg, border: "1px solid " + border, textDecoration: "none" }}>
+          <span style={{ fontSize: 20 }}>📅</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Book an appointment" : lang === "es" ? "Reservar cita" : "Termin vereinbaren"}</div>
+            <div style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Opens Doctolib" : lang === "es" ? "Abre Doctolib" : "Öffnet Doctolib zur Terminvereinbarung"}</div>
+          </div>
+          <span style={{ color: grn, fontSize: 14, fontWeight: 600 }}>→</span>
+        </a>
       </div>
       {/* DSGVO Section */}
       <div style={{ padding: "8px 20px 0" }}>
