@@ -126,24 +126,8 @@ export default function BerichtePage() {
     setAiLoading(false);
   };
 
-  
-  const exportCSV = () => {
-    const params = new URLSearchParams({ von: selected.von, bis: selected.bis, format: "csv" });
-    window.open("/api/steuerberater?" + params, "_blank");
-  };
-
-  const exportPDF = () => {
-    const params = new URLSearchParams({ von: selected.von, bis: selected.bis, format: "pdf" });
-    window.open("/api/steuerberater?" + params, "_blank");
-  };
-
-  const triggerNotifications = async () => {
-    const res = await fetch("/api/cron/notifications", { method: "POST" });
-    if (res.ok) {
-      const j = await res.json();
-      alert("Benachrichtigungen geprüft: " + j.created + " neue Benachrichtigungen erstellt.");
-    }
-  };
+  const exportCSV = () => window.open("/api/steuerberater?von=" + selected.von + "&bis=" + selected.bis + "&format=csv", "_blank");
+  const exportPDF = () => window.open("/api/steuerberater?von=" + selected.von + "&bis=" + selected.bis + "&format=pdf", "_blank");
 
   const a = data?.aktuell;
   const v = data?.vergleich;
@@ -234,19 +218,10 @@ export default function BerichtePage() {
           <button onClick={generateAiReport} disabled={aiLoading} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${border}`, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.04)", color: grn, cursor: "pointer", fontFamily: "inherit", opacity: aiLoading ? 0.5 : 1 }}>
             <Sparkles size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{aiLoading ? "Erstellt..." : "AI-Report"}
           </button>
-          <button onClick={exportCSV} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "1px solid " + border, background: "transparent", color: muted, cursor: "pointer", fontFamily: "inherit" }}>
-            <Download size={14} style={{ verticalAlign: -2, marginRight: 6 }} />DATEV CSV
-          </button>
-          <button onClick={exportPDF} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "1px solid " + border, background: "transparent", color: muted, cursor: "pointer", fontFamily: "inherit" }}>
-            <Download size={14} style={{ verticalAlign: -2, marginRight: 6 }} />PDF
-          </button>
-          <button onClick={triggerNotifications} style={{ padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "1px solid " + border, background: "transparent", color: muted, cursor: "pointer", fontFamily: "inherit" }}>
-            <Bell size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Benachrichtigungen
-          </button>
         </div>
       </div>
 
-      {/* AI Report */
+      {/* AI Report */}
       {aiReport && (
         <motion.div {...anim(0)} style={{ background: dk ? "rgba(74,222,128,0.04)" : "rgba(34,197,94,0.03)", border: `1px solid ${dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)"}`, borderRadius: 16, padding: 20, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
