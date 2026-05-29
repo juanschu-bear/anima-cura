@@ -166,18 +166,26 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     setTyping(false);
   };
 
-  const openArchive = () => {
-    const grouped: {msgs: any[]; firstText: string; date: string}[] = [];
-    let current: any[] = [];
-    msgs.forEach((m, i) => {
-      if (i > 0) {
-        const gap = new Date(m.created_at).getTime() - new Date(msgs[i-1].created_at).getTime();
-        if (gap > 3600000) { if (current.length > 0) grouped.push({ msgs: [...current], firstText: current[0]?.text?.slice(0,50) || "Chat", date: current[0]?.created_at }); current = []; }
-      }
-      current.push(m);
-    });
-    if (current.length > 0) grouped.push({ msgs: [...current], firstText: current[0]?.text?.slice(0,50) || "Chat", date: current[0]?.created_at });
-    setChatArchive(grouped);
+  const openArchive = async () => {
+    const res = await fetch("/api/patient/nachrichten");
+    if (res.ok) {
+      const j = await res.json();
+      const allMsgs = (j.nachrichten || []).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const grouped: {msgs: any[]; firstText: string; date: string}[] = [];
+      let current: any[] = [];
+      allMsgs.forEach((m: any, i: number) => {
+        if (i > 0) {
+          const gap = new Date(m.created_at).getTime() - new Date(allMsgs[i-1].created_at).getTime();
+          if (gap > 3600000) {
+            if (current.length > 0) grouped.push({ msgs: [...current], firstText: current.find((x: any) => x.sender_type === "patient")?.text?.slice(0,50) || "Chat", date: current[0]?.created_at });
+            current = [];
+          }
+        }
+        current.push(m);
+      });
+      if (current.length > 0) grouped.push({ msgs: [...current], firstText: current.find((x: any) => x.sender_type === "patient")?.text?.slice(0,50) || "Chat", date: current[0]?.created_at });
+      setChatArchive(grouped.reverse());
+    }
     setShowArchive(true);
   };
 
