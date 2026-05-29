@@ -63,6 +63,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consent, setConsent] = useState<{ portal_nutzung: boolean; datenschutz_akzeptiert: boolean; digitaler_rechnungsempfang: boolean; push_benachrichtigungen: boolean } | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
   const [showDsgvo, setShowDsgvo] = useState(false);
+  const [consentCheck1, setConsentCheck1] = useState(false);
+  const [consentCheck2, setConsentCheck2] = useState(false);
+  const [consentIsGuardian, setConsentIsGuardian] = useState(false);
 
   // Check consent status
   useEffect(() => {
@@ -638,12 +641,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   );
 
   // ═══ CONSENT GATE ═══
-  const [consentCheck1, setConsentCheck1] = useState(false);
-  const [consentCheck2, setConsentCheck2] = useState(false);
-  const [consentIsGuardian, setConsentIsGuardian] = useState(false);
 
   // Determine if patient is minor (from geburtsdatum in patient data, or assume adult if unknown)
-  const patientGeb = null;
+  const patientGeb = rp?.patient?.geburtsdatum;
   const isMinor = patientGeb ? (new Date().getFullYear() - new Date(patientGeb).getFullYear()) < 16 : false;
 
   if (!consentLoading && consent && !consent.datenschutz_akzeptiert) {
