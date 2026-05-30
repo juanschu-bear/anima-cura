@@ -27,7 +27,7 @@ const dict: Record<string, Record<Lang, string>> = {
 
   // Hint banner
   "hint.title": { de: "Hinweis:", en: "Notice:", es: "Aviso:" },
-  "hint.text": { de: "Es gibt eine kleine Verzögerung bei Ihrer letzten Rate. Bitte prüfen Sie dies kurz im Fortschritt-Reiter, damit Ihr Verlauf reibungslos weitergeht.", en: "There is a small delay with your last payment. Please check the Progress tab to keep your journey on track.", es: "Hay un pequeño retraso con su último pago. Por favor revise la pestaña de Avance para mantener su progreso al día." },
+  "hint.text": { de: "Bei deiner Rate gibt es eine kleine Verzögerung. Bitte prüfe dies kurz im Fortschritt-Reiter, damit dein Verlauf reibungslos weitergeht.", en: "There is a small delay with your last payment. Please check the Progress tab to keep your journey on track.", es: "Hay un pequeño retraso con su último pago. Por favor revise la pestaña de Avance para mantener su progreso al día." },
 
   // Journey
   "journey.title": { de: "Verlauf", en: "Journey", es: "Progreso" },

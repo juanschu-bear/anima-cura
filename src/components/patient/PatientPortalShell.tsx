@@ -145,6 +145,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab, typing]);
+  // Auto-archive chat after 1 hour of inactivity
+  useEffect(() => {
+    if (tab !== "chat" || msgs.length === 0) return;
+    const lastMsg = msgs[msgs.length - 1];
+    if (!lastMsg?.created_at) return;
+    const elapsed = Date.now() - new Date(lastMsg.created_at).getTime();
+    if (elapsed > 3600000) {
+      setMsgs([]);
+    }
+  }, [tab]);
+
 
   const sendMsg = async () => {
     const text = msgInput.trim();
@@ -394,7 +405,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const JourneyTab = (
     <div>
       {Header}
-      {HintBanner}
+      
       <div style={{ padding: "16px 20px 0" }}>
         <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("journey.title", lang)}</h1>
         <p style={{ fontSize: 13, color: muted, marginBottom: 22 }}>{t("journey.subtitle", lang)}</p>
@@ -453,7 +464,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const ProgressTab = (
     <div>
       {Header}
-      {HintBanner}
+      
       <div style={{ padding: "16px 20px 0" }}>
         <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("progress.title", lang)}</h1>
         <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{t("progress.subtitle", lang)}</p>
