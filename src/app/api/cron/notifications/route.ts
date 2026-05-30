@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST: Run notification check (called by Vercel Cron or manually from dashboard)
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   // Simple auth check - either cron secret or authenticated user
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
