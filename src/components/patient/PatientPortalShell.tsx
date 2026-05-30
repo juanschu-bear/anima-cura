@@ -156,6 +156,30 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     }
   }, [tab]);
 
+  // Register Service Worker + Push subscription
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").then(async (reg) => {
+      if (!("PushManager" in window)) return;
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+      if (!vapidKey) return;
+      try {
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          const perm = await Notification.requestPermission();
+          if (perm !== "granted") return;
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
+        }
+        if (sub && patientId) {
+          await fetch("/api/patient/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription: sub.toJSON(), patient_id: patientId }),
+          });
+        }
+      } catch (e) { console.log("Push setup skipped:", e); }
+    }).catch(() => {});
+  }, [patientId]);
 
   const sendMsg = async () => {
     const text = msgInput.trim();
