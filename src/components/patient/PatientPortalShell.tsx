@@ -61,6 +61,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
+  const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number } | null>(null);
   const [chatArchive, setChatArchive] = useState<{msgs: any[]; firstText: string; date: string}[]>([]);
   const [consent, setConsent] = useState<{ portal_nutzung: boolean; datenschutz_akzeptiert: boolean; digitaler_rechnungsempfang: boolean; push_benachrichtigungen: boolean } | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
@@ -1234,7 +1235,28 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         )}
       </AnimatePresence>
 
+      {payingRate && (
+        <AnimaPayOverlay
+          betrag={payingRate.betrag}
+          verwendungszweck={payingRate.verwendungszweck}
+          rateNummer={payingRate.rateNummer}
+          onClose={() => setPayingRate(null)}
+          dark={dk}
+          lang={lang}
+        />
+      )}
+
       <style>{fontCss}{`
+        @keyframes animapayGlow {
+          0% { box-shadow: 0 0 8px rgba(34,197,94,0.4), inset 0 0 8px rgba(34,197,94,0.1); }
+          50% { box-shadow: 0 0 20px rgba(34,197,94,0.6), inset 0 0 12px rgba(34,197,94,0.15); }
+          100% { box-shadow: 0 0 8px rgba(34,197,94,0.4), inset 0 0 8px rgba(34,197,94,0.1); }
+        }
+        @keyframes glowBorder {
+          0% { border-color: rgba(34,197,94,0.3); }
+          50% { border-color: rgba(34,197,94,0.8); }
+          100% { border-color: rgba(34,197,94,0.3); }
+        }
         @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
         @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
         @media (min-width: 768px) {
