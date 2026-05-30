@@ -485,6 +485,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
               <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)} ({Math.floor((Date.now() - new Date(rp.ueberfaellig.faellig_am).getTime()) / 864e5)} {lang === "en" ? "days" : lang === "es" ? "días" : "Tage"})</div>
+              <button onClick={() => setPayingRate({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "none", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlow 2s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+                Jetzt bezahlen
+              </button>
             </div>
             <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
               <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
