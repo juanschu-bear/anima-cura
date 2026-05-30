@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
+import AnimaPayOverlay from "@/components/patient/AnimaPayOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
 import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, getPhaseContent, translateTipp, type Lang } from "@/lib/patient-i18n";
