@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { ArrowLeft, MessageSquare, FileText } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
@@ -269,6 +269,18 @@ export default function PatientDetailPage() {
         patientName={`${patient.vorname} ${patient.nachname}`}
       />
 
+      {/* Rechnung generieren */}
+      <div className={"rounded-[16px] border mt-6 " + (theme === "dark" ? "border-white/[0.06] bg-[rgba(16,18,28,0.75)]" : "border-surface-200 bg-white")} style={{ padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <FileText size={18} color="#4ade80" />
+            <span style={{ fontSize: 15, fontWeight: 700, color: theme === "dark" ? "#f0f0f0" : "#1c3044" }}>Rechnungs-Engine</span>
+          </div>
+          <button onClick={() => window.open("/api/rechnungen/generate?patient_id=" + patient.id, "_blank")} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid " + (theme === "dark" ? "rgba(255,255,255,0.06)" : "#e5e8ef"), background: theme === "dark" ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.04)", color: "#4ade80", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Rechnung generieren
+          </button>
+        </div>
+      </div>
       <PatientMessages patientId={patient.id} dark={theme === "dark"} />
     </div>
   );
