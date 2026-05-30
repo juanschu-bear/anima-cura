@@ -5,7 +5,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 import { FileText, Plus, Trash2, Download, Eye, ChevronDown, Search, Package } from "lucide-react";
 
-interface Patient { id: string; vorname: string; nachname: string; geburtsdatum?: string; }
+interface Patient { id: string; name: string; vorname?: string; nachname?: string; geburtsdatum?: string; email?: string; }
 interface Position { id: string; goz_nr: string; bezeichnung: string; faktor: number; anzahl: number; preis: number; gkv_abzug: number; endpreis: number; begruendung: string; }
 
 const GOZ_KATALOG = [
