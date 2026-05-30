@@ -33,9 +33,13 @@ export default function UebersichtPage() {
   const [stats, setStats] = useState<PraxisStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [engagement, setEngagement] = useState<any>(null);
+  const [engDays, setEngDays] = useState(30);
 
   useEffect(() => {
-    fetch("/api/praxis/engagement?days=30").then(r => r.ok ? r.json() : null).then(d => { if (d) setEngagement(d); }).catch(() => {});
+    fetch("/api/praxis/engagement?days=" + engDays).then(r => r.ok ? r.json() : null).then(d => { if (d) setEngagement(d); }).catch(() => {});
+  }, [engDays]);
+
+  useEffect(() => {
     async function fetchStats() {
       const supabase = createBrowserClient();
 
@@ -318,10 +322,19 @@ export default function UebersichtPage() {
       {/* Patient Engagement */}
       {engagement && (
         <div className="stat-card">
-          <h3 className="ac-section-title mb-4 flex items-center gap-2">
-            <Activity size={14} className="text-[#4ade80]" />
-            Patient Engagement (30 Tage)
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="ac-section-title flex items-center gap-2">
+              <Activity size={14} className="text-[#4ade80]" />
+              Patient Engagement
+            </h3>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[7, 30, 60, 90].map(d => (
+                <button key={d} onClick={() => setEngDays(d)} style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", border: engDays === d ? "1px solid #4ade80" : ("1px solid " + (isDark ? "rgba(255,255,255,0.06)" : "#e5e8ef")), background: engDays === d ? (isDark ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.04)") : "transparent", color: engDays === d ? "#4ade80" : (isDark ? "#9db0cc" : "#8797ac") }}>
+                  {d}T
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-4">
             <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
               <p className={`text-2xl font-bold ${isDark ? "text-[#4ade80]" : "text-[#22c55e]"}`}>{engagement.active_patients}</p>
@@ -339,6 +352,21 @@ export default function UebersichtPage() {
               <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.by_type?.chat_message || 0}</p>
               <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Chat-Nachrichten</p>
             </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 md:grid-cols-6 mb-4">
+            {[
+              { key: "tab_view", label: "Tab-Wechsel" },
+              { key: "payment_view", label: "Zahlungen angesehen" },
+              { key: "animapay_open", label: "AnimaPay geoeffnet" },
+              { key: "notification_read", label: "Benachrichtigungen" },
+              { key: "document_view", label: "Dokumente" },
+              { key: "ratenplan_view", label: "Ratenplan angesehen" },
+            ].map(ev => (
+              <div key={ev.key} className={`rounded-xl border p-3 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+                <p className={`text-lg font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.by_type?.[ev.key] || 0}</p>
+                <p className={`mt-1 text-[10px] ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>{ev.label}</p>
+              </div>
+            ))
           </div>
           {engagement.daily && engagement.daily.length > 0 && (
             <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
