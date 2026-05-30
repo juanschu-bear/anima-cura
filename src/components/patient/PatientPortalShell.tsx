@@ -1,4 +1,5 @@
 "use client";
+import { trackEvent } from "@/lib/useTracking";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -180,6 +181,12 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       } catch (e) { console.log("Push setup skipped:", e); }
     }).catch(() => {});
   }, [patientId]);
+
+  // Track app open
+  useEffect(() => { if (patientId) trackEvent(patientId, "app_open"); }, []);
+
+  // Track tab views
+  useEffect(() => { if (patientId && tab) trackEvent(patientId, "tab_view", { tab }); }, [tab]);
 
   const sendMsg = async () => {
     const text = msgInput.trim();
