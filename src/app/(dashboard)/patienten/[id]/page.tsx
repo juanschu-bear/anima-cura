@@ -223,7 +223,23 @@ export default function PatientDetailPage() {
                     {(h.bezahlt_betrag || h.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€
                   </td>
                   <td className="table-cell">
-                    <StatusBadge status="auto" />
+                    {(() => {
+                      const isPaid = h.status === "bezahlt";
+                      const isOverdue = h.status === "überfällig";
+                      const isOpen = h.status === "offen";
+                      const daysLate = isPaid && h.bezahlt_am && h.faellig_am
+                        ? Math.floor((new Date(h.bezahlt_am).getTime() - new Date(h.faellig_am).getTime()) / 864e5)
+                        : 0;
+                      const daysOverdue = isOverdue && h.faellig_am
+                        ? Math.floor((Date.now() - new Date(h.faellig_am).getTime()) / 864e5)
+                        : 0;
+
+                      if (isPaid && daysLate <= 0) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "#4ade80" }}>✓ {locale === "en" ? "On time" : "Pünktlich"}</span>;
+                      if (isPaid && daysLate > 0) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "#fbbf24" }}>✓ +{daysLate} {locale === "en" ? "days late" : "Tage verspätet"}</span>;
+                      if (isOverdue) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "#ef4444" }}>! {daysOverdue} {locale === "en" ? "days overdue" : "Tage überfällig"}</span>;
+                      if (isOpen) return <span style={{ fontSize: 13, fontWeight: 600, color: "#666" }}>{locale === "en" ? "Pending" : "Ausstehend"}</span>;
+                      return <StatusBadge status="auto" />;
+                    })()}
                   </td>
                 </tr>
               ))}
