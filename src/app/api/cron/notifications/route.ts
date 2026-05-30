@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !request.headers.get("x-vercel-cron")) {
     // Check if it's an authenticated admin user
     const { createServerComponentClient } = await import("@/lib/db/supabase-server");
     const supabase = createServerComponentClient();
