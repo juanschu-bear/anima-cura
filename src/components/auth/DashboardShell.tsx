@@ -241,7 +241,7 @@ export default function DashboardShell({
         </div>
       </aside>
 
-      <main className="ac-main flex flex-1 flex-col overflow-hidden">
+      <main className="ac-main flex flex-1 flex-col">
         <header className="h-16 border-b border-surface-200 px-6">
           <div className="flex h-full items-center justify-between gap-4">
             <div className="hidden text-xs tracking-wide text-praxis-400 md:block">
