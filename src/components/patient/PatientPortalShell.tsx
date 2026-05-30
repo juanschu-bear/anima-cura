@@ -382,6 +382,22 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
         </div>
       )}
+
+      {rp && rp.naechste_rate && dl <= 7 && dl >= 0 && (
+        <div style={{ margin: "0 20px 14px", borderRadius: 16, padding: 18, background: dk ? "rgba(34,197,94,0.04)" : "rgba(34,197,94,0.03)", border: "1px solid " + (dk ? "rgba(34,197,94,0.12)" : "rgba(34,197,94,0.1)") }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: grn, textTransform: "uppercase", letterSpacing: "0.1em" }}>AnimaPay</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: fg, marginTop: 2 }}>{lang === "en" ? "Next rate" : lang === "es" ? "Pr\u00f3xima cuota" : "N\u00e4chste Rate"}: {rp.naechste_rate.betrag} \u20ac</div>
+              <div style={{ fontSize: 12, color: muted }}>{dl === 0 ? (lang === "en" ? "Due today" : lang === "es" ? "Vence hoy" : "Heute f\u00e4llig") : (lang === "en" ? "Due in " + dl + " days" : lang === "es" ? "Vence en " + dl + " d\u00edas" : "F\u00e4llig in " + dl + " Tagen")}</div>
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif" }}>{rp.naechste_rate.betrag} \u20ac</div>
+          </div>
+          <button onClick={() => rp.naechste_rate && setPayingRate({ betrag: rp.naechste_rate.betrag, verwendungszweck: "AC-PAT-R" + (rp.raten_bezahlt + 1), rateNummer: rp.raten_bezahlt + 1 })} style={{ width: "100%", padding: "14px", borderRadius: 14, border: "2px solid rgba(34,197,94,0.3)", background: dk ? "rgba(34,197,94,0.06)" : "rgba(34,197,94,0.04)", color: "#22c55e", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "glowBorder 2.5s ease-in-out infinite" }}>
+            {lang === "en" ? "Pay now" : lang === "es" ? "Pagar ahora" : "Jetzt bezahlen"}
+          </button>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 20px", marginBottom: 14 }}>
         <div onClick={() => { setTab("chat"); hapticMedium(); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, cursor: "pointer", background: cardBg, border: "1px solid " + border }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)" }}>💬</div>
