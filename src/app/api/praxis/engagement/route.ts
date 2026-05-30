@@ -45,7 +45,12 @@ export async function GET(request: NextRequest) {
   for (const e of allEvents || []) {
     patientCounts[e.patient_id] = (patientCounts[e.patient_id] || 0) + 1;
   }
-  const topPatients = Object.entries(patientCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, count]) => ({ id, count }));
+  const patientDetails: Record<string, Record<string, number>> = {};
+  for (const e of allEvents || []) {
+    if (!patientDetails[e.patient_id]) patientDetails[e.patient_id] = {};
+    patientDetails[e.patient_id][e.event_type] = (patientDetails[e.patient_id][e.event_type] || 0) + 1;
+  }
+  const topPatients = Object.entries(patientCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, count]) => ({ id, count, details: patientDetails[id] || {} }));
 
   // Fetch names for top patients
   if (topPatients.length > 0) {

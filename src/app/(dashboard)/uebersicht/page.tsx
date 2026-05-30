@@ -357,7 +357,7 @@ export default function UebersichtPage() {
             {[
               { key: "tab_view", label: "Tab-Wechsel" },
               { key: "payment_view", label: "Zahlungen angesehen" },
-              { key: "animapay_open", label: "AnimaPay geoeffnet" },
+              { key: "animapay_open", label: "AnimaPay geöffnet" },
               { key: "notification_read", label: "Benachrichtigungen" },
               { key: "document_view", label: "Dokumente" },
               { key: "ratenplan_view", label: "Ratenplan angesehen" },
@@ -370,7 +370,7 @@ export default function UebersichtPage() {
           </div>
           {engagement.daily && engagement.daily.length > 0 && (
             <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
-              <p className={`text-xs font-semibold mb-3 ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktivitaet (14 Tage)</p>
+              <p className={`text-xs font-semibold mb-3 ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktivität (14 Tage)</p>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60 }}>
                 {engagement.daily.map((d: any, i: number) => {
                   const max = Math.max(...engagement.daily.map((x: any) => x.count), 1);
@@ -388,9 +388,14 @@ export default function UebersichtPage() {
             <div className="mt-3">
               <p className={`text-xs font-semibold mb-2 ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktivste Patienten</p>
               {engagement.top_patients.slice(0, 5).map((p: any, i: number) => (
-                <div key={p.id} className={`flex items-center justify-between py-2 ${i > 0 ? (isDark ? "border-t border-white/5" : "border-t border-surface-100") : ""}`}>
-                  <span className={`text-sm font-medium ${isDark ? "text-white" : "text-praxis-700"}`}>{p.name}</span>
-                  <span className={`text-xs font-semibold ${isDark ? "text-[#4ade80]" : "text-[#22c55e]"}`}>{p.count} Events</span>
+                <div key={p.id} className={`flex items-center justify-between py-2 cursor-pointer group ${i > 0 ? (isDark ? "border-t border-white/5" : "border-t border-surface-100") : ""}`} onClick={() => router.push("/patienten/" + p.id)}>
+                  <span className={`text-sm font-medium group-hover:text-[#4ade80] transition-colors ${isDark ? "text-white" : "text-praxis-700"}`}>{p.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {p.details && Object.entries(p.details).map(([k, v]: [string, any]) => (
+                      <span key={k} title={k} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? "bg-white/5 text-[#9db0cc]" : "bg-surface-50 text-praxis-500"}`}>{k === "app_open" ? "🔓" : k === "tab_view" ? "📑" : k === "chat_message" ? "💬" : k === "payment_view" ? "💰" : k === "animapay_open" ? "📱" : "📋"}{v}</span>
+                    ))}
+                    <span className={`text-xs font-semibold ${isDark ? "text-[#4ade80]" : "text-[#22c55e]"}`}>{p.count}</span>
+                  </div>
                 </div>
               ))}
             </div>
