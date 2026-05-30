@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -78,6 +78,11 @@ export default function DashboardShell({
     toggleTheme,
   } = useAppStore();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{id:string;name:string;email:string}[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  const doSearch = (q: string) => { setSearchQuery(q); if (searchTimer.current) clearTimeout(searchTimer.current); if (q.length < 2) { setSearchResults([]); setSearchOpen(false); return; } searchTimer.current = setTimeout(async () => { const res = await fetch("/api/praxis/search?q=" + encodeURIComponent(q)); if (res.ok) { const j = await res.json(); setSearchResults(j.results || []); setSearchOpen(true); } }, 250); };
 
   const activeUser = authUser ?? user;
   const isGerman = locale === "de";
@@ -250,18 +255,29 @@ export default function DashboardShell({
               <input
                 className="input pl-9"
                 placeholder={t("search.placeholder", locale)}
+                value={searchQuery}
+                onChange={(e) => doSearch(e.target.value)}
+                onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+                onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                 onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    (e.target as HTMLInputElement).value.trim()
-                  ) {
-                    const val = (e.target as HTMLInputElement).value.trim();
-                    window.sessionStorage.setItem("ac-patient-search", val);
+                  if (e.key === "Enter" && searchQuery.trim()) {
+                    window.sessionStorage.setItem("ac-patient-search", searchQuery.trim());
                     router.push("/patienten");
-                    (e.target as HTMLInputElement).value = "";
+                    setSearchQuery(""); setSearchOpen(false);
                   }
+                  if (e.key === "Escape") { setSearchOpen(false); }
                 }}
               />
+              {searchOpen && searchResults.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 100, background: "var(--surface-50, #0d0f1a)", border: "1px solid var(--surface-200, rgba(255,255,255,0.06))" }}>
+                  {searchResults.map((r) => (
+                    <div key={r.id} onMouseDown={() => { router.push("/patienten/" + r.id); setSearchQuery(""); setSearchOpen(false); }} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--surface-200, rgba(255,255,255,0.04))", transition: "background 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74,222,128,0.06)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h, #f0f0f0)" }}>{r.name}</div>
+                      {r.email && <div style={{ fontSize: 11, color: "var(--text-muted, #666)", marginTop: 1 }}>{r.email}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
