@@ -383,7 +383,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       )}
 
-      {rp && rp.naechste_rate && dl <= 7 && dl >= 0 && (
+      {rp && rp.naechste_rate && dl >= 0 && (
         <div style={{ margin: "0 20px 14px", borderRadius: 16, padding: 18, background: dk ? "rgba(34,197,94,0.04)" : "rgba(34,197,94,0.03)", border: "1px solid " + (dk ? "rgba(34,197,94,0.12)" : "rgba(34,197,94,0.1)") }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div>
