@@ -678,7 +678,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         )}
       </div>
       {/* Fixed input bar */}
-      <div style={{ position: "sticky", bottom: 0, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, background: dk ? "rgba(3,8,6,0.98)" : "rgba(245,241,235,0.98)", backdropFilter: "blur(12px)" }}>
+      <div style={{ position: "sticky", bottom: 80, padding: "10px 16px", display: "flex", gap: 8, alignItems: "center", borderTop: "1px solid " + border, borderRadius: "0 0 16px 16px", background: dk ? "rgba(3,8,6,0.98)" : "rgba(245,241,235,0.98)", backdropFilter: "blur(12px)" }}>
         <button style={{ width: 42, height: 42, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, border: "none", background: dk ? "#141414" : "#e8e2d8" }}>🎤</button>
         <input value={msgInput} onChange={e => setMsgInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendMsg(); }} placeholder={t("chat.placeholder", lang)} style={{ flex: 1, padding: "11px 16px", borderRadius: 24, fontSize: 14, outline: "none", fontFamily: "inherit", background: dk ? "#141414" : "#fff", border: "1px solid " + border, color: fg }} />
         <button onClick={sendMsg} style={{ width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#fff", background: msgInput.trim() ? "#22c55e" : btnBg, transition: "background 0.2s" }}>↑</button>
@@ -943,7 +943,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           style={{ position: "absolute", width: 280, height: 280, borderRadius: "50%", top: -60, right: -40, opacity: dk ? 0.1 : 0.05, filter: "blur(60px)" }}
         />
       </div>
-      <div style={{ position: "relative", zIndex: 1, paddingBottom: 10 }}>
+      <div style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && ProgressTab}
