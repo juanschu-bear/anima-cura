@@ -366,7 +366,7 @@ export default function UebersichtPage() {
                 <p className={`text-lg font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.by_type?.[ev.key] || 0}</p>
                 <p className={`mt-1 text-[10px] ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>{ev.label}</p>
               </div>
-            ))
+            ))}
           </div>
           {engagement.daily && engagement.daily.length > 0 && (
             <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
