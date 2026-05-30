@@ -77,10 +77,9 @@ export default function PatientDetailPage() {
   const mahnHighlight = mahnStageMeta[status];
 
   const history = raten
-    .filter((r: any) => r.status === "bezahlt" || r.bezahlt_betrag)
     .sort((a: any, b: any) => {
-      const da = new Date(a.bezahlt_am || a.faellig_am).getTime();
-      const db = new Date(b.bezahlt_am || b.faellig_am).getTime();
+      const da = new Date(a.faellig_am).getTime();
+      const db = new Date(b.faellig_am).getTime();
       return db - da;
     });
 
@@ -210,7 +209,7 @@ export default function PatientDetailPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-surface-50">
-                <th className="table-header">{t("detail.dateHeader", locale)}</th>
+                <th className="table-header">{locale === "en" ? "Due date" : "Fällig am"}</th>
                 <th className="table-header text-right">{t("detail.amount", locale)}</th>
                 <th className="table-header">{t("detail.statusHeader", locale)}</th>
               </tr>
@@ -218,9 +217,19 @@ export default function PatientDetailPage() {
             <tbody>
               {history.map((h: any) => (
                 <tr key={h.id} className="hover:bg-surface-50/70">
-                  <td className="table-cell text-base text-praxis-700">{formatDate(h.bezahlt_am || h.faellig_am, locale)}</td>
-                  <td className="table-cell text-right text-[24px] font-extrabold text-[#4ca43f]">
-                    {(h.bezahlt_betrag || h.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€
+                  <td className="table-cell text-base text-praxis-700">
+                    <div>{formatDate(h.faellig_am, locale)}</div>
+                    {h.status === "bezahlt" && h.bezahlt_am && h.bezahlt_am !== h.faellig_am && (
+                      <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{locale === "en" ? "Paid" : "Bezahlt"}: {formatDate(h.bezahlt_am, locale)}</div>
+                    )}
+                  </td>
+                  <td className="table-cell text-right">
+                    <div style={{ fontSize: 24, fontWeight: 800, color: h.status === "überfällig" ? "#ef4444" : h.status === "offen" ? "#888" : "#4ca43f" }}>
+                      {h.status === "bezahlt" ? (h.bezahlt_betrag || h.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE") : (h.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€
+                    </div>
+                    {h.status === "bezahlt" && h.bezahlt_betrag && h.betrag && Number(h.bezahlt_betrag) < Number(h.betrag) && (
+                      <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 2 }}>{locale === "en" ? "of" : "von"} {Number(h.betrag).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€ — {locale === "en" ? "remaining" : "Rest"}: {(Number(h.betrag) - Number(h.bezahlt_betrag)).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</div>
+                    )}
                   </td>
                   <td className="table-cell">
                     {(() => {
