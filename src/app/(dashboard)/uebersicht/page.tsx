@@ -7,7 +7,7 @@ import { useAlerts, useTransaktionen } from "@/hooks/useData";
 import { CardSkeleton, StatusBadge } from "@/components/ui";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { RatenstatusChart, ZahlungsverlaufChart } from "@/components/charts";
-import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert, Users, Stethoscope, Shield, CreditCard } from "lucide-react";
+import { AlertTriangle, ArrowUp, Check, Circle, TriangleAlert, Users, Stethoscope, Shield, CreditCard, Activity } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { t, tData } from "@/lib/i18n";
@@ -32,8 +32,10 @@ export default function UebersichtPage() {
   const { transaktionen } = useTransaktionen({ status: "alle" });
   const [stats, setStats] = useState<PraxisStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [engagement, setEngagement] = useState<any>(null);
 
   useEffect(() => {
+    fetch("/api/praxis/engagement?days=30").then(r => r.ok ? r.json() : null).then(d => { if (d) setEngagement(d); }).catch(() => {});
     async function fetchStats() {
       const supabase = createBrowserClient();
 
@@ -312,6 +314,61 @@ export default function UebersichtPage() {
           </div>
         )}
       </div>
+
+      {/* Patient Engagement */}
+      {engagement && (
+        <div className="stat-card">
+          <h3 className="ac-section-title mb-4 flex items-center gap-2">
+            <Activity size={14} className="text-[#4ade80]" />
+            Patient Engagement (30 Tage)
+          </h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-4">
+            <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+              <p className={`text-2xl font-bold ${isDark ? "text-[#4ade80]" : "text-[#22c55e]"}`}>{engagement.active_patients}</p>
+              <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktive Patienten</p>
+            </div>
+            <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+              <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.total_events}</p>
+              <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Interaktionen</p>
+            </div>
+            <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+              <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.by_type?.app_open || 0}</p>
+              <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>App-Aufrufe</p>
+            </div>
+            <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+              <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-praxis-800"}`}>{engagement.by_type?.chat_message || 0}</p>
+              <p className={`mt-1 text-xs ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Chat-Nachrichten</p>
+            </div>
+          </div>
+          {engagement.daily && engagement.daily.length > 0 && (
+            <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-[#0f1520]" : "border-surface-200 bg-white"}`}>
+              <p className={`text-xs font-semibold mb-3 ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktivitaet (14 Tage)</p>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60 }}>
+                {engagement.daily.map((d: any, i: number) => {
+                  const max = Math.max(...engagement.daily.map((x: any) => x.count), 1);
+                  const h = Math.max((d.count / max) * 52, 2);
+                  return <div key={i} title={`${d.date}: ${d.count} Events`} style={{ flex: 1, height: h, borderRadius: 3, background: d.count > 0 ? "#4ade80" : (isDark ? "#1a2030" : "#e5e7eb"), transition: "height 0.3s" }} />;
+                })}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span className={`text-[10px] ${isDark ? "text-[#666]" : "text-[#999]"}`}>{engagement.daily[0]?.date?.slice(5)}</span>
+                <span className={`text-[10px] ${isDark ? "text-[#666]" : "text-[#999]"}`}>{engagement.daily[engagement.daily.length - 1]?.date?.slice(5)}</span>
+              </div>
+            </div>
+          )}
+          {engagement.top_patients && engagement.top_patients.length > 0 && (
+            <div className="mt-3">
+              <p className={`text-xs font-semibold mb-2 ${isDark ? "text-[#9db0cc]" : "text-praxis-500"}`}>Aktivste Patienten</p>
+              {engagement.top_patients.slice(0, 5).map((p: any, i: number) => (
+                <div key={p.id} className={`flex items-center justify-between py-2 ${i > 0 ? (isDark ? "border-t border-white/5" : "border-t border-surface-100") : ""}`}>
+                  <span className={`text-sm font-medium ${isDark ? "text-white" : "text-praxis-700"}`}>{p.name}</span>
+                  <span className={`text-xs font-semibold ${isDark ? "text-[#4ade80]" : "text-[#22c55e]"}`}>{p.count} Events</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
