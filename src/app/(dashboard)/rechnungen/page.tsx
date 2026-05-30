@@ -102,6 +102,38 @@ const PAKETE = [
 
 // Vordefinierte Positionen pro Paket (aus ODS-Dateien der Praxis)
 const PAKET_POSITIONEN: Record<string, Omit<Position, "id">[]> = {
+  angel_leicht: [
+    { goz_nr: "6000", bezeichnung: "KFO-Diagnostik/Fotodokumentation", faktor: 2.30, anzahl: 4, preis: 41.40, gkv_abzug: 0, endpreis: 41.40, begruendung: "" },
+    { goz_nr: "6010", bezeichnung: "Kiefermodell-Analyse", faktor: 2.30, anzahl: 2, preis: 46.55, gkv_abzug: 0, endpreis: 46.55, begruendung: "" },
+    { goz_nr: "6030", bezeichnung: "Kieferumformung gering inkl. Retention", faktor: 2.30, anzahl: 1, preis: 174.63, gkv_abzug: 0, endpreis: 174.63, begruendung: "" },
+    { goz_nr: "6210", bezeichnung: "Kontrolle Behandlungsverlauf", faktor: 2.30, anzahl: 10, preis: 109.96, gkv_abzug: 0, endpreis: 109.96, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Attachment-Befestigung", faktor: 2.30, anzahl: 10, preis: 213.44, gkv_abzug: 0, endpreis: 213.44, begruendung: "" },
+    { goz_nr: "6110", bezeichnung: "Attachment-Entfernung", faktor: 2.30, anzahl: 10, preis: 90.64, gkv_abzug: 0, endpreis: 90.64, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Festsitzender Retainer", faktor: 2.55, anzahl: 6, preis: 141.98, gkv_abzug: 0, endpreis: 141.98, begruendung: "schwieriger Zugang" },
+  ],
+  angel_mittel: [
+    { goz_nr: "6000", bezeichnung: "KFO-Diagnostik/Fotodokumentation", faktor: 2.30, anzahl: 4, preis: 41.40, gkv_abzug: 0, endpreis: 41.40, begruendung: "" },
+    { goz_nr: "6010", bezeichnung: "Kiefermodell-Analyse", faktor: 2.30, anzahl: 2, preis: 46.55, gkv_abzug: 0, endpreis: 46.55, begruendung: "" },
+    { goz_nr: "6020", bezeichnung: "Gesichtsschaedel-Auswertung", faktor: 2.30, anzahl: 1, preis: 46.58, gkv_abzug: 0, endpreis: 46.58, begruendung: "" },
+    { goz_nr: "6040", bezeichnung: "Kieferumformung mittel inkl. Retention", faktor: 2.30, anzahl: 1, preis: 271.65, gkv_abzug: 0, endpreis: 271.65, begruendung: "" },
+    { goz_nr: "6210", bezeichnung: "Kontrolle Behandlungsverlauf", faktor: 2.30, anzahl: 18, preis: 197.93, gkv_abzug: 0, endpreis: 197.93, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Attachment-Befestigung", faktor: 2.30, anzahl: 16, preis: 341.50, gkv_abzug: 0, endpreis: 341.50, begruendung: "" },
+    { goz_nr: "6110", bezeichnung: "Attachment-Entfernung", faktor: 2.30, anzahl: 16, preis: 145.02, gkv_abzug: 0, endpreis: 145.02, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Festsitzender Retainer OK+UK", faktor: 2.55, anzahl: 12, preis: 283.97, gkv_abzug: 0, endpreis: 283.97, begruendung: "schwieriger Zugang" },
+    { goz_nr: "4050a", bezeichnung: "KFO-Prophylaxe", faktor: 1.15, anzahl: 108, preis: 75.60, gkv_abzug: 0, endpreis: 75.60, begruendung: "" },
+  ],
+  angel_komplex: [
+    { goz_nr: "6000", bezeichnung: "KFO-Diagnostik/Fotodokumentation", faktor: 2.30, anzahl: 4, preis: 41.40, gkv_abzug: 0, endpreis: 41.40, begruendung: "" },
+    { goz_nr: "6010", bezeichnung: "Kiefermodell-Analyse", faktor: 2.30, anzahl: 4, preis: 93.10, gkv_abzug: 0, endpreis: 93.10, begruendung: "" },
+    { goz_nr: "6020", bezeichnung: "Gesichtsschaedel-Auswertung", faktor: 2.30, anzahl: 2, preis: 93.16, gkv_abzug: 0, endpreis: 93.16, begruendung: "" },
+    { goz_nr: "6050", bezeichnung: "Kieferumformung hoch inkl. Retention", faktor: 2.30, anzahl: 1, preis: 465.68, gkv_abzug: 0, endpreis: 465.68, begruendung: "" },
+    { goz_nr: "6210", bezeichnung: "Kontrolle Behandlungsverlauf", faktor: 2.30, anzahl: 28, preis: 308.00, gkv_abzug: 0, endpreis: 308.00, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Attachment-Befestigung", faktor: 2.30, anzahl: 20, preis: 426.88, gkv_abzug: 0, endpreis: 426.88, begruendung: "" },
+    { goz_nr: "6110", bezeichnung: "Attachment-Entfernung", faktor: 2.30, anzahl: 20, preis: 181.28, gkv_abzug: 0, endpreis: 181.28, begruendung: "" },
+    { goz_nr: "6100", bezeichnung: "Festsitzender Retainer OK+UK", faktor: 2.55, anzahl: 12, preis: 283.97, gkv_abzug: 0, endpreis: 283.97, begruendung: "schwieriger Zugang" },
+    { goz_nr: "6140", bezeichnung: "Retainer Teilbogen", faktor: 2.55, anzahl: 2, preis: 60.23, gkv_abzug: 0, endpreis: 60.23, begruendung: "schwieriger Zugang" },
+    { goz_nr: "4050a", bezeichnung: "KFO-Prophylaxe", faktor: 1.15, anzahl: 162, preis: 113.40, gkv_abzug: 0, endpreis: 113.40, begruendung: "" },
+  ],
   keramik: [
     { goz_nr: "6100", bezeichnung: "Keramikbrackets", faktor: 5.00, anzahl: 12, preis: 556.80, gkv_abzug: 141.48, endpreis: 415.32, begruendung: "ueberdurchschnittlicher Zeitbedarf und Positionierungsaufwand" },
     { goz_nr: "6110", bezeichnung: "Keramikbrackets Entfernung", faktor: 5.00, anzahl: 12, preis: 165.48, gkv_abzug: 47.16, endpreis: 118.32, begruendung: "" },
@@ -217,7 +249,29 @@ export default function RechnungenPage() {
   const generatePDF = () => {
     if (!selectedPatient) { alert("Bitte Patient auswaehlen"); return; }
     if (positionen.length === 0) { alert("Bitte Positionen hinzufuegen"); return; }
-    window.open(`/api/rechnungen/generate?patient_id=${selectedPatient.id}`, "_blank");
+    const fE = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const datum = new Date().toLocaleDateString("de-DE");
+    const faellig = new Date(Date.now() + 14 * 864e5).toLocaleDateString("de-DE");
+    const rNr = String(Math.floor(Math.random() * 90000) + 10000).padStart(8, "0");
+    const uz = "P-" + selectedPatient.id.slice(0, 4).toUpperCase() + "-UZ-1";
+    const isPrv = patientArt === "privat";
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rechnung ${rNr}</title>
+<style>@page{size:A4;margin:20mm 18mm}body{font-family:"Times New Roman",serif;font-size:11px;color:#000;line-height:1.4;max-width:680px;margin:0 auto;padding:20px}.hdr{font-size:16px;font-weight:bold}.sub{font-size:11px}.abs{font-size:8px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:12px;color:#444}h1{font-size:15px;font-weight:bold;margin:16px 0 12px;letter-spacing:1px}.mg{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;font-size:10px;margin-bottom:16px}.ml{font-weight:bold}table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0}th{background:#f5f5f5;text-align:left;padding:5px 6px;border:1px solid #ccc;font-weight:bold;font-size:9px}td{padding:4px 6px;border:1px solid #ddd;vertical-align:top}.r{text-align:right}.t{font-weight:bold;background:#f0f0f0}.pb{border:1px solid #000;padding:10px;margin:14px 0;font-size:10px;line-height:1.5}.ft{font-size:8px;color:#555;margin-top:20px;line-height:1.4;border-top:1px solid #ccc;padding-top:8px}@media print{body{margin:0;padding:0}}</style></head><body>
+<div style="display:flex;justify-content:space-between"><div><div class="hdr">Dr. Maria Elena Schubert</div><div class="sub">Zahnaerztin fuer Kieferorthopaedie</div></div><div style="text-align:right;font-size:10px">04109 Leipzig - Oelssner's Hof - Nikolaistr. 20<br>Tel.: 0341/9806457</div></div>
+<div class="abs">Dr. Maria Elena Schubert - Nikolaistrasse 20 im Oelssner's Hof - 04109 Leipzig</div>
+<div style="font-size:11px;margin-bottom:20px;line-height:1.5">${selectedPatient.name}</div>
+<h1>RECHNUNG</h1>
+<div class="mg"><span class="ml">Rechnungsdatum:</span><span>${datum}</span><span class="ml">Unser Zeichen:</span><span>${uz}</span><span class="ml">Rechnungsnummer:</span><span>${rNr}</span><span class="ml">Versicherungsart:</span><span>${artLabels[patientArt]}</span></div>
+<p style="font-size:10px">Bitte bei Ueberweisung <strong>Unser Zeichen</strong> angeben.</p>
+<table><thead><tr><th>Nr.</th><th>Leistung</th><th>Anz.</th><th>Faktor</th>${!isPrv ? '<th class="r">GKV-Abzug</th>' : ''}<th class="r">Endpreis EUR</th></tr></thead><tbody>
+${positionen.map(p => `<tr><td>${p.goz_nr}</td><td>${p.bezeichnung}${p.begruendung ? '<br><span style="font-size:8px;color:#666">' + p.begruendung + '</span>' : ''}</td><td>${p.anzahl}</td><td>${p.faktor.toFixed(2)}</td>${!isPrv ? '<td class="r" style="color:#888">' + (p.gkv_abzug > 0 ? '-' + fE(p.gkv_abzug) : '') + '</td>' : ''}<td class="r">${fE(p.endpreis)}</td></tr>`).join("")}
+<tr class="t"><td colspan="${isPrv ? 4 : 5}">${isPrv ? "Gesamtbetrag" : "Eigenanteil"}</td><td class="r">${fE(gesamtEndpreis)}</td></tr></tbody></table>
+${ratenAnzahl > 1 ? '<p style="font-size:10px;margin-top:8px"><strong>Ratenplan:</strong> ' + ratenAnzahl + ' Raten a ' + fE(rateProMonat) + ' EUR/Monat ab ' + startDatum + '</p>' : ''}
+<div class="pb">Bitte ueberweisen Sie den Betrag in Hoehe von <strong>${fE(gesamtEndpreis)} EUR</strong> bis spaetestens ${faellig} auf unser Konto Nr. 1090118941 bei der Sparkasse Leipzig Bankleitzahl: 86055592.<br>IBAN: DE03860555921090118941 - BIC: WELADE8LXXX<br><br><strong>Verwendungszweck: ${uz}</strong></div>
+<div class="ft">Konformitaetserklaerung gemaess Anhang XIII MDR fuer Sonderanfertigungen: Diese Sonderanfertigung ist ausschliesslich fuer den genannten Patienten bestimmt.<br><br>Alle kieferorthopaedischen Geraete bleiben Eigentum des verordnenden Kieferorthopaedens. Alle erbrachten Leistungen sind nach Paragraph 4 Nr. 14 UStG von der Umsatzsteuer befreit.</div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
   };
 
   const artLabels: Record<PatientArt, string> = { kasse: "Kassenpatient (MKV)", privat: "Privatpatient (GOZ)", mkv: "Kassenrechnung (80/20)" };
