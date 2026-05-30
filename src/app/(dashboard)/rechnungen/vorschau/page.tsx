@@ -5,7 +5,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import Link from "next/link";
 
-interface Pos { goz_nr: string; bezeichnung: string; faktor: number; anzahl: number; preis: number; gkv_abzug: number; endpreis: number; begruendung: string; }
+interface Pos { goz_nr: string; bezeichnung: string; faktor: number; anzahl: number; preis: number; gkv_abzug: number; endpreis: number; begruendung: string; datum?: string; region?: string; material?: number; }
 interface PreviewData {
   patient: { id: string; name: string };
   patientArt: string;
@@ -121,8 +121,8 @@ export default function VorschauPage() {
             const bgrIdx = bgrList.findIndex(b => b.text === p.begruendung);
             return (
               <tr key={i} style={{ borderBottom: "0.5px solid #ddd" }}>
-                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}></td>
-                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}></td>
+                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.datum ? new Date(p.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : ""}</td>
+                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.region || ""}</td>
                 <td style={{ padding: "3px", verticalAlign: "top" }}>{p.goz_nr}</td>
                 <td style={{ padding: "3px", verticalAlign: "top" }}>{p.bezeichnung}</td>
                 <td style={{ padding: "3px", verticalAlign: "top", textAlign: "center" }}>{bgrIdx >= 0 ? `${bgrIdx + 1})` : ""}</td>
@@ -249,6 +249,7 @@ export default function VorschauPage() {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 8.5 }}>
         <thead>
           <tr style={{ borderTop: "1.5px solid #000", borderBottom: "1px solid #000" }}>
+            <th style={{ textAlign: "left", padding: "4px 3px", fontWeight: "bold", width: "9%" }}>Datum</th>
             <th style={{ textAlign: "left", padding: "4px 3px", fontWeight: "bold", width: "6%" }}>Nr.</th>
             <th style={{ textAlign: "left", padding: "4px 3px", fontWeight: "bold", width: "7%" }}>Zahn/<br/>Kiefer</th>
             <th style={{ textAlign: "left", padding: "4px 3px", fontWeight: "bold" }}>Leistung</th>
@@ -261,15 +262,16 @@ export default function VorschauPage() {
         <tbody>
           {data.positionen.map((p, i) => (
             <tr key={i} style={{ borderBottom: "0.5px solid #ddd" }}>
+              <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.datum ? new Date(p.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</td>
               <td style={{ padding: "3px", verticalAlign: "top" }}>{p.goz_nr}</td>
-              <td style={{ padding: "3px", verticalAlign: "top" }}></td>
+              <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.region || ""}</td>
               <td style={{ padding: "3px", verticalAlign: "top" }}>
                 {p.bezeichnung}
                 {p.begruendung && <><br/><span style={{ fontSize: 7.5, color: "#666" }}>{p.begruendung}</span></>}
               </td>
               <td style={{ padding: "3px", verticalAlign: "top", textAlign: "right" }}>{p.anzahl}</td>
               <td style={{ padding: "3px", verticalAlign: "top", textAlign: "right" }}>{p.faktor.toFixed(2)}</td>
-              <td style={{ padding: "3px", verticalAlign: "top", textAlign: "right" }}></td>
+              <td style={{ padding: "3px", verticalAlign: "top", textAlign: "right" }}>{(p.material && p.material > 0) ? fE(p.material) : ""}</td>
               <td style={{ padding: "3px", verticalAlign: "top", textAlign: "right" }}>{fE(p.preis)}</td>
             </tr>
           ))}

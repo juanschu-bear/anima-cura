@@ -10,6 +10,7 @@ interface Patient { id: string; name: string; email?: string; }
 interface Position {
   id: string; goz_nr: string; bezeichnung: string; faktor: number;
   anzahl: number; preis: number; gkv_abzug: number; endpreis: number; begruendung: string;
+  datum?: string; region?: string; material?: number;
 }
 
 // GOZ Punktwert: 0,0562421 EUR pro Punkt
@@ -204,7 +205,7 @@ export default function RechnungenPage() {
   const selectPaket = (key: string) => {
     setSelectedPaket(key);
     if (PAKET_POSITIONEN[key]) {
-      setPositionen(PAKET_POSITIONEN[key].map((p, i) => ({ ...p, id: `p-${i}` })));
+      setPositionen(PAKET_POSITIONEN[key].map((p, i) => ({ ...p, id: `p-${i}`, datum: (p as any).datum || "", region: (p as any).region || "", material: (p as any).material || 0 })));
     } else {
       setPositionen([]);
     }
@@ -218,6 +219,7 @@ export default function RechnungenPage() {
       id: `p-${Date.now()}`, goz_nr: g.nr, bezeichnung: g.bez,
       faktor: std.faktor, anzahl: 1, preis: honorar, gkv_abzug: gkvAbzug,
       endpreis: honorar - gkvAbzug, begruendung: std.begr,
+      datum: "", region: "", material: 0,
     }]);
     setShowGozPicker(false);
   };
@@ -361,10 +363,13 @@ export default function RechnungenPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${border}` }}>
-                      <th style={{ textAlign: "left", padding: "8px 6px", color: muted, fontWeight: 600 }}>GOZ</th>
+                      <th style={{ textAlign: "left", padding: "8px 6px", color: muted, fontWeight: 600, width: 75 }}>Datum</th>
+                      <th style={{ textAlign: "left", padding: "8px 6px", color: muted, fontWeight: 600, width: 45 }}>GOZ</th>
+                      <th style={{ textAlign: "left", padding: "8px 6px", color: muted, fontWeight: 600, width: 65 }}>Zahn/Kiefer</th>
                       <th style={{ textAlign: "left", padding: "8px 6px", color: muted, fontWeight: 600 }}>Leistung</th>
-                      <th style={{ textAlign: "center", padding: "8px 6px", color: muted, fontWeight: 600, width: 55 }}>Anz.</th>
-                      <th style={{ textAlign: "center", padding: "8px 6px", color: muted, fontWeight: 600, width: 65 }}>Faktor</th>
+                      <th style={{ textAlign: "center", padding: "8px 6px", color: muted, fontWeight: 600, width: 48 }}>Anz.</th>
+                      <th style={{ textAlign: "center", padding: "8px 6px", color: muted, fontWeight: 600, width: 55 }}>Faktor</th>
+                      <th style={{ textAlign: "right", padding: "8px 6px", color: muted, fontWeight: 600, width: 65 }}>Mat./Lab.</th>
                       {patientArt !== "privat" && <th style={{ textAlign: "right", padding: "8px 6px", color: muted, fontWeight: 600 }}>GKV</th>}
                       <th style={{ textAlign: "right", padding: "8px 6px", color: muted, fontWeight: 600 }}>Endpreis</th>
                       <th style={{ width: 32 }}></th>
@@ -373,8 +378,14 @@ export default function RechnungenPage() {
                   <tbody>
                     {positionen.map(p => (
                       <tr key={p.id} style={{ borderBottom: `1px solid ${border}` }}>
-                        <td style={{ padding: "8px 6px", color: grn, fontWeight: 600, fontSize: 11 }}>{p.goz_nr}</td>
-                        <td style={{ padding: "8px 6px", color: fg }}>
+                        <td style={{ padding: "8px 4px" }}>
+                          <input type="date" value={p.datum} onChange={e => updatePos(p.id, "datum", e.target.value)} style={{ width: 68, padding: 3, borderRadius: 5, border: `1px solid ${border}`, background: inputBg, color: fg, fontSize: 10, fontFamily: "inherit" }} />
+                        </td>
+                        <td style={{ padding: "8px 4px", color: grn, fontWeight: 600, fontSize: 11 }}>{p.goz_nr}</td>
+                        <td style={{ padding: "8px 4px" }}>
+                          <input value={p.region} onChange={e => updatePos(p.id, "region", e.target.value)} placeholder="OK/UK" style={{ width: 52, padding: 3, borderRadius: 5, border: `1px solid ${border}`, background: inputBg, color: fg, fontSize: 10, fontFamily: "inherit" }} />
+                        </td>
+                        <td style={{ padding: "8px 4px", color: fg }}>
                           <input value={p.bezeichnung} onChange={e => updatePos(p.id, "bezeichnung", e.target.value)} style={{ background: "transparent", border: "none", color: fg, fontSize: 12, width: "100%", outline: "none", fontFamily: "inherit" }} />
                           {p.begruendung && <div style={{ fontSize: 9, color: muted, marginTop: 1 }}>{p.begruendung}</div>}
                         </td>
@@ -383,6 +394,9 @@ export default function RechnungenPage() {
                         </td>
                         <td style={{ padding: "8px 4px", textAlign: "center" }}>
                           <input type="number" step="0.1" value={p.faktor} onChange={e => updatePos(p.id, "faktor", Number(e.target.value))} style={{ width: 52, textAlign: "center", padding: 4, borderRadius: 6, border: `1px solid ${border}`, background: inputBg, color: fg, fontSize: 12, fontFamily: "inherit" }} />
+                        </td>
+                        <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                          <input type="number" step="0.01" value={p.material || ""} onChange={e => updatePos(p.id, "material", Number(e.target.value))} placeholder="0" style={{ width: 52, textAlign: "right", padding: 3, borderRadius: 5, border: `1px solid ${border}`, background: inputBg, color: fg, fontSize: 10, fontFamily: "inherit" }} />
                         </td>
                         {patientArt !== "privat" && <td style={{ padding: "8px 6px", textAlign: "right", color: p.gkv_abzug > 0 ? "#ef4444" : muted, fontSize: 11 }}>{p.gkv_abzug > 0 ? `-${fmtEur(p.gkv_abzug)}` : "\u2014"}</td>}
                         <td style={{ padding: "8px 6px", textAlign: "right", color: fg, fontWeight: 700 }}>{fmtEur(p.endpreis)}</td>
