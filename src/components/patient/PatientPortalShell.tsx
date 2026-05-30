@@ -485,7 +485,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
               <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)} ({Math.floor((Date.now() - new Date(rp.ueberfaellig.faellig_am).getTime()) / 864e5)} {lang === "en" ? "days" : lang === "es" ? "días" : "Tage"})</div>
-              <button onClick={() => setPayingRate({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "none", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlow 2s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+              <button onClick={() => setPayingRate({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "none", background: "#ef4444", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlowRed 2s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
                 Jetzt bezahlen
               </button>
             </div>
@@ -496,7 +496,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
           <div style={{ margin: "0 20px 14px" }}>
-            <button onClick={() => { hapticStrong(); setShowIBAN(true); }} style={{ width: "100%", padding: 18, borderRadius: 16, border: "none", background: red, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("progress.payNow", lang)}</button>
+
           </div>
         </div>
       )}
@@ -1251,6 +1251,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       )}
 
       <style>{fontCss}{`
+        @keyframes animapayGlowRed {
+          0% { box-shadow: 0 0 8px rgba(239,68,68,0.4), inset 0 0 8px rgba(239,68,68,0.1); }
+          50% { box-shadow: 0 0 20px rgba(239,68,68,0.6), inset 0 0 12px rgba(239,68,68,0.15); }
+          100% { box-shadow: 0 0 8px rgba(239,68,68,0.4), inset 0 0 8px rgba(239,68,68,0.1); }
+        }
         @keyframes animapayGlow {
           0% { box-shadow: 0 0 8px rgba(34,197,94,0.4), inset 0 0 8px rgba(34,197,94,0.1); }
           50% { box-shadow: 0 0 20px rgba(34,197,94,0.6), inset 0 0 12px rgba(34,197,94,0.15); }
