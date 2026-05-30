@@ -269,7 +269,7 @@ export default function DashboardShell({
                 }}
               />
               {searchOpen && searchResults.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 100, background: "var(--surface-50, #0d0f1a)", border: "1px solid var(--surface-200, rgba(255,255,255,0.06))" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 9999, background: "var(--surface-50, #0d0f1a)", border: "1px solid var(--surface-200, rgba(255,255,255,0.06))" }}>
                   {searchResults.map((r) => (
                     <div key={r.id} onMouseDown={() => { router.push("/patienten/" + r.id); setSearchQuery(""); setSearchOpen(false); }} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--surface-200, rgba(255,255,255,0.04))", transition: "background 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74,222,128,0.06)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-h, #f0f0f0)" }}>{r.name}</div>
