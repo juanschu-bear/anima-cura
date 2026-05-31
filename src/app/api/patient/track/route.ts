@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/db/supabase";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_EVENTS = ["app_open", "tab_view", "chat_message", "payment_view", "animapay_open", "notification_read", "document_view", "ratenplan_view"];
+const VALID_EVENTS = ["app_open", "tab_view", "chat_message", "chat_response", "payment_view", "animapay_open", "qrcode_view", "notification_read", "notification_clicked", "document_view", "ratenplan_view"];
 
 export async function POST(request: NextRequest) {
   const supabase = createServerComponentClient();

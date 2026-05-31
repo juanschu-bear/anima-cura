@@ -30,10 +30,10 @@ interface EngagementData {
   top_patients: PatientRisk[];
   breakdown?: {
     app_nutzung: { frequenz: number; tageszeiten: Record<string, number>; geraete: Record<string, number> };
-    tab_verhalten: { tabs: Record<string, number> };
-    zahlungsinteraktion: { animapay_geoeffnet: number; zahlung_angesehen: number };
-    kommunikation: { nachrichten: number };
-    benachrichtigungen: { gelesen: number };
+    tab_verhalten: { tabs: Record<string, number>; avg_dauer_sekunden?: Record<string, number>; navigations_pfade?: [string, number][] };
+    zahlungsinteraktion: { animapay_geoeffnet: number; qrcode_angesehen: number; zahlung_angesehen: number };
+    kommunikation: { nachrichten: number; avg_antwortzeit_sekunden?: number | null };
+    benachrichtigungen: { gelesen: number; push_geklickt?: number };
   };
 }
 
@@ -275,25 +275,46 @@ export default function IntelligencePage() {
               <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>📑 Tab-Verhalten</h3>
                 <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Welche Bereiche der App genutzt werden</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {Object.entries(data.breakdown.tab_verhalten.tabs).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
-                    <div key={k} style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa", display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, color: fg, fontWeight: 600 }}>{TAB_NAMES[k] || k}</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: grn }}>{v}</span>
-                    </div>
-                  ))}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {Object.entries(data.breakdown.tab_verhalten.tabs).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+                    const dur = data.breakdown?.tab_verhalten.avg_dauer_sekunden?.[k];
+                    return (
+                      <div key={k} style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, color: fg, fontWeight: 600 }}>{TAB_NAMES[k] || k}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: grn }}>{v}</span>
+                        </div>
+                        {dur && <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>Ø {dur}s Verweildauer</div>}
+                      </div>
+                    );
+                  })}
                   {Object.keys(data.breakdown.tab_verhalten.tabs).length === 0 && <div style={{ fontSize: 11, color: muted }}>Keine Daten</div>}
                 </div>
+                {data.breakdown.tab_verhalten.navigations_pfade && data.breakdown.tab_verhalten.navigations_pfade.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: muted, fontWeight: 600, marginBottom: 6 }}>HÄUFIGSTE NAVIGATIONS-PFADE</div>
+                    {data.breakdown.tab_verhalten.navigations_pfade.map(([path, count]: [string, number], i: number) => (
+                      <div key={i} style={{ fontSize: 11, color: fg, display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                        <span>{path.split(" → ").map(t => TAB_NAMES[t] || t).join(" → ")}</span>
+                        <span style={{ fontWeight: 700, color: muted }}>{count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Zahlungsinteraktion */}
               <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>💰 Zahlungsinteraktion</h3>
                 <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Zeigt Interesse an Zahlungen und AnimaPay</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                   <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.zahlungsinteraktion.animapay_geoeffnet}</div>
                     <div style={{ fontSize: 11, color: muted }}>AnimaPay geöffnet</div>
+                  </div>
+                  <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.zahlungsinteraktion.qrcode_angesehen}</div>
+                    <div style={{ fontSize: 11, color: muted }}>QR-Code angesehen</div>
                   </div>
                   <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.zahlungsinteraktion.zahlung_angesehen}</div>
@@ -309,12 +330,18 @@ export default function IntelligencePage() {
                   <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Chat-Aktivität mit der Praxis</p>
                   <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.kommunikation.nachrichten}</div>
                   <div style={{ fontSize: 11, color: muted }}>Nachrichten gesendet</div>
+                  {data.breakdown.kommunikation.avg_antwortzeit_sekunden != null && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: muted }}>Ø Antwortzeit: <strong style={{ color: fg }}>{data.breakdown.kommunikation.avg_antwortzeit_sekunden}s</strong></div>
+                  )}
                 </div>
                 <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>🔔 Benachrichtigungen</h3>
                   <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Reaktion auf Erinnerungen</p>
                   <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.benachrichtigungen.gelesen}</div>
                   <div style={{ fontSize: 11, color: muted }}>Geöffnet / gelesen</div>
+                  {(data.breakdown.benachrichtigungen.push_geklickt || 0) > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: muted }}>davon <strong style={{ color: fg }}>{data.breakdown.benachrichtigungen.push_geklickt}</strong> Push-Clicks</div>
+                  )}
                 </div>
               </div>
 

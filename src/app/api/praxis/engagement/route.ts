@@ -56,6 +56,39 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Tab durations
+  const tabDurations: Record<string, number[]> = {};
+  for (const e of metaEvents || []) {
+    if (e.event_type === "tab_view" && e.metadata?.duration_seconds && e.metadata.duration_seconds > 0) {
+      const tab = e.metadata?.tab || "unknown";
+      if (!tabDurations[tab]) tabDurations[tab] = [];
+      tabDurations[tab].push(e.metadata.duration_seconds);
+    }
+  }
+  const tabAvgDuration: Record<string, number> = {};
+  for (const [tab, durations] of Object.entries(tabDurations)) {
+    tabAvgDuration[tab] = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+  }
+
+  // Tab sequence (most common navigation paths)
+  const tabSequences: string[] = [];
+  const seqEvents = (metaEvents || []).filter(e => e.event_type === "tab_view" && e.metadata?.tab).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  for (let i = 0; i < seqEvents.length - 1; i++) {
+    tabSequences.push(seqEvents[i].metadata.tab + " → " + seqEvents[i + 1].metadata.tab);
+  }
+  const seqCounts: Record<string, number> = {};
+  for (const s of tabSequences) seqCounts[s] = (seqCounts[s] || 0) + 1;
+  const topSequences = Object.entries(seqCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Chat response times
+  const responseTimes: number[] = [];
+  for (const e of metaEvents || []) {
+    if (e.event_type === "chat_response" && e.metadata?.response_time_seconds) {
+      responseTimes.push(e.metadata.response_time_seconds);
+    }
+  }
+  const avgResponseTime = responseTimes.length > 0 ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : null;
+
   const breakdown = {
     app_nutzung: {
       frequenz: byType["app_open"] || 0,
@@ -64,16 +97,21 @@ export async function GET(request: NextRequest) {
     },
     tab_verhalten: {
       tabs: byTab,
+      avg_dauer_sekunden: tabAvgDuration,
+      navigations_pfade: topSequences,
     },
     zahlungsinteraktion: {
       animapay_geoeffnet: byType["animapay_open"] || 0,
+      qrcode_angesehen: byType["qrcode_view"] || 0,
       zahlung_angesehen: byType["payment_view"] || 0,
     },
     kommunikation: {
       nachrichten: byType["chat_message"] || 0,
+      avg_antwortzeit_sekunden: avgResponseTime,
     },
     benachrichtigungen: {
       gelesen: (byType["notification_read"] || 0) + (byType["notification_clicked"] || 0),
+      push_geklickt: byType["notification_clicked"] || 0,
     },
   };
 

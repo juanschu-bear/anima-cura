@@ -192,28 +192,35 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     if (fromPush) trackEvent(patientId, "notification_clicked");
   }, []);
 
-  // Track tab views with duration + specific interactions
+  // Track tab views with duration + sequence + specific interactions
   const tabOpenTime = useRef(Date.now());
+  const tabSequence = useRef(0);
   useEffect(() => {
     if (!patientId || !tab) return;
+    tabSequence.current++;
     const duration = Math.round((Date.now() - tabOpenTime.current) / 1000);
-    trackEvent(patientId, "tab_view", { tab, duration_seconds: duration > 1 ? duration : undefined });
+    trackEvent(patientId, "tab_view", { tab, duration_seconds: duration > 1 ? duration : undefined, sequence: tabSequence.current });
     tabOpenTime.current = Date.now();
     if (tab === "progress") trackEvent(patientId, "payment_view");
+    if (tab === "more") trackEvent(patientId, "document_view");
   }, [tab]);
 
   // Track AnimaPay opens
   const trackAnimaPay = () => { if (patientId) trackEvent(patientId, "animapay_open"); };
 
   const openPayment = (rate: { betrag: number; verwendungszweck: string; rateNummer: number }) => {
-    if (patientId) trackEvent(patientId, "animapay_open", { verwendungszweck: rate.verwendungszweck });
+    if (patientId) {
+      trackEvent(patientId, "animapay_open", { verwendungszweck: rate.verwendungszweck });
+      trackEvent(patientId, "qrcode_view", { betrag: rate.betrag });
+    }
     setPayingRate(rate);
   };
 
   const sendMsg = async () => {
     const text = msgInput.trim();
     if (!text) return;
-    if (patientId) trackEvent(patientId, "chat_message", { sent_at: Date.now() });
+    const chatSentAt = Date.now();
+    if (patientId) trackEvent(patientId, "chat_message", { sent_at: chatSentAt });
     setMsgInput("");
     const tempId = "temp-" + Date.now();
     setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);
@@ -224,6 +231,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       if (res.ok) {
         const d = await res.json();
         if (d.icura_response) {
+          const responseTime = Math.round((Date.now() - chatSentAt) / 1000);
+          if (patientId) trackEvent(patientId, "chat_response", { response_time_seconds: responseTime });
           setMsgs(prev => [...prev, d.icura_response]);
         } else if (d.fallback) {
           setMsgs(prev => [...prev, { id: "fb-" + Date.now(), sender_type: "praxis", sender_name: "iCura", text: d.message || "Das Praxis-Team wurde benachrichtigt.", created_at: new Date().toISOString() }]);
