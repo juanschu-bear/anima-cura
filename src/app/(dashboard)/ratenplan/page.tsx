@@ -154,22 +154,21 @@ export default function RatenplanPage() {
 
       {/* Patient Table */}
       <div className="stat-card overflow-x-auto" style={{ padding: 0 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              {["Patient", "Rate/Monat", "Fortschritt", "Restschuld", "Nächste Rate", "Status"].map(h => (
-                <th key={h} style={{ textAlign: h === "Restschuld" || h === "Rate/Monat" ? "right" : "left", padding: "12px 16px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.05)" : "#e8eaef"}` }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+        <div>
+          {/* Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 200px 100px 90px 80px", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.05)" : "#e8eaef"}` }}>
+            {["Patient", "Rate/Monat", "Fortschritt", "Restschuld", "Nächste Rate", "Status"].map(h => (
+              <div key={h} style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac", textAlign: h === "Restschuld" || h === "Rate/Monat" ? "right" : "left" }}>{h}</div>
+            ))}
+          </div>
+          <div>
             {filtered.map((plan, idx) => {
               const rates = ratenByPlan[plan.id] || [];
               return (
-                <motion.tr key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}>
-                  <td colSpan={6} style={{ padding: 0 }}>
+                <motion.div key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}>
+                  <div style={{ padding: 0 }}>
                     {/* Row */}
-                    <div onClick={() => setExpandedId(expandedId === plan.id ? null : plan.id)} style={{ display: "grid", gridTemplateColumns: "1fr 100px 180px 110px 100px 90px", alignItems: "center", padding: "14px 16px", cursor: "pointer", transition: "background 0.15s", borderBottom: expandedId === plan.id ? "none" : `1px solid ${dk ? "rgba(255,255,255,0.03)" : "#f0f1f5"}`, borderRadius: expandedId === plan.id ? "10px 10px 0 0" : 0 }} onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.01)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <div onClick={() => setExpandedId(expandedId === plan.id ? null : plan.id)} style={{ display: "grid", gridTemplateColumns: "1fr 90px 200px 100px 90px 80px", alignItems: "center", padding: "14px 16px", cursor: "pointer", transition: "background 0.15s", borderBottom: expandedId === plan.id ? "none" : `1px solid ${dk ? "rgba(255,255,255,0.03)" : "#f0f1f5"}`, borderRadius: expandedId === plan.id ? "10px 10px 0 0" : 0 }} onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.01)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700 }}>{plan.name}</div>
                         <div style={{ fontSize: 10, color: dk ? "#4a5568" : "#8797ac", marginTop: 2 }}>{plan.behandlung} · Seit {new Date(plan.start_datum).toLocaleDateString("de-DE", { month: "short", year: "numeric" })}</div>
@@ -211,12 +210,12 @@ export default function RatenplanPage() {
                         </div>
                       </div>
                     )}
-                  </td>
-                </motion.tr>
+                  </div>
+                </motion.div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        </div>
         {filtered.length === 0 && <div style={{ padding: 40, textAlign: "center", color: dk ? "#4a5568" : "#8797ac", fontSize: 13 }}>Keine Ratenpläne gefunden.</div>}
       </div>
 
