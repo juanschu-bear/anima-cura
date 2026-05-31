@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   if (!events || events.length === 0) return NextResponse.json({ events: [] });
 
-  const patientIds = [...new Set(events.map(e => e.patient_id))];
+  const patientIds = Array.from(new Set(events.map(e => e.patient_id)));
   const { data: patients } = await sc
     .from("patients")
     .select("id, vorname, nachname")
