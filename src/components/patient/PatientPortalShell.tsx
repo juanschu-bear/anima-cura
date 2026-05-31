@@ -182,18 +182,33 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     }).catch(() => {});
   }, [patientId]);
 
-  // Track app open
-  useEffect(() => { if (patientId) trackEvent(patientId, "app_open"); }, []);
+  // Track app open with device context
+  useEffect(() => {
+    if (!patientId) return;
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const device = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : "Desktop";
+    trackEvent(patientId, "app_open", { device, hour: new Date().getHours() });
+  }, []);
 
-  // Track tab views
-  useEffect(() => { if (patientId && tab) trackEvent(patientId, "tab_view", { tab }); }, [tab]);
+  // Track tab views + specific interactions
+  useEffect(() => {
+    if (!patientId || !tab) return;
+    trackEvent(patientId, "tab_view", { tab });
+    if (tab === "progress") trackEvent(patientId, "payment_view");
+  }, [tab]);
 
   // Track AnimaPay opens
   const trackAnimaPay = () => { if (patientId) trackEvent(patientId, "animapay_open"); };
 
+  const openPayment = (rate: { betrag: number; verwendungszweck: string; rateNummer: number }) => {
+    if (patientId) trackEvent(patientId, "animapay_open", { verwendungszweck: rate.verwendungszweck });
+    setPayingRate(rate);
+  };
+
   const sendMsg = async () => {
     const text = msgInput.trim();
     if (!text) return;
+    if (patientId) trackEvent(patientId, "chat_message");
     setMsgInput("");
     const tempId = "temp-" + Date.now();
     setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);
@@ -427,7 +442,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif" }}>{rp.naechste_rate.betrag} €</div>
           </div>
-          <button onClick={() => rp.naechste_rate && setPayingRate({ betrag: rp.naechste_rate.betrag, verwendungszweck: "AC-PAT-R" + (rp.raten_bezahlt + 1), rateNummer: rp.raten_bezahlt + 1 })} style={{ width: "100%", padding: "14px", borderRadius: 14, border: "2px solid rgba(34,197,94,0.3)", background: dk ? "rgba(34,197,94,0.06)" : "rgba(34,197,94,0.04)", color: "#22c55e", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "glowBorder 2.5s ease-in-out infinite" }}>
+          <button onClick={() => rp.naechste_rate && openPayment({ betrag: rp.naechste_rate.betrag, verwendungszweck: "AC-PAT-R" + (rp.raten_bezahlt + 1), rateNummer: rp.raten_bezahlt + 1 })} style={{ width: "100%", padding: "14px", borderRadius: 14, border: "2px solid rgba(34,197,94,0.3)", background: dk ? "rgba(34,197,94,0.06)" : "rgba(34,197,94,0.04)", color: "#22c55e", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "glowBorder 2.5s ease-in-out infinite" }}>
             {lang === "en" ? "Pay now" : lang === "es" ? "Pagar ahora" : "Jetzt bezahlen"}
           </button>
         </div>
@@ -546,7 +561,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
               <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)} ({Math.floor((Date.now() - new Date(rp.ueberfaellig.faellig_am).getTime()) / 864e5)} {lang === "en" ? "days" : lang === "es" ? "días" : "Tage"})</div>
-              <button onClick={() => setPayingRate({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "2px solid rgba(239,68,68,0.6)", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlowRed 2.5s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+              <button onClick={() => openPayment({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "2px solid rgba(239,68,68,0.6)", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlowRed 2.5s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
                 Jetzt bezahlen
               </button>
             </div>

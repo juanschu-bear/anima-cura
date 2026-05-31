@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { buildProfile } from "@/lib/revenue-intelligence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,12 +53,35 @@ export async function GET(request: NextRequest) {
   }
   const topPatients = Object.entries(patientCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, count]) => ({ id, count, details: patientDetails[id] || {} }));
 
-  // Fetch names for top patients
+  // Fetch patient context (name, age, insurance) + compute scores
   if (topPatients.length > 0) {
-    const { data: names } = await sc.from("patients").select("id, vorname, nachname").in("id", topPatients.map(p => p.id));
+    const ids = topPatients.map(p => p.id);
+    const { data: names } = await sc.from("patients").select("id, vorname, nachname, geburtsdatum, versicherung_status, behandlung_status").in("id", ids);
+
+    // Fetch full event timeline per patient for scoring
+    const { data: patientEvents } = await sc.from("patient_engagement").select("patient_id, event_type, created_at").in("patient_id", ids).order("created_at", { ascending: false });
+
     for (const tp of topPatients) {
       const n = (names || []).find(n => n.id === tp.id);
       (tp as any).name = n ? `${n.vorname} ${n.nachname}` : "Unbekannt";
+      if (n?.geburtsdatum) {
+        const age = Math.floor((Date.now() - new Date(n.geburtsdatum).getTime()) / (365.25 * 864e5));
+        (tp as any).age = age;
+      }
+      (tp as any).versicherung = (n as any)?.versicherung_status || null;
+
+      // Build behavioral profile (no score)
+      const evts = (patientEvents || []).filter(e => e.patient_id === tp.id);
+      const age = (tp as any).age;
+      const profile = buildProfile({
+        events: evts,
+        context: { age, versicherung: (n as any)?.versicherung_status, behandlung_status: (n as any)?.behandlung_status },
+      });
+      (tp as any).risk_level = profile.risk_level;
+      (tp as any).signals = profile.signals;
+      (tp as any).context_tags = profile.context_tags;
+      (tp as any).activity_summary = profile.activity_summary;
+      (tp as any).trend = profile.trend;
     }
   }
 

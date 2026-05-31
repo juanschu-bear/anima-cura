@@ -6,6 +6,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 import { Brain, AlertTriangle, TrendingDown, TrendingUp, Activity, Clock, MessageSquare, CreditCard, Bell, Eye, User } from "lucide-react";
 
+interface BehaviorSignal { text: string; type: "positive" | "neutral" | "warning"; }
 interface PatientRisk {
   id: string;
   name: string;
@@ -13,9 +14,11 @@ interface PatientRisk {
   details: Record<string, number>;
   age?: number;
   versicherung?: string;
-  last_active?: string;
   risk_level?: "high" | "medium" | "low";
-  risk_reasons?: string[];
+  signals?: BehaviorSignal[];
+  context_tags?: string[];
+  trend?: "rising" | "stable" | "falling" | "unknown";
+  activity_summary?: { app_opens: number; last_active_days: number | null; most_used_tab: string | null; total_events: number };
 }
 
 interface EngagementData {
@@ -76,45 +79,8 @@ export default function IntelligencePage() {
       .catch(() => {});
   }, [period]);
 
-  // Compute risk profiles from engagement data
-  const riskPatients = (data?.top_patients || []).map(p => {
-    const reasons: string[] = [];
-    let level: "high" | "medium" | "low" = "low";
-
-    // No app opens in period = high risk
-    if (!p.details?.app_open || p.details.app_open < 2) {
-      reasons.push("Kaum App-Nutzung");
-      level = "high";
-    }
-    // No payment views = medium risk
-    if (!p.details?.payment_view && !p.details?.animapay_open) {
-      reasons.push("Kein Zahlungsinteresse gezeigt");
-      if (level !== "high") level = "medium";
-    }
-    // No notification interactions
-    if (!p.details?.notification_read && !p.details?.notification_clicked) {
-      reasons.push("Benachrichtigungen ignoriert");
-      if (level !== "high") level = "medium";
-    }
-    // Low overall activity
-    if (p.count < 3) {
-      reasons.push("Sehr geringe Aktivität");
-      level = "high";
-    }
-    // Good signals
-    if (p.details?.chat_message && p.details.chat_message > 0) {
-      reasons.push("Aktiv im Chat ✓");
-    }
-    if (p.details?.animapay_open && p.details.animapay_open > 0) {
-      reasons.push("AnimaPay genutzt ✓");
-    }
-    if (p.count > 10) {
-      level = "low";
-      reasons.push("Sehr engagiert ✓");
-    }
-
-    return { ...p, risk_level: level, risk_reasons: reasons };
-  });
+  // Risk profiles come from the API (buildProfile engine)
+  const riskPatients = (data?.top_patients || []);
 
   const highRisk = riskPatients.filter(p => p.risk_level === "high");
   const mediumRisk = riskPatients.filter(p => p.risk_level === "medium");
@@ -187,13 +153,24 @@ export default function IntelligencePage() {
 
                     {/* Patient info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: fg }}>{p.name}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: `${riskColor(p.risk_level || "low")}15`, color: riskColor(p.risk_level || "low") }}>{riskLabel(p.risk_level || "low")}</span>
+                        {p.trend === "falling" && <span style={{ fontSize: 10, color: red }}>↓ sinkt</span>}
+                        {p.trend === "rising" && <span style={{ fontSize: 10, color: grn }}>↑ steigt</span>}
                       </div>
+                      {/* Context tags (age, insurance, treatment) */}
+                      {p.context_tags && p.context_tags.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                          {p.context_tags.map((tag, j) => (
+                            <span key={j} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: dk ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.08)", color: dk ? "#a78bfa" : "#7c3aed", fontWeight: 600 }}>{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Behavioral signals */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                        {(p.risk_reasons || []).map((r, j) => (
-                          <span key={j} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: dk ? "rgba(255,255,255,0.04)" : "#f5f5f5", color: r.includes("✓") ? grn : muted }}>{r}</span>
+                        {(p.signals || []).map((s, j) => (
+                          <span key={j} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.type === "positive" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.08)") : s.type === "warning" ? (dk ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.06)") : (dk ? "rgba(255,255,255,0.04)" : "#f5f5f5"), color: s.type === "positive" ? grn : s.type === "warning" ? red : muted }}>{s.text}{s.type === "positive" ? " ✓" : ""}</span>
                         ))}
                       </div>
                     </div>
