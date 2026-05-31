@@ -209,17 +209,11 @@ export default function IntelligencePage() {
                       )}
                     </div>
 
-                    {/* Activity breakdown */}
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      {Object.entries(p.details || {}).slice(0, 4).map(([k, v]) => (
-                        <span key={k} title={EVENT_LABELS[k]?.label || k} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 2, color: muted }}>
-                          {EVENT_LABELS[k]?.icon || "📋"}{v as number}
-                        </span>
-                      ))}
+                    {/* Activity summary */}
+                    <div style={{ flexShrink: 0, textAlign: "right" }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif" }}>{p.count}</div>
+                      <div style={{ fontSize: 10, color: muted }}>Aktionen</div>
                     </div>
-
-                    {/* Total */}
-                    <div style={{ fontSize: 16, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif", flexShrink: 0, width: 40, textAlign: "right" }}>{p.count}</div>
                   </div>
                 ))}
               </div>

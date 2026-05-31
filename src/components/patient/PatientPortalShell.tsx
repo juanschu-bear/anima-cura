@@ -182,18 +182,23 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     }).catch(() => {});
   }, [patientId]);
 
-  // Track app open with device context
+  // Track app open with device context + notification click detection
   useEffect(() => {
     if (!patientId) return;
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
     const device = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : "Desktop";
+    const fromPush = typeof window !== "undefined" && window.location.search.includes("from=push");
     trackEvent(patientId, "app_open", { device, hour: new Date().getHours() });
+    if (fromPush) trackEvent(patientId, "notification_clicked");
   }, []);
 
-  // Track tab views + specific interactions
+  // Track tab views with duration + specific interactions
+  const tabOpenTime = useRef(Date.now());
   useEffect(() => {
     if (!patientId || !tab) return;
-    trackEvent(patientId, "tab_view", { tab });
+    const duration = Math.round((Date.now() - tabOpenTime.current) / 1000);
+    trackEvent(patientId, "tab_view", { tab, duration_seconds: duration > 1 ? duration : undefined });
+    tabOpenTime.current = Date.now();
     if (tab === "progress") trackEvent(patientId, "payment_view");
   }, [tab]);
 
@@ -208,7 +213,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const sendMsg = async () => {
     const text = msgInput.trim();
     if (!text) return;
-    if (patientId) trackEvent(patientId, "chat_message");
+    if (patientId) trackEvent(patientId, "chat_message", { sent_at: Date.now() });
     setMsgInput("");
     const tempId = "temp-" + Date.now();
     setMsgs(prev => [...prev, { id: tempId, sender_type: "patient", sender_name: null, text, created_at: new Date().toISOString() }]);

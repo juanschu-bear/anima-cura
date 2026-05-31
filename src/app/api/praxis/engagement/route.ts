@@ -117,11 +117,25 @@ export async function GET(request: NextRequest) {
       }
       (tp as any).versicherung = (n as any)?.versicherung_status || null;
 
-      // Build behavioral profile (no score)
+      // Build behavioral profile with payment context
       const evts = (patientEvents || []).filter(e => e.patient_id === tp.id);
       const age = (tp as any).age;
+
+      // Fetch raten for payment profiling
+      const { data: raten } = await sc.from("raten")
+        .select("status, faellig_am, bezahlt_am")
+        .eq("ratenplan_id", tp.id);
+      // Also try via ratenplaene
+      const { data: rp } = await sc.from("ratenplaene").select("id").eq("patient_id", tp.id).limit(1);
+      let zahlungen: { status: string; faellig_am: string; bezahlt_am?: string }[] = [];
+      if (rp && rp[0]) {
+        const { data: rpRaten } = await sc.from("raten").select("status, faellig_am, bezahlt_am").eq("ratenplan_id", rp[0].id);
+        zahlungen = (rpRaten || []).map(r => ({ status: r.status, faellig_am: r.faellig_am, bezahlt_am: r.bezahlt_am || undefined }));
+      }
+
       const profile = buildProfile({
         events: evts,
+        zahlungen,
         context: { age, versicherung: (n as any)?.versicherung_status, behandlung_status: (n as any)?.behandlung_status },
       });
       (tp as any).risk_level = profile.risk_level;

@@ -116,7 +116,7 @@ export function buildProfile(input: ProfilingInput): PatientProfile {
   if (context.age) context_tags.push(`${context.age} Jahre`);
   const ag = ageGroup(context.age);
   if (ag) context_tags.push(ag);
-  if (context.versicherung) context_tags.push(context.versicherung === "gesetzlich" ? "Gesetzlich" : context.versicherung === "privat" ? "Privat" : context.versicherung);
+  if (context.versicherung) { const v = context.versicherung.toLowerCase(); context_tags.push(v.includes("statut") || v.includes("gesetz") ? "Gesetzlich versichert" : v.includes("priv") ? "Privat versichert" : v.includes("famil") ? "Familienversichert" : context.versicherung); }
   if (context.behandlung_status === "aktiv") context_tags.push("Aktive Behandlung");
   if (context.beruf) context_tags.push(context.beruf);
   if (context.familienstand) context_tags.push(context.familienstand);

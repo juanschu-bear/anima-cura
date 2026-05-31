@@ -30,7 +30,8 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/patient/portal";
-  event.waitUntil(clients.openWindow(url));
+  const sep = url.includes("?") ? "&" : "?";
+  event.waitUntil(clients.openWindow(url + sep + "from=push"));
 });
 
 self.addEventListener("install", () => self.skipWaiting());
