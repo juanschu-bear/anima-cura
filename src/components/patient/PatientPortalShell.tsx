@@ -188,6 +188,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // Track tab views
   useEffect(() => { if (patientId && tab) trackEvent(patientId, "tab_view", { tab }); }, [tab]);
 
+  // Track AnimaPay opens
+  const trackAnimaPay = () => { if (patientId) trackEvent(patientId, "animapay_open"); };
+
   const sendMsg = async () => {
     const text = msgInput.trim();
     if (!text) return;

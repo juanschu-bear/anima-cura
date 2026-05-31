@@ -15,6 +15,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.quarterly": { de: "Quartalsbericht", en: "Quarterly" },
   "nav.reports": { de: "Berichte", en: "Reports" },
   "nav.invoices": { de: "Rechnungen", en: "Invoices" },
+  "nav.intelligence": { de: "Revenue Intelligence", en: "Revenue Intelligence" },
   "nav.messages": { de: "Nachrichten", en: "Messages" },
   "nav.automations": { de: "Automatisierungen", en: "Automations" },
   "nav.import": { de: "Datenimport", en: "Data Import" },
