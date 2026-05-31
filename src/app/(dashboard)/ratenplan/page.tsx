@@ -154,21 +154,27 @@ export default function RatenplanPage() {
 
       {/* Patient Table */}
       <div className="stat-card overflow-x-auto" style={{ padding: 0 }}>
-        <div>
-          {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 200px 100px 90px 80px", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.05)" : "#e8eaef"}` }}>
-            {["Patient", "Rate/Monat", "Fortschritt", "Restschuld", "Nächste Rate", "Status"].map(h => (
-              <div key={h} style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac", textAlign: h === "Restschuld" || h === "Rate/Monat" ? "right" : "left" }}>{h}</div>
-            ))}
-          </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 4px" }}>
+          <thead>
+            <tr>
+              <th style={{ width: "25%", textAlign: "left", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Patient</th>
+              <th style={{ width: "11%", textAlign: "right", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Rate/Monat</th>
+              <th style={{ width: "24%", textAlign: "left", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Fortschritt</th>
+              <th style={{ width: "13%", textAlign: "right", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Restschuld</th>
+              <th style={{ width: "13%", textAlign: "left", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Nächste Rate</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "12px 14px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: dk ? "#4a5568" : "#8797ac" }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
           <div>
             {filtered.map((plan, idx) => {
               const rates = ratenByPlan[plan.id] || [];
               return (
-                <motion.div key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}>
-                  <div style={{ padding: 0 }}>
+                <motion.tr key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}>
+                  <td colSpan={6} style={{ padding: 0, background: "transparent" }}>
                     {/* Row */}
-                    <div onClick={() => setExpandedId(expandedId === plan.id ? null : plan.id)} style={{ display: "grid", gridTemplateColumns: "1fr 90px 200px 100px 90px 80px", alignItems: "center", padding: "14px 16px", cursor: "pointer", transition: "background 0.15s", borderBottom: expandedId === plan.id ? "none" : `1px solid ${dk ? "rgba(255,255,255,0.03)" : "#f0f1f5"}`, borderRadius: expandedId === plan.id ? "10px 10px 0 0" : 0 }} onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.01)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <div onClick={() => setExpandedId(expandedId === plan.id ? null : plan.id)} style={{ display: "grid", gridTemplateColumns: "25% 11% 24% 13% 13% 10%", alignItems: "center", padding: "14px", cursor: "pointer", transition: "background 0.15s" }} onMouseEnter={e => (e.currentTarget.style.background = dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.01)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700 }}>{plan.name}</div>
                         <div style={{ fontSize: 10, color: dk ? "#4a5568" : "#8797ac", marginTop: 2 }}>{plan.behandlung} · Seit {new Date(plan.start_datum).toLocaleDateString("de-DE", { month: "short", year: "numeric" })}</div>
@@ -210,11 +216,12 @@ export default function RatenplanPage() {
                         </div>
                       </div>
                     )}
-                  </div>
-                </motion.div>
+                  </td>
+                </motion.tr>
               );
             })}
-          </div>
+          </tbody>
+        </table>
         </div>
         {filtered.length === 0 && <div style={{ padding: 40, textAlign: "center", color: dk ? "#4a5568" : "#8797ac", fontSize: 13 }}>Keine Ratenpläne gefunden.</div>}
       </div>
