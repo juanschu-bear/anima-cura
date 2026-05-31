@@ -161,22 +161,30 @@ export async function GET(request: NextRequest) {
 
       // Fetch raten for payment profiling
       const { data: raten } = await sc.from("raten")
-        .select("status, faellig_am, bezahlt_am")
+        .select("status, faellig_am, bezahlt_am, betrag")
         .eq("ratenplan_id", tp.id);
       // Also try via ratenplaene
       const { data: rp } = await sc.from("ratenplaene").select("id").eq("patient_id", tp.id).limit(1);
       let zahlungen: { status: string; faellig_am: string; bezahlt_am?: string }[] = [];
       if (rp && rp[0]) {
-        const { data: rpRaten } = await sc.from("raten").select("status, faellig_am, bezahlt_am").eq("ratenplan_id", rp[0].id);
+        const { data: rpRaten } = await sc.from("raten").select("status, faellig_am, bezahlt_am, betrag").eq("ratenplan_id", rp[0].id);
         zahlungen = (rpRaten || []).map(r => ({ status: r.status, faellig_am: r.faellig_am, bezahlt_am: r.bezahlt_am || undefined }));
       }
+
+      // Calculate restschuld
+      const restschuld = zahlungen.filter(z => z.status !== "bezahlt").reduce((s, z) => s + (Number((z as any).betrag) || 0), 0);
 
       const profile = buildProfile({
         events: evts,
         zahlungen,
+        restschuld,
         context: { age, versicherung: (n as any)?.versicherung_status, behandlung_status: (n as any)?.behandlung_status, geschlecht: (n as any)?.geschlecht },
       });
       (tp as any).risk_level = profile.risk_level;
+      (tp as any).risk_punkte = profile.risk_punkte;
+      (tp as any).financial_risk = profile.financial_risk;
+      (tp as any).restschuld = restschuld;
+      (tp as any).category_presence = profile.category_presence;
       (tp as any).signals = profile.signals;
       (tp as any).context_tags = profile.context_tags;
       (tp as any).observation = profile.observation;
