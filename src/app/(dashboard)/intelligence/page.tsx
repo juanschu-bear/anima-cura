@@ -28,6 +28,13 @@ interface EngagementData {
   by_type: Record<string, number>;
   daily: { date: string; count: number }[];
   top_patients: PatientRisk[];
+  breakdown?: {
+    app_nutzung: { frequenz: number; tageszeiten: Record<string, number>; geraete: Record<string, number> };
+    tab_verhalten: { tabs: Record<string, number> };
+    zahlungsinteraktion: { animapay_geoeffnet: number; zahlung_angesehen: number };
+    kommunikation: { nachrichten: number };
+    benachrichtigungen: { gelesen: number };
+  };
 }
 
 interface ActivityEvent {
@@ -50,6 +57,8 @@ const EVENT_LABELS: Record<string, { icon: string; label: string }> = {
   payment_completed: { icon: "✅", label: "Zahlung abgeschlossen" },
   payment_overdue: { icon: "⚠️", label: "Zahlung überfällig" },
 };
+
+const TAB_NAMES: Record<string, string> = { home: "Start", journey: "Verlauf", progress: "Fortschritt", chat: "Chat", more: "Mehr" };
 
 export default function IntelligencePage() {
   const { theme, locale } = useAppStore();
@@ -115,23 +124,41 @@ export default function IntelligencePage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Plain-language insight banner */}
+      <div style={{ background: dk ? "linear-gradient(135deg, rgba(74,222,128,0.08), rgba(124,58,237,0.05))" : "linear-gradient(135deg, rgba(34,197,94,0.06), rgba(124,58,237,0.04))", borderRadius: 16, border: `1px solid ${border}`, padding: "18px 22px", marginBottom: 20 }}>
+        <p style={{ fontSize: 15, color: fg, margin: 0, lineHeight: 1.5 }}>
+          {highRisk.length === 0 && mediumRisk.length === 0
+            ? <>Alle aktiven Kunden zeigen <strong style={{ color: grn }}>gesundes Verhalten</strong>. Keine Warnsignale im gewählten Zeitraum.</>
+            : <>
+                {highRisk.length > 0 && <><strong style={{ color: red }}>{highRisk.length} {highRisk.length === 1 ? "Kunde braucht" : "Kunden brauchen"} jetzt Aufmerksamkeit</strong>. </>}
+                {mediumRisk.length > 0 && <><strong style={{ color: yellow }}>{mediumRisk.length} {mediumRisk.length === 1 ? "zeigt" : "zeigen"} erste Warnsignale</strong>. </>}
+                {healthyPatients.length > 0 && <>{healthyPatients.length} {healthyPatients.length === 1 ? "ist" : "sind"} stabil.</>}
+              </>
+          }
+        </p>
+      </div>
+
+      {/* Summary Cards with explanations */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-        <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: 16 }}>
+        <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${highRisk.length > 0 ? red + "44" : border}`, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><AlertTriangle size={14} color={red} /><span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Hohes Risiko</span></div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: highRisk.length > 0 ? red : grn, fontFamily: "'Fraunces', serif" }}>{highRisk.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: highRisk.length > 0 ? red : grn, fontFamily: "'Fraunces', serif", lineHeight: 1 }}>{highRisk.length}</div>
+          <p style={{ fontSize: 10.5, color: muted, marginTop: 6, lineHeight: 1.4 }}>Mehrere Warnsignale. Zahlungsausfall wahrscheinlich ohne Eingreifen.</p>
         </div>
         <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><Eye size={14} color={yellow} /><span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Aufmerksamkeit</span></div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{mediumRisk.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif", lineHeight: 1 }}>{mediumRisk.length}</div>
+          <p style={{ fontSize: 10.5, color: muted, marginTop: 6, lineHeight: 1.4 }}>Erste Anzeichen nachlassender Bindung. Beobachten.</p>
         </div>
         <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><TrendingUp size={14} color={grn} /><span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Stabil</span></div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif" }}>{healthyPatients.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif", lineHeight: 1 }}>{healthyPatients.length}</div>
+          <p style={{ fontSize: 10.5, color: muted, marginTop: 6, lineHeight: 1.4 }}>Engagiert und zuverlässig. Kein Handlungsbedarf.</p>
         </div>
         <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><Activity size={14} color={grn} /><span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Interaktionen</span></div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data?.total_events || 0}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif", lineHeight: 1 }}>{data?.total_events || 0}</div>
+          <p style={{ fontSize: 10.5, color: muted, marginTop: 6, lineHeight: 1.4 }}>Aktionen in der App: Öffnen, Tabs, Chat, Zahlungen.</p>
         </div>
       </div>
 
@@ -173,6 +200,13 @@ export default function IntelligencePage() {
                           <span key={j} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.type === "positive" ? (dk ? "rgba(74,222,128,0.1)" : "rgba(34,197,94,0.08)") : s.type === "warning" ? (dk ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.06)") : (dk ? "rgba(255,255,255,0.04)" : "#f5f5f5"), color: s.type === "positive" ? grn : s.type === "warning" ? red : muted }}>{s.text}{s.type === "positive" ? " ✓" : ""}</span>
                         ))}
                       </div>
+                      {/* Activity summary line */}
+                      {p.activity_summary && (
+                        <div style={{ fontSize: 10.5, color: muted, marginTop: 6 }}>
+                          {p.activity_summary.last_active_days === 0 ? "Heute aktiv" : p.activity_summary.last_active_days === 1 ? "Gestern aktiv" : p.activity_summary.last_active_days != null ? `Zuletzt vor ${p.activity_summary.last_active_days} Tagen` : "Noch nicht aktiv"}
+                          {p.activity_summary.most_used_tab && <> · Nutzt meist {p.activity_summary.most_used_tab === "home" ? "Start" : p.activity_summary.most_used_tab === "progress" ? "Fortschritt" : p.activity_summary.most_used_tab === "chat" ? "Chat" : p.activity_summary.most_used_tab === "journey" ? "Verlauf" : p.activity_summary.most_used_tab}</>}
+                        </div>
+                      )}
                     </div>
 
                     {/* Activity breakdown */}
@@ -212,20 +246,84 @@ export default function IntelligencePage() {
             </div>
           )}
 
-          {/* Event Type Breakdown */}
-          {data?.by_type && (
-            <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                <Activity size={16} color={grn} /> Interaktionen nach Typ
-              </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {Object.entries(data.by_type).map(([key, count]) => (
-                  <div key={key} style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: fg }}>{count}</div>
-                    <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>{EVENT_LABELS[key]?.icon} {EVENT_LABELS[key]?.label || key}</div>
+          {/* Structured Behavioral Breakdown */}
+          {data?.breakdown && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+              {/* App-Nutzung */}
+              <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>📱 App-Nutzung</h3>
+                <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Wie oft, wann und womit Kunden die App öffnen</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: muted, fontWeight: 600, marginBottom: 6 }}>FREQUENZ</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.app_nutzung.frequenz}</div>
+                    <div style={{ fontSize: 10, color: muted }}>Öffnungen gesamt</div>
                   </div>
-                ))}
+                  <div>
+                    <div style={{ fontSize: 10, color: muted, fontWeight: 600, marginBottom: 6 }}>TAGESZEITEN</div>
+                    {Object.entries(data.breakdown.app_nutzung.tageszeiten).filter(([, v]) => v > 0).map(([k, v]) => (
+                      <div key={k} style={{ fontSize: 11, color: fg, display: "flex", justifyContent: "space-between", marginBottom: 2 }}><span>{k.split(" ")[0]}</span><span style={{ fontWeight: 700 }}>{v}</span></div>
+                    ))}
+                    {Object.values(data.breakdown.app_nutzung.tageszeiten).every(v => v === 0) && <div style={{ fontSize: 10, color: muted }}>Keine Daten</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: muted, fontWeight: 600, marginBottom: 6 }}>GERÄT</div>
+                    {Object.entries(data.breakdown.app_nutzung.geraete).map(([k, v]) => (
+                      <div key={k} style={{ fontSize: 11, color: fg, display: "flex", justifyContent: "space-between", marginBottom: 2 }}><span>{k}</span><span style={{ fontWeight: 700 }}>{v}</span></div>
+                    ))}
+                    {Object.keys(data.breakdown.app_nutzung.geraete).length === 0 && <div style={{ fontSize: 10, color: muted }}>Keine Daten</div>}
+                  </div>
+                </div>
               </div>
+
+              {/* Tab-Verhalten */}
+              <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>📑 Tab-Verhalten</h3>
+                <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Welche Bereiche der App genutzt werden</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {Object.entries(data.breakdown.tab_verhalten.tabs).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                    <div key={k} style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, color: fg, fontWeight: 600 }}>{TAB_NAMES[k] || k}</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: grn }}>{v}</span>
+                    </div>
+                  ))}
+                  {Object.keys(data.breakdown.tab_verhalten.tabs).length === 0 && <div style={{ fontSize: 11, color: muted }}>Keine Daten</div>}
+                </div>
+              </div>
+
+              {/* Zahlungsinteraktion */}
+              <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>💰 Zahlungsinteraktion</h3>
+                <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Zeigt Interesse an Zahlungen und AnimaPay</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.zahlungsinteraktion.animapay_geoeffnet}</div>
+                    <div style={{ fontSize: 11, color: muted }}>AnimaPay geöffnet</div>
+                  </div>
+                  <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fafafa" }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.zahlungsinteraktion.zahlung_angesehen}</div>
+                    <div style={{ fontSize: 11, color: muted }}>Zahlungen angesehen</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kommunikation + Benachrichtigungen */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>💬 Kommunikation</h3>
+                  <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Chat-Aktivität mit der Praxis</p>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.kommunikation.nachrichten}</div>
+                  <div style={{ fontSize: 11, color: muted }}>Nachrichten gesendet</div>
+                </div>
+                <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: fg, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>🔔 Benachrichtigungen</h3>
+                  <p style={{ fontSize: 11, color: muted, marginBottom: 14 }}>Reaktion auf Erinnerungen</p>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: fg, fontFamily: "'Fraunces', serif" }}>{data.breakdown.benachrichtigungen.gelesen}</div>
+                  <div style={{ fontSize: 11, color: muted }}>Geöffnet / gelesen</div>
+                </div>
+              </div>
+
             </div>
           )}
         </div>

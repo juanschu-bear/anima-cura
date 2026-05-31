@@ -30,6 +30,53 @@ export async function GET(request: NextRequest) {
     byType[e.event_type] = (byType[e.event_type] || 0) + 1;
   }
 
+  // Structured breakdown matching the data architecture
+  // Need metadata, so fetch it
+  const { data: metaEvents } = await sc.from("patient_engagement").select("event_type, metadata, created_at").gte("created_at", since).limit(1000);
+
+  // App-Nutzung: Frequenz, Tageszeit, Gerät
+  const byDevice: Record<string, number> = {};
+  const byTimeOfDay: Record<string, number> = { "Morgens (6-12)": 0, "Mittags (12-18)": 0, "Abends (18-24)": 0, "Nachts (0-6)": 0 };
+  // Tab-Verhalten
+  const byTab: Record<string, number> = {};
+
+  for (const e of metaEvents || []) {
+    if (e.event_type === "app_open") {
+      const dev = e.metadata?.device || "Unbekannt";
+      byDevice[dev] = (byDevice[dev] || 0) + 1;
+      const hour = typeof e.metadata?.hour === "number" ? e.metadata.hour : new Date(e.created_at).getHours();
+      if (hour >= 6 && hour < 12) byTimeOfDay["Morgens (6-12)"]++;
+      else if (hour >= 12 && hour < 18) byTimeOfDay["Mittags (12-18)"]++;
+      else if (hour >= 18) byTimeOfDay["Abends (18-24)"]++;
+      else byTimeOfDay["Nachts (0-6)"]++;
+    }
+    if (e.event_type === "tab_view") {
+      const tab = e.metadata?.tab || "Unbekannt";
+      byTab[tab] = (byTab[tab] || 0) + 1;
+    }
+  }
+
+  const breakdown = {
+    app_nutzung: {
+      frequenz: byType["app_open"] || 0,
+      tageszeiten: byTimeOfDay,
+      geraete: byDevice,
+    },
+    tab_verhalten: {
+      tabs: byTab,
+    },
+    zahlungsinteraktion: {
+      animapay_geoeffnet: byType["animapay_open"] || 0,
+      zahlung_angesehen: byType["payment_view"] || 0,
+    },
+    kommunikation: {
+      nachrichten: byType["chat_message"] || 0,
+    },
+    benachrichtigungen: {
+      gelesen: (byType["notification_read"] || 0) + (byType["notification_clicked"] || 0),
+    },
+  };
+
   // Daily activity (last 14 days)
   const daily: Record<string, number> = {};
   for (let i = 0; i < 14; i++) {
@@ -92,5 +139,6 @@ export async function GET(request: NextRequest) {
     by_type: byType,
     daily: Object.entries(daily).sort().map(([date, count]) => ({ date, count })),
     top_patients: topPatients,
+    breakdown,
   });
 }
