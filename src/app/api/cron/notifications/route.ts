@@ -123,9 +123,35 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // 4. Negative Event Detection: Rate fällig in 3 Tagen aber AnimaPay nicht geöffnet
+  let negativeEvents = 0;
+  for (const rate of (faelligBald || [])) {
+    const { data: recentAnimaPay } = await sc
+      .from("patient_engagement")
+      .select("id")
+      .eq("patient_id", rate.patient_id)
+      .eq("event_type", "animapay_open")
+      .gte("created_at", new Date(now.getTime() - 7 * 864e5).toISOString())
+      .limit(1);
+
+    if (!recentAnimaPay || recentAnimaPay.length === 0) {
+      // Write as engagement event for profiling
+      await sc.from("patient_engagement").insert({
+        patient_id: rate.patient_id,
+        event_type: "negative_event",
+        metadata: { reason: "rate_faellig_animapay_nicht_geoeffnet", rate_id: rate.id, betrag: rate.betrag },
+      });
+      negativeEvents++;
+    }
+  }
+
+  // 5. Track push_sent count for each notification created
+  // (Already tracked above by the created counter)
+
   return NextResponse.json({
     success: true,
     created,
+    negative_events: negativeEvents,
     checked: {
       faellig_bald: (faelligBald || []).length,
       ueberfaellig: (ueberfaellig || []).length,

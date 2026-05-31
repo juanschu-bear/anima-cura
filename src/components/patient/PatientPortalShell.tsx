@@ -182,7 +182,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     }).catch(() => {});
   }, [patientId]);
 
-  // Track app open with device context + notification click detection
+  // Track app open with device context + notification click + session tracking
+  const sessionStart = useRef(Date.now());
   useEffect(() => {
     if (!patientId) return;
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
@@ -190,6 +191,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     const fromPush = typeof window !== "undefined" && window.location.search.includes("from=push");
     trackEvent(patientId, "app_open", { device, hour: new Date().getHours() });
     if (fromPush) trackEvent(patientId, "notification_clicked");
+
+    // Track session end when user leaves
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        const sessionSeconds = Math.round((Date.now() - sessionStart.current) / 1000);
+        if (sessionSeconds > 2) trackEvent(patientId, "session_end", { duration_seconds: sessionSeconds });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   // Track tab views with duration + sequence + specific interactions
@@ -204,9 +215,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     if (tab === "progress") trackEvent(patientId, "payment_view");
     if (tab === "more") trackEvent(patientId, "document_view");
   }, [tab]);
-
-  // Track AnimaPay opens
-  const trackAnimaPay = () => { if (patientId) trackEvent(patientId, "animapay_open"); };
 
   const openPayment = (rate: { betrag: number; verwendungszweck: string; rateNummer: number }) => {
     if (patientId) {

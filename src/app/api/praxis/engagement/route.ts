@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
   // Fetch patient context (name, age, insurance) + compute scores
   if (topPatients.length > 0) {
     const ids = topPatients.map(p => p.id);
-    const { data: names } = await sc.from("patients").select("id, vorname, nachname, geburtsdatum, versicherung_status, behandlung_status").in("id", ids);
+    const { data: names } = await sc.from("patients").select("id, vorname, nachname, geburtsdatum, versicherung_status, behandlung_status, geschlecht").in("id", ids);
 
     // Fetch full event timeline per patient for scoring
     const { data: patientEvents } = await sc.from("patient_engagement").select("patient_id, event_type, created_at").in("patient_id", ids).order("created_at", { ascending: false });
@@ -174,12 +174,16 @@ export async function GET(request: NextRequest) {
       const profile = buildProfile({
         events: evts,
         zahlungen,
-        context: { age, versicherung: (n as any)?.versicherung_status, behandlung_status: (n as any)?.behandlung_status },
+        context: { age, versicherung: (n as any)?.versicherung_status, behandlung_status: (n as any)?.behandlung_status, geschlecht: (n as any)?.geschlecht },
       });
       (tp as any).risk_level = profile.risk_level;
       (tp as any).signals = profile.signals;
       (tp as any).context_tags = profile.context_tags;
+      (tp as any).observation = profile.observation;
       (tp as any).activity_summary = profile.activity_summary;
+      (tp as any).deltas = profile.deltas;
+      (tp as any).stress_indicators = profile.stress_indicators;
+      (tp as any).absence_signals = profile.absence_signals;
       (tp as any).trend = profile.trend;
     }
   }
