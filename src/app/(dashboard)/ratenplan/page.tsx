@@ -94,10 +94,10 @@ export default function RatenplanPage() {
       {hint && <div className="rounded-lg border border-surface-200 bg-white px-4 py-3 text-sm text-praxis-600">{hint}</div>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="stat-card"><p className="text-sm font-medium text-praxis-400">Aktive Pläne</p><p className="mt-1 text-3xl font-extrabold tracking-tight text-praxis-800">{planStats.length}</p></div>
-        <div className="stat-card"><p className="text-sm font-medium text-praxis-400">Monatliches Volumen</p><p className="mt-1 text-3xl font-extrabold tracking-tight" style={{ color: "#4ade80" }}>{fE(monthlyVolume)} €</p></div>
-        <div className="stat-card"><p className="text-sm font-medium text-praxis-400">Im Verzug</p><p className="mt-1 text-3xl font-extrabold tracking-tight" style={{ color: imVerzug > 0 ? "#f87171" : "#4ade80" }}>{imVerzug}</p></div>
-        <div className="stat-card"><p className="text-sm font-medium text-praxis-400">Pünktlichkeitsquote</p><p className="mt-1 text-3xl font-extrabold tracking-tight" style={{ color: puenktlichRate >= 80 ? "#4ade80" : "#fbbf24" }}>{puenktlichRate}%</p></div>
+        <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.05)", background: "rgba(12,15,24,0.9)" }}><p style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces', serif" }}>{planStats.length}</p><p style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Aktive Pläne</p></div>
+        <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.05)", background: "rgba(12,15,24,0.9)" }}><p style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces', serif", color: "#4ade80" }}>{fE(monthlyVolume)} €</p><p style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Monatliches Volumen</p></div>
+        <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.05)", background: "rgba(12,15,24,0.9)" }}><p style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces', serif", color: imVerzug > 0 ? "#f87171" : "#4ade80" }}>{imVerzug}</p><p style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Im Verzug</p></div>
+        <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.05)", background: "rgba(12,15,24,0.9)" }}><p style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces', serif", color: puenktlichRate >= 80 ? "#4ade80" : "#fbbf24" }}>{puenktlichRate}%</p><p style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Pünktlichkeitsquote</p></div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
