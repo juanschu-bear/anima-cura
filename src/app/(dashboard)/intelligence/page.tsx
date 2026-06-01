@@ -4,20 +4,25 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/hooks/useAppStore";
 
-interface BehaviorSignal { text: string; type: "positive" | "neutral" | "warning" | "info"; }
+interface BehaviorSignal { text: string; type: "positive" | "neutral" | "warning" | "info"; severity?: "kritisch" | "mittel" | "frueh" | "none"; weight?: number; }
 interface Delta { metric: string; previous: number; current: number; change_pct: number; }
 interface PatientRisk {
   id: string; name: string; count: number; details: Record<string, number>;
   age?: number; versicherung?: string;
   risk_level?: "high" | "medium" | "low";
+  risk_punkte?: number;
+  financial_risk?: number;
+  restschuld?: number;
   signals?: BehaviorSignal[];
   context_tags?: string[];
   observation?: string;
+  category_presence?: { engagement: number; intent: number; action: number };
   activity_summary?: { app_opens_14d: number; total_events: number; last_active_days: number | null; most_used_tab: string | null; avg_session_seconds: number | null; primary_device: string | null; primary_time_of_day: string | null };
   deltas?: Delta[];
   stress_indicators?: string[];
   absence_signals?: string[];
   trend?: string;
+  severity_timestamp?: { first_risk_date: string | null; risk_duration_days: number | null };
 }
 interface EngData {
   total_events: number; active_patients: number; by_type: Record<string, number>;
@@ -76,10 +81,12 @@ export default function IntelligencePage() {
   const riskColor = (l?: string) => l === "high" ? red : l === "medium" ? yellow : grn;
   const timeAgo = (iso: string) => { const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000); if (m < 60) return `vor ${m}m`; const h = Math.floor(m / 60); return h < 24 ? `vor ${h}h` : `vor ${Math.floor(h / 24)}d`; };
 
-  const patients = data?.top_patients || [];
+  const patients = (data?.top_patients || []).sort((a, b) => (b.financial_risk || 0) - (a.financial_risk || 0));
   const high = patients.filter(p => p.risk_level === "high");
   const med = patients.filter(p => p.risk_level === "medium");
   const low = patients.filter(p => p.risk_level === "low");
+  const gefaehrdetesVolumen = high.reduce((s, p) => s + (p.restschuld || 0), 0);
+  const beobachtetesVolumen = med.reduce((s, p) => s + (p.restschuld || 0), 0);
 
   const sLabel = { fontSize: 10, fontWeight: 700 as const, textTransform: "uppercase" as const, letterSpacing: 1.5, color: grn, marginBottom: 14 };
   const cardS = { background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 22, marginBottom: 16 };
@@ -103,7 +110,7 @@ export default function IntelligencePage() {
       <div style={{ background: dk ? "linear-gradient(135deg,rgba(74,222,128,0.04),rgba(167,139,250,0.03))" : "linear-gradient(135deg,rgba(74,222,128,0.06),rgba(167,139,250,0.04))", border: `1px solid ${border}`, borderRadius: 14, padding: "18px 24px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: grn, boxShadow: "0 0 12px rgba(74,222,128,0.5)" }} />
-          <div style={{ fontSize: 13, color: fg }}>Basierend auf <strong style={{ color: grn }}>{data?.total_events || 0} Datenpunkten</strong> von <strong style={{ color: grn }}>{data?.active_patients || 0} Patienten</strong> <span style={{ color: muted }}>· {period} Tage</span></div>
+          <div style={{ fontSize: 13, color: fg }}>Basierend auf <strong style={{ color: grn }}>{data?.total_events || 0} Datenpunkten</strong> von <strong style={{ color: grn }}>{data?.active_patients || 0} Patienten</strong> <span style={{ color: muted }}>· {period} Tage</span>{gefaehrdetesVolumen > 0 && <> · <strong style={{ color: red }}>Gefährdet: {gefaehrdetesVolumen.toLocaleString("de-DE")} €</strong></>}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, padding: "5px 12px", borderRadius: 6, background: "rgba(167,139,250,0.08)", color: purple }}>Aufbauphase</span>
@@ -167,7 +174,13 @@ export default function IntelligencePage() {
                 <div key={p.id}>
                   <div onClick={() => setExpanded(expanded === p.id ? null : p.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: expanded === p.id ? "10px 10px 0 0" : 10, border: `1px solid ${expanded === p.id ? "rgba(74,222,128,0.25)" : border}`, marginBottom: expanded === p.id ? 0 : 6, cursor: "pointer", transition: "all 0.2s" }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: riskColor(p.risk_level), boxShadow: `0 0 8px ${riskColor(p.risk_level)}66`, flexShrink: 0 }} />
-                    <div style={{ fontSize: 13, fontWeight: 700, flex: 1, color: fg }}>{p.name}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{p.name}</span>
+                        {p.restschuld != null && p.restschuld > 0 && <span style={{ fontSize: 11, color: muted }}>{p.restschuld.toLocaleString("de-DE")} €</span>}
+                        {p.severity_timestamp?.risk_duration_days != null && p.severity_timestamp.risk_duration_days > 0 && <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(248,113,113,0.08)", color: red, fontWeight: 600 }}>seit {p.severity_timestamp.risk_duration_days}d</span>}
+                      </div>
+                    </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {(p.context_tags || []).slice(0, 4).map((t, i) => (
                         <span key={i} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: muted, fontWeight: 600 }}>{t}</span>
@@ -178,6 +191,45 @@ export default function IntelligencePage() {
                   {expanded === p.id && (
                     <div style={{ border: `1px solid rgba(74,222,128,0.25)`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: 20, marginBottom: 6, background: dk ? "rgba(8,12,20,0.95)" : "#fafbfd" }}>
                       {/* Observation */}
+                      {/* Category Presence */}
+                      {p.category_presence && (
+                        <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+                          {[
+                            { key: "engagement", label: "Engagement", desc: "Ist der Patient da?", val: p.category_presence.engagement },
+                            { key: "intent", label: "Intent", desc: "Will er zahlen?", val: p.category_presence.intent },
+                            { key: "action", label: "Action", desc: "Reagiert er?", val: p.category_presence.action },
+                          ].map(c => (
+                            <div key={c.key} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${c.val > 0 ? "rgba(74,222,128,0.2)" : border}`, background: c.val > 0 ? "rgba(74,222,128,0.04)" : "transparent", textAlign: "center" }}>
+                              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'Fraunces', serif", color: c.val > 0 ? grn : red }}>{c.val}</div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: fg, marginTop: 2 }}>{c.label}</div>
+                              <div style={{ fontSize: 9, color: muted }}>{c.desc}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Risk Score */}
+                      {p.risk_punkte != null && (
+                        <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+                          <div style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${border}`, textAlign: "center" }}>
+                            <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'Fraunces', serif", color: (p.risk_punkte || 0) >= 6 ? red : (p.risk_punkte || 0) >= 3 ? yellow : grn }}>{p.risk_punkte}</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: fg, marginTop: 2 }}>Risiko-Punkte</div>
+                            <div style={{ fontSize: 9, color: muted }}>≥6 hoch · ≥3 mittel</div>
+                          </div>
+                          <div style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${border}`, textAlign: "center" }}>
+                            <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'Fraunces', serif", color: (p.financial_risk || 0) > 10000 ? red : (p.financial_risk || 0) > 3000 ? yellow : fg }}>{(p.financial_risk || 0).toLocaleString("de-DE")}</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: fg, marginTop: 2 }}>Financial Risk</div>
+                            <div style={{ fontSize: 9, color: muted }}>Punkte × Restschuld</div>
+                          </div>
+                          {p.restschuld != null && (
+                            <div style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${border}`, textAlign: "center" }}>
+                              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'Fraunces', serif" }}>{p.restschuld.toLocaleString("de-DE")} €</div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: fg, marginTop: 2 }}>Restschuld</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {p.observation && (
                         <>
                           <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: muted, marginBottom: 8 }}>Das System hat beobachtet</div>
@@ -240,9 +292,13 @@ export default function IntelligencePage() {
 
                       {/* Signals */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                        {(p.signals || []).map((s, i) => (
-                          <span key={i} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, fontWeight: 600, background: s.type === "positive" ? "rgba(74,222,128,0.08)" : s.type === "warning" ? "rgba(248,113,113,0.08)" : s.type === "info" ? "rgba(96,165,250,0.08)" : dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: s.type === "positive" ? grn : s.type === "warning" ? red : s.type === "info" ? blue : muted }}>{s.text}</span>
-                        ))}
+                        {(p.signals || []).sort((a, b) => (b.weight || 0) - (a.weight || 0)).map((s, i) => {
+                          const isKritisch = s.severity === "kritisch";
+                          const isMittel = s.severity === "mittel";
+                          return (
+                            <span key={i} style={{ fontSize: isKritisch ? 11 : 10, padding: isKritisch ? "4px 10px" : "3px 8px", borderRadius: 5, fontWeight: isKritisch ? 800 : 600, border: isKritisch ? `1px solid ${red}44` : isMittel ? `1px solid ${yellow}33` : "none", background: s.type === "positive" ? "rgba(74,222,128,0.08)" : s.type === "warning" ? (isKritisch ? "rgba(248,113,113,0.15)" : "rgba(248,113,113,0.08)") : s.type === "info" ? "rgba(96,165,250,0.08)" : dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: s.type === "positive" ? grn : s.type === "warning" ? red : s.type === "info" ? blue : muted }}>{s.text}</span>
+                          );
+                        })}
                       </div>
 
                       {/* Activity summary line */}
