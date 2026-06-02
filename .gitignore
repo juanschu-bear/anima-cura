@@ -8,3 +8,8 @@ tsconfig.tsbuildinfo
 # Dependencies
 node_modules/
 test.mp3
+
+# Environment (never commit secrets)
+.env
+.env.local
+.env.*.local
