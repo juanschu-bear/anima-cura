@@ -1,10 +1,11 @@
 // ============================================================
 // BANK SYNC SERVICE – Automatischer Kontoauszug-Import
 // ============================================================
-// Läuft als Cron-Job (täglich 06:00) oder manuell auslösbar.
+// Läuft als Cron-Job (täglich, nach finAPIs Batch-Update) oder
+// manuell per Button.
 //
 // Ablauf pro Bankverbindung:
-// 1. Bank-Update bei finAPI triggern (holt neue Buchungen).
+// 1. Optional Bank-Update bei finAPI triggern (nur Button).
 // 2. ALLE Transaktionen (Ein- und Ausgänge) paginiert laden.
 // 3. Jede Buchung unveränderlich in bank_transactions_raw
 //    archivieren (volle Rohdaten als JSONB, Vorzeichen erhalten).
@@ -52,7 +53,7 @@ async function fetchAllTransactions(
   return all;
 }
 
-export async function syncBankTransactions(): Promise<{
+export async function syncBankTransactions(options: { triggerUpdate?: boolean } = {}): Promise<{
   newTransactions: number;
   errors: string[];
 }> {
@@ -92,7 +93,7 @@ export async function syncBankTransactions(): Promise<{
 
   let archivedTotal = 0;
 
-  // 3. Für jede Verbindung: Update triggern + Transaktionen holen
+  // 3. Für jede Verbindung: Transaktionen holen
   for (const conn of connections as BankConnectionRow[]) {
     // Erster Sync: kein minDate, damit die volle Historie kommt
     const minDate = conn.last_sync
@@ -120,9 +121,17 @@ export async function syncBankTransactions(): Promise<{
     let importedNew = 0;
 
     try {
-      // Bank-Update triggern (holt neue Buchungen)
-      if (conn.finapi_connection_id) {
-        await updateBankConnection(userToken, Number(conn.finapi_connection_id));
+      // Bank-Update nur auf ausdruecklichen Wunsch (z.B. Button-Klick).
+      // Den taeglichen Refresh macht finAPIs Batch-Update (07:00) serverseitig,
+      // unser Cron holt danach nur noch den Bestand ab.
+      // best effort: schlaegt das Update fehl, z.B. PSD2-Tageslimit, holen
+      // wir trotzdem den bei finAPI gespeicherten Bestand.
+      if (options.triggerUpdate && conn.finapi_connection_id) {
+        try {
+          await updateBankConnection(userToken, Number(conn.finapi_connection_id));
+        } catch (updErr) {
+          errors.push(`Bank-Update ${conn.bank_name}: ${updErr}`);
+        }
       }
 
       // ALLE Transaktionen abrufen (paginiert)
@@ -159,17 +168,23 @@ export async function syncBankTransactions(): Promise<{
       }
       archivedTotal += archivedNew;
 
-      // 5. Eingänge in die Arbeitstabelle (Matching-Pipeline), wie bisher
-      for (const tx of transactions) {
-        if (!(Number(tx.amount) > 0)) continue; // Nur Eingänge
-
+      // 5. Eingänge in die Arbeitstabelle (Matching-Pipeline), wie bisher.
+      // Duplikat-Prüfung gebündelt in Chunks statt pro Buchung einzeln.
+      const incoming = transactions.filter((tx) => Number(tx.amount) > 0);
+      const existingIds = new Set<string>();
+      for (let i = 0; i < incoming.length; i += ARCHIVE_CHUNK) {
+        const ids = incoming.slice(i, i + ARCHIVE_CHUNK).map((tx) => tx.id);
         const { data: existing } = await db
           .from("transaktionen")
-          .select("id")
-          .eq("finapi_id", tx.id)
-          .limit(1);
+          .select("finapi_id")
+          .in("finapi_id", ids);
+        for (const row of (existing ?? []) as { finapi_id: number | string }[]) {
+          existingIds.add(String(row.finapi_id));
+        }
+      }
 
-        if (existing?.length) continue; // Schon importiert
+      for (const tx of incoming) {
+        if (existingIds.has(String(tx.id))) continue; // Schon importiert
 
         const { error } = await db.from("transaktionen").insert({
           finapi_id: tx.id,
