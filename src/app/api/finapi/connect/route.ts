@@ -13,10 +13,10 @@ const CLIENT_ID = process.env.FINAPI_CLIENT_ID!;
 const CLIENT_SECRET = process.env.FINAPI_CLIENT_SECRET!;
 const APP_URL = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
 
-// finAPI User-ID for the practice (deterministic)
-const FINAPI_USER_ID = "anima-cura-praxis";
-const FINAPI_USER_PASSWORD = "Pr4x1s-S3cur3!2026";
-const FINAPI_USER_EMAIL = "praxis@anima-cura.app";
+// finAPI User for the practice (aus Env, niemals hartcodiert)
+const FINAPI_USER_ID = process.env.FINAPI_USER_ID!;
+const FINAPI_USER_PASSWORD = process.env.FINAPI_USER_PASSWORD!;
+const FINAPI_USER_EMAIL = process.env.FINAPI_USER_EMAIL || "praxis@anima-cura.app";
 
 async function ensureFinapiUser(clientToken: string): Promise<string> {
   // Try to get user token first (user might already exist)
