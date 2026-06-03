@@ -52,6 +52,7 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/quartal", roles: ["admin", "verwaltung", "lesezugriff"] },
   { path: "/berichte", roles: ["admin", "verwaltung", "lesezugriff"] },
   { path: "/rechnungen", roles: ["admin", "verwaltung"] },
+  { path: "/offene-posten", roles: ["admin", "verwaltung"] },
   { path: "/intelligence", roles: ["admin", "verwaltung"] },
   { path: "/nachrichten", roles: ["admin", "verwaltung"] },
   { path: "/automatisierungen", roles: ["admin", "verwaltung"] },
