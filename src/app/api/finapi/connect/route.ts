@@ -8,7 +8,7 @@ export const maxDuration = 30;
 const FINAPI_BASE = process.env.FINAPI_BASE_URL || "https://sandbox.finapi.io";
 const WEBFORM_BASE = FINAPI_BASE.includes("sandbox")
   ? "https://webform-sandbox.finapi.io"
-  : "https://webform.finapi.io";
+  : "https://webform-live.finapi.io";
 const CLIENT_ID = process.env.FINAPI_CLIENT_ID!;
 const CLIENT_SECRET = process.env.FINAPI_CLIENT_SECRET!;
 const APP_URL = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
