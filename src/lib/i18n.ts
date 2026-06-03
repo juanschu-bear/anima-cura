@@ -429,7 +429,11 @@ const translations: Record<string, { de: string; en: string }> = {
   // ─── Offene Posten ──────────────────────────────────────
   "openItems.title": { de: "Offene Posten", en: "Open Items" },
   "openItems.subtitle": { de: "Forderungen aus BEMA- und GOZ-Rechnungen, abgeglichen über das Verwendungszweck-Zeichen.", en: "Receivables from BEMA and GOZ invoices, reconciled via the payment reference." },
-  "openItems.kpi.openTotal": { de: "Offen gesamt", en: "Total outstanding" },
+  "openItems.kpi.openTotal": { de: "Offen gesamt (€)", en: "Total outstanding (€)" },
+  "openItems.type.all": { de: "Alle Arten", en: "All types" },
+  "openItems.type.bema": { de: "BEMA", en: "BEMA" },
+  "openItems.type.goz": { de: "GOZ", en: "GOZ" },
+  "openItems.sortToggle": { de: "Nach Datum sortieren", en: "Sort by date" },
   "openItems.kpi.openCount": { de: "Offene Posten", en: "Open items" },
   "openItems.kpi.partial": { de: "Teilbezahlt", en: "Partial" },
   "openItems.kpi.paid": { de: "Bezahlt", en: "Paid" },

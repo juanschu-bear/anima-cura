@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState, StatusBadge, CardSkeleton } from "@/components/ui";
-import { Receipt } from "lucide-react";
+import { ArrowDown, ArrowUp, Receipt } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
@@ -36,6 +36,8 @@ export default function OffenePostenPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [statusFilter, setStatusFilter] = useState("alle");
+  const [typFilter, setTypFilter] = useState("alle");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     let active = true;
@@ -81,10 +83,23 @@ export default function OffenePostenPage() {
     { key: "erloesminderung", label: t("openItems.filter.writeoff", locale) },
   ];
 
+  const typFilters = [
+    { key: "alle", label: t("openItems.type.all", locale) },
+    { key: "bema", label: t("openItems.type.bema", locale) },
+    { key: "goz", label: t("openItems.type.goz", locale) },
+  ];
+
   const visiblePosten = useMemo(() => {
-    if (statusFilter === "alle") return posten;
-    return posten.filter((p) => p.status === statusFilter);
-  }, [posten, statusFilter]);
+    let rows = posten;
+    if (statusFilter !== "alle") rows = rows.filter((p) => p.status === statusFilter);
+    if (typFilter !== "alle") rows = rows.filter((p) => (p.typ || "").toLowerCase() === typFilter);
+    const sorted = [...rows].sort((a, b) => {
+      const ta = a.rechnung_datum ? new Date(a.rechnung_datum).getTime() : 0;
+      const tb = b.rechnung_datum ? new Date(b.rechnung_datum).getTime() : 0;
+      return sortDir === "asc" ? ta - tb : tb - ta;
+    });
+    return sorted;
+  }, [posten, statusFilter, typFilter, sortDir]);
 
   const numberLocale = locale === "en" ? "en-GB" : "de-DE";
   const fmtEur = (v: number | null) => `${Number(v || 0).toLocaleString(numberLocale)}€`;
@@ -115,7 +130,7 @@ export default function OffenePostenPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label={t("openItems.kpi.openTotal", locale)} value={fmtEur(metrics.openTotal)} amber theme={theme} />
+        <MetricCard label={t("openItems.kpi.openTotal", locale)} value={metrics.openTotal.toLocaleString(numberLocale)} amber theme={theme} />
         <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} theme={theme} />
         <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} theme={theme} />
         <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} green theme={theme} />
@@ -127,6 +142,18 @@ export default function OffenePostenPage() {
             key={f.key}
             onClick={() => setStatusFilter(f.key)}
             className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {typFilters.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setTypFilter(f.key)}
+            className={`ac-chip ${typFilter === f.key ? "ac-chip-active" : ""}`}
           >
             {f.label}
           </button>
@@ -166,7 +193,17 @@ export default function OffenePostenPage() {
           <table className="w-full">
             <thead>
               <tr style={{ background: "var(--ac-surface-muted)" }}>
-                <th className="table-header">{t("openItems.col.date", locale)}</th>
+                <th className="table-header">
+                  <button
+                    type="button"
+                    onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+                    className="inline-flex items-center gap-1"
+                    title={t("openItems.sortToggle", locale)}
+                  >
+                    {t("openItems.col.date", locale)}
+                    {sortDir === "desc" ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                  </button>
+                </th>
                 <th className="table-header">{t("openItems.col.reference", locale)}</th>
                 <th className="table-header">{t("openItems.col.patient", locale)}</th>
                 <th className="table-header">{t("openItems.col.type", locale)}</th>
