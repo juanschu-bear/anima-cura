@@ -18,6 +18,7 @@ export interface Patient {
   behandlung: string;
   behandlung_start: string;
   behandlung_status: "aktiv" | "abgeschlossen" | "pausiert";
+  guthaben?: number; // verrechnetes Guthaben aus Ueberzahlungen
   notizen: string | null;
   created_at: string;
   updated_at: string;
@@ -101,6 +102,7 @@ export interface MatchingDetails {
   zweck_score: number;
   methode: "exakt" | "fuzzy" | "iban" | "manuell" | "referenz";
   referenz?: string; // erkanntes unser_zeichen bei einem Referenz-Treffer
+  ueberzahlung?: number; // verrechneter Ueberzahlungsbetrag, falls vorhanden
 }
 
 // ─── Mahnwesen ──────────────────────────────────────────────

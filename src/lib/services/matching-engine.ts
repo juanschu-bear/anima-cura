@@ -266,6 +266,53 @@ export interface ReferenceResult {
   ueberzahlung: number;
 }
 
+// Verrechnet eine Ueberzahlung mit den naechsten offenen Posten des Patienten
+// (aeltester zuerst). Der unverbrauchte Rest wird als Guthaben am Patienten geparkt.
+async function applyUeberzahlung(
+  db: ReturnType<typeof createServerClient>,
+  patientId: string | null,
+  excess: number,
+  excludePostenId: string,
+  datum: string
+): Promise<void> {
+  if (!patientId || cents(excess) <= 0) return;
+  let rest = excess;
+
+  const { data: weitere } = await db
+    .from("offene_posten")
+    .select("id, offen, betrag, gezahlt")
+    .eq("patient_id", patientId)
+    .in("status", ["offen", "teilbezahlt"])
+    .neq("id", excludePostenId)
+    .order("rechnung_datum", { ascending: true });
+
+  for (const p of (weitere || []) as { id: string; offen: number | null; betrag: number | null; gezahlt: number | null }[]) {
+    if (cents(rest) <= 0) break;
+    const offen = p.offen != null ? p.offen : (p.betrag || 0);
+    if (cents(offen) <= 0) continue;
+    const anrechnung = Math.min(rest, offen);
+    const neuOffen = offen - anrechnung;
+    const bezahlt = cents(neuOffen) === 0;
+    await db.from("offene_posten").update({
+      offen: neuOffen,
+      gezahlt: (p.gezahlt || 0) + anrechnung,
+      status: bezahlt ? "bezahlt" : "teilbezahlt",
+      bezahlt_am: bezahlt ? datum : null,
+    }).eq("id", p.id);
+    rest -= anrechnung;
+  }
+
+  if (cents(rest) > 0) {
+    const { data: pat } = await db
+      .from("patients")
+      .select("guthaben")
+      .eq("id", patientId)
+      .single();
+    const aktuell = ((pat?.guthaben as number | null) ?? 0);
+    await db.from("patients").update({ guthaben: aktuell + rest }).eq("id", patientId);
+  }
+}
+
 // Gibt null zurueck, wenn keine eindeutige Referenz gefunden wird (dann greift Stufe 1).
 export async function reconcileByReference(
   db: ReturnType<typeof createServerClient>,
@@ -326,8 +373,8 @@ export async function reconcileByReference(
   return {
     patient_id: posten.patient_id,
     posten_id: posten.id,
-    status: ueberzahlung > 0 ? "abweichung" : "auto",
-    details: { name_score: 0, betrag_match: diff === 0, zweck_score: 100, methode: "referenz", referenz: posten.unser_zeichen },
+    status: (ueberzahlung > 0 && !posten.patient_id) ? "abweichung" : "auto",
+    details: { name_score: 0, betrag_match: diff === 0, zweck_score: 100, methode: "referenz", referenz: posten.unser_zeichen, ueberzahlung: ueberzahlung || undefined },
     posten_update: { status: neuerStatus, gezahlt: gezahltVorher + zahlung, offen: offenNachher, bezahlt_am: bezahltAm },
     ueberzahlung,
   };
@@ -375,6 +422,10 @@ export async function runBatchMatching(): Promise<{
         matching_score: 100,
         matching_details: ref.details,
       }).eq("id", tx.id);
+
+      if (ref.ueberzahlung > 0) {
+        await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
+      }
 
       if (ref.status === "auto") stats.auto++;
       else stats.abweichung++;
