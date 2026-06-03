@@ -226,6 +226,113 @@ function levenshtein(a: string, b: string): number {
 }
 
 // ─── Batch-Matching (für Cron) ──────────────────────────────
+// ─── Stufe 0: Referenz-Abgleich (deterministisch) ───────────
+// Zieht das unser_zeichen aus dem Verwendungszweck und gleicht es direkt
+// gegen offene_posten ab. Hoechste Sicherheit, schlaegt jeden Fuzzy-Treffer
+// und funktioniert auch bei Fremdzahlern (Name egal, Referenz zaehlt).
+
+interface OffenerPosten {
+  id: string;
+  unser_zeichen: string;
+  basis_nr: string;
+  offen: number | null;
+  gezahlt: number | null;
+  betrag: number | null;
+  status: "offen" | "teilbezahlt" | "bezahlt" | "erloesminderung";
+  patient_id: string | null;
+}
+
+// Cent-genauer Vergleich, vermeidet Fliesskomma-Fehler.
+function cents(n: number): number {
+  return Math.round(n * 100);
+}
+
+// Erkennt unser_zeichen wie "00005988-1/2026" und die 8-stellige Basis (ivoris_nummer).
+export function extractUnserZeichen(verwendungszweck: string): { full: string | null; base: string | null } {
+  if (!verwendungszweck) return { full: null, base: null };
+  const norm = verwendungszweck.replace(/\s*([-/])\s*/g, "$1");
+  const m = norm.match(/(\d{8})-(\d+)\/(\d{4})/);
+  if (m) return { full: m[0], base: m[1] };
+  const b = norm.match(/(?<!\d)(\d{8})(?!\d)/);
+  return { full: null, base: b ? b[1] : null };
+}
+
+export interface ReferenceResult {
+  patient_id: string | null;
+  posten_id: string;
+  status: "auto" | "abweichung";
+  details: MatchingDetails;
+  posten_update: { status: OffenerPosten["status"]; gezahlt: number; offen: number; bezahlt_am: string | null };
+  ueberzahlung: number;
+}
+
+// Gibt null zurueck, wenn keine eindeutige Referenz gefunden wird (dann greift Stufe 1).
+export async function reconcileByReference(
+  db: ReturnType<typeof createServerClient>,
+  tx: { betrag: number; verwendungszweck: string; datum: string }
+): Promise<ReferenceResult | null> {
+  const { full, base } = extractUnserZeichen(tx.verwendungszweck);
+  if (!full && !base) return null;
+
+  let posten: OffenerPosten | null = null;
+
+  if (full) {
+    const { data } = await db
+      .from("offene_posten")
+      .select("id, unser_zeichen, basis_nr, offen, gezahlt, betrag, status, patient_id")
+      .eq("unser_zeichen", full)
+      .neq("status", "bezahlt")
+      .limit(1);
+    posten = (data?.[0] as OffenerPosten) || null;
+  }
+
+  // Fallback: nur zuordnen, wenn genau ein offener Posten zur 8-stelligen Basis existiert.
+  if (!posten && base) {
+    const { data } = await db
+      .from("offene_posten")
+      .select("id, unser_zeichen, basis_nr, offen, gezahlt, betrag, status, patient_id")
+      .eq("basis_nr", base)
+      .neq("status", "bezahlt")
+      .order("rechnung_datum", { ascending: true })
+      .limit(2);
+    if (data && data.length === 1) posten = data[0] as OffenerPosten;
+  }
+
+  if (!posten) return null;
+
+  const offenVorher = posten.offen != null ? posten.offen : (posten.betrag || 0);
+  const gezahltVorher = posten.gezahlt || 0;
+  const zahlung = tx.betrag;
+  const diff = cents(zahlung) - cents(offenVorher);
+
+  let neuerStatus: OffenerPosten["status"];
+  let ueberzahlung = 0;
+  let offenNachher = offenVorher - zahlung;
+  let bezahltAm: string | null = null;
+
+  if (diff === 0) {
+    neuerStatus = "bezahlt";
+    offenNachher = 0;
+    bezahltAm = tx.datum;
+  } else if (diff < 0) {
+    neuerStatus = "teilbezahlt";
+  } else {
+    neuerStatus = "bezahlt";
+    offenNachher = 0;
+    bezahltAm = tx.datum;
+    ueberzahlung = diff / 100;
+  }
+
+  return {
+    patient_id: posten.patient_id,
+    posten_id: posten.id,
+    status: ueberzahlung > 0 ? "abweichung" : "auto",
+    details: { name_score: 0, betrag_match: diff === 0, zweck_score: 100, methode: "referenz", referenz: posten.unser_zeichen },
+    posten_update: { status: neuerStatus, gezahlt: gezahltVorher + zahlung, offen: offenNachher, bezahlt_am: bezahltAm },
+    ueberzahlung,
+  };
+}
+
 export async function runBatchMatching(): Promise<{
   total: number;
   auto: number;
@@ -247,6 +354,33 @@ export async function runBatchMatching(): Promise<{
 
   for (const tx of unmatched) {
     stats.total++;
+
+    // Stufe 0: deterministischer Referenz-Abgleich gegen offene_posten.
+    const ref = await reconcileByReference(db, {
+      betrag: tx.betrag,
+      verwendungszweck: tx.verwendungszweck || "",
+      datum: tx.datum,
+    });
+    if (ref) {
+      await db.from("offene_posten").update({
+        status: ref.posten_update.status,
+        gezahlt: ref.posten_update.gezahlt,
+        offen: ref.posten_update.offen,
+        bezahlt_am: ref.posten_update.bezahlt_am,
+      }).eq("id", ref.posten_id);
+
+      await db.from("transaktionen").update({
+        matching_status: ref.status,
+        matched_patient_id: ref.patient_id,
+        matching_score: 100,
+        matching_details: ref.details,
+      }).eq("id", tx.id);
+
+      if (ref.status === "auto") stats.auto++;
+      else stats.abweichung++;
+      continue;
+    }
+
     const result = await matchTransaction({
       absender_name: tx.absender_name || "",
       absender_iban: tx.absender_iban,
