@@ -1,0 +1,3 @@
+-- 008: Matching Stufe 1+2 (geprueft_am, Kategorisierer, Namens-Matching)
+-- Vollstaendiger Inhalt wurde direkt im Supabase SQL-Editor ausgefuehrt.
+-- Diese Datei dokumentiert den Stand fuer das Repo, siehe Chat 04.06.2026.

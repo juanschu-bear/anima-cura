@@ -394,13 +394,26 @@ export async function runBatchMatching(): Promise<{
     .from("transaktionen")
     .select("*")
     .eq("matching_status", "unklar")
+    .is("geprueft_am", null)
     .gt("betrag", 0) // Nur Eingänge
-    .order("datum", { ascending: false });
+    .order("datum", { ascending: false })
+    .limit(500);
 
   if (!unmatched?.length) return stats;
 
   for (const tx of unmatched) {
     stats.total++;
+
+    // Kategorisierer: Nicht-Patientenzahlungen sofort aussortieren.
+    const zweckUndAbsender = `${tx.verwendungszweck || ""} ${tx.absender_name || ""}`;
+    if (/kartenumsaetze|payone|rueckueberweisung/i.test(zweckUndAbsender)) {
+      await db.from("transaktionen").update({
+        matching_status: "ignoriert",
+        matching_details: { methode: "kategorie", name_score: 0, betrag_match: false, zweck_score: 0 },
+        geprueft_am: new Date().toISOString(),
+      }).eq("id", tx.id);
+      continue;
+    }
 
     // Stufe 0: deterministischer Referenz-Abgleich gegen offene_posten.
     const ref = await reconcileByReference(db, {
@@ -421,6 +434,7 @@ export async function runBatchMatching(): Promise<{
         matched_patient_id: ref.patient_id,
         matching_score: 100,
         matching_details: ref.details,
+        geprueft_am: new Date().toISOString(),
       }).eq("id", tx.id);
 
       if (ref.ueberzahlung > 0) {
@@ -446,6 +460,7 @@ export async function runBatchMatching(): Promise<{
       matched_rate_id: result.rate_id,
       matching_score: result.score,
       matching_details: result.details,
+      geprueft_am: new Date().toISOString(),
     }).eq("id", tx.id);
 
     // Bei Auto-Match: Rate als bezahlt markieren
@@ -463,6 +478,14 @@ export async function runBatchMatching(): Promise<{
     } else {
       stats.unklar++;
     }
+  }
+
+  // Stufe 2: Namens-Matching mengenbasiert in der Datenbank.
+  // Schreibt nur Vorschlaege (status 'abweichung') bei genau einem Kandidaten.
+  const { data: nameMatches, error: nameError } = await db.rpc("ac_match_names");
+  if (!nameError && typeof nameMatches === "number" && nameMatches > 0) {
+    stats.total += nameMatches;
+    stats.abweichung += nameMatches;
   }
 
   // Alert erstellen

@@ -100,7 +100,7 @@ export interface MatchingDetails {
   name_score: number;
   betrag_match: boolean;
   zweck_score: number;
-  methode: "exakt" | "fuzzy" | "iban" | "manuell" | "referenz";
+  methode: "exakt" | "fuzzy" | "iban" | "manuell" | "referenz" | "kategorie" | "name";
   referenz?: string; // erkanntes unser_zeichen bei einem Referenz-Treffer
   ueberzahlung?: number; // verrechneter Ueberzahlungsbetrag, falls vorhanden
 }
