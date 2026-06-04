@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarRange,
+  ChevronDown,
   CreditCard,
   FileBarChart,
   FileText,
@@ -38,21 +39,46 @@ import AccessDenied from "@/components/auth/AccessDenied";
 import AuthSessionManager from "@/components/auth/AuthSessionManager";
 import ICuraVoiceCompanion from "@/components/icura/ICuraVoiceCompanion";
 
-const NAV_ITEMS = [
+type NavItem = { href: string; icon: typeof LayoutDashboard; key: string };
+
+const NAV_STANDALONE: NavItem[] = [
   { href: "/uebersicht", icon: LayoutDashboard, key: "nav.overview" },
-  { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
-  { href: "/patienten", icon: Users, key: "nav.patients" },
-  { href: "/ratenplan", icon: CalendarRange, key: "nav.rateplans" },
-  { href: "/mahnwesen", icon: AlertTriangle, key: "nav.dunning" },
-  { href: "/quartal", icon: BarChart3, key: "nav.quarterly" },
-  { href: "/berichte", icon: FileBarChart, key: "nav.reports" },
-  { href: "/rechnungen", icon: FileText, key: "nav.invoices" },
-  { href: "/offene-posten", icon: Receipt, key: "nav.openItems" },
-  { href: "/intelligence", icon: Brain, key: "nav.intelligence" },
-  { href: "/nachrichten", icon: MessageSquare, key: "nav.messages" },
-  { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
-  { href: "/import", icon: Upload, key: "nav.import" },
-  { href: "/einstellungen", icon: Settings, key: "nav.settings" },
+];
+
+const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
+  {
+    key: "navGroup.finance",
+    items: [
+      { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
+      { href: "/offene-posten", icon: Receipt, key: "nav.openItems" },
+      { href: "/rechnungen", icon: FileText, key: "nav.invoices" },
+      { href: "/ratenplan", icon: CalendarRange, key: "nav.rateplans" },
+      { href: "/mahnwesen", icon: AlertTriangle, key: "nav.dunning" },
+    ],
+  },
+  {
+    key: "navGroup.insights",
+    items: [
+      { href: "/quartal", icon: BarChart3, key: "nav.quarterly" },
+      { href: "/berichte", icon: FileBarChart, key: "nav.reports" },
+      { href: "/intelligence", icon: Brain, key: "nav.intelligence" },
+    ],
+  },
+  {
+    key: "navGroup.practice",
+    items: [
+      { href: "/patienten", icon: Users, key: "nav.patients" },
+      { href: "/nachrichten", icon: MessageSquare, key: "nav.messages" },
+    ],
+  },
+  {
+    key: "navGroup.system",
+    items: [
+      { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
+      { href: "/import", icon: Upload, key: "nav.import" },
+      { href: "/einstellungen", icon: Settings, key: "nav.settings" },
+    ],
+  },
 ];
 
 function getInitials(fullName: string) {
@@ -97,9 +123,16 @@ export default function DashboardShell({
     day: "2-digit",
     month: "short",
   });
-  const visibleNavItems = NAV_ITEMS.filter((item) =>
+  const visibleStandalone = NAV_STANDALONE.filter((item) =>
     canAccessPath(activeUser.role, item.href)
   );
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessPath(activeUser.role, item.href)),
+  })).filter((group) => group.items.length > 0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (key: string) =>
+    setOpenGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
   const hasAccess = pathname ? canAccessPath(activeUser.role, pathname) : true;
   const fallbackHref = getDefaultDashboardPath(activeUser.role);
   const isReadOnly = isReadOnlyRole(activeUser.role);
@@ -140,6 +173,32 @@ export default function DashboardShell({
     }
   }
 
+  function renderNavItem(item: NavItem) {
+    const isActive =
+      pathname === item.href ||
+      (item.href !== "/uebersicht" && pathname?.startsWith(item.href));
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        data-nav={item.href.slice(1)}
+        className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
+        style={{ position: "relative" }}
+      >
+        {isActive && (
+          <motion.div
+            layoutId="sidebarActiveBlob"
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            style={{ position: "absolute", inset: 0, borderRadius: 12, background: theme === "dark" ? "rgba(74,222,128,0.08)" : "var(--ac-sidebar-active-bg)", zIndex: -1 }}
+          />
+        )}
+        <Icon size={18} />
+        {t(item.key, locale)}
+      </Link>
+    );
+  }
+
   return (
     <div className="ac-shell">
       <AuthSessionManager initialUser={user} />
@@ -171,29 +230,32 @@ export default function DashboardShell({
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-          {visibleNavItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/uebersicht" && pathname?.startsWith(item.href));
-            const Icon = item.icon;
+          {visibleStandalone.map((item) => renderNavItem(item))}
+          {visibleGroups.map((group) => {
+            const isOpen = openGroups[group.key] ?? true;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                data-nav={item.href.slice(1)}
-                className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
-                style={{ position: "relative" }}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="sidebarActiveBlob"
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    style={{ position: "absolute", inset: 0, borderRadius: 12, background: theme === "dark" ? "rgba(74,222,128,0.08)" : "var(--ac-sidebar-active-bg)", zIndex: -1 }}
+              <div key={group.key} className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className={`flex w-full items-center justify-between px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors ${
+                    theme === "dark"
+                      ? "text-white/40 hover:text-white/70"
+                      : "text-praxis-400 hover:text-praxis-600"
+                  }`}
+                >
+                  {t(group.key, locale)}
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform ${isOpen ? "" : "-rotate-90"}`}
                   />
+                </button>
+                {isOpen && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => renderNavItem(item))}
+                  </div>
                 )}
-                <Icon size={18} />
-                {t(item.key, locale)}
-              </Link>
+              </div>
             );
           })}
         </nav>

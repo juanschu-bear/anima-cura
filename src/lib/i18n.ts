@@ -21,6 +21,10 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.automations": { de: "Automatisierungen", en: "Automations" },
   "nav.import": { de: "Datenimport", en: "Data Import" },
   "nav.settings": { de: "Einstellungen", en: "Settings" },
+  "navGroup.finance": { de: "Finanzen", en: "Finance" },
+  "navGroup.insights": { de: "Auswertungen", en: "Insights" },
+  "navGroup.practice": { de: "Praxis", en: "Practice" },
+  "navGroup.system": { de: "System", en: "System" },
 
   // ─── Common ─────────────────────────────────────────────
   "common.save": { de: "Speichern", en: "Save" },
