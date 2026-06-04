@@ -42,13 +42,18 @@ export default function ZahlungenPage() {
     if (page > pages) setPage(pages);
   }, [totalCount, page, pageSize]);
 
-  const metrics = useMemo(() => ({
-    total: stats.total,
-    auto: stats.auto,
-    unclear: stats.review,
-    incomingToday: stats.incomingToday,
-    autoRate: stats.total > 0 ? Math.round((stats.auto / stats.total) * 100) : 0,
-  }), [stats]);
+  const metrics = useMemo(() => {
+    const confirmed = stats.auto + stats.manuell;
+    return {
+      total: stats.total,
+      confirmed,
+      vorschlag: stats.vorschlag,
+      unklar: stats.unklar,
+      incomingToday: stats.incomingToday,
+      oldestDate: stats.oldestDate,
+      confirmedRate: stats.total > 0 ? Math.round((confirmed / stats.total) * 100) : 0,
+    };
+  }, [stats]);
 
   async function handleManualMatch(txId: string, patientId: string) {
     const selectedPatient = patienten.find((p) => p.id === patientId);
@@ -122,6 +127,14 @@ export default function ZahlungenPage() {
     refetchStats();
   }
 
+  // Dialog mit vorbefuellter Suche: Nachname aus dem Absender raten.
+  function openAssignModal(tx: any) {
+    const name = String(tx?.absender_name || "").trim();
+    const guess = name.includes(",") ? name.split(",")[0] : name.split(/\s+/)[0] || "";
+    setPatSearch(guess.trim());
+    setMatchModal(tx);
+  }
+
   function openStatusHelp(id: string, el: HTMLElement) {
     const rect = el.getBoundingClientRect();
     const width = 340;
@@ -157,7 +170,9 @@ export default function ZahlungenPage() {
     { key: "alle", label: t("payments.filter.all", locale) },
     { key: "auto", label: t("payments.filter.auto", locale) },
     { key: "abweichung", label: t("payments.filter.deviation", locale) },
+    { key: "manuell", label: t("payments.filter.manual", locale) },
     { key: "unklar", label: t("payments.filter.unclear", locale) },
+    { key: "ignoriert", label: t("payments.filter.ignored", locale) },
   ];
   const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
 
@@ -169,16 +184,32 @@ export default function ZahlungenPage() {
     return typeof monthlyRate === "number" ? monthlyRate : null;
   }
 
-  function getDeviationText(tx: any) {
-    if (tx.matching_status !== "abweichung") return null;
-    const expected = getExpectedAmount(tx);
-    if (expected === null) {
-      return t("payments.deviationAmount", locale);
+  // Klartext: worueber wurde diese Zahlung gefunden?
+  function reasonText(tx: any) {
+    const details = tx.matching_details || {};
+    const methode = details.methode || "";
+    const score = Number(tx.matching_score || 0);
+    if (methode === "kategorie") {
+      const kat = details.kategorie || "";
+      if (kat === "kzv") return t("payments.reason.kzv", locale);
+      if (kat === "umbuchung") return t("payments.reason.umbuchung", locale);
+      return t("payments.reason.kartenterminal", locale);
     }
-    const diff = Number(tx.betrag || 0) - expected;
-    const sign = diff > 0 ? "+" : "";
+    if (methode === "referenz" || score >= 95) return t("payments.reason.referenz", locale);
+    if (methode === "iban" || score === 90) return t("payments.reason.iban", locale);
+    if (score === 75) return t("payments.reason.nameParts", locale);
+    if (score === 70) return t("payments.reason.siblingRate", locale);
+    if (score === 65) return t("payments.reason.typo", locale);
+    if (methode === "name" || score === 80) return t("payments.reason.name", locale);
+    return null;
+  }
+
+  function amountHint(tx: any) {
+    const expected = getExpectedAmount(tx);
+    if (expected === null) return null;
+    if (Math.abs(Number(tx.betrag || 0) - expected) > 0.005) return null;
     const dl = locale === "en" ? "en-GB" : "de-DE";
-    return t("payments.expectedDiff", locale, { expected: expected.toLocaleString(dl), sign, diff: diff.toLocaleString(dl) });
+    return t("payments.reason.amountMatches", locale, { expected: expected.toLocaleString(dl) });
   }
 
   return (
@@ -187,7 +218,10 @@ export default function ZahlungenPage() {
         <div>
           <h1 className="ac-page-title">{t("payments.title", locale)}</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-            {metrics.total.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} {t("payments.transactions", locale)} · {metrics.unclear.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} {t("payments.open", locale)}
+            {metrics.total.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} {t("payments.transactions", locale)}
+            {metrics.oldestDate
+              ? ` · ${t("payments.range", locale, { from: new Date(metrics.oldestDate).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE") })}`
+              : ""}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
@@ -210,9 +244,9 @@ export default function ZahlungenPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard label={t("payments.incomingToday", locale)} value={`${metrics.incomingToday.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} green theme={theme} />
-        <MetricCard label={t("payments.autoAssigned", locale)} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${t("payments.matchRate", locale)}`} theme={theme} />
-        <MetricCard label={t("payments.needsReview", locale)} value={String(metrics.unclear)} amber theme={theme} />
-        <MetricCard label={t("payments.totalTransactions", locale)} value={String(metrics.total)} sub={t("payments.allTime", locale)} theme={theme} />
+        <MetricCard label={t("payments.autoAssigned", locale)} value={metrics.confirmed.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} sub={`${metrics.confirmedRate}% ${t("payments.matchRate", locale)}`} theme={theme} />
+        <MetricCard label={t("payments.needsReview", locale)} value={metrics.vorschlag.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} amber theme={theme} />
+        <MetricCard label={t("payments.unclearCard", locale)} value={metrics.unklar.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} sub={t("payments.allTime", locale)} theme={theme} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -241,7 +275,11 @@ export default function ZahlungenPage() {
           {" · "}
           <span className="font-semibold">{t("payments.status.deviation", locale)}:</span> {t("payments.status.deviationDesc", locale)}
           {" · "}
+          <span className="font-semibold">{t("payments.filter.manual", locale)}:</span> {t("payments.status.manualDesc", locale)}
+          {" · "}
           <span className="font-semibold">{t("payments.status.unclear", locale)}:</span> {t("payments.status.unclearDesc", locale)}
+          {" · "}
+          <span className="font-semibold">{t("payments.filter.ignored", locale)}:</span> {t("payments.status.ignoredDesc", locale)}
         </p>
       </div>
       <div
@@ -305,9 +343,9 @@ export default function ZahlungenPage() {
                     >
                       <StatusBadge status={tx.matching_status} />
                     </button>
-                    {tx.matching_status === "abweichung" && (
+                    {tx.matching_status === "abweichung" && reasonText(tx) && (
                       <span className="text-[11px] font-semibold" style={{ color: theme === "dark" ? "#f0bf7e" : "#a16b15" }}>
-                        {getDeviationText(tx)}
+                        {reasonText(tx)}
                       </span>
                     )}
                   </div>
@@ -332,7 +370,7 @@ export default function ZahlungenPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMatchModal(tx);
+                        openAssignModal(tx);
                         setSyncHint(t("payments.selectPatient", locale));
                       }}
                       type="button"
@@ -360,7 +398,7 @@ export default function ZahlungenPage() {
                           handleConfirmSuggestion(tx);
                         } else {
                           setSyncHint(t("payments.assignFirst", locale));
-                          setMatchModal(tx);
+                          openAssignModal(tx);
                         }
                       }}
                       type="button"
@@ -469,14 +507,9 @@ export default function ZahlungenPage() {
       {statusHelpFor && statusHelpPos && (() => {
         const tx = visibleTransactions.find((item) => item.id === statusHelpFor) || clientTx.find((item) => item.id === statusHelpFor);
         if (!tx) return null;
-        const score = tx.matching_score ? `${Math.round(Number(tx.matching_score))}%` : "—";
-        const expected = getExpectedAmount(tx);
-        const delta = expected === null ? null : Number(tx.betrag || 0) - expected;
-        const dl = locale === "en" ? "en-GB" : "de-DE";
-        const deltaLabel =
-          delta === null
-            ? null
-            : `${delta > 0 ? "+" : ""}${delta.toLocaleString(dl)}€`;
+        const score = tx.matching_score ? String(Math.round(Number(tx.matching_score))) : "—";
+        const reason = reasonText(tx);
+        const hint = amountHint(tx);
         const statusText: Record<string, string> = {
           auto: t("payments.status.auto", locale),
           abweichung: t("payments.status.deviationLong", locale),
@@ -500,20 +533,18 @@ export default function ZahlungenPage() {
           >
             <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltipMatchingStatus", locale)}</p>
             <p>{statusText[tx.matching_status] || tx.matching_status}</p>
+            {reason && (
+              <p className="mt-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
+                <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltip.reason", locale)}:</span> {reason}
+                {hint ? ` · ${hint}` : ""}
+              </p>
+            )}
             <p className="mt-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
               <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltip.matchScore", locale)}:</span> {score}
             </p>
             <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
               {t("payments.tooltip.matchScoreMeaning", locale)}
             </p>
-            {tx.matching_status === "abweichung" && (
-              <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
-                <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.tooltip.deviation", locale)}:</span>{" "}
-                {expected === null
-                  ? t("payments.tooltip.deviationGeneric", locale)
-                  : t("payments.tooltip.deviationSpecific", locale, { expected: expected.toLocaleString(dl), received: Number(tx.betrag || 0).toLocaleString(dl), delta: deltaLabel || "" })}
-              </p>
-            )}
             <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>
               <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.actions", locale)}</span>{" "}
               {t("payments.tooltip.actionsHint", locale)}
@@ -522,7 +553,7 @@ export default function ZahlungenPage() {
         );
       })()}
 
-      <Modal open={!!matchModal} onClose={() => setMatchModal(null)} title={t("payments.modalTitle", locale)} size="lg">
+      <Modal open={!!matchModal} onClose={() => { setMatchModal(null); setPatSearch(""); }} title={t("payments.modalTitle", locale)} size="lg">
         {matchModal && (
           <div className="space-y-4">
             <div className="rounded-lg border border-accent-blue/25 bg-accent-blue/5 px-3 py-2 text-sm" style={{ color: "var(--ac-text)" }}>

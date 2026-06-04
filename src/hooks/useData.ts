@@ -140,19 +140,24 @@ export function useTransaktionen(filters?: {
 
 // ─── Transaktions-Statistiken (serverseitig ueber ALLE Zeilen) ──
 export function useTransaktionenStats() {
-  const [stats, setStats] = useState({ total: 0, auto: 0, manuell: 0, review: 0, incomingToday: 0 });
+  const [stats, setStats] = useState({
+    total: 0, auto: 0, manuell: 0, vorschlag: 0, unklar: 0, ignoriert: 0,
+    incomingToday: 0, oldestDate: null as string | null,
+  });
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
     setLoading(true);
     const today = new Date().toISOString().slice(0, 10);
-    const [totalRes, autoRes, manuellRes, unklarRes, abwRes, todayRes] = await Promise.all([
+    const [totalRes, autoRes, manuellRes, unklarRes, abwRes, ignRes, todayRes, oldestRes] = await Promise.all([
       supabase.from("transaktionen").select("id", { count: "exact", head: true }),
       supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "auto"),
       supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "manuell"),
       supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "unklar"),
       supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "abweichung"),
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "ignoriert"),
       supabase.from("transaktionen").select("betrag").gte("datum", today),
+      supabase.from("transaktionen").select("datum").order("datum", { ascending: true }).limit(1),
     ]);
     const incomingToday = (todayRes.data || []).reduce(
       (sum: number, row: { betrag: number | null }) => sum + Number(row.betrag || 0),
@@ -162,8 +167,11 @@ export function useTransaktionenStats() {
       total: totalRes.count ?? 0,
       auto: autoRes.count ?? 0,
       manuell: manuellRes.count ?? 0,
-      review: (unklarRes.count ?? 0) + (abwRes.count ?? 0),
+      vorschlag: abwRes.count ?? 0,
+      unklar: unklarRes.count ?? 0,
+      ignoriert: ignRes.count ?? 0,
       incomingToday,
+      oldestDate: oldestRes.data?.[0]?.datum ?? null,
     });
     setLoading(false);
   }, []);
