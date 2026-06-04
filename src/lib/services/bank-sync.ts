@@ -24,7 +24,7 @@ import { createServerClient } from "../db/supabase";
 import { getUserToken, getTransactions, updateBankConnection } from "../api/finapi-client";
 import type { FinAPITransaction } from "../types";
 
-const MAX_PAGES = 20; // 20 x 500 = max. 10.000 Buchungen pro Lauf
+const MAX_PAGES = 60; // 20 x 500 = max. 10.000 Buchungen pro Lauf
 const ARCHIVE_CHUNK = 200;
 
 interface BankConnectionRow {
