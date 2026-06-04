@@ -146,7 +146,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
           sync_run_id: runId,
           bank_connection_id: conn.id,
           amount: tx.amount,
-          booking_date: tx.bookingDate,
+          booking_date: tx.bankBookingDate,
           value_date: tx.valueDate,
           purpose: tx.purpose,
           counterpart_name: tx.counterpartName,
@@ -189,7 +189,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
         const { error } = await db.from("transaktionen").insert({
           finapi_id: tx.id,
           bank_connection_id: conn.id,
-          datum: tx.bookingDate,
+          datum: tx.bankBookingDate,
           betrag: Math.abs(tx.amount), // Immer positiv speichern
           absender_name: tx.counterpartName || "Unbekannt",
           absender_iban: tx.counterpartIban,

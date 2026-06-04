@@ -127,12 +127,12 @@ export async function getTransactions(
     view: "userView",
     perPage: String(params.perPage || 500),
     page: String(params.page || 1),
-    order: "bookingDate,desc",
+    order: "bankBookingDate,desc",
   });
 
   if (params.accountIds?.length) query.set("accountIds", params.accountIds.join(","));
-  if (params.minDate) query.set("minBookingDate", params.minDate);
-  if (params.maxDate) query.set("maxBookingDate", params.maxDate);
+  if (params.minDate) query.set("minBankBookingDate", params.minDate);
+  if (params.maxDate) query.set("maxBankBookingDate", params.maxDate);
   if (params.direction && params.direction !== "all") query.set("direction", params.direction);
 
   return apiRequest(`/transactions?${query}`, userToken);

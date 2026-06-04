@@ -200,7 +200,6 @@ export interface FinAPITransaction {
   counterpartName: string | null;
   counterpartIban: string | null;
   purpose: string | null;
-  bookingDate: string;
   valueDate: string;
   bankBookingDate: string;
   category?: { id: number; name: string };

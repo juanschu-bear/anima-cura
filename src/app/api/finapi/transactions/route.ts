@@ -7,7 +7,7 @@ export const maxDuration = 300;
 
 export async function POST() {
   try {
-    const bankSync = await syncBankTransactions({ triggerUpdate: true });
+    const bankSync = await syncBankTransactions();
     const matching = await runBatchMatching();
 
     return NextResponse.json({
