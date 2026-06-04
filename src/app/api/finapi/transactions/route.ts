@@ -3,7 +3,7 @@ import { syncBankTransactions } from "@/lib/services/bank-sync";
 import { runBatchMatching } from "@/lib/services/matching-engine";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 export async function POST() {
   try {
