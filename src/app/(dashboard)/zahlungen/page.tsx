@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePatienten, useTransaktionen } from "@/hooks/useData";
+import { usePatienten, useTransaktionen, useTransaktionenStats } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { ArrowRight, Check, CreditCard, Search, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
@@ -14,7 +14,10 @@ export default function ZahlungenPage() {
   const { locale, theme } = useAppStore();
 
   const [statusFilter, setStatusFilter] = useState("alle");
-  const { transaktionen, refetch } = useTransaktionen({ status: statusFilter });
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, page, pageSize });
+  const { stats, refetch: refetchStats } = useTransaktionenStats();
   const [matchModal, setMatchModal] = useState<any>(null);
   const [patSearch, setPatSearch] = useState("");
   const { patienten } = usePatienten(patSearch);
@@ -34,23 +37,18 @@ export default function ZahlungenPage() {
     setClientTx(transaktionen);
   }, [transaktionen]);
 
-  const metrics = useMemo(() => {
-    const total = clientTx.length;
-    const auto = clientTx.filter((t) => t.matching_status === "auto").length;
-    const unclear = clientTx.filter((t) => t.matching_status === "unklar" || t.matching_status === "abweichung").length;
-    const today = new Date().toISOString().slice(0, 10);
-    const incomingToday = clientTx
-      .filter((t) => t.datum?.slice?.(0, 10) === today)
-      .reduce((sum, t) => sum + Number(t.betrag || 0), 0);
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (page > pages) setPage(pages);
+  }, [totalCount, page, pageSize]);
 
-    return {
-      total,
-      auto,
-      unclear,
-      incomingToday,
-      autoRate: total > 0 ? Math.round((auto / total) * 100) : 0,
-    };
-  }, [clientTx]);
+  const metrics = useMemo(() => ({
+    total: stats.total,
+    auto: stats.auto,
+    unclear: stats.review,
+    incomingToday: stats.incomingToday,
+    autoRate: stats.total > 0 ? Math.round((stats.auto / stats.total) * 100) : 0,
+  }), [stats]);
 
   async function handleManualMatch(txId: string, patientId: string) {
     const selectedPatient = patienten.find((p) => p.id === patientId);
@@ -81,6 +79,7 @@ export default function ZahlungenPage() {
     );
     setMatchModal(null);
     refetch();
+    refetchStats();
   }
 
   async function handleIgnore(txId: string) {
@@ -93,6 +92,7 @@ export default function ZahlungenPage() {
     }
     setClientTx((prev) => prev.map((tx) => (tx.id === txId ? { ...tx, matching_status: "ignoriert" } : tx)));
     refetch();
+    refetchStats();
   }
 
   async function handleConfirmSuggestion(tx: any) {
@@ -119,6 +119,7 @@ export default function ZahlungenPage() {
       )
     );
     refetch();
+    refetchStats();
   }
 
   function openStatusHelp(id: string, el: HTMLElement) {
@@ -144,6 +145,7 @@ export default function ZahlungenPage() {
         setSyncHint(t("payments.syncImported", locale, { imported, auto }));
       }
       refetch();
+      refetchStats();
     } catch {
       setSyncHint(t("payments.syncFailed", locale));
     } finally {
@@ -185,7 +187,7 @@ export default function ZahlungenPage() {
         <div>
           <h1 className="ac-page-title">{t("payments.title", locale)}</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-            {visibleTransactions.length} {t("payments.transactions", locale)} · {metrics.unclear} {t("payments.open", locale)}
+            {metrics.total.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} {t("payments.transactions", locale)} · {metrics.unclear.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} {t("payments.open", locale)}
           </p>
         </div>
         <button className="btn-primary" disabled={syncing} onClick={handleBankSync}>
@@ -210,14 +212,14 @@ export default function ZahlungenPage() {
         <MetricCard label={t("payments.incomingToday", locale)} value={`${metrics.incomingToday.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} green theme={theme} />
         <MetricCard label={t("payments.autoAssigned", locale)} value={String(metrics.auto)} sub={`${metrics.autoRate}% ${t("payments.matchRate", locale)}`} theme={theme} />
         <MetricCard label={t("payments.needsReview", locale)} value={String(metrics.unclear)} amber theme={theme} />
-        <MetricCard label={t("payments.totalTransactions", locale)} value={String(metrics.total)} sub={t("payments.last5days", locale)} theme={theme} />
+        <MetricCard label={t("payments.totalTransactions", locale)} value={String(metrics.total)} sub={t("payments.allTime", locale)} theme={theme} />
       </div>
 
       <div className="flex flex-wrap gap-2">
         {filters.map((f) => (
           <button
             key={f.key}
-            onClick={() => setStatusFilter(f.key)}
+            onClick={() => { setStatusFilter(f.key); setPage(1); }}
             className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
           >
             {f.label}
@@ -388,6 +390,36 @@ export default function ZahlungenPage() {
             <a href="/einstellungen" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ac-primary)" }}>
               {t("payments.setupBank", locale)}
             </a>
+          </div>
+        )}
+
+        {totalCount > pageSize && (
+          <div
+            className="flex items-center justify-between border-t px-4 py-3"
+            style={{ borderColor: "var(--ac-border)" }}
+          >
+            <button
+              type="button"
+              className="ac-chip"
+              style={page <= 1 ? { opacity: 0.45, pointerEvents: "none" } : undefined}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              {t("payments.prevPage", locale)}
+            </button>
+            <span className="text-sm" style={{ color: "var(--ac-text-soft)" }}>
+              {t("payments.pageOf", locale, {
+                page: String(page),
+                pages: String(Math.max(1, Math.ceil(totalCount / pageSize))),
+              })}
+            </span>
+            <button
+              type="button"
+              className="ac-chip"
+              style={page >= Math.ceil(totalCount / pageSize) ? { opacity: 0.45, pointerEvents: "none" } : undefined}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              {t("payments.nextPage", locale)}
+            </button>
           </div>
         )}
       </div>

@@ -103,17 +103,23 @@ export function useTransaktionen(filters?: {
   status?: string;
   from?: string;
   to?: string;
+  page?: number;
+  pageSize?: number;
 }) {
   const [transaktionen, setTransaktionen] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    const pageSize = filters?.pageSize ?? 100;
+    const page = filters?.page ?? 1;
+    const fromIdx = (page - 1) * pageSize;
     let query = supabase
       .from("transaktionen")
-      .select("*, patients:matched_patient_id(vorname, nachname)")
+      .select("*, patients:matched_patient_id(vorname, nachname)", { count: "exact" })
       .order("datum", { ascending: false })
-      .limit(100);
+      .range(fromIdx, fromIdx + pageSize - 1);
 
     if (filters?.status && filters.status !== "alle") {
       query = query.eq("matching_status", filters.status);
@@ -121,14 +127,50 @@ export function useTransaktionen(filters?: {
     if (filters?.from) query = query.gte("datum", filters.from);
     if (filters?.to) query = query.lte("datum", filters.to);
 
-    const { data } = await query;
+    const { data, count } = await query;
     setTransaktionen(data || []);
+    setTotalCount(count ?? 0);
     setLoading(false);
-  }, [filters?.status, filters?.from, filters?.to]);
+  }, [filters?.status, filters?.from, filters?.to, filters?.page, filters?.pageSize]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { transaktionen, loading, refetch: fetch };
+  return { transaktionen, totalCount, loading, refetch: fetch };
+}
+
+// ─── Transaktions-Statistiken (serverseitig ueber ALLE Zeilen) ──
+export function useTransaktionenStats() {
+  const [stats, setStats] = useState({ total: 0, auto: 0, manuell: 0, review: 0, incomingToday: 0 });
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const today = new Date().toISOString().slice(0, 10);
+    const [totalRes, autoRes, manuellRes, unklarRes, abwRes, todayRes] = await Promise.all([
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }),
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "auto"),
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "manuell"),
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "unklar"),
+      supabase.from("transaktionen").select("id", { count: "exact", head: true }).eq("matching_status", "abweichung"),
+      supabase.from("transaktionen").select("betrag").gte("datum", today),
+    ]);
+    const incomingToday = (todayRes.data || []).reduce(
+      (sum: number, row: { betrag: number | null }) => sum + Number(row.betrag || 0),
+      0
+    );
+    setStats({
+      total: totalRes.count ?? 0,
+      auto: autoRes.count ?? 0,
+      manuell: manuellRes.count ?? 0,
+      review: (unklarRes.count ?? 0) + (abwRes.count ?? 0),
+      incomingToday,
+    });
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { stats, loading, refetch: fetch };
 }
 
 // ─── Mahnungen ──────────────────────────────────────────────
