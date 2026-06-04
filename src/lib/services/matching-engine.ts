@@ -380,6 +380,15 @@ export async function reconcileByReference(
   };
 }
 
+// Die vier Konten der Praxis (Sparkasse Leipzig). Eingaenge von diesen
+// IBANs sind Umbuchungen zwischen eigenen Konten, kein Patientengeld.
+const EIGENE_IBANS = new Set([
+  "DE28860555921090118976",
+  "DE17860555921632044206",
+  "DE03860555921090118941",
+  "DE51860555921090118950",
+]);
+
 export async function runBatchMatching(): Promise<{
   total: number;
   auto: number;
@@ -405,11 +414,22 @@ export async function runBatchMatching(): Promise<{
     stats.total++;
 
     // Kategorisierer: Nicht-Patientenzahlungen sofort aussortieren.
+    // kzv: Quartalsgelder der Kassenseite. umbuchung: Transfers zwischen
+    // den eigenen Praxiskonten. kartenterminal: Sammler und Rueckgaben.
     const zweckUndAbsender = `${tx.verwendungszweck || ""} ${tx.absender_name || ""}`;
-    if (/kartenumsaetze|payone|rueckueberweisung/i.test(zweckUndAbsender)) {
+    const absenderIban = (tx.absender_iban || "").replace(/\s/g, "").toUpperCase();
+    let kategorie: string | null = null;
+    if (/\bkzv\b/i.test(tx.absender_name || "")) {
+      kategorie = "kzv";
+    } else if (EIGENE_IBANS.has(absenderIban)) {
+      kategorie = "umbuchung";
+    } else if (/kartenumsaetze|payone|rueckueberweisung/i.test(zweckUndAbsender)) {
+      kategorie = "kartenterminal";
+    }
+    if (kategorie) {
       await db.from("transaktionen").update({
         matching_status: "ignoriert",
-        matching_details: { methode: "kategorie", name_score: 0, betrag_match: false, zweck_score: 0 },
+        matching_details: { methode: "kategorie", name_score: 0, betrag_match: false, zweck_score: 0, kategorie },
         geprueft_am: new Date().toISOString(),
       }).eq("id", tx.id);
       continue;
@@ -480,12 +500,38 @@ export async function runBatchMatching(): Promise<{
     }
   }
 
-  // Stufe 2: Namens-Matching mengenbasiert in der Datenbank.
-  // Schreibt nur Vorschlaege (status 'abweichung') bei genau einem Kandidaten.
+  // Stufe 2: set-basierte Nachlaeufe in der Datenbank, alle nur als
+  // Vorschlag (status 'abweichung') bei genau einem Kandidaten.
+  // Reihenfolge nach Verlaesslichkeit:
+  // Rechnungszeichen (95, korrigiert auch schwaechere Namens-Vorschlaege)
+  // -> exakte Namen (80) -> Namensbausteine/Geschwister (75/70)
+  // -> Tippfehler (65).
+  const { data: refMatches } = await db.rpc("ac_match_referenz");
+  if (Array.isArray(refMatches) && refMatches[0]) {
+    const neu = Number(refMatches[0].neu) || 0;
+    stats.total += neu;
+    stats.abweichung += neu;
+  }
+
   const { data: nameMatches, error: nameError } = await db.rpc("ac_match_names");
   if (!nameError && typeof nameMatches === "number" && nameMatches > 0) {
     stats.total += nameMatches;
     stats.abweichung += nameMatches;
+  }
+
+  const { data: v2Matches } = await db.rpc("ac_match_names_v2");
+  if (Array.isArray(v2Matches)) {
+    for (const zeile of v2Matches) {
+      const n = Number(zeile.zugeordnet) || 0;
+      stats.total += n;
+      stats.abweichung += n;
+    }
+  }
+
+  const { data: typoMatches } = await db.rpc("ac_match_typos");
+  if (typeof typoMatches === "number" && typoMatches > 0) {
+    stats.total += typoMatches;
+    stats.abweichung += typoMatches;
   }
 
   // Alert erstellen
