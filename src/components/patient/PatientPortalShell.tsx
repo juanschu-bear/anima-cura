@@ -983,7 +983,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           style={{ position: "absolute", width: 280, height: 280, borderRadius: "50%", top: -60, right: -40, opacity: dk ? 0.1 : 0.05, filter: "blur(60px)" }}
         />
       </div>
-      <div style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
+      <div className="portal-content" style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && ProgressTab}
@@ -1378,14 +1378,19 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             max-height: 88vh !important;
             min-height: 88vh !important;
             overflow-y: auto !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
+          .portal-content { flex: 1 0 auto; }
           .portal-nav {
             position: sticky !important;
             bottom: 0 !important;
             left: auto !important;
             right: auto !important;
+            margin-top: auto !important;
             border-radius: 0 0 32px 32px !important;
+            flex-shrink: 0;
           }
         }
       `}</style>
