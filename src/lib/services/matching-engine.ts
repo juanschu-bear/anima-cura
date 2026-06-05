@@ -430,6 +430,8 @@ export async function runBatchMatching(): Promise<{
       await db.from("transaktionen").update({
         matching_status: "ignoriert",
         matching_details: { methode: "kategorie", name_score: 0, betrag_match: false, zweck_score: 0, kategorie },
+        // Terminal-Buendel warten auf den Abgleich mit den Praxis-Listen.
+        ...(kategorie === "kartenterminal" ? { abgleich_status: "offen" } : {}),
         geprueft_am: new Date().toISOString(),
       }).eq("id", tx.id);
       continue;

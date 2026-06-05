@@ -71,6 +71,24 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
   const errors: string[] = [];
   let newCount = 0;
 
+  // Doppelklick-Schutz: laeuft bereits ein frischer Sync (juenger als
+  // 10 Minuten, noch nicht beendet), startet kein zweiter parallel.
+  {
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: laufend } = await db
+      .from("bank_sync_runs")
+      .select("id")
+      .eq("status", "running")
+      .gte("started_at", cutoff)
+      .limit(1);
+    if (laufend?.length) {
+      return {
+        newTransactions: 0,
+        errors: ["Ein Bank-Sync laeuft bereits. Bitte kurz warten."],
+      };
+    }
+  }
+
   // 1. Aktive Bankverbindungen laden
   const { data: connections } = await db
     .from("bank_connections")
@@ -168,7 +186,13 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
             );
           }
         } catch (updErr) {
-          errors.push(`Bank-Update ${conn.bank_name}: ${updErr}`);
+          const msg = String(updErr);
+          if (msg.includes("[423]") || msg.includes("LOCKED")) {
+            // Update laeuft bereits (z.B. finAPI-Batch oder paralleler
+            // Anstoss): kein Fehler, unten einfach auf READY warten.
+          } else {
+            errors.push(`Bank-Update ${conn.bank_name}: ${msg}`);
+          }
         }
         // Belt & braces: warten bis die Verbindung selbst READY meldet,
         // bevor Transaktionen abgerufen werden (Daten-Download asynchron).
