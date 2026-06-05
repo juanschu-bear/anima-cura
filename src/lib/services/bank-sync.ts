@@ -138,6 +138,13 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
       // updateStatus READY warten, erst danach Transaktionen abrufen.
       // best effort: schlaegt das Update fehl (z.B. PSD2-Neufreigabe noetig),
       // holen wir trotzdem den bei finAPI gespeicherten Bestand.
+      if (triggerUpdate && !conn.finapi_connection_id) {
+        // Ohne gespeicherte finAPI-Verbindungs-ID kann kein Update angestossen
+        // werden; dann liest der Sync nur den gecachten Bestand. Sichtbar machen!
+        errors.push(
+          `Bank-Update ${conn.bank_name}: uebersprungen, keine finapi_connection_id hinterlegt (Sync liest nur Cache).`
+        );
+      }
       if (triggerUpdate && conn.finapi_connection_id) {
         const connectionId = Number(conn.finapi_connection_id);
         try {
@@ -244,7 +251,9 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
         .update({ last_sync: new Date().toISOString() })
         .eq("id", conn.id);
 
-      // 7. Lauf abschließen
+      // 7. Lauf abschließen. Warnungen (z.B. fehlgeschlagenes Bank-Update)
+      // landen auch bei Status ok im error-Feld, damit das Protokoll nie
+      // wieder stumm ist, wenn etwas hakt.
       if (runId) {
         await db
           .from("bank_sync_runs")
@@ -254,6 +263,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
             archived_new_count: archivedNew,
             imported_new_count: importedNew,
             status: "ok",
+            error: errors.length ? errors.join(" | ").slice(0, 2000) : null,
           })
           .eq("id", runId);
       }
@@ -276,7 +286,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
   }
 
   // 8. System-Alert erstellen
-  if (newCount > 0 || archivedTotal > 0) {
+  if (newCount > 0 || archivedTotal > 0 || errors.length > 0) {
     await db.from("alerts").insert({
       typ: "system",
       titel: `Bank-Sync: ${newCount} neue Eingänge, ${archivedTotal} neu archiviert`,
