@@ -111,6 +111,33 @@ export async function updateBankConnection(
   });
 }
 
+export async function getBankConnection(
+  userToken: string,
+  connectionId: number
+): Promise<{ id: number; updateStatus?: "READY" | "IN_PROGRESS" | "QUEUED" }> {
+  return apiRequest(`/bankConnections/${connectionId}`, userToken);
+}
+
+// Wartet, bis ein angestossenes Bank-Update abgeschlossen ist.
+// Laut finAPI-Doku laeuft das Update asynchron (updateStatus IN_PROGRESS),
+// Transaktionen duerfen erst nach READY abgerufen werden.
+// Rueckgabe: true = READY, false = Timeout (dann letzten Stand abrufen).
+export async function waitForConnectionReady(
+  userToken: string,
+  connectionId: number,
+  options: { timeoutMs?: number; intervalMs?: number } = {}
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? 180_000;
+  const intervalMs = options.intervalMs ?? 4_000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const conn = await getBankConnection(userToken, connectionId);
+    if (conn.updateStatus === "READY") return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 // ─── Transaktionen ──────────────────────────────────────────
 export async function getTransactions(
   userToken: string,

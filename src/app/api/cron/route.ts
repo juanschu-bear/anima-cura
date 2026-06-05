@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const { count } = await db.from("bank_connections").select("*", { count: "exact", head: true }).eq("status", "connected");
     if (count && count > 0) {
       const { syncBankTransactions } = await import("@/lib/services/bank-sync");
-      results.bankSync = await syncBankTransactions();
+      results.bankSync = await syncBankTransactions({ triggerUpdate: true });
       const { count: ratenCount } = await db.from("raten").select("*", { count: "exact", head: true });
       if (ratenCount && ratenCount > 0) {
         const { runBatchMatching } = await import("@/lib/services/matching-engine");

@@ -1,11 +1,10 @@
 // ============================================================
 // BANK SYNC SERVICE – Automatischer Kontoauszug-Import
 // ============================================================
-// Läuft als Cron-Job (täglich, nach finAPIs Batch-Update) oder
-// manuell per Button.
+// Läuft als Cron-Job (täglich) oder manuell per Button.
 //
 // Ablauf pro Bankverbindung:
-// 1. Optional Bank-Update bei finAPI triggern (nur Button).
+// 1. Bank-Update bei finAPI anstossen und auf READY warten (Standard).
 // 2. ALLE Transaktionen (Ein- und Ausgänge) paginiert laden.
 // 3. Jede Buchung unveränderlich in bank_transactions_raw
 //    archivieren (volle Rohdaten als JSONB, Vorzeichen erhalten).
@@ -21,11 +20,20 @@
 // ============================================================
 
 import { createServerClient } from "../db/supabase";
-import { getUserToken, getTransactions, updateBankConnection } from "../api/finapi-client";
+import {
+  getUserToken,
+  getTransactions,
+  updateBankConnection,
+  waitForConnectionReady,
+} from "../api/finapi-client";
 import type { FinAPITransaction } from "../types";
 
 const MAX_PAGES = 60; // 20 x 500 = max. 10.000 Buchungen pro Lauf
 const ARCHIVE_CHUNK = 200;
+// Abruf-Fenster ueberlappt rueckwirkend, damit nachtraeglich eingebuchte
+// Umsaetze (Wertstellung, spaete Buchung) nie durchs Raster fallen.
+// Duplikate faengt das Archiv per finapi_id-Upsert ab.
+const OVERLAP_DAYS = 5;
 
 interface BankConnectionRow {
   id: string;
@@ -57,6 +65,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
   newTransactions: number;
   errors: string[];
 }> {
+  const { triggerUpdate = true } = options;
   const db = createServerClient();
   const errors: string[] = [];
   let newCount = 0;
@@ -95,9 +104,12 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
 
   // 3. Für jede Verbindung: Transaktionen holen
   for (const conn of connections as BankConnectionRow[]) {
-    // Erster Sync: kein minDate, damit die volle Historie kommt
+    // Erster Sync: kein minDate, damit die volle Historie kommt.
+    // Folge-Syncs: last_sync minus Ueberlappung (nachzuegliche Buchungen).
     const minDate = conn.last_sync
-      ? new Date(conn.last_sync).toISOString().split("T")[0]
+      ? new Date(new Date(conn.last_sync).getTime() - OVERLAP_DAYS * 86_400_000)
+          .toISOString()
+          .split("T")[0]
       : undefined;
 
     // Sync-Lauf protokollieren (best effort)
@@ -121,16 +133,36 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
     let importedNew = 0;
 
     try {
-      // Bank-Update nur auf ausdruecklichen Wunsch (z.B. Button-Klick).
-      // Den taeglichen Refresh macht finAPIs Batch-Update (07:00) serverseitig,
-      // unser Cron holt danach nur noch den Bestand ab.
-      // best effort: schlaegt das Update fehl, z.B. PSD2-Tageslimit, holen
-      // wir trotzdem den bei finAPI gespeicherten Bestand.
-      if (options.triggerUpdate && conn.finapi_connection_id) {
+      // Bank-Update bei finAPI anstossen (Standard fuer Cron UND Button).
+      // Laut finAPI-Doku laeuft das Update asynchron: anstossen, dann auf
+      // updateStatus READY warten, erst danach Transaktionen abrufen.
+      // best effort: schlaegt das Update fehl (z.B. PSD2-Neufreigabe noetig),
+      // holen wir trotzdem den bei finAPI gespeicherten Bestand.
+      if (triggerUpdate && conn.finapi_connection_id) {
+        const connectionId = Number(conn.finapi_connection_id);
         try {
-          await updateBankConnection(userToken, Number(conn.finapi_connection_id));
+          await updateBankConnection(userToken, connectionId);
         } catch (updErr) {
-          errors.push(`Bank-Update ${conn.bank_name}: ${updErr}`);
+          const msg = String(updErr);
+          if (msg.includes("[510]")) {
+            // Bank verlangt Nutzer-Interaktion (SCA), z.B. Freigabe aelter als 90 Tage.
+            errors.push(
+              `Bank-Update ${conn.bank_name}: Bank verlangt erneute Freigabe (PSD2). Bitte Bankverbindung in den Einstellungen erneuern.`
+            );
+          } else if (!msg.toLowerCase().includes("locked")) {
+            // "locked" = Update laeuft bereits; dann unten einfach auf READY warten.
+            errors.push(`Bank-Update ${conn.bank_name}: ${msg}`);
+          }
+        }
+        try {
+          const ready = await waitForConnectionReady(userToken, connectionId);
+          if (!ready) {
+            errors.push(
+              `Bank-Update ${conn.bank_name}: nicht rechtzeitig fertig (Timeout), letzter gespeicherter Stand wird abgerufen.`
+            );
+          }
+        } catch (waitErr) {
+          errors.push(`Bank-Update-Status ${conn.bank_name}: ${waitErr}`);
         }
       }
 
