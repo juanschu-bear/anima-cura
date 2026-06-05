@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  AlertTriangle,
+import { AlertTriangle,
   BarChart3,
   CalendarRange,
   ChevronDown,
@@ -24,8 +23,7 @@ import {
   Sun,
   Upload,
   Users,
-  Zap,
-} from "lucide-react";
+  Zap, Coins } from "lucide-react";
 import type { AuthenticatedAppUser } from "@/lib/auth";
 import {
   canAccessPath,
@@ -49,6 +47,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
   {
     key: "navGroup.finance",
     items: [
+      { href: "/finanzen", icon: Coins, key: "nav.finances" },
       { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
       { href: "/offene-posten", icon: Receipt, key: "nav.openItems" },
       { href: "/rechnungen", icon: FileText, key: "nav.invoices" },
