@@ -16,10 +16,21 @@ export default function ZahlungenPage() {
   const [statusFilter, setStatusFilter] = useState("alle");
   const [page, setPage] = useState(1);
   const pageSize = 25;
-  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, page, pageSize });
+  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, page, pageSize, suche: sucheAktiv });
+
+  // Suche entprellen: erst 350ms nach dem letzten Tastendruck abfragen.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSucheAktiv(suche);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [suche]);
   const { stats, refetch: refetchStats } = useTransaktionenStats();
   const [matchModal, setMatchModal] = useState<any>(null);
   const [patSearch, setPatSearch] = useState("");
+  const [suche, setSuche] = useState("");
+  const [sucheAktiv, setSucheAktiv] = useState("");
   const { patienten } = usePatienten(patSearch);
   const [syncing, setSyncing] = useState(false);
   const [syncHint, setSyncHint] = useState("");
@@ -247,6 +258,26 @@ export default function ZahlungenPage() {
         <MetricCard label={t("payments.autoAssigned", locale)} value={metrics.confirmed.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} sub={`${metrics.confirmedRate}% ${t("payments.matchRate", locale)}`} theme={theme} />
         <MetricCard label={t("payments.needsReview", locale)} value={metrics.vorschlag.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} amber theme={theme} />
         <MetricCard label={t("payments.unclearCard", locale)} value={metrics.unklar.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} sub={t("payments.allTime", locale)} theme={theme} />
+      </div>
+
+      <div className="relative max-w-md">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
+        <input
+          type="text"
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          placeholder={t("payments.searchPlaceholder", locale)}
+          className="input w-full pl-9"
+        />
+        {suche ? (
+          <button
+            onClick={() => setSuche("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-praxis-400 hover:text-praxis-600"
+            aria-label="Suche leeren"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">

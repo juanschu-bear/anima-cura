@@ -10,6 +10,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.overview": { de: "Übersicht", en: "Overview" },
   "nav.payments": { de: "Zahlungen", en: "Payments" },
   "nav.finances": { de: "Finanzen", en: "Finances" },
+  "payments.searchPlaceholder": { de: "Suchen: Name, Verwendungszweck oder Betrag …", en: "Search: name, reference or amount …" },
   // ─── Finanzen (Messstation) ───────────────────────────────
   "fin.title": { de: "Finanzen", en: "Finances" },
   "fin.subtitle": { de: "Alle Geldströme aus den Kontodaten, gemessen, nicht geschätzt. Zeitraum: seit 14.06.2024.", en: "All money flows from bank data, measured, not estimated. Period: since 14 Jun 2024." },

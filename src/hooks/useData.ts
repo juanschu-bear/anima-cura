@@ -105,6 +105,7 @@ export function useTransaktionen(filters?: {
   to?: string;
   page?: number;
   pageSize?: number;
+  suche?: string;
 }) {
   const [transaktionen, setTransaktionen] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -127,11 +128,28 @@ export function useTransaktionen(filters?: {
     if (filters?.from) query = query.gte("datum", filters.from);
     if (filters?.to) query = query.lte("datum", filters.to);
 
+    // Serverseitige Suche ueber Absender, Verwendungszweck und Betrag.
+    // Kommas/Klammern wuerden die PostgREST-or()-Syntax brechen -> raus.
+    const suchbegriff = (filters?.suche || "").trim();
+    if (suchbegriff) {
+      const istZahl = /^[0-9]+([.,][0-9]{1,2})?$/.test(suchbegriff);
+      const sauber = suchbegriff.replace(/[%,()*]/g, " ").trim();
+      const teile: string[] = [];
+      if (sauber) {
+        teile.push(`verwendungszweck.ilike.*${sauber}*`);
+        teile.push(`absender_name.ilike.*${sauber}*`);
+      }
+      if (istZahl) {
+        teile.push(`betrag.eq.${suchbegriff.replace(",", ".")}`);
+      }
+      if (teile.length) query = query.or(teile.join(","));
+    }
+
     const { data, count } = await query;
     setTransaktionen(data || []);
     setTotalCount(count ?? 0);
     setLoading(false);
-  }, [filters?.status, filters?.from, filters?.to, filters?.page, filters?.pageSize]);
+  }, [filters?.status, filters?.from, filters?.to, filters?.page, filters?.pageSize, filters?.suche]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
