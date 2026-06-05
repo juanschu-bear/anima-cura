@@ -130,10 +130,10 @@ export default function OffenePostenPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label={t("openItems.kpi.openTotal", locale)} value={metrics.openTotal.toLocaleString(numberLocale)} amber theme={theme} />
-        <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} theme={theme} />
-        <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} theme={theme} />
-        <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} green theme={theme} />
+        <MetricCard label={t("openItems.kpi.openTotal", locale)} value={metrics.openTotal.toLocaleString(numberLocale)} sub={t("openItems.kpi.openTotalSub", locale)} amber theme={theme} />
+        <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} sub={t("openItems.kpi.openCountSub", locale)} theme={theme} />
+        <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} sub={t("openItems.kpi.partialSub", locale)} theme={theme} />
+        <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} sub={t("openItems.kpi.paidSub", locale)} green theme={theme} />
       </div>
 
       <div className="flex flex-wrap gap-2">
