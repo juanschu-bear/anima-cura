@@ -160,7 +160,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
             );
           } else if (result.status === "COMPLETED_WITH_ERROR") {
             errors.push(
-              `Bank-Update ${conn.bank_name}: mit Fehlern abgeschlossen, letzter Stand wird abgerufen.`
+              `Bank-Update ${conn.bank_name}: mit Fehlern abgeschlossen${result.errorCode ? ` (${result.errorCode})` : ""}, letzter Stand wird abgerufen.`
             );
           } else if (result.status === "TIMEOUT") {
             errors.push(

@@ -153,8 +153,11 @@ const WEBFORM_BASE = BASE_URL.includes("sandbox")
 interface WebFormUpdateTask {
   id: string;
   status?: string;
-  webForm?: { id?: string; url?: string };
-  url?: string;
+  payload?: {
+    bankConnectionId?: number;
+    webForm?: { id?: string; url?: string; status?: string };
+    errorCode?: string;
+  };
 }
 
 async function webFormRequest<T>(
@@ -181,9 +184,11 @@ export async function startBackgroundUpdateTask(
   userToken: string,
   bankConnectionId: number
 ): Promise<WebFormUpdateTask> {
+  // Schema laut Web-Form-2.0-API (BankConnectionUpdateTaskDetails):
+  // bankConnectionId ist SINGULAR; die Doku-Prosa nennt faelschlich den Plural.
   return webFormRequest<WebFormUpdateTask>("/api/tasks/backgroundUpdate", userToken, {
     method: "POST",
-    body: JSON.stringify({ bankConnectionIds: [bankConnectionId] }),
+    body: JSON.stringify({ bankConnectionId }),
   });
 }
 
@@ -202,7 +207,7 @@ export async function waitForUpdateTask(
   userToken: string,
   taskId: string,
   options: { timeoutMs?: number; intervalMs?: number } = {}
-): Promise<{ status: string; webFormUrl?: string }> {
+): Promise<{ status: string; webFormUrl?: string; errorCode?: string }> {
   const timeoutMs = options.timeoutMs ?? 180_000;
   const intervalMs = options.intervalMs ?? 4_000;
   const deadline = Date.now() + timeoutMs;
@@ -214,7 +219,11 @@ export async function waitForUpdateTask(
       status === "COMPLETED_WITH_ERROR" ||
       status === "WEB_FORM_REQUIRED"
     ) {
-      return { status, webFormUrl: task.webForm?.url || task.url };
+      return {
+        status,
+        webFormUrl: task.payload?.webForm?.url,
+        errorCode: task.payload?.errorCode,
+      };
     }
     if (Date.now() >= deadline) return { status: status || "TIMEOUT" };
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
