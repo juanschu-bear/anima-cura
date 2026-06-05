@@ -1374,8 +1374,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         @media (min-width: 768px) {
           .phone-app-container {
             border-radius: 32px !important;
+            height: 88vh !important;
             max-height: 88vh !important;
-            min-height: auto !important;
+            min-height: 88vh !important;
             overflow-y: auto !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
