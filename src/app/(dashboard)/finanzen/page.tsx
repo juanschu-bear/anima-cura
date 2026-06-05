@@ -55,6 +55,14 @@ interface Messwerte {
     harte_kandidaten: Zaehler;
     einstufungen: Record<string, Zaehler>;
   };
+  // Optional: kommt erst mit Migration 012, Seite vertraegt das Fehlen.
+  ausgaben?: {
+    buik: Zaehler;
+    meta: Zaehler;
+    kontofuehrung: Zaehler;
+    align: Zaehler;
+    mittwald: Zaehler;
+  };
 }
 
 function euro(value: number, locale: string): string {
@@ -256,7 +264,44 @@ export default function FinanzenPage() {
           )}`}
           tone="red"
         />
+        {werte.ausgaben ? (
+          <FinCard
+            label={t("fin.buik", locale)}
+            value={euro(werte.ausgaben.buik.summe, locale)}
+            sub={`${zahl(werte.ausgaben.buik.anzahl, locale)} ${t("fin.buikSub", locale)}`}
+            tone="red"
+          />
+        ) : null}
       </Abschnitt>
+
+      {werte.ausgaben ? (
+        <Abschnitt
+          icon={Receipt}
+          titel={t("fin.expensesSection", locale)}
+          hinweis={t("fin.expensesHint", locale)}
+        >
+          <FinCard
+            label={t("fin.expMeta", locale)}
+            value={euro(werte.ausgaben.meta.summe, locale)}
+            sub={`${zahl(werte.ausgaben.meta.anzahl, locale)} ${t("fin.debits", locale)}`}
+          />
+          <FinCard
+            label={t("fin.expKonto", locale)}
+            value={euro(werte.ausgaben.kontofuehrung.summe, locale)}
+            sub={`${zahl(werte.ausgaben.kontofuehrung.anzahl, locale)} ${t("fin.debits", locale)}`}
+          />
+          <FinCard
+            label={t("fin.expAlign", locale)}
+            value={euro(werte.ausgaben.align.summe, locale)}
+            sub={`${zahl(werte.ausgaben.align.anzahl, locale)} ${t("fin.debits", locale)}`}
+          />
+          <FinCard
+            label={t("fin.expMittwald", locale)}
+            value={euro(werte.ausgaben.mittwald.summe, locale)}
+            sub={`${zahl(werte.ausgaben.mittwald.anzahl, locale)} ${t("fin.debits", locale)}`}
+          />
+        </Abschnitt>
+      ) : null}
 
       <Abschnitt icon={Receipt} titel={t("fin.openItemsSection", locale)}>
         <FinCard
