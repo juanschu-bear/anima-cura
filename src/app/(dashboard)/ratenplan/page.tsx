@@ -15,6 +15,8 @@ export default function RatenplanPage() {
   const [patienten, setPatienten] = useState<any[]>([]);
   const [ratenByPlan, setRatenByPlan] = useState<Record<string, any[]>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Nur-Lese-Sollplan: bestaetigte Bankzahlungen je Patient, lazy bei Aufklappen.
+  const [sollZahlungen, setSollZahlungen] = useState<Record<string, any[] | "laedt">>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hint, setHint] = useState("");
@@ -46,6 +48,22 @@ export default function RatenplanPage() {
     const rates = Array.from({ length: form.anzahl_raten }).map((_, i) => { const d = new Date(form.start_datum); d.setMonth(d.getMonth() + i); return { ratenplan_id: plan.id, patient_id: form.patient_id, rate_nummer: i + 1, betrag: rateBetrag, faellig_am: d.toISOString().slice(0, 10), status: "offen", mahnstufe: 0 }; });
     await supabase.from("raten").insert(rates);
     setSaving(false); setCreateOpen(false); setForm({ patient_id: "", gesamtbetrag: 0, anzahl_raten: 12, start_datum: new Date().toISOString().slice(0, 10), rhythmus: "monatlich" }); fetchData();
+  }
+
+  async function loadSollZahlungen(plan: any) {
+    if (!plan?.patient_id || sollZahlungen[plan.id]) return;
+    setSollZahlungen(prev => ({ ...prev, [plan.id]: "laedt" }));
+    const seit = new Date(plan.start_datum);
+    seit.setDate(seit.getDate() - 31); // Puffer: Erstzahlung kurz vor Planstart
+    const { data } = await supabase
+      .from("transaktionen")
+      .select("datum, betrag")
+      .eq("matched_patient_id", plan.patient_id)
+      .in("matching_status", ["auto", "manuell"])
+      .gt("betrag", 0)
+      .gte("datum", seit.toISOString().slice(0, 10))
+      .order("datum", { ascending: true });
+    setSollZahlungen(prev => ({ ...prev, [plan.id]: data || [] }));
   }
 
   const planStats = useMemo(() => plaene.map(plan => {
@@ -130,7 +148,7 @@ export default function RatenplanPage() {
               const rates = (ratenByPlan[plan.id] || []).sort((a: any, b: any) => a.rate_nummer - b.rate_nummer);
               const isExp = expandedId === plan.id;
               return (
-                <motion.tr key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.015 }} style={{ cursor: "pointer" }} onClick={() => setExpandedId(isExp ? null : plan.id)}>
+                <motion.tr key={plan.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.015 }} style={{ cursor: "pointer" }} onClick={() => { const next = isExp ? null : plan.id; setExpandedId(next); if (next && rates.length === 0) loadSollZahlungen(plan); }}>
                   <td colSpan={6} style={{ padding: 0 }}>
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                       <tbody>
@@ -180,6 +198,43 @@ export default function RatenplanPage() {
                             </td>
                           </tr>
                         )}
+                        {isExp && rates.length === 0 && (() => {
+                          const z = sollZahlungen[plan.id];
+                          if (!z || z === "laedt") {
+                            return (
+                              <tr><td colSpan={6} style={{ padding: "16px 20px", borderBottom: `1px solid ${border}`, color: muted, fontSize: 12 }}>
+                                Sollplan wird berechnet …
+                              </td></tr>
+                            );
+                          }
+                          const sp = buildSollplan(plan, z as any[]);
+                          return (
+                            <tr>
+                              <td colSpan={6} style={{ padding: "16px 20px 20px", borderBottom: `1px solid ${border}`, background: dk ? "rgba(8,12,20,0.5)" : "rgba(245,246,250,0.5)" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(95px, 1fr))", gap: 6 }}>
+                                  {sp.kacheln.map((r: any) => {
+                                    const bg = r.zustand === "bezahlt" ? "rgba(74,222,128,0.06)" : r.zustand === "ueberfaellig" ? "rgba(248,113,113,0.06)" : dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)";
+                                    const bc = r.zustand === "bezahlt" ? "rgba(74,222,128,0.2)" : r.zustand === "ueberfaellig" ? "rgba(248,113,113,0.2)" : (dk ? "rgba(255,255,255,0.05)" : "#e8eaef");
+                                    return (
+                                      <div key={r.nummer} style={{ padding: 10, borderRadius: 8, border: `1px solid ${bc}`, background: bg, textAlign: "center", opacity: r.zustand === "offen" ? 0.5 : 1 }}>
+                                        <div style={{ fontSize: 10, color: muted, fontWeight: 600 }}>Rate {r.nummer}</div>
+                                        <div style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Fraunces', serif", marginTop: 2 }}>{fE(r.betrag)}€</div>
+                                        <div style={{ fontSize: 9, color: muted, marginTop: 3 }}>{r.faellig.toLocaleDateString("de-DE", { month: "short", year: "2-digit" })}</div>
+                                        {r.zustand === "bezahlt" && <div style={{ fontSize: 9, fontWeight: 700, color: "#4ade80", marginTop: 3 }}>✓ {r.bezahltAm ? r.bezahltAm.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "Gedeckt"}</div>}
+                                        {r.zustand === "ueberfaellig" && <div style={{ fontSize: 9, fontWeight: 700, color: "#f87171", marginTop: 3 }}>Überfällig</div>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{ marginTop: 12, fontSize: 11, color: muted }}>
+                                  Nur-Lese-Sollplan, berechnet aus bestätigten Bankzahlungen · Gedeckt: {sp.gedeckt} von {sp.anzahl} Raten
+                                  {sp.guthaben > 0 ? ` · Rechnerisches Guthaben: ${fE(sp.guthaben)} €` : ""}
+                                  {sp.sonstigeAnzahl > 0 ? ` · Weitere bestätigte Zahlungen (nicht ratengroß): ${sp.sonstigeAnzahl} über ${fE(sp.sonstigeSumme)} €` : ""}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })()}
                       </tbody>
                     </table>
                   </td>
@@ -209,4 +264,62 @@ export default function RatenplanPage() {
       </Modal>
     </div>
   );
+}
+
+// ── Nur-Lese-Sollplan (Variante A) ──────────────────────────────
+// Berechnet aus Plan + bestaetigten Zahlungen, schreibt NICHTS.
+// Eine Zahlung deckt k Raten, wenn sie ~k * Ratenhoehe entspricht
+// (Toleranz 10% bzw. 5 Euro); Quartalszahler zahlen z.B. 3 Raten
+// in einer Buchung. Nicht ratengrosse Zahlungen laufen separat.
+function buildSollplan(plan: any, zahlungen: any[]) {
+  const rate = Number(plan.rate_betrag) || 0;
+  const anzahl = Number(plan.anzahl_raten) || 0;
+  const start = new Date(plan.start_datum);
+  const schrittMonate = plan.rhythmus === "quartalsweise" ? 3 : 1;
+  const heute = new Date();
+
+  const soll = Array.from({ length: anzahl }).map((_, i) => {
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + i * schrittMonate);
+    return { nummer: i + 1, betrag: rate, faellig: d, bezahltAm: null as Date | null, gedeckt: false };
+  });
+
+  const tol = Math.max(5, rate * 0.1);
+  let sonstigeSumme = 0;
+  let sonstigeAnzahl = 0;
+  let guthaben = 0;
+  let idx = 0;
+
+  for (const z of zahlungen) {
+    const betrag = Number(z.betrag) || 0;
+    const k = rate > 0 ? Math.round(betrag / rate) : 0;
+    if (k >= 1 && Math.abs(betrag - k * rate) <= tol) {
+      let rest = k;
+      while (rest > 0 && idx < soll.length) {
+        soll[idx].gedeckt = true;
+        soll[idx].bezahltAm = new Date(z.datum);
+        idx++;
+        rest--;
+      }
+      if (rest > 0) guthaben += rest * rate; // Plan voll, Ueberschuss
+    } else {
+      sonstigeSumme += betrag;
+      sonstigeAnzahl++;
+    }
+  }
+
+  const kacheln = soll.map(r => {
+    const ueberfaellig = !r.gedeckt && r.faellig < heute;
+    const zukunft = !r.gedeckt && r.faellig >= heute;
+    return { ...r, zustand: r.gedeckt ? "bezahlt" : ueberfaellig ? "ueberfaellig" : zukunft ? "offen" : "offen" };
+  });
+
+  return {
+    kacheln,
+    gedeckt: idx,
+    anzahl,
+    guthaben,
+    sonstigeSumme,
+    sonstigeAnzahl,
+  };
 }
