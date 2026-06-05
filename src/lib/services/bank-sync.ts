@@ -23,7 +23,8 @@ import { createServerClient } from "../db/supabase";
 import {
   getUserToken,
   getTransactions,
-  updateBankConnection,
+  startBackgroundUpdateTask,
+  waitForUpdateTask,
   waitForConnectionReady,
 } from "../api/finapi-client";
 import type { FinAPITransaction } from "../types";
@@ -134,10 +135,13 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
 
     try {
       // Bank-Update bei finAPI anstossen (Standard fuer Cron UND Button).
-      // Laut finAPI-Doku laeuft das Update asynchron: anstossen, dann auf
-      // updateStatus READY warten, erst danach Transaktionen abrufen.
-      // best effort: schlaegt das Update fehl (z.B. PSD2-Neufreigabe noetig),
-      // holen wir trotzdem den bei finAPI gespeicherten Bestand.
+      // Unser Client ist Web-Form-2.0-Kunde: direkte /bankConnections/update-
+      // Aufrufe sind gesperrt (422 ILLEGAL_ENTITY_STATE). Offizieller Weg:
+      // Hintergrund-Task (POST /api/tasks/backgroundUpdate) starten und den
+      // Task-Status pollen. Ausgaenge laut finAPI-Doku: COMPLETED,
+      // COMPLETED_WITH_ERROR, WEB_FORM_REQUIRED (= einmal neu freigeben).
+      // best effort: schlaegt das Update fehl, holen wir trotzdem den bei
+      // finAPI gespeicherten Bestand.
       if (triggerUpdate && !conn.finapi_connection_id) {
         // Ohne gespeicherte finAPI-Verbindungs-ID kann kein Update angestossen
         // werden; dann liest der Sync nur den gecachten Bestand. Sichtbar machen!
@@ -148,28 +152,30 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
       if (triggerUpdate && conn.finapi_connection_id) {
         const connectionId = Number(conn.finapi_connection_id);
         try {
-          await updateBankConnection(userToken, connectionId);
-        } catch (updErr) {
-          const msg = String(updErr);
-          if (msg.includes("[510]")) {
-            // Bank verlangt Nutzer-Interaktion (SCA), z.B. Freigabe aelter als 90 Tage.
+          const task = await startBackgroundUpdateTask(userToken, connectionId);
+          const result = await waitForUpdateTask(userToken, task.id);
+          if (result.status === "WEB_FORM_REQUIRED") {
             errors.push(
-              `Bank-Update ${conn.bank_name}: Bank verlangt erneute Freigabe (PSD2). Bitte Bankverbindung in den Einstellungen erneuern.`
+              `Bank-Update ${conn.bank_name}: Bank verlangt erneute Freigabe (PSD2). Bitte Bankverbindung in den Einstellungen erneuern.${result.webFormUrl ? ` Formular: ${result.webFormUrl}` : ""}`
             );
-          } else if (!msg.toLowerCase().includes("locked")) {
-            // "locked" = Update laeuft bereits; dann unten einfach auf READY warten.
-            errors.push(`Bank-Update ${conn.bank_name}: ${msg}`);
-          }
-        }
-        try {
-          const ready = await waitForConnectionReady(userToken, connectionId);
-          if (!ready) {
+          } else if (result.status === "COMPLETED_WITH_ERROR") {
+            errors.push(
+              `Bank-Update ${conn.bank_name}: mit Fehlern abgeschlossen, letzter Stand wird abgerufen.`
+            );
+          } else if (result.status === "TIMEOUT") {
             errors.push(
               `Bank-Update ${conn.bank_name}: nicht rechtzeitig fertig (Timeout), letzter gespeicherter Stand wird abgerufen.`
             );
           }
-        } catch (waitErr) {
-          errors.push(`Bank-Update-Status ${conn.bank_name}: ${waitErr}`);
+        } catch (updErr) {
+          errors.push(`Bank-Update ${conn.bank_name}: ${updErr}`);
+        }
+        // Belt & braces: warten bis die Verbindung selbst READY meldet,
+        // bevor Transaktionen abgerufen werden (Daten-Download asynchron).
+        try {
+          await waitForConnectionReady(userToken, connectionId, { timeoutMs: 60_000 });
+        } catch {
+          // Statusabfrage fehlgeschlagen: Abruf trotzdem versuchen.
         }
       }
 

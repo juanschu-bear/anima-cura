@@ -138,6 +138,89 @@ export async function waitForConnectionReady(
   }
 }
 
+// ─── Web Form 2.0: Hintergrund-Update ───────────────────────
+// Unser finAPI-Client ist als Web-Form-2.0-Kunde konfiguriert:
+// Direkte Aufrufe von /bankConnections/update sind gesperrt (422
+// ILLEGAL_ENTITY_STATE). Der offizielle Weg laut finAPI-Doku:
+// POST {WEBFORM_BASE}/api/tasks/backgroundUpdate mit bankConnectionIds,
+// dann Task-Status pollen (COMPLETED / COMPLETED_WITH_ERROR /
+// WEB_FORM_REQUIRED = Nutzer muss einmal ins Web-Formular).
+
+const WEBFORM_BASE = BASE_URL.includes("sandbox")
+  ? "https://webform-sandbox.finapi.io"
+  : "https://webform-live.finapi.io";
+
+interface WebFormUpdateTask {
+  id: string;
+  status?: string;
+  webForm?: { id?: string; url?: string };
+  url?: string;
+}
+
+async function webFormRequest<T>(
+  endpoint: string,
+  userToken: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetch(`${WEBFORM_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${userToken}`,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`finAPI WebForm [${res.status}] ${endpoint}: ${err}`);
+  }
+  return res.json();
+}
+
+export async function startBackgroundUpdateTask(
+  userToken: string,
+  bankConnectionId: number
+): Promise<WebFormUpdateTask> {
+  return webFormRequest<WebFormUpdateTask>("/api/tasks/backgroundUpdate", userToken, {
+    method: "POST",
+    body: JSON.stringify({ bankConnectionIds: [bankConnectionId] }),
+  });
+}
+
+export async function getUpdateTask(
+  userToken: string,
+  taskId: string
+): Promise<WebFormUpdateTask> {
+  return webFormRequest<WebFormUpdateTask>(`/api/tasks/${taskId}`, userToken);
+}
+
+// Pollt die Update-Task bis zu einem Endzustand.
+// Rueckgabe: { status, webFormUrl? }; Endzustaende laut Doku:
+// COMPLETED, COMPLETED_WITH_ERROR, WEB_FORM_REQUIRED. Alles andere
+// (z.B. IN_PROGRESS / NOT_YET_STARTED) wird weiter gepollt bis Timeout.
+export async function waitForUpdateTask(
+  userToken: string,
+  taskId: string,
+  options: { timeoutMs?: number; intervalMs?: number } = {}
+): Promise<{ status: string; webFormUrl?: string }> {
+  const timeoutMs = options.timeoutMs ?? 180_000;
+  const intervalMs = options.intervalMs ?? 4_000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const task = await getUpdateTask(userToken, taskId);
+    const status = (task.status || "").toUpperCase();
+    if (
+      status === "COMPLETED" ||
+      status === "COMPLETED_WITH_ERROR" ||
+      status === "WEB_FORM_REQUIRED"
+    ) {
+      return { status, webFormUrl: task.webForm?.url || task.url };
+    }
+    if (Date.now() >= deadline) return { status: status || "TIMEOUT" };
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 // ─── Transaktionen ──────────────────────────────────────────
 export async function getTransactions(
   userToken: string,
