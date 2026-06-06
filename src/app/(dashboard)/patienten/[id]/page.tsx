@@ -37,7 +37,7 @@ export default function PatientDetailPage() {
           .order("kassen_datum", { ascending: false })
           .limit(25),
         supabaseDetail.from("transaktionen")
-          .select("id, betrag, datum, verwendungszweck, matching_status")
+          .select("id, betrag, datum, verwendungszweck, matching_status, matching_details")
           .eq("matched_patient_id", pid)
           .in("matching_status", ["auto", "manuell"])
           .order("datum", { ascending: false })
@@ -62,7 +62,7 @@ export default function PatientDetailPage() {
         liste.push({
           id: `b-${b.id}`,
           datum: b.datum,
-          quelle: "Bank",
+          quelle: b.matching_details?.methode === "animapay_kasse" ? "AnimaPay · QR" : "Bank",
           zweck: b.verwendungszweck || "",
           betrag: Number(b.betrag),
           status: "bestätigt",
@@ -294,8 +294,9 @@ export default function PatientDetailPage() {
         )}
       </div>
 
+      {(history.length > 0 || totalRaten > 0) && (
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("detail.paymentHistory", locale)}</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{locale === "en" ? "Installment history (plan)" : "Raten-Historie (Sollplan)"}</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -354,6 +355,7 @@ export default function PatientDetailPage() {
           </table>
         </div>
       </div>
+      )}
 
       <PatientPortalAdmin
         patientId={patient.id}

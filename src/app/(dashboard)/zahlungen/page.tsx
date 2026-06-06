@@ -184,8 +184,28 @@ export default function ZahlungenPage() {
     { key: "manuell", label: t("payments.filter.manual", locale) },
     { key: "unklar", label: t("payments.filter.unclear", locale) },
     { key: "ignoriert", label: t("payments.filter.ignored", locale) },
+    { key: "kasse", label: locale === "en" ? "Till (cash/card)" : "Kasse (Bar/Karte)" },
   ];
   const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
+
+  const [kassenListe, setKassenListe] = useState<any[]>([]);
+  useEffect(() => {
+    if (statusFilter !== "kasse") return;
+    const db = createBrowserClient();
+    db.from("kassen_zahlungen")
+      .select("*, patients:patient_id(vorname, nachname)")
+      .order("kassen_datum", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .then(({ data }) => setKassenListe(data || []));
+  }, [statusFilter]);
+
+  const KASSE_ZAHLART: Record<string, string> = {
+    qr_ueberweisung: "QR-Überweisung",
+    girocard: "Girocard",
+    kreditkarte: "Kreditkarte",
+    bar: "Bar",
+  };
 
   function getExpectedAmount(tx: any) {
     const matchedPatient = patienten.find((p) => p.id === tx.matched_patient_id);
@@ -325,6 +345,53 @@ export default function ZahlungenPage() {
         {t("payments.actionsDesc", locale)}
       </div>
 
+      {statusFilter === "kasse" ? (
+        <div
+          className="overflow-hidden rounded-[16px] border"
+          style={{
+            borderColor: "var(--ac-border)",
+            background: "var(--ac-surface)",
+            boxShadow: "var(--ac-shadow-soft)",
+          }}
+        >
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: "var(--ac-surface-muted)" }}>
+                <th className="table-header">{t("payments.date", locale)}</th>
+                <th className="table-header">Patient</th>
+                <th className="table-header">Zahlart</th>
+                <th className="table-header">Zweck / Beleg</th>
+                <th className="table-header text-right">{t("payments.amount", locale)}</th>
+                <th className="table-header">{t("payments.status", locale)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kassenListe.map((z: any) => (
+                <tr key={z.id} className="hover:bg-surface-50/70">
+                  <td className="table-cell text-sm">{new Date(z.kassen_datum).toLocaleDateString("de-DE")}</td>
+                  <td className="table-cell text-sm font-semibold">{z.patients?.nachname}, {z.patients?.vorname}</td>
+                  <td className="table-cell text-sm">{KASSE_ZAHLART[z.zahlart] || z.zahlart}</td>
+                  <td className="table-cell text-sm text-praxis-500">
+                    {z.zweck || "—"}
+                    {z.beleg_nr ? <span className="block text-[11px] text-praxis-400">{z.beleg_nr}</span> : null}
+                  </td>
+                  <td className="table-cell text-right text-base font-bold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
+                  <td className="table-cell text-sm">
+                    {z.zahlart === "qr_ueberweisung"
+                      ? (z.transaktion_id
+                        ? <span style={{ color: "#4ca43f", fontWeight: 600 }}>eingegangen</span>
+                        : <span className="text-praxis-400">wartet auf Geldeingang</span>)
+                      : <span style={{ color: "#4ca43f", fontWeight: 600 }}>erhalten</span>}
+                  </td>
+                </tr>
+              ))}
+              {kassenListe.length === 0 && (
+                <tr><td className="table-cell text-sm text-praxis-400" colSpan={6}>Noch keine Kassen-Zahlungen erfasst.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <div
         className="overflow-hidden rounded-[16px] border"
         style={{
@@ -494,6 +561,7 @@ export default function ZahlungenPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Rücklastschriften */}
       <div className="stat-card">
