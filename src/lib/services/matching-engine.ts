@@ -425,6 +425,10 @@ export async function runBatchMatching(): Promise<{
       kategorie = "umbuchung";
     } else if (/kartenumsaetze|payone|rueckueberweisung/i.test(zweckUndAbsender)) {
       kategorie = "kartenterminal";
+    } else if (/eink\.st|aufl(ö|oe)sung konto|kontoaufl(ö|oe)sung|kontosaldos wegen|kartenbeladung|miet(ü|ue)berschuss|schaden-nr|maximalentschaedigung/i.test(zweckUndAbsender)) {
+      // Sonderverkehr: Steuererstattungen, Kontoaufloesungen, Versicherung,
+      // Miete u.ae. - legitime Eingaenge, aber kein Patientengeld.
+      kategorie = "sonderverkehr";
     }
     if (kategorie) {
       await db.from("transaktionen").update({
