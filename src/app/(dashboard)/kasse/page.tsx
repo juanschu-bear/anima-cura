@@ -183,7 +183,7 @@ export default function KassePage() {
     const zeichen = patient.ivoris_nummer || null;
     const zweckFinal = zahlart === "qr_ueberweisung"
       ? (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient.nachname || ""}`).trim()
-      : null;
+      : leistung;
     const { data: kz, error } = await supabase.from("kassen_zahlungen").insert({
       patient_id: patient.id,
       betrag: b,
@@ -295,22 +295,23 @@ export default function KassePage() {
             </div>
           </div>
 
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-praxis-500">Leistung (wofür wird gezahlt)</span>
+            <select
+              className="input w-full"
+              value={leistung}
+              onChange={(e) => { setLeistung(e.target.value); setZweckManuell(null); }}
+            >
+              {LEISTUNGEN.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </label>
+
           {zahlart === "qr_ueberweisung" && patient ? (() => {
             const standard = `${leistung} ${patient.ivoris_nummer || ""} ${patient.nachname || ""}`.trim();
             const zweck = zweckManuell ?? standard;
             const ohneZeichen = patient.ivoris_nummer && !zweck.includes(patient.ivoris_nummer);
             return (
               <div className="space-y-2">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-praxis-500">Leistung</span>
-                  <select
-                    className="input w-full"
-                    value={leistung}
-                    onChange={(e) => { setLeistung(e.target.value); setZweckManuell(null); }}
-                  >
-                    {LEISTUNGEN.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-praxis-500">Verwendungszweck im QR (anpassbar)</span>
                   <input
@@ -469,6 +470,12 @@ export default function KassePage() {
       <Modal open={!!detail} onClose={() => setDetail(null)} title="Kassen-Eintrag" size="sm">
         {detail ? (
           <div className="space-y-3 text-sm">
+            {detail.beleg_nr ? (
+              <div className="flex items-center justify-between">
+                <span className="text-praxis-400">Beleg-Nr.</span>
+                <span className="font-semibold">{detail.beleg_nr}</span>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between">
               <span className="text-praxis-400">Patient</span>
               <span className="font-semibold">{detail.patients?.nachname}, {detail.patients?.vorname}</span>
@@ -508,6 +515,14 @@ export default function KassePage() {
                 <p className="mt-1 text-xs text-praxis-400">GiroCode, kann jederzeit erneut gescannt werden.</p>
               </div>
             ) : null}
+            <a
+              href={`/kasse/beleg?id=${detail.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary block w-full text-center text-xs"
+            >
+              Beleg anzeigen / drucken
+            </a>
             {!detail.transaktion_id ? (
               loeschBestaetigung ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-red-400/40 p-3">
