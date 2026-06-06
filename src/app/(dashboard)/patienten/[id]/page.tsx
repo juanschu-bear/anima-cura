@@ -9,11 +9,70 @@ import { Skeleton, StatusBadge } from "@/components/ui";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 import PatientPortalAdmin from "@/components/patient/PatientPortalAdmin";
+import { createBrowserClient } from "@/lib/db/supabase";
+
+const supabaseDetail = createBrowserClient();
+
+const KASSE_ZAHLART: Record<string, string> = {
+  qr_ueberweisung: "QR-Überweisung",
+  girocard: "Girocard",
+  kreditkarte: "Kreditkarte",
+  bar: "Bar",
+};
 
 export default function PatientDetailPage() {
   const params = useParams();
   const { theme, locale } = useAppStore();
   const { patient, loading } = usePatient(params.id as string);
+  const [geldbewegungen, setGeldbewegungen] = useState<any[]>([]);
+
+  useEffect(() => {
+    const pid = params.id as string;
+    if (!pid) return;
+    (async () => {
+      const [kasse, bank] = await Promise.all([
+        supabaseDetail.from("kassen_zahlungen")
+          .select("id, betrag, zahlart, zweck, kassen_datum, transaktion_id, beleg_nr")
+          .eq("patient_id", pid)
+          .order("kassen_datum", { ascending: false })
+          .limit(25),
+        supabaseDetail.from("transaktionen")
+          .select("id, betrag, datum, verwendungszweck, matching_status")
+          .eq("matched_patient_id", pid)
+          .in("matching_status", ["auto", "manuell"])
+          .order("datum", { ascending: false })
+          .limit(25),
+      ]);
+      const liste: any[] = [];
+      for (const k of kasse.data || []) {
+        // Verknuepfte QR-Zahlungen erscheinen ueber die Bankzeile,
+        // sonst stuenden sie doppelt da.
+        if (k.zahlart === "qr_ueberweisung" && k.transaktion_id) continue;
+        liste.push({
+          id: `k-${k.id}`,
+          datum: k.kassen_datum,
+          quelle: `Kasse · ${KASSE_ZAHLART[k.zahlart] || k.zahlart}`,
+          zweck: k.zweck || "",
+          betrag: Number(k.betrag),
+          status: k.zahlart === "qr_ueberweisung" && !k.transaktion_id ? "wartet auf Geldeingang" : "erhalten",
+          beleg: k.beleg_nr || null,
+        });
+      }
+      for (const b of bank.data || []) {
+        liste.push({
+          id: `b-${b.id}`,
+          datum: b.datum,
+          quelle: "Bank",
+          zweck: b.verwendungszweck || "",
+          betrag: Number(b.betrag),
+          status: "bestätigt",
+          beleg: null,
+        });
+      }
+      liste.sort((a, b) => (a.datum < b.datum ? 1 : -1));
+      setGeldbewegungen(liste.slice(0, 25));
+    })();
+  }, [params.id]);
 
   if (loading) {
     return (
@@ -201,6 +260,38 @@ export default function PatientDetailPage() {
           <Legend color="bg-accent-coral" label={t("detail.overdue", locale)} />
           <Legend color="bg-white border border-surface-200" label={t("detail.pending", locale)} />
         </div>
+      </div>
+
+      <div className="stat-card">
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">Zahlungen (Kasse &amp; Bank)</h3>
+        {geldbewegungen.length === 0 ? (
+          <p className="text-sm text-praxis-400">Noch keine Zahlungen erfasst oder zugeordnet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-surface-50">
+                  <th className="table-header">Datum</th>
+                  <th className="table-header">Weg</th>
+                  <th className="table-header">Zweck</th>
+                  <th className="table-header text-right">Betrag</th>
+                  <th className="table-header">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {geldbewegungen.map((g) => (
+                  <tr key={g.id} className="hover:bg-surface-50/70">
+                    <td className="table-cell text-sm">{new Date(g.datum).toLocaleDateString("de-DE")}</td>
+                    <td className="table-cell text-sm">{g.quelle}{g.beleg ? <span className="block text-[11px] text-praxis-400">{g.beleg}</span> : null}</td>
+                    <td className="table-cell max-w-[280px] truncate text-sm text-praxis-500">{g.zweck}</td>
+                    <td className="table-cell text-right text-base font-bold">{g.betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
+                    <td className="table-cell text-sm">{g.status === "wartet auf Geldeingang" ? <span className="text-praxis-400">{g.status}</span> : <span style={{ color: "#4ca43f", fontWeight: 600 }}>{g.status}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="stat-card">
