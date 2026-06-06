@@ -184,21 +184,45 @@ export default function ZahlungenPage() {
     { key: "manuell", label: t("payments.filter.manual", locale) },
     { key: "unklar", label: t("payments.filter.unclear", locale) },
     { key: "ignoriert", label: t("payments.filter.ignored", locale) },
-    { key: "kasse", label: locale === "en" ? "Till (cash/card)" : "Kasse (Bar/Karte)" },
+    { key: "erhalten", label: locale === "en" ? "Received (till)" : "Erhalten (Kasse)" },
+    { key: "wartet", label: locale === "en" ? "Awaiting funds" : "Wartet" },
   ];
-  const visibleTransactions = clientTx.filter((tx) => (statusFilter === "alle" ? true : tx.matching_status === statusFilter));
+  const visibleTransactions = clientTx
+    .filter((tx) => {
+      // "erhalten"/"wartet" sind reine Kassen-Zustaende
+      if (statusFilter === "erhalten" || statusFilter === "wartet") return false;
+      return statusFilter === "alle" ? true : tx.matching_status === statusFilter;
+    })
+    .filter((tx) => (wegFilter === "alle" ? true : wegVonTransaktion(tx).gruppe === wegFilter));
 
   const [kassenListe, setKassenListe] = useState<any[]>([]);
+  const [wegFilter, setWegFilter] = useState("alle");
   useEffect(() => {
-    if (statusFilter !== "kasse") return;
     const db = createBrowserClient();
     db.from("kassen_zahlungen")
       .select("*, patients:patient_id(vorname, nachname)")
       .order("kassen_datum", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(100)
-      .then(({ data }) => setKassenListe(data || []));
-  }, [statusFilter]);
+      .then(({ data }) => setKassenListe(
+        // Verknuepfte QR-Zahlungen leben als Bankzeile weiter
+        (data || []).filter((z: any) => z.zahlart !== "qr_ueberweisung" || !z.transaktion_id)
+      ));
+  }, []);
+
+  function wegVonTransaktion(tx: any): { gruppe: string; w1: string; w2: string } {
+    const methode = tx?.matching_details?.methode;
+    if (methode === "animapay_kasse") return { gruppe: "kasse", w1: "AnimaPay Kasse", w2: "QR-Überweisung" };
+    if (methode === "animapay_app") return { gruppe: "app", w1: "AnimaPay App", w2: "QR-Überweisung" };
+    return { gruppe: "bank", w1: "Bank", w2: "Überweisung" };
+  }
+
+  const kassenSichtbar = kassenListe.filter((z: any) => {
+    const status = z.zahlart === "qr_ueberweisung" ? "wartet" : "erhalten";
+    const statusOk = statusFilter === "alle" || statusFilter === status;
+    const wegOk = wegFilter === "alle" || wegFilter === "kasse";
+    return statusOk && wegOk;
+  });
 
   const KASSE_ZAHLART: Record<string, string> = {
     qr_ueberweisung: "QR-Überweisung",
@@ -300,16 +324,36 @@ export default function ZahlungenPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => { setStatusFilter(f.key); setPage(1); }}
-            className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div>
+        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Status</p>
+        <div className="flex flex-wrap gap-2">
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setStatusFilter(f.key); setPage(1); }}
+              className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zahlungsweg</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "alle", label: locale === "en" ? "All" : "Alle" },
+            { key: "kasse", label: "AnimaPay Kasse" },
+            { key: "app", label: "AnimaPay App" },
+            { key: "bank", label: "Bank" },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setWegFilter(f.key); setPage(1); }}
+              className={`ac-chip ${wegFilter === f.key ? "ac-chip-active" : ""}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div
@@ -345,53 +389,6 @@ export default function ZahlungenPage() {
         {t("payments.actionsDesc", locale)}
       </div>
 
-      {statusFilter === "kasse" ? (
-        <div
-          className="overflow-hidden rounded-[16px] border"
-          style={{
-            borderColor: "var(--ac-border)",
-            background: "var(--ac-surface)",
-            boxShadow: "var(--ac-shadow-soft)",
-          }}
-        >
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: "var(--ac-surface-muted)" }}>
-                <th className="table-header">{t("payments.date", locale)}</th>
-                <th className="table-header">Patient</th>
-                <th className="table-header">Zahlart</th>
-                <th className="table-header">Zweck / Beleg</th>
-                <th className="table-header text-right">{t("payments.amount", locale)}</th>
-                <th className="table-header">{t("payments.status", locale)}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kassenListe.map((z: any) => (
-                <tr key={z.id} className="hover:bg-surface-50/70">
-                  <td className="table-cell text-sm">{new Date(z.kassen_datum).toLocaleDateString("de-DE")}</td>
-                  <td className="table-cell text-sm font-semibold">{z.patients?.nachname}, {z.patients?.vorname}</td>
-                  <td className="table-cell text-sm">{KASSE_ZAHLART[z.zahlart] || z.zahlart}</td>
-                  <td className="table-cell text-sm text-praxis-500">
-                    {z.zweck || "—"}
-                    {z.beleg_nr ? <span className="block text-[11px] text-praxis-400">{z.beleg_nr}</span> : null}
-                  </td>
-                  <td className="table-cell text-right text-base font-bold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
-                  <td className="table-cell text-sm">
-                    {z.zahlart === "qr_ueberweisung"
-                      ? (z.transaktion_id
-                        ? <span style={{ color: "#4ca43f", fontWeight: 600 }}>eingegangen</span>
-                        : <span className="text-praxis-400">wartet auf Geldeingang</span>)
-                      : <span style={{ color: "#4ca43f", fontWeight: 600 }}>erhalten</span>}
-                  </td>
-                </tr>
-              ))}
-              {kassenListe.length === 0 && (
-                <tr><td className="table-cell text-sm text-praxis-400" colSpan={6}>Noch keine Kassen-Zahlungen erfasst.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : (
       <div
         className="overflow-hidden rounded-[16px] border"
         style={{
@@ -405,6 +402,7 @@ export default function ZahlungenPage() {
             <tr style={{ background: "var(--ac-surface-muted)" }}>
               <th className="table-header">{t("payments.date", locale)}</th>
               <th className="table-header">{t("payments.sender", locale)}</th>
+              <th className="table-header">{locale === "en" ? "Channel" : "Weg"}</th>
               <th className="table-header text-right">{t("payments.amount", locale)}</th>
               <th className="table-header">{t("payments.purpose", locale)}</th>
               <th className="table-header">{t("payments.status", locale)}</th>
@@ -413,6 +411,30 @@ export default function ZahlungenPage() {
             </tr>
           </thead>
           <tbody>
+            {page === 1 && kassenSichtbar.map((z: any) => (
+              <tr key={`kz-${z.id}`} className="transition-colors">
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(z.kassen_datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
+                <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
+                <td className="table-cell py-3 text-sm">
+                  <span>
+                    <span className="block font-bold" style={{ color: "#4ade80" }}>AnimaPay Kasse</span>
+                    <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.zahlart === "qr_ueberweisung" ? "QR-Überweisung" : z.zahlart === "girocard" ? "Girocard" : z.zahlart === "kreditkarte" ? "Kreditkarte" : "Bar"}</span>
+                  </span>
+                </td>
+                <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(z.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+                  {z.zweck || "—"}
+                  {z.beleg_nr ? <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.beleg_nr}</span> : null}
+                </td>
+                <td className="table-cell py-3">
+                  {z.zahlart === "qr_ueberweisung"
+                    ? <span className="text-sm" style={{ color: "var(--ac-text-soft)" }}>wartet auf Geldeingang</span>
+                    : <span className="text-sm font-semibold" style={{ color: "#4ca43f" }}>erhalten</span>}
+                </td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-mute)" }}>—</td>
+              </tr>
+            ))}
             {visibleTransactions.map((tx) => (
               <tr
                 key={tx.id}
@@ -427,6 +449,17 @@ export default function ZahlungenPage() {
               >
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
                 <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{tx.absender_name}</td>
+                <td className="table-cell py-3 text-sm">
+                  {(() => {
+                    const w = wegVonTransaktion(tx);
+                    return (
+                      <span>
+                        <span className="block font-bold" style={{ color: w.gruppe === "kasse" ? "#4ade80" : w.gruppe === "app" ? "#7aa2ff" : "var(--ac-text-soft)" }}>{w.w1}</span>
+                        <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{w.w2}</span>
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>{tx.verwendungszweck || "—"}</td>
                 <td className="table-cell py-3">
@@ -561,7 +594,18 @@ export default function ZahlungenPage() {
           </div>
         )}
       </div>
-      )}
+
+      <div
+        className="rounded-lg border px-4 py-3 text-sm"
+        style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)", color: "var(--ac-text-soft)" }}
+      >
+        <span className="font-bold" style={{ color: "var(--ac-text)" }}>Lesehilfe Zahlungsweg:</span>{" "}
+        <span style={{ color: "#4ade80", fontWeight: 700 }}>AnimaPay Kasse</span> kam über den Tresen (QR, Bar, Girocard, Kreditkarte),{" "}
+        <span style={{ color: "#7aa2ff", fontWeight: 700 }}>AnimaPay App</span> zahlt der Patient künftig selbst im Portal,{" "}
+        <span className="font-bold">Bank</span> sind fremde Überweisungen, die das System entziffert.
+        Eine Kasse-QR-Zahlung erscheint genau einmal: erst als „wartet auf Geldeingang", nach Eintreffen als bestätigte Zeile mit demselben Weg.
+        Bar- und Kartenzeilen haben keine Aktionen, da gibt es nichts zuzuordnen.
+      </div>
 
       {/* Rücklastschriften */}
       <div className="stat-card">
