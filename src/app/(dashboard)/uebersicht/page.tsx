@@ -35,6 +35,8 @@ export default function UebersichtPage() {
     aktiv: number; inaktiv: number; aktivUnbekannt: number;
     aligner: number; multiband: number; artUnbekannt: number;
     kinder: number; erwachsene: number; alterUnbekannt: number;
+    aktivKinder: number; aktivErwachsene: number;
+    inaktivKinder: number; inaktivErwachsene: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [engagement, setEngagement] = useState<any>(null);
@@ -69,7 +71,7 @@ export default function UebersichtPage() {
       const geschlechtMap: Record<string, number> = {};
       let mitEmail = 0;
       let mitTelefon = 0;
-      const st = { aktiv: 0, inaktiv: 0, aktivUnbekannt: 0, aligner: 0, multiband: 0, artUnbekannt: 0, kinder: 0, erwachsene: 0, alterUnbekannt: 0 };
+      const st = { aktiv: 0, inaktiv: 0, aktivUnbekannt: 0, aligner: 0, multiband: 0, artUnbekannt: 0, kinder: 0, erwachsene: 0, alterUnbekannt: 0, aktivKinder: 0, aktivErwachsene: 0, inaktivKinder: 0, inaktivErwachsene: 0 };
       const stichtag = new Date();
       stichtag.setFullYear(stichtag.getFullYear() - 18);
 
@@ -98,12 +100,18 @@ export default function UebersichtPage() {
         if (art.includes("aligner")) st.aligner++;
         else if (art.includes("multiband") || art.includes("multibracket")) st.multiband++;
         else st.artUnbekannt++;
+        let altersgruppe: "kind" | "erwachsen" | null = null;
         if (p.geburtsdatum) {
           const geb = new Date(p.geburtsdatum);
           if (isNaN(geb.getTime())) st.alterUnbekannt++;
-          else if (geb > stichtag) st.kinder++;
-          else st.erwachsene++;
+          else if (geb > stichtag) { st.kinder++; altersgruppe = "kind"; }
+          else { st.erwachsene++; altersgruppe = "erwachsen"; }
         } else st.alterUnbekannt++;
+        // Kreuz-Auswertung: Alter innerhalb der Aktivitaet
+        if (p.aktiv === true && altersgruppe === "kind") st.aktivKinder++;
+        if (p.aktiv === true && altersgruppe === "erwachsen") st.aktivErwachsene++;
+        if (p.aktiv === false && altersgruppe === "kind") st.inaktivKinder++;
+        if (p.aktiv === false && altersgruppe === "erwachsen") st.inaktivErwachsene++;
       }
       setStruktur(st);
 
@@ -218,7 +226,9 @@ export default function UebersichtPage() {
               <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Aktivität</p>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span>Aktiv in Behandlung</span><span className="font-bold">{struktur.aktiv || "—"}</span></div>
+                <div className="flex justify-between text-xs" style={{ color: "var(--ac-text-mute)" }}><span>davon Kinder · Erwachsene</span><span>{struktur.aktiv ? `${struktur.aktivKinder} · ${struktur.aktivErwachsene}` : "— · —"}</span></div>
                 <div className="flex justify-between"><span>Nicht aktiv</span><span className="font-bold">{struktur.inaktiv || "—"}</span></div>
+                <div className="flex justify-between text-xs" style={{ color: "var(--ac-text-mute)" }}><span>davon Kinder · Erwachsene</span><span>{struktur.inaktiv ? `${struktur.inaktivKinder} · ${struktur.inaktivErwachsene}` : "— · —"}</span></div>
                 <div className="flex justify-between" style={{ color: "var(--ac-text-mute)" }}><span>Noch unbekannt</span><span>{struktur.aktivUnbekannt}</span></div>
               </div>
             </div>
