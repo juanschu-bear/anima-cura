@@ -44,7 +44,8 @@ export default function KassePage() {
   const [saving, setSaving] = useState(false);
   const [hinweis, setHinweis] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [qrInfo, setQrInfo] = useState<{ name: string; betrag: number; zweck: string } | null>(null);
+  const [qrInfo, setQrInfo] = useState<{ kzId: string; name: string; betrag: number; zweck: string; eingegangen: boolean } | null>(null);
+  const [pruefe, setPruefe] = useState(false);
   const [tagesListe, setTagesListe] = useState<any[]>([]);
 
   const treffer = useMemo(
@@ -68,6 +69,37 @@ export default function KassePage() {
     return s;
   }, [tagesListe]);
 
+  // Holt frische Bankdaten und verknuepft wartende QR-Zahlungen mit
+  // eingetroffenen Ueberweisungen (Zeichen im Zweck + exakter Betrag).
+  async function pruefeEingaenge() {
+    setPruefe(true);
+    try { await fetch("/api/finapi/transactions", { method: "POST" }); } catch { /* Sync-Fehler unten sichtbar */ }
+    const { data: offene } = await supabase
+      .from("kassen_zahlungen")
+      .select("id, betrag, zeichen, kassen_datum")
+      .eq("zahlart", "qr_ueberweisung")
+      .is("transaktion_id", null);
+    for (const kz of offene || []) {
+      if (!kz.zeichen) continue;
+      const { data: tx } = await supabase
+        .from("transaktionen")
+        .select("id")
+        .gt("finapi_id", 0)
+        .gte("datum", kz.kassen_datum)
+        .eq("betrag", kz.betrag)
+        .ilike("verwendungszweck", `%${kz.zeichen}%`)
+        .limit(1);
+      if (tx?.length) {
+        await supabase.from("kassen_zahlungen")
+          .update({ transaktion_id: tx[0].id, abgleich_status: "eingegangen" })
+          .eq("id", kz.id);
+        if (qrInfo && qrInfo.kzId === kz.id) setQrInfo({ ...qrInfo, eingegangen: true });
+      }
+    }
+    setPruefe(false);
+    ladeTagesliste();
+  }
+
   async function speichern() {
     setHinweis("");
     const b = parseBetrag(betrag);
@@ -76,13 +108,13 @@ export default function KassePage() {
 
     setSaving(true);
     const zeichen = patient.ivoris_nummer || null;
-    const { error } = await supabase.from("kassen_zahlungen").insert({
+    const { data: kz, error } = await supabase.from("kassen_zahlungen").insert({
       patient_id: patient.id,
       betrag: b,
       zahlart,
       zeichen,
       notiz: notiz || null,
-    });
+    }).select().single();
     if (error) {
       setHinweis(`Speichern fehlgeschlagen: ${error.message}`);
       setSaving(false);
@@ -93,7 +125,7 @@ export default function KassePage() {
       const zweck = `Behandlung ${zeichen || ""} ${patient.nachname || ""}`.trim();
       const url = await QRCode.toDataURL(epcPayload(b, zweck), { width: 280, margin: 1 });
       setQrDataUrl(url);
-      setQrInfo({ name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck });
+      setQrInfo({ kzId: kz.id, name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck, eingegangen: false });
     } else {
       setQrDataUrl(null);
       setQrInfo(null);
@@ -198,18 +230,39 @@ export default function KassePage() {
         {/* QR / Tagesübersicht */}
         <div className="space-y-5">
           {qrDataUrl && qrInfo && (
-            <div className="stat-card text-center space-y-2">
+            <div className="stat-card relative text-center space-y-2">
+              <button
+                onClick={() => { setQrDataUrl(null); setQrInfo(null); }}
+                className="absolute right-3 top-3 text-praxis-400 hover:text-praxis-600"
+                aria-label="QR-Code schließen"
+              >
+                <X size={18} />
+              </button>
               <p className="text-sm font-semibold">GiroCode für {qrInfo.name}</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrDataUrl} alt="GiroCode" className="mx-auto rounded-lg" />
               <p className="text-lg font-bold">{qrInfo.betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</p>
               <p className="text-xs text-praxis-400">Verwendungszweck: {qrInfo.zweck}</p>
               <p className="text-xs text-praxis-400">Patient scannt mit der Banking-App, alle Felder sind vorausgefüllt.</p>
+              {qrInfo.eingegangen ? (
+                <p className="flex items-center justify-center gap-1 text-sm font-semibold text-[#5f9339]">
+                  <Check size={16} /> Zahlung eingegangen
+                </p>
+              ) : (
+                <button className="btn-secondary" onClick={pruefeEingaenge} disabled={pruefe}>
+                  {pruefe ? "Prüft …" : "Eingang prüfen"}
+                </button>
+              )}
             </div>
           )}
 
           <div className="stat-card">
-            <p className="mb-3 text-sm font-semibold">Heute erfasst</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold">Heute erfasst</p>
+              <button className="btn-secondary text-xs" onClick={pruefeEingaenge} disabled={pruefe}>
+                {pruefe ? "Prüft …" : "Eingang prüfen"}
+              </button>
+            </div>
             <div className="mb-3 flex flex-wrap gap-2">
               {ZAHLARTEN.map(({ key, label }) => (
                 <span key={key} className="ac-chip text-xs">
@@ -224,7 +277,14 @@ export default function KassePage() {
                 {tagesListe.map((z: any) => (
                   <div key={z.id} className="flex items-center justify-between border-b border-surface-100 py-1.5 text-sm last:border-0">
                     <span>{z.patients?.nachname}, {z.patients?.vorname}</span>
-                    <span className="text-xs text-praxis-400">{ZAHLARTEN.find(a => a.key === z.zahlart)?.label}</span>
+                    <span className="text-xs text-praxis-400">
+                      {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
+                      {z.zahlart === "qr_ueberweisung" ? (
+                        z.transaktion_id
+                          ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen</span>
+                          : <span className="ml-1">· wartet</span>
+                      ) : null}
+                    </span>
                     <span className="font-semibold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
                   </div>
                 ))}
