@@ -69,11 +69,12 @@ export default function KassePage() {
     return s;
   }, [tagesListe]);
 
-  // Holt frische Bankdaten und verknuepft wartende QR-Zahlungen mit
-  // eingetroffenen Ueberweisungen (Zeichen im Zweck + exakter Betrag).
+  // Verknuepft wartende QR-Zahlungen mit bereits abgeholten
+  // Ueberweisungen (Zeichen im Zweck + exakter Betrag). Loest bewusst
+  // KEINEN Bank-Abruf aus (PSD2-Tagesbudget); frische Daten bringen
+  // Morgen-Cron und Sync-Knopf.
   async function pruefeEingaenge() {
     setPruefe(true);
-    try { await fetch("/api/finapi/transactions", { method: "POST" }); } catch { /* Sync-Fehler unten sichtbar */ }
     const { data: offene } = await supabase
       .from("kassen_zahlungen")
       .select("id, betrag, zeichen, kassen_datum")
@@ -264,6 +265,9 @@ export default function KassePage() {
               </button>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
+              <span className="ac-chip ac-chip-active text-xs">
+                Gesamt: {tagesListe.length} {tagesListe.length === 1 ? "Zahlung" : "Zahlungen"} · {tagesListe.reduce((s, z) => s + Number(z.betrag), 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+              </span>
               {ZAHLARTEN.map(({ key, label }) => (
                 <span key={key} className="ac-chip text-xs">
                   {label}: {(tagesSummen[key] || 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
