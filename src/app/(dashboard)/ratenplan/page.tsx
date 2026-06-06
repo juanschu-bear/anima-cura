@@ -53,6 +53,7 @@ export default function RatenplanPage() {
   async function loadSollZahlungen(plan: any) {
     if (!plan?.patient_id || sollZahlungen[plan.id]) return;
     setSollZahlungen(prev => ({ ...prev, [plan.id]: "laedt" }));
+    const supabase = createBrowserClient();
     const seit = new Date(plan.start_datum);
     seit.setDate(seit.getDate() - 31); // Puffer: Erstzahlung kurz vor Planstart
     const { data } = await supabase

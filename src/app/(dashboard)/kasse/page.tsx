@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Banknote, Check, CreditCard, QrCode, Search, X } from "lucide-react";
 import QRCode from "qrcode";
-import { supabase } from "@/lib/supabase";
+import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
 
 // Empfangskonto der Praxis (Patientenkonto, steht auf jeder Rechnung).
@@ -31,6 +31,8 @@ function epcPayload(betrag: number, zweck: string): string {
     "", "", zweck.slice(0, 140), "",
   ].join("\n");
 }
+
+const supabase = createBrowserClient();
 
 export default function KassePage() {
   const [patSearch, setPatSearch] = useState("");

@@ -16,6 +16,8 @@ export default function ZahlungenPage() {
   const [statusFilter, setStatusFilter] = useState("alle");
   const [page, setPage] = useState(1);
   const pageSize = 25;
+  const [suche, setSuche] = useState("");
+  const [sucheAktiv, setSucheAktiv] = useState("");
   const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, page, pageSize, suche: sucheAktiv });
 
   // Suche entprellen: erst 350ms nach dem letzten Tastendruck abfragen.
@@ -29,8 +31,6 @@ export default function ZahlungenPage() {
   const { stats, refetch: refetchStats } = useTransaktionenStats();
   const [matchModal, setMatchModal] = useState<any>(null);
   const [patSearch, setPatSearch] = useState("");
-  const [suche, setSuche] = useState("");
-  const [sucheAktiv, setSucheAktiv] = useState("");
   const { patienten } = usePatienten(patSearch);
   const [syncing, setSyncing] = useState(false);
   const [syncHint, setSyncHint] = useState("");
