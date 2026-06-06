@@ -31,6 +31,11 @@ export default function UebersichtPage() {
   const { alerts, markRead } = useAlerts();
   const { transaktionen } = useTransaktionen({ status: "alle" });
   const [stats, setStats] = useState<PraxisStats | null>(null);
+  const [struktur, setStruktur] = useState<{
+    aktiv: number; inaktiv: number; aktivUnbekannt: number;
+    aligner: number; multiband: number; artUnbekannt: number;
+    kinder: number; erwachsene: number; alterUnbekannt: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [engagement, setEngagement] = useState<any>(null);
   const [engDays, setEngDays] = useState(30);
@@ -51,7 +56,7 @@ export default function UebersichtPage() {
       // Behandlung
       const { data: allPatients } = await supabase
         .from("patients")
-        .select("behandlung, kasse, geschlecht, email, telefon, versicherung_status")
+        .select("behandlung, kasse, geschlecht, email, telefon, versicherung_status, geburtsdatum, aktiv, behandlungsart")
         .range(0, 9999);
 
       if (!allPatients) {
@@ -64,6 +69,9 @@ export default function UebersichtPage() {
       const geschlechtMap: Record<string, number> = {};
       let mitEmail = 0;
       let mitTelefon = 0;
+      const st = { aktiv: 0, inaktiv: 0, aktivUnbekannt: 0, aligner: 0, multiband: 0, artUnbekannt: 0, kinder: 0, erwachsene: 0, alterUnbekannt: 0 };
+      const stichtag = new Date();
+      stichtag.setFullYear(stichtag.getFullYear() - 18);
 
       for (const p of allPatients) {
         const beh = p.behandlung || "Kein Status";
@@ -81,7 +89,23 @@ export default function UebersichtPage() {
 
         if (p.email) mitEmail++;
         if (p.telefon) mitTelefon++;
+
+        // Patientenstruktur: Geruest fuer kommende ivoris-Daten
+        if (p.aktiv === true) st.aktiv++;
+        else if (p.aktiv === false) st.inaktiv++;
+        else st.aktivUnbekannt++;
+        const art = (p.behandlungsart || "").toLowerCase();
+        if (art.includes("aligner")) st.aligner++;
+        else if (art.includes("multiband") || art.includes("multibracket")) st.multiband++;
+        else st.artUnbekannt++;
+        if (p.geburtsdatum) {
+          const geb = new Date(p.geburtsdatum);
+          if (isNaN(geb.getTime())) st.alterUnbekannt++;
+          else if (geb > stichtag) st.kinder++;
+          else st.erwachsene++;
+        } else st.alterUnbekannt++;
       }
+      setStruktur(st);
 
       // Raten & Mahnungen
       const { count: offeneRaten } = await supabase
@@ -178,6 +202,45 @@ export default function UebersichtPage() {
           </>
         )}
       </div>
+
+      {/* Patientenstruktur: Geruest, fuellt sich mit den ivoris-Vertragsdaten */}
+      {!loading && struktur && (
+        <div className="stat-card">
+          <h3 className="ac-section-title mb-1 flex items-center gap-2">
+            <Circle size={11} className="fill-[#2cb88a] text-[#2cb88a]" />
+            Patientenstruktur
+          </h3>
+          <p className={`mb-4 text-xs ${isDark ? "text-[#8fa2bf]" : "text-praxis-400"}`}>
+            Aktivität und Behandlungsart füllen sich, sobald die Vertrags- und Plandaten aus ivoris übernommen sind. Das Alter rechnet bereits live.
+          </p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-surface-200 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Aktivität</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span>Aktiv in Behandlung</span><span className="font-bold">{struktur.aktiv || "—"}</span></div>
+                <div className="flex justify-between"><span>Nicht aktiv</span><span className="font-bold">{struktur.inaktiv || "—"}</span></div>
+                <div className="flex justify-between" style={{ color: "var(--ac-text-mute)" }}><span>Noch unbekannt</span><span>{struktur.aktivUnbekannt}</span></div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-surface-200 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Behandlungsart</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span>Aligner</span><span className="font-bold">{struktur.aligner || "—"}</span></div>
+                <div className="flex justify-between"><span>Multiband</span><span className="font-bold">{struktur.multiband || "—"}</span></div>
+                <div className="flex justify-between" style={{ color: "var(--ac-text-mute)" }}><span>Noch unbekannt</span><span>{struktur.artUnbekannt}</span></div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-surface-200 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Alter</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span>Kinder &amp; Jugendliche (unter 18)</span><span className="font-bold">{struktur.kinder}</span></div>
+                <div className="flex justify-between"><span>Erwachsene</span><span className="font-bold">{struktur.erwachsene}</span></div>
+                <div className="flex justify-between" style={{ color: "var(--ac-text-mute)" }}><span>Ohne Geburtsdatum</span><span>{struktur.alterUnbekannt}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Behandlungsverteilung */}
       {!loading && stats && (
