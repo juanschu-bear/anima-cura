@@ -10,6 +10,18 @@ import { usePatienten } from "@/hooks/useData";
 const PRAXIS_NAME = "Dr. Maria Elena Schubert";
 const PRAXIS_IBAN = "DE03860555921090118941";
 
+// Was an der Kasse typischerweise berechnet wird. Baut den
+// Verwendungszweck mit; spaeter ueber Einstellungen pflegbar.
+const LEISTUNGEN = [
+  "Behandlung",
+  "Anfangsdiagnostik",
+  "Retainer",
+  "Prophylaxe",
+  "Rate",
+  "Eigenanteil",
+  "Material",
+] as const;
+
 const ZAHLARTEN = [
   { key: "qr_ueberweisung", label: "QR-Überweisung", icon: QrCode },
   { key: "girocard", label: "Girocard", icon: CreditCard },
@@ -41,6 +53,8 @@ export default function KassePage() {
   const [betrag, setBetrag] = useState("");
   const [zahlart, setZahlart] = useState<(typeof ZAHLARTEN)[number]["key"]>("qr_ueberweisung");
   const [notiz, setNotiz] = useState("");
+  const [leistung, setLeistung] = useState<string>(LEISTUNGEN[0]);
+  const [zweckManuell, setZweckManuell] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hinweis, setHinweis] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -134,7 +148,7 @@ export default function KassePage() {
     }
 
     if (zahlart === "qr_ueberweisung") {
-      const zweck = `Behandlung ${zeichen || ""} ${patient.nachname || ""}`.trim();
+      const zweck = (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient.nachname || ""}`).trim();
       const url = await QRCode.toDataURL(epcPayload(b, zweck), { width: 280, margin: 1 });
       setQrDataUrl(url);
       setQrInfo({ kzId: kz.id, name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck, eingegangen: false });
@@ -148,6 +162,8 @@ export default function KassePage() {
     setPatSearch("");
     setBetrag("");
     setNotiz("");
+    setZweckManuell(null);
+    setLeistung(LEISTUNGEN[0]);
     setSaving(false);
     ladeTagesliste();
   }
@@ -229,15 +245,42 @@ export default function KassePage() {
             </div>
           </div>
 
-          {zahlart === "qr_ueberweisung" && patient ? (
-            <div className="rounded-lg border border-surface-200 bg-surface-100/50 px-3 py-2 text-xs text-praxis-500">
-              <span className="font-medium text-praxis-600">Verwendungszweck im QR:</span>{" "}
-              Behandlung {patient.ivoris_nummer} {patient.nachname}
-              <span className="mt-1 block">
-                Gutschrift geht auf {patient.vorname} {patient.nachname}, egal wer überweist (z.&nbsp;B. Eltern). Die Notiz bleibt intern.
-              </span>
-            </div>
-          ) : null}
+          {zahlart === "qr_ueberweisung" && patient ? (() => {
+            const standard = `${leistung} ${patient.ivoris_nummer || ""} ${patient.nachname || ""}`.trim();
+            const zweck = zweckManuell ?? standard;
+            const ohneZeichen = patient.ivoris_nummer && !zweck.includes(patient.ivoris_nummer);
+            return (
+              <div className="space-y-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-praxis-500">Leistung</span>
+                  <select
+                    className="input w-full"
+                    value={leistung}
+                    onChange={(e) => { setLeistung(e.target.value); setZweckManuell(null); }}
+                  >
+                    {LEISTUNGEN.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-praxis-500">Verwendungszweck im QR (anpassbar)</span>
+                  <input
+                    className="input w-full"
+                    value={zweck}
+                    onChange={(e) => setZweckManuell(e.target.value)}
+                  />
+                </label>
+                {ohneZeichen ? (
+                  <p className="text-xs font-semibold text-amber-500">
+                    Achtung: Ohne die Patientennummer {patient.ivoris_nummer} kann der Zahlungseingang nicht automatisch zugeordnet werden.
+                  </p>
+                ) : (
+                  <p className="text-xs text-praxis-400">
+                    Gutschrift geht auf {patient.vorname} {patient.nachname}, egal wer überweist (z.&nbsp;B. Eltern). Die Notiz bleibt intern.
+                  </p>
+                )}
+              </div>
+            );
+          })() : null}
 
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-praxis-500">Notiz (optional)</span>
