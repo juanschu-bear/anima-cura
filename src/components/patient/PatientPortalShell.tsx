@@ -1,5 +1,6 @@
 "use client";
 import { trackEvent } from "@/lib/useTracking";
+import QRCode from "qrcode";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -73,6 +74,48 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consentIsGuardian, setConsentIsGuardian] = useState(false);
   const [deactivatePopup, setDeactivatePopup] = useState<"rechnungen" | "push" | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
+
+  // ── Anima Balance ──
+  const [finSheet, setFinSheet] = useState(false);
+  const [balanceView, setBalanceView] = useState(false);
+  const [balance, setBalance] = useState<{ saldo: number; buchungen: any[]; ivoris_nummer: string; nachname: string } | null>(null);
+  const [aufladenSheet, setAufladenSheet] = useState(false);
+  const [aufladeBetrag, setAufladeBetrag] = useState<number | "frei">(300);
+  const [aufladeFrei, setAufladeFrei] = useState("");
+  const [aufladeQr, setAufladeQr] = useState<string | null>(null);
+  const [rueckholHinweis, setRueckholHinweis] = useState(false);
+
+  const ladeBalance = useCallback(async () => {
+    try {
+      const r = await fetch("/api/patient/balance");
+      if (r.ok) setBalance(await r.json());
+    } catch { /* Portal bleibt nutzbar */ }
+  }, []);
+
+  useEffect(() => {
+    if (balanceView) { ladeBalance(); setRueckholHinweis(false); }
+  }, [balanceView, ladeBalance]);
+
+  useEffect(() => {
+    if (!aufladenSheet || !balance) { setAufladeQr(null); return; }
+    const betrag = aufladeBetrag === "frei" ? parseFloat(aufladeFrei.replace(",", ".")) : aufladeBetrag;
+    if (!betrag || betrag <= 0) { setAufladeQr(null); return; }
+    const zweck = `AUFLADUNG ${balance.ivoris_nummer} ${balance.nachname}`.trim().slice(0, 140);
+    // Hinweis: Empfaenger ist vorerst das Patientenkonto der Praxis.
+    // Sobald das separate Balance-Konto eroeffnet ist, wird hier nur
+    // die IBAN getauscht.
+    const payload = ["BCD", "002", "1", "SCT", "", "Dr. Maria Elena Schubert", "DE03860555921090118941", `EUR${betrag.toFixed(2)}`, "", "", zweck, ""].join("\n");
+    QRCode.toDataURL(payload, { width: 220, margin: 1 }).then(setAufladeQr).catch(() => setAufladeQr(null));
+  }, [aufladenSheet, aufladeBetrag, aufladeFrei, balance]);
+
+  const BAL_TYP: Record<string, string> = {
+    aufladung: "Aufladung per QR",
+    ueberzahlung: "Überzahlung gutgeschrieben",
+    erstattung: "Erstattung",
+    verrechnung: "Verrechnung",
+    auszahlung: "Auszahlung",
+    korrektur: "Korrektur",
+  };
 
   // Check consent status
   useEffect(() => {
@@ -382,7 +425,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           return (
             <motion.button
               key={id}
-              onClick={() => { setTab(id); hapticLight(); }}
+              onClick={() => { if (id === "progress") { setFinSheet(true); } else { setTab(id); setBalanceView(false); } hapticLight(); }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               style={{ position: "relative", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 16px", fontSize: 10, fontWeight: 600, fontFamily: "inherit", color: isActive ? grn : navInactive, transition: "color 0.3s", zIndex: 2 }}
@@ -548,6 +591,60 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ PROGRESS TAB ═══
   const circ = 2 * Math.PI * 76;
   const off = circ - (pct / 100) * circ;
+  const goldRing: React.CSSProperties = {
+    width: 220, height: 220, margin: "8px auto 16px", borderRadius: "50%", position: "relative",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "radial-gradient(circle at 32% 26%, rgba(255,235,180,0.35), transparent 42%), radial-gradient(circle at 70% 80%, rgba(0,0,0,0.5), transparent 55%), conic-gradient(from 210deg, #b88a2e, #f6c453, #fff0c2, #f6c453, #9a7224, #b88a2e)",
+    boxShadow: "0 22px 46px rgba(0,0,0,0.5), 0 0 38px rgba(246,196,83,0.16), inset 0 2px 6px rgba(255,255,255,0.35), inset 0 -10px 22px rgba(0,0,0,0.45)",
+  };
+
+  const BalanceTab = (
+    <div style={{ padding: "0 4px" }}>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 600, color: fg }}>Anima Balance</h1>
+      <p style={{ fontSize: 14, color: muted, margin: "4px 0 14px" }}>Dein Geld bleibt deins, bis behandelt wurde.</p>
+
+      <div style={goldRing}>
+        <div style={{ width: 176, height: 176, borderRadius: "50%", background: dk ? "radial-gradient(circle at 40% 30%, #1b2018, #0c0f0b 70%)" : "radial-gradient(circle at 40% 30%, #fffdf6, #f3ecd9 70%)", boxShadow: "inset 0 6px 16px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+          <span style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: "#f6c453" }}>Guthaben</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 600, color: fg }}>
+            {(balance?.saldo ?? 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })}&nbsp;€
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <button onClick={() => { setAufladenSheet(true); hapticLight(); }} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 700, fontSize: 14, fontFamily: "inherit", background: "linear-gradient(180deg, #ffd97a, #f6c453)", color: "#231a04", boxShadow: "0 8px 20px rgba(246,196,83,0.25)" }}>Aufladen</button>
+        <button onClick={() => setRueckholHinweis(!rueckholHinweis)} style={{ flex: 1, cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 600, fontSize: 14, fontFamily: "inherit", background: "transparent", border: `1px solid ${dk ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.15)"}`, color: muted }}>Zurückholen</button>
+      </div>
+      {rueckholHinweis && (
+        <div style={{ ...card, padding: "12px 14px", marginBottom: 12, fontSize: 13, color: muted }}>
+          Nicht genutztes Guthaben bekommst du jederzeit zurück. Sag der Praxis kurz Bescheid (Chat oder am Tresen), die Rücküberweisung geht auf dein Konto.
+        </div>
+      )}
+
+      <div style={{ ...card, padding: "14px 16px" }}>
+        <span style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: muted }}>Bewegungen</span>
+        {!balance || balance.buchungen.length === 0 ? (
+          <p style={{ fontSize: 13, color: muted, marginTop: 8 }}>
+            Noch keine Bewegungen. Dein Guthaben entsteht durch Aufladen, Überzahlungen oder Erstattungen, ganz von selbst.
+          </p>
+        ) : (
+          balance.buchungen.map((b: any) => (
+            <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 0", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`, fontSize: 13 }}>
+              <span>
+                <span style={{ fontWeight: 600, color: fg }}>{BAL_TYP[b.typ] || b.typ}{b.beschreibung ? ` · ${b.beschreibung}` : ""}</span>
+                <span style={{ display: "block", fontSize: 11, color: muted, marginTop: 1 }}>{new Date(b.created_at).toLocaleDateString("de-DE")}</span>
+              </span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, whiteSpace: "nowrap", color: Number(b.betrag) >= 0 ? grn : "#f08c8c" }}>
+                {Number(b.betrag) >= 0 ? "+" : ""}{Number(b.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })}&nbsp;€
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   const ProgressTab = (
     <div>
       {Header}
@@ -986,11 +1083,65 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <div className="portal-content" style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
         {tab === "home" && HomeTab}
         {tab === "journey" && JourneyTab}
-        {tab === "progress" && ProgressTab}
+        {tab === "progress" && (balanceView ? BalanceTab : ProgressTab)}
         {tab === "chat" && ChatTab}
         {tab === "more" && MoreTab}
       </div>
       {Nav}
+
+      {/* Finanzen-Auswahl: Fortschritt oder Anima Balance */}
+      {finSheet && (
+        <div onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
+            <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
+            <button onClick={() => { setBalanceView(false); setTab("progress"); setFinSheet(false); hapticLight(); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderRadius: 18, padding: "15px 14px", marginBottom: 10, background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", fontFamily: "inherit" }}>
+              <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)" }}>📈</span>
+              <span><b style={{ display: "block", fontSize: 15, color: fg }}>Dein Fortschritt</b><span style={{ fontSize: 12, color: muted }}>Investiert, offen, Raten im Blick</span></span>
+              <span style={{ marginLeft: "auto", color: muted, fontSize: 18 }}>›</span>
+            </button>
+            <button onClick={() => { setBalanceView(true); setTab("progress"); setFinSheet(false); hapticLight(); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: "1px solid rgba(246,196,83,0.55)", borderRadius: 18, padding: "15px 14px", background: "linear-gradient(160deg, rgba(246,196,83,0.14), rgba(255,255,255,0.02))", boxShadow: "0 0 22px rgba(246,196,83,0.12)", fontFamily: "inherit" }}>
+              <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: "rgba(246,196,83,0.16)" }}>🪙</span>
+              <span><b style={{ display: "block", fontSize: 15, color: fg }}>Anima Balance <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: "#231a04", background: "#f6c453", borderRadius: 999, padding: "2px 8px", verticalAlign: "middle" }}>NEU</span></b><span style={{ fontSize: 12, color: muted }}>Dein Guthaben, deine Bewegungen</span></span>
+              <span style={{ marginLeft: "auto", color: muted, fontSize: 18 }}>›</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Aufladen-Sheet mit Betragsleiter und GiroCode */}
+      {aufladenSheet && (
+        <div onClick={() => setAufladenSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px", maxHeight: "85%", overflowY: "auto" }}>
+            <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Guthaben aufladen</h3>
+            <div style={{ display: "flex", gap: 7, marginBottom: 10, flexWrap: "wrap" }}>
+              {([100, 300, 500, 1000, "frei"] as (number | "frei")[]).map((b) => (
+                <button key={String(b)} onClick={() => { setAufladeBetrag(b); hapticLight(); }} style={{ flex: "1 0 17%", cursor: "pointer", borderRadius: 12, padding: "11px 0", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit", border: aufladeBetrag === b ? "1px solid #f6c453" : `1px solid ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`, background: aufladeBetrag === b ? "rgba(246,196,83,0.14)" : "transparent", color: aufladeBetrag === b ? "#f6c453" : muted }}>
+                  {b === "frei" ? "Frei" : `${b} €`}
+                </button>
+              ))}
+            </div>
+            {aufladeBetrag === "frei" && (
+              <input value={aufladeFrei} onChange={(e) => setAufladeFrei(e.target.value)} placeholder="Betrag in €, z. B. 250" inputMode="decimal" style={{ width: "100%", marginBottom: 10, borderRadius: 12, padding: "12px 14px", fontSize: 15, fontFamily: "inherit", border: `1px solid ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.15)"}`, background: "transparent", color: fg, outline: "none" }} />
+            )}
+            {aufladeQr ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={aufladeQr} alt="GiroCode" style={{ display: "block", width: 200, height: 200, margin: "6px auto 10px", borderRadius: 14, background: "#fff", padding: 8 }} />
+                <p style={{ textAlign: "center", fontSize: 12, color: muted, lineHeight: 1.55 }}>
+                  Mit der Banking-App scannen, alles ist vorausgefüllt.<br />
+                  Verwendungszweck: <b style={{ color: fg }}>AUFLADUNG {balance?.ivoris_nummer} {balance?.nachname}</b>
+                </p>
+              </>
+            ) : (
+              <p style={{ textAlign: "center", fontSize: 13, color: muted, padding: "18px 0" }}>Betrag wählen, dann erscheint dein GiroCode.</p>
+            )}
+            <p style={{ textAlign: "center", fontSize: 11, color: muted, marginTop: 10 }}>Nicht genutztes Guthaben holst du dir jederzeit zurück.</p>
+          </div>
+        </div>
+      )}
+
       {popup && (
         <div onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
           <div onClick={e => e.stopPropagation()} style={{ borderRadius: 24, padding: "36px 28px", textAlign: "center", maxWidth: 300, width: "100%", background: cardBg, border: "1px solid " + border }}>
