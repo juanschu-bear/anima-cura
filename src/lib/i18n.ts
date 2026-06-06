@@ -531,7 +531,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "status.storniert": { de: "Storniert", en: "Cancelled" },
   "status.auto": { de: "automatisch", en: "automatic" },
   "status.manuell": { de: "manuell", en: "manual" },
-  "status.abweichung": { de: "abweichung", en: "deviation" },
+  "status.abweichung": { de: "Vorschlag", en: "Suggestion" },
   "status.unklar": { de: "unklar", en: "unclear" },
   "status.ignoriert": { de: "Ignoriert", en: "Ignored" },
   "status.aktiv": { de: "Aktiv", en: "Active" },

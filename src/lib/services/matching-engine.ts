@@ -540,6 +540,21 @@ export async function runBatchMatching(): Promise<{
     stats.abweichung += typoMatches;
   }
 
+  // Beweisklasse 90+ bucht die Engine selbst fest: Was per Nummern-
+  // oder Kombibeweis gefunden wurde, braucht keinen menschlichen
+  // Haken mehr. (Vorsichtsregel vom 05.06.2026 aufgehoben; der
+  // Ideal-Flow QR -> Eingang -> auto soll ohne Handgriff schliessen.)
+  const { data: festgebucht } = await db
+    .from("transaktionen")
+    .update({ matching_status: "auto", geprueft_am: new Date().toISOString() })
+    .eq("matching_status", "abweichung")
+    .gte("matching_score", 90)
+    .select("id");
+  const autoGebucht = Array.isArray(festgebucht) ? festgebucht.length : 0;
+  if (autoGebucht > 0) {
+    stats.abweichung = Math.max(0, stats.abweichung - autoGebucht);
+  }
+
   // Alert erstellen
   await db.from("alerts").insert({
     typ: "matching",
