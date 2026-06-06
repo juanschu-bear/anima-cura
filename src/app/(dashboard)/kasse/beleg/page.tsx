@@ -48,49 +48,62 @@ function BelegInhalt() {
   });
 
   return (
-    <div className="mx-auto max-w-md p-6">
-      <div className="beleg-druck rounded-xl border border-surface-200 bg-white p-8 text-[#1c3044]">
-        <div className="mb-6 text-center">
-          <p className="text-lg font-bold">{PRAXIS.name}</p>
-          <p className="text-sm">{PRAXIS.zusatz}</p>
-          <p className="text-xs text-[#6b7a90]">{PRAXIS.strasse} · {PRAXIS.ort}</p>
-        </div>
-
-        <h1 className="mb-1 text-center text-xl font-bold">Quittung</h1>
-        <p className="mb-6 text-center text-xs text-[#6b7a90]">
-          Beleg-Nr. {zahlung.beleg_nr || "—"} · {datum}
-        </p>
-
-        <div className="mb-6 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-[#6b7a90]">Patient</span>
-            <span className="font-semibold">{zahlung.patients?.nachname}, {zahlung.patients?.vorname}</span>
+    <div className="mx-auto max-w-2xl p-6">
+      <div
+        className="beleg-druck"
+        style={{
+          background: "#ffffff",
+          color: "#1c3044",
+          borderRadius: 12,
+          padding: "48px 56px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+          fontFamily: "inherit",
+        }}
+      >
+        {/* Briefkopf */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #1c3044", paddingBottom: 16, marginBottom: 28 }}>
+          <div>
+            <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{PRAXIS.name}</p>
+            <p style={{ fontSize: 13, margin: "2px 0 0" }}>{PRAXIS.zusatz}</p>
+            <p style={{ fontSize: 11, color: "#6b7a90", margin: "4px 0 0" }}>{PRAXIS.strasse} · {PRAXIS.ort}</p>
           </div>
-          <div className="flex justify-between">
-            <span className="text-[#6b7a90]">Patientennummer</span>
-            <span>{zahlung.patients?.ivoris_nummer || "—"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[#6b7a90]">Leistung</span>
-            <span>{zahlung.zweck || "—"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[#6b7a90]">Zahlart</span>
-            <span>{ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart}</span>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>Quittung</p>
+            <p style={{ fontSize: 11, color: "#6b7a90", margin: "4px 0 0" }}>Beleg-Nr. {zahlung.beleg_nr || "—"}</p>
+            <p style={{ fontSize: 11, color: "#6b7a90", margin: "2px 0 0" }}>{datum}</p>
           </div>
         </div>
 
-        <div className="mb-6 rounded-lg bg-[#f4f6f9] p-4 text-center">
-          <p className="text-xs text-[#6b7a90]">Betrag</p>
-          <p className="text-3xl font-bold">
-            {Number(zahlung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-          </p>
-        </div>
+        {/* Angaben */}
+        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
+          <tbody>
+            {[
+              ["Patient", `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}`],
+              ["Patientennummer", zahlung.patients?.ivoris_nummer || "—"],
+              ["Leistung", zahlung.zweck || "—"],
+              ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
+            ].map(([k, v]) => (
+              <tr key={k as string} style={{ borderBottom: "1px solid #e8ecf2" }}>
+                <td style={{ padding: "8px 0", color: "#6b7a90", width: 180 }}>{k}</td>
+                <td style={{ padding: "8px 0", fontWeight: 600, textAlign: "right" }}>{v}</td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ padding: "14px 0", fontSize: 14, fontWeight: 700 }}>Erhaltener Betrag</td>
+              <td style={{ padding: "14px 0", fontSize: 22, fontWeight: 800, textAlign: "right" }}>
+                {Number(zahlung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-        <p className="text-center text-sm">Betrag dankend erhalten.</p>
-        <p className="mt-4 text-center text-[10px] text-[#9aa7b8]">
-          Dies ist eine Quittung über eine erhaltene Zahlung, keine Rechnung.
-        </p>
+        <p style={{ fontSize: 13, margin: "0 0 36px" }}>Betrag dankend erhalten.</p>
+
+        {/* Fusszeile */}
+        <div style={{ borderTop: "1px solid #e8ecf2", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9aa7b8" }}>
+          <span>{PRAXIS.name} · {PRAXIS.strasse} · {PRAXIS.ort}</span>
+          <span>Quittung über eine erhaltene Zahlung, keine Rechnung.</span>
+        </div>
       </div>
 
       <button
@@ -104,7 +117,7 @@ function BelegInhalt() {
         @media print {
           body * { visibility: hidden; }
           .beleg-druck, .beleg-druck * { visibility: visible; }
-          .beleg-druck { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+          .beleg-druck { position: absolute; left: 0; top: 0; width: 100%; border-radius: 0 !important; box-shadow: none !important; }
           .druck-knopf { display: none; }
         }
       `}</style>

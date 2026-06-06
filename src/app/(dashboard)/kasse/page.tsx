@@ -413,7 +413,7 @@ export default function KassePage() {
                 <>
               <div className="space-y-1">
                 {sichtbar.map((z: any) => (
-                  <button key={z.id} onClick={() => oeffneDetail(z)} className="flex w-full items-center justify-between border-b border-surface-100 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-surface-100/50">
+                  <button key={z.id} onClick={() => oeffneDetail(z)} className="flex w-full items-center justify-between border-b border-surface-100 px-2 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-[rgba(127,148,180,0.12)] rounded">
                     <span>{z.patients?.nachname}, {z.patients?.vorname}</span>
                     <span className="text-xs text-praxis-400">
                       {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
