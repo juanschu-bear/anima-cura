@@ -84,15 +84,24 @@ export default function KassePage() {
       if (!kz.zeichen) continue;
       const { data: tx } = await supabase
         .from("transaktionen")
-        .select("id")
+        .select("id, datum, verwendungszweck")
         .gt("finapi_id", 0)
         .gte("datum", kz.kassen_datum)
         .eq("betrag", kz.betrag)
         .ilike("verwendungszweck", `%${kz.zeichen}%`)
         .limit(1);
       if (tx?.length) {
+        // Echtzeit = am selben Banktag eingetroffen oder ausdruecklich
+        // so im Buchungstext; Standard braucht 1-2 Banktage.
+        const echtzeit = tx[0].datum === kz.kassen_datum
+          || /echtzeit|instant/i.test(tx[0].verwendungszweck || "");
         await supabase.from("kassen_zahlungen")
-          .update({ transaktion_id: tx[0].id, abgleich_status: "eingegangen" })
+          .update({
+            transaktion_id: tx[0].id,
+            abgleich_status: "eingegangen",
+            eingang_am: new Date().toISOString(),
+            eingang_typ: echtzeit ? "echtzeit" : "standard",
+          })
           .eq("id", kz.id);
         if (qrInfo && qrInfo.kzId === kz.id) setQrInfo({ ...qrInfo, eingegangen: true });
       }
@@ -285,8 +294,8 @@ export default function KassePage() {
                       {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
                       {z.zahlart === "qr_ueberweisung" ? (
                         z.transaktion_id
-                          ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen</span>
-                          : <span className="ml-1">· wartet</span>
+                          ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen{z.eingang_typ === "echtzeit" ? " (Echtzeit)" : z.eingang_typ === "standard" ? " (Standard)" : ""}</span>
+                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· wartet</span>
                       ) : null}
                     </span>
                     <span className="font-semibold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
