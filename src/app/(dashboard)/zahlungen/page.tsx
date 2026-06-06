@@ -187,14 +187,6 @@ export default function ZahlungenPage() {
     { key: "erhalten", label: locale === "en" ? "Received (till)" : "Erhalten (Kasse)" },
     { key: "wartet", label: locale === "en" ? "Awaiting funds" : "Wartet" },
   ];
-  const visibleTransactions = clientTx
-    .filter((tx) => {
-      // "erhalten"/"wartet" sind reine Kassen-Zustaende
-      if (statusFilter === "erhalten" || statusFilter === "wartet") return false;
-      return statusFilter === "alle" ? true : tx.matching_status === statusFilter;
-    })
-    .filter((tx) => (wegFilter === "alle" ? true : wegVonTransaktion(tx).gruppe === wegFilter));
-
   const [kassenListe, setKassenListe] = useState<any[]>([]);
   const [wegFilter, setWegFilter] = useState("alle");
   useEffect(() => {
@@ -223,6 +215,15 @@ export default function ZahlungenPage() {
     const wegOk = wegFilter === "alle" || wegFilter === "kasse";
     return statusOk && wegOk;
   });
+
+  const visibleTransactions = clientTx
+    .filter((tx) => {
+      // "erhalten"/"wartet" sind reine Kassen-Zustaende
+      if (statusFilter === "erhalten" || statusFilter === "wartet") return false;
+      return statusFilter === "alle" ? true : tx.matching_status === statusFilter;
+    })
+    .filter((tx) => (wegFilter === "alle" ? true : wegVonTransaktion(tx).gruppe === wegFilter));
+
 
   const KASSE_ZAHLART: Record<string, string> = {
     qr_ueberweisung: "QR-Überweisung",
