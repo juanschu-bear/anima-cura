@@ -104,7 +104,7 @@ export default function KassePage() {
     setPruefe(true);
     const { data: offene } = await supabase
       .from("kassen_zahlungen")
-      .select("id, betrag, zeichen, kassen_datum")
+      .select("id, betrag, zeichen, kassen_datum, patient_id")
       .eq("zahlart", "qr_ueberweisung")
       .is("transaktion_id", null);
     for (const kz of offene || []) {
@@ -130,6 +130,17 @@ export default function KassePage() {
             eingang_typ: echtzeit ? "echtzeit" : "standard",
           })
           .eq("id", kz.id);
+        // Beweisklasse 100: diesen QR-Code haben wir selbst erzeugt,
+        // die Zahlung ist keine Vermutung, sondern unsere Handschrift.
+        await supabase.from("transaktionen")
+          .update({
+            matched_patient_id: kz.patient_id,
+            matching_status: "auto",
+            matching_score: 100,
+            matching_details: { methode: "animapay_kasse", quelle: "kasse" },
+            geprueft_am: new Date().toISOString(),
+          })
+          .eq("id", tx[0].id);
         if (qrInfo && qrInfo.kzId === kz.id) setQrInfo({ ...qrInfo, eingegangen: true });
       }
     }
@@ -298,23 +309,6 @@ export default function KassePage() {
             {saving ? "Speichert …" : "Zahlung erfassen"}
           </button>
 
-          <div className="rounded-lg border border-surface-200 px-4 py-3">
-            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
-              <Info size={14} /> So funktioniert die QR-Zahlung
-            </p>
-            <p className="text-xs leading-relaxed text-praxis-400">
-              Der Patient scannt den Code mit seiner Banking-App. Betrag, Empfänger und Verwendungszweck
-              sind schon ausgefüllt, er muss nur noch bestätigen. Im Verwendungszweck stehen immer
-              Patientennummer und Nachname: Die <strong>Nummer</strong> ist der wichtige Teil, daran erkennt
-              das Programm die Zahlung, wenn sie auf dem Praxiskonto ankommt, und schreibt sie von selbst
-              beim richtigen Patienten gut. Der Nachname steht nur zur Kontrolle dabei.{" "}
-              {patient && istMinderjaehrig(patient.geburtsdatum) === true
-                ? `${patient.vorname} ist minderjährig, hier dürfen selbstverständlich die Eltern bezahlen: `
-                : "Es ist egal, von wessen Konto bezahlt wird: "}
-              Das Programm richtet sich nach der Nummer im Verwendungszweck, nicht nach dem Namen
-              des Überweisenden.
-            </p>
-          </div>
         </div>
 
         {/* QR / Tagesübersicht */}
@@ -390,7 +384,7 @@ export default function KassePage() {
                       {z.zahlart === "qr_ueberweisung" ? (
                         z.transaktion_id
                           ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen{z.eingang_typ === "echtzeit" ? " (Echtzeit)" : z.eingang_typ === "standard" ? " (Standard)" : ""}</span>
-                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· wartet</span>
+                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· wartet auf Geldeingang</span>
                       ) : null}
                     </span>
                     <span className="font-semibold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
@@ -398,6 +392,32 @@ export default function KassePage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="stat-card">
+        <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+          <Info size={15} /> So funktioniert die Kasse
+        </p>
+        <div className="grid grid-cols-1 gap-4 text-xs leading-relaxed text-praxis-400 md:grid-cols-2">
+          <div>
+            <p className="mb-1 font-semibold text-praxis-600">QR-Überweisung</p>
+            <ul className="list-disc space-y-1 pl-4">
+              <li>Der Patient scannt den Code mit seiner Banking-App. Betrag, Empfänger und Verwendungszweck sind schon ausgefüllt, er bestätigt nur noch.</li>
+              <li>Im Verwendungszweck stehen immer Patientennummer und Nachname. Die <strong>Nummer</strong> ist der wichtige Teil: Daran erkennt das Programm die Zahlung, wenn sie auf dem Praxiskonto ankommt, und bucht sie von selbst beim richtigen Patienten.</li>
+              <li>Es ist egal, wer überweist, bei Kindern z.&nbsp;B. die Eltern: Es zählt die Nummer im Text, nicht der Name des Überweisenden.</li>
+              <li><strong>„wartet auf Geldeingang"</strong> heißt: Das Geld ist noch nicht auf dem Konto gesehen worden. Echtzeitüberweisungen kommen in Sekunden, normale brauchen einen Banktag. Spätestens der Morgen-Abruf holt sie und der Status springt auf „eingegangen".</li>
+            </ul>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-praxis-600">Girocard, Kreditkarte und Bar</p>
+            <ul className="list-disc space-y-1 pl-4">
+              <li>Girocard und Kreditkarte laufen weiter ganz normal über das Kartengerät. Hier wird die Zahlung nur <strong>eingetragen</strong>, damit das Kassenbuch stimmt.</li>
+              <li>Dieser Eintrag ersetzt die Papier-Liste: Das Programm vergleicht die Tagessummen später mit den Sammel-Gutschriften des Kartengeräts.</li>
+              <li>Barzahlungen werden genauso eingetragen, dann ist der Tag komplett.</li>
+              <li>Die <strong>Notiz</strong> ist nur für die Praxis sichtbar, sie steht nirgends auf dem QR-Code oder der Überweisung.</li>
+            </ul>
           </div>
         </div>
       </div>
