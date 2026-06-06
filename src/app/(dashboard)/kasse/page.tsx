@@ -119,9 +119,17 @@ export default function KassePage() {
 
   async function loescheEintrag() {
     if (!detail) return;
-    await supabase.from("kassen_zahlungen").delete().eq("id", detail.id);
+    const { data, error } = await supabase
+      .from("kassen_zahlungen")
+      .delete()
+      .eq("id", detail.id)
+      .select("id");
     setDetail(null);
-    setHinweis("Eintrag gelöscht.");
+    if (error || !data?.length) {
+      setHinweis("Löschen fehlgeschlagen, der Eintrag ist noch da. Bitte Juan Bescheid geben (Datenbank-Rechte).");
+    } else {
+      setHinweis("Eintrag gelöscht.");
+    }
     ladeTagesliste();
   }
 

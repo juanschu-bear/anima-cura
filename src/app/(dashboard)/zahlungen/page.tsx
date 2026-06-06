@@ -349,7 +349,20 @@ export default function ZahlungenPage() {
             <button
               key={f.key}
               onClick={() => { setWegFilter(f.key); setPage(1); }}
-              className={`ac-chip ${wegFilter === f.key ? "ac-chip-active" : ""}`}
+              className="ac-chip"
+              style={{
+                padding: "9px 20px",
+                fontSize: 14,
+                fontWeight: 700,
+                ...(wegFilter === f.key
+                  ? {
+                      borderColor: "#7aa2ff",
+                      color: "#7aa2ff",
+                      background: "rgba(122,162,255,0.1)",
+                      boxShadow: "0 0 14px rgba(122,162,255,0.35)",
+                    }
+                  : {}),
+              }}
             >
               {f.label}
             </button>
@@ -413,7 +426,13 @@ export default function ZahlungenPage() {
           </thead>
           <tbody>
             {page === 1 && kassenSichtbar.map((z: any) => (
-              <tr key={`kz-${z.id}`} className="transition-colors">
+              <tr
+                key={`kz-${z.id}`}
+                className="cursor-pointer transition-colors"
+                onClick={() => z.patient_id && router.push(`/patienten/${z.patient_id}`)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = theme === "dark" ? "#151c2a" : "#f8faff"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(z.kassen_datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
                 <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
                 <td className="table-cell py-3 text-sm">
