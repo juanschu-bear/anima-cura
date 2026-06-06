@@ -46,6 +46,7 @@ export const DEFAULT_AUTH_USERS: DefaultAuthUser[] = [
 const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/uebersicht", roles: ["admin", "verwaltung", "lesezugriff"] },
   { path: "/zahlungen", roles: ["admin", "verwaltung"] },
+  { path: "/kasse", roles: ["admin", "verwaltung"] },
   { path: "/patienten", roles: ["admin", "verwaltung", "lesezugriff"] },
   { path: "/ratenplan", roles: ["admin", "verwaltung"] },
   { path: "/mahnwesen", roles: ["admin", "verwaltung"] },

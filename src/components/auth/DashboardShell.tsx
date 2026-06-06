@@ -23,7 +23,7 @@ import { AlertTriangle,
   Sun,
   Upload,
   Users,
-  Zap, Coins } from "lucide-react";
+  Zap, Coins, Banknote } from "lucide-react";
 import type { AuthenticatedAppUser } from "@/lib/auth";
 import {
   canAccessPath,
@@ -48,6 +48,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
     key: "navGroup.finance",
     items: [
       { href: "/finanzen", icon: Coins, key: "nav.finances" },
+      { href: "/kasse", icon: Banknote, key: "nav.kasse" },
       { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
       { href: "/offene-posten", icon: Receipt, key: "nav.openItems" },
       { href: "/rechnungen", icon: FileText, key: "nav.invoices" },
