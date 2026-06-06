@@ -47,6 +47,8 @@ export default function KassePage() {
   const [qrInfo, setQrInfo] = useState<{ kzId: string; name: string; betrag: number; zweck: string; eingegangen: boolean } | null>(null);
   const [pruefe, setPruefe] = useState(false);
   const [tagesListe, setTagesListe] = useState<any[]>([]);
+  const [kassenTag, setKassenTag] = useState(() => new Date().toISOString().slice(0, 10));
+  const [filterArt, setFilterArt] = useState<string>("alle");
 
   const treffer = useMemo(
     () => (patSearch.length >= 2 && !patient ? patienten.slice(0, 8) : []),
@@ -57,11 +59,11 @@ export default function KassePage() {
     const { data } = await supabase
       .from("kassen_zahlungen")
       .select("*, patients:patient_id(vorname, nachname)")
-      .eq("kassen_datum", new Date().toISOString().slice(0, 10))
+      .eq("kassen_datum", kassenTag)
       .order("created_at", { ascending: false });
     setTagesListe(data || []);
   }
-  useEffect(() => { ladeTagesliste(); }, []);
+  useEffect(() => { ladeTagesliste(); }, [kassenTag]);
 
   const tagesSummen = useMemo(() => {
     const s: Record<string, number> = {};
@@ -227,6 +229,16 @@ export default function KassePage() {
             </div>
           </div>
 
+          {zahlart === "qr_ueberweisung" && patient ? (
+            <div className="rounded-lg border border-surface-200 bg-surface-100/50 px-3 py-2 text-xs text-praxis-500">
+              <span className="font-medium text-praxis-600">Verwendungszweck im QR:</span>{" "}
+              Behandlung {patient.ivoris_nummer} {patient.nachname}
+              <span className="mt-1 block">
+                Gutschrift geht auf {patient.vorname} {patient.nachname}, egal wer überweist (z.&nbsp;B. Eltern). Die Notiz bleibt intern.
+              </span>
+            </div>
+          ) : null}
+
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-praxis-500">Notiz (optional)</span>
             <input className="input w-full" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Anzahlung Retainer" />
@@ -267,27 +279,42 @@ export default function KassePage() {
           )}
 
           <div className="stat-card">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold">Heute erfasst</p>
-              <button className="btn-secondary text-xs" onClick={pruefeEingaenge} disabled={pruefe}>
-                {pruefe ? "Prüft …" : "Eingang prüfen"}
-              </button>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">Kassenbuch</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="input text-xs"
+                  value={kassenTag}
+                  onChange={(e) => setKassenTag(e.target.value)}
+                />
+                <button className="btn-secondary text-xs" onClick={pruefeEingaenge} disabled={pruefe}>
+                  {pruefe ? "Prüft …" : "Eingang prüfen"}
+                </button>
+              </div>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
-              <span className="ac-chip ac-chip-active text-xs">
+              <button
+                onClick={() => setFilterArt("alle")}
+                className={`ac-chip text-xs ${filterArt === "alle" ? "ac-chip-active" : ""}`}
+              >
                 Gesamt: {tagesListe.length} {tagesListe.length === 1 ? "Zahlung" : "Zahlungen"} · {tagesListe.reduce((s, z) => s + Number(z.betrag), 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-              </span>
+              </button>
               {ZAHLARTEN.map(({ key, label }) => (
-                <span key={key} className="ac-chip text-xs">
+                <button
+                  key={key}
+                  onClick={() => setFilterArt(filterArt === key ? "alle" : key)}
+                  className={`ac-chip text-xs ${filterArt === key ? "ac-chip-active" : ""}`}
+                >
                   {label}: {(tagesSummen[key] || 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                </span>
+                </button>
               ))}
             </div>
-            {tagesListe.length === 0 ? (
-              <p className="text-sm text-praxis-400">Noch keine Zahlungen heute.</p>
+            {tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt).length === 0 ? (
+              <p className="text-sm text-praxis-400">Keine Zahlungen an diesem Tag{filterArt !== "alle" ? " mit dieser Zahlart" : ""}.</p>
             ) : (
               <div className="space-y-1">
-                {tagesListe.map((z: any) => (
+                {tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt).map((z: any) => (
                   <div key={z.id} className="flex items-center justify-between border-b border-surface-100 py-1.5 text-sm last:border-0">
                     <span>{z.patients?.nachname}, {z.patients?.vorname}</span>
                     <span className="text-xs text-praxis-400">
