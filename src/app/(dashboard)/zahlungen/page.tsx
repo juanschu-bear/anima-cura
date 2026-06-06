@@ -422,22 +422,24 @@ export default function ZahlungenPage() {
                     >
                       <X size={14} />
                     </button>
-                    <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                        if (tx.matched_patient_id) {
-                          handleConfirmSuggestion(tx);
-                        } else {
-                          setSyncHint(t("payments.assignFirst", locale));
-                          openAssignModal(tx);
-                        }
-                      }}
-                      type="button"
-                      className="rounded-lg p-1.5 text-accent-emerald transition-colors hover:bg-accent-emerald/10"
-                      title={t("payments.confirmSuggestion", locale)}
-                    >
-                      <Check size={14} />
-                    </button>
+                    {(tx.matching_status === "abweichung" || tx.matching_status === "unklar") && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (tx.matched_patient_id) {
+                            handleConfirmSuggestion(tx);
+                          } else {
+                            setSyncHint(t("payments.assignFirst", locale));
+                            openAssignModal(tx);
+                          }
+                        }}
+                        type="button"
+                        className="rounded-lg p-1.5 text-accent-emerald transition-colors hover:bg-accent-emerald/10"
+                        title={t("payments.confirmSuggestion", locale)}
+                      >
+                        <Check size={14} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

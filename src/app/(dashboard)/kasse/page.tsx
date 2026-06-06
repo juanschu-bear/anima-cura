@@ -5,6 +5,7 @@ import { Banknote, Check, CreditCard, Info, QrCode, Search, X } from "lucide-rea
 import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
+import { Modal } from "@/components/ui";
 
 // Empfangskonto der Praxis (Patientenkonto, steht auf jeder Rechnung).
 const PRAXIS_NAME = "Dr. Maria Elena Schubert";
@@ -74,6 +75,10 @@ export default function KassePage() {
   const [tagesListe, setTagesListe] = useState<any[]>([]);
   const [kassenTag, setKassenTag] = useState(() => new Date().toISOString().slice(0, 10));
   const [filterArt, setFilterArt] = useState<string>("alle");
+  const [seite, setSeite] = useState(1);
+  const [detail, setDetail] = useState<any | null>(null);
+  const [detailQr, setDetailQr] = useState<string | null>(null);
+  const [loeschBestaetigung, setLoeschBestaetigung] = useState(false);
 
   const treffer = useMemo(
     () => (patSearch.length >= 2 && !patient ? patienten.slice(0, 8) : []),
@@ -89,6 +94,7 @@ export default function KassePage() {
     setTagesListe(data || []);
   }
   useEffect(() => { ladeTagesliste(); }, [kassenTag]);
+  useEffect(() => { setSeite(1); }, [kassenTag, filterArt]);
 
   const tagesSummen = useMemo(() => {
     const s: Record<string, number> = {};
@@ -100,6 +106,25 @@ export default function KassePage() {
   // Ueberweisungen (Zeichen im Zweck + exakter Betrag). Loest bewusst
   // KEINEN Bank-Abruf aus (PSD2-Tagesbudget); frische Daten bringen
   // Morgen-Cron und Sync-Knopf.
+  async function oeffneDetail(z: any) {
+    setDetail(z);
+    setLoeschBestaetigung(false);
+    setDetailQr(null);
+    if (z.zahlart === "qr_ueberweisung") {
+      const zweck = z.zweck || `Behandlung ${z.zeichen || ""} ${z.patients?.nachname || ""}`.trim();
+      const url = await QRCode.toDataURL(epcPayload(Number(z.betrag), zweck), { width: 240, margin: 1 });
+      setDetailQr(url);
+    }
+  }
+
+  async function loescheEintrag() {
+    if (!detail) return;
+    await supabase.from("kassen_zahlungen").delete().eq("id", detail.id);
+    setDetail(null);
+    setHinweis("Eintrag gelöscht.");
+    ladeTagesliste();
+  }
+
   async function pruefeEingaenge() {
     setPruefe(true);
     const { data: offene } = await supabase
@@ -156,11 +181,15 @@ export default function KassePage() {
 
     setSaving(true);
     const zeichen = patient.ivoris_nummer || null;
+    const zweckFinal = zahlart === "qr_ueberweisung"
+      ? (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient.nachname || ""}`).trim()
+      : null;
     const { data: kz, error } = await supabase.from("kassen_zahlungen").insert({
       patient_id: patient.id,
       betrag: b,
       zahlart,
       zeichen,
+      zweck: zweckFinal,
       notiz: notiz || null,
     }).select().single();
     if (error) {
@@ -169,11 +198,10 @@ export default function KassePage() {
       return;
     }
 
-    if (zahlart === "qr_ueberweisung") {
-      const zweck = (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient.nachname || ""}`).trim();
-      const url = await QRCode.toDataURL(epcPayload(b, zweck), { width: 280, margin: 1 });
+    if (zahlart === "qr_ueberweisung" && zweckFinal) {
+      const url = await QRCode.toDataURL(epcPayload(b, zweckFinal), { width: 280, margin: 1 });
       setQrDataUrl(url);
-      setQrInfo({ kzId: kz.id, name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck, eingegangen: false });
+      setQrInfo({ kzId: kz.id, name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck: zweckFinal, eingegangen: false });
     } else {
       setQrDataUrl(null);
       setQrInfo(null);
@@ -372,12 +400,19 @@ export default function KassePage() {
                 </button>
               ))}
             </div>
-            {tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt).length === 0 ? (
-              <p className="text-sm text-praxis-400">Keine Zahlungen an diesem Tag{filterArt !== "alle" ? " mit dieser Zahlart" : ""}.</p>
-            ) : (
+            {(() => {
+              const gefiltert = tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt);
+              const proSeite = 10;
+              const seiten = Math.max(1, Math.ceil(gefiltert.length / proSeite));
+              const sichtbar = gefiltert.slice((seite - 1) * proSeite, seite * proSeite);
+              if (gefiltert.length === 0) {
+                return <p className="text-sm text-praxis-400">Keine Zahlungen an diesem Tag{filterArt !== "alle" ? " mit dieser Zahlart" : ""}.</p>;
+              }
+              return (
+                <>
               <div className="space-y-1">
-                {tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt).map((z: any) => (
-                  <div key={z.id} className="flex items-center justify-between border-b border-surface-100 py-1.5 text-sm last:border-0">
+                {sichtbar.map((z: any) => (
+                  <button key={z.id} onClick={() => oeffneDetail(z)} className="flex w-full items-center justify-between border-b border-surface-100 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-surface-100/50">
                     <span>{z.patients?.nachname}, {z.patients?.vorname}</span>
                     <span className="text-xs text-praxis-400">
                       {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
@@ -388,10 +423,19 @@ export default function KassePage() {
                       ) : null}
                     </span>
                     <span className="font-semibold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
-                  </div>
+                  </button>
                 ))}
               </div>
-            )}
+              {seiten > 1 && (
+                <div className="mt-3 flex items-center justify-between text-xs text-praxis-400">
+                  <button className="btn-secondary text-xs" disabled={seite <= 1} onClick={() => setSeite(seite - 1)}>Zurück</button>
+                  <span>Seite {seite} von {seiten}</span>
+                  <button className="btn-secondary text-xs" disabled={seite >= seiten} onClick={() => setSeite(seite + 1)}>Weiter</button>
+                </div>
+              )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -421,6 +465,66 @@ export default function KassePage() {
           </div>
         </div>
       </div>
+
+      <Modal open={!!detail} onClose={() => setDetail(null)} title="Kassen-Eintrag" size="sm">
+        {detail ? (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Patient</span>
+              <span className="font-semibold">{detail.patients?.nachname}, {detail.patients?.vorname}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Betrag</span>
+              <span className="font-semibold">{Number(detail.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Zahlart</span>
+              <span>{ZAHLARTEN.find(a => a.key === detail.zahlart)?.label}</span>
+            </div>
+            {detail.zweck ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-praxis-400">Verwendungszweck</span>
+                <span className="text-right text-xs">{detail.zweck}</span>
+              </div>
+            ) : null}
+            {detail.notiz ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-praxis-400">Notiz</span>
+                <span className="text-right text-xs">{detail.notiz}</span>
+              </div>
+            ) : null}
+            {detail.zahlart === "qr_ueberweisung" ? (
+              <div className="flex items-center justify-between">
+                <span className="text-praxis-400">Status</span>
+                {detail.transaktion_id
+                  ? <span className="font-semibold text-[#5f9339]">eingegangen{detail.eingang_typ === "echtzeit" ? " (Echtzeit)" : detail.eingang_typ === "standard" ? " (Standard)" : ""}</span>
+                  : <span>wartet auf Geldeingang</span>}
+              </div>
+            ) : null}
+            {detailQr && !detail.transaktion_id ? (
+              <div className="rounded-lg border border-surface-200 p-3 text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={detailQr} alt="GiroCode" className="mx-auto rounded" />
+                <p className="mt-1 text-xs text-praxis-400">GiroCode, kann jederzeit erneut gescannt werden.</p>
+              </div>
+            ) : null}
+            {!detail.transaktion_id ? (
+              loeschBestaetigung ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-red-400/40 p-3">
+                  <span className="text-xs text-red-400">Wirklich löschen? Das lässt sich nicht rückgängig machen.</span>
+                  <button className="btn-secondary text-xs" onClick={loescheEintrag}>Ja, löschen</button>
+                </div>
+              ) : (
+                <button className="btn-secondary w-full text-xs" onClick={() => setLoeschBestaetigung(true)}>
+                  Eintrag löschen (z.&nbsp;B. Demo oder Irrtum)
+                </button>
+              )
+            ) : (
+              <p className="text-xs text-praxis-400">Dieser Eintrag ist mit einer eingegangenen Zahlung verknüpft und kann nicht gelöscht werden.</p>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
