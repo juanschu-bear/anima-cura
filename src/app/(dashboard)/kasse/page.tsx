@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Check, CreditCard, QrCode, Search, X } from "lucide-react";
+import { Banknote, Check, CreditCard, Info, QrCode, Search, X } from "lucide-react";
 import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
@@ -28,6 +28,17 @@ const ZAHLARTEN = [
   { key: "kreditkarte", label: "Kreditkarte", icon: CreditCard },
   { key: "bar", label: "Bar", icon: Banknote },
 ] as const;
+
+function istMinderjaehrig(geburtsdatum?: string | null): boolean | null {
+  if (!geburtsdatum) return null;
+  const geb = new Date(geburtsdatum);
+  if (isNaN(geb.getTime())) return null;
+  const heute = new Date();
+  let alter = heute.getFullYear() - geb.getFullYear();
+  const m = heute.getMonth() - geb.getMonth();
+  if (m < 0 || (m === 0 && heute.getDate() < geb.getDate())) alter--;
+  return alter < 18;
+}
 
 function parseBetrag(s: string): number | null {
   const n = Number(s.replace(/\./g, "").replace(",", "."));
@@ -271,25 +282,39 @@ export default function KassePage() {
                 </label>
                 {ohneZeichen ? (
                   <p className="text-xs font-semibold text-amber-500">
-                    Achtung: Ohne die Patientennummer {patient.ivoris_nummer} kann der Zahlungseingang nicht automatisch zugeordnet werden.
+                    Wichtig: Die Nummer {patient.ivoris_nummer} muss im Text bleiben. Ohne sie kann das Programm die Zahlung später nicht von selbst zuordnen, dann muss jemand von Hand suchen.
                   </p>
-                ) : (
-                  <p className="text-xs text-praxis-400">
-                    Gutschrift geht auf {patient.vorname} {patient.nachname}, egal wer überweist (z.&nbsp;B. Eltern). Die Notiz bleibt intern.
-                  </p>
-                )}
+                ) : null}
               </div>
             );
           })() : null}
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-praxis-500">Notiz (optional)</span>
+            <span className="mb-1 block text-xs font-medium text-praxis-500">Notiz (optional, nur für die Praxis sichtbar, steht nicht im QR-Code)</span>
             <input className="input w-full" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Anzahlung Retainer" />
           </label>
 
           <button className="btn-primary w-full py-3" onClick={speichern} disabled={saving}>
             {saving ? "Speichert …" : "Zahlung erfassen"}
           </button>
+
+          <div className="rounded-lg border border-surface-200 px-4 py-3">
+            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
+              <Info size={14} /> So funktioniert die QR-Zahlung
+            </p>
+            <p className="text-xs leading-relaxed text-praxis-400">
+              Der Patient scannt den Code mit seiner Banking-App. Betrag, Empfänger und Verwendungszweck
+              sind schon ausgefüllt, er muss nur noch bestätigen. Im Verwendungszweck stehen immer
+              Patientennummer und Nachname: Die <strong>Nummer</strong> ist der wichtige Teil, daran erkennt
+              das Programm die Zahlung, wenn sie auf dem Praxiskonto ankommt, und schreibt sie von selbst
+              beim richtigen Patienten gut. Der Nachname steht nur zur Kontrolle dabei.{" "}
+              {patient && istMinderjaehrig(patient.geburtsdatum) === true
+                ? `${patient.vorname} ist minderjährig, hier dürfen selbstverständlich die Eltern bezahlen: `
+                : "Es ist egal, von wessen Konto bezahlt wird: "}
+              Das Programm richtet sich nach der Nummer im Verwendungszweck, nicht nach dem Namen
+              des Überweisenden.
+            </p>
+          </div>
         </div>
 
         {/* QR / Tagesübersicht */}
