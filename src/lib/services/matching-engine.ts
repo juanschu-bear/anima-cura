@@ -540,6 +540,47 @@ export async function runBatchMatching(): Promise<{
     stats.abweichung += typoMatches;
   }
 
+  // AUFLADUNG-Eingaenge: Guthaben-Gutschrift (Anima Balance).
+  // Den Zweck 'AUFLADUNG <Patientennummer> <Name>' erzeugt unser
+  // eigenes Portal, der Eingang ist also Beweisklasse 100. Jede
+  // Gutschrift referenziert die Bankzahlung und ist dadurch
+  // dublettensicher (eine Transaktion, eine Buchung).
+  const { data: aufladungsKandidaten } = await db
+    .from("transaktionen")
+    .select("id, betrag, verwendungszweck")
+    .gt("betrag", 0)
+    .ilike("verwendungszweck", "%AUFLADUNG%");
+  for (const tx of aufladungsKandidaten || []) {
+    const nummer = (tx.verwendungszweck || "").match(/AUFLADUNG\s+(\d{8})/i)?.[1];
+    if (!nummer) continue;
+    const { data: vorhandene } = await db
+      .from("anima_balance_buchungen")
+      .select("id")
+      .eq("referenz_transaktion_id", tx.id)
+      .limit(1);
+    if (vorhandene?.length) continue;
+    const { data: pat } = await db
+      .from("patients")
+      .select("id")
+      .eq("ivoris_nummer", nummer)
+      .maybeSingle();
+    if (!pat) continue;
+    await db.from("anima_balance_buchungen").insert({
+      patient_id: pat.id,
+      betrag: tx.betrag,
+      typ: "aufladung",
+      beschreibung: "per QR",
+      referenz_transaktion_id: tx.id,
+    });
+    await db.from("transaktionen").update({
+      matched_patient_id: pat.id,
+      matching_status: "auto",
+      matching_score: 100,
+      matching_details: { methode: "animapay_aufladung", quelle: "portal" },
+      geprueft_am: new Date().toISOString(),
+    }).eq("id", tx.id);
+  }
+
   // Beweisklasse 90+ bucht die Engine selbst fest: Was per Nummern-
   // oder Kombibeweis gefunden wurde, braucht keinen menschlichen
   // Haken mehr. (Vorsichtsregel vom 05.06.2026 aufgehoben; der

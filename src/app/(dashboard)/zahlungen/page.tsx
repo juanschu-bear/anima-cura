@@ -206,6 +206,7 @@ export default function ZahlungenPage() {
     const methode = tx?.matching_details?.methode;
     if (methode === "animapay_kasse") return { gruppe: "kasse", w1: "AnimaPay Kasse", w2: "QR-Überweisung" };
     if (methode === "animapay_app") return { gruppe: "app", w1: "AnimaPay App", w2: "QR-Überweisung" };
+    if (methode === "animapay_aufladung") return { gruppe: "app", w1: "AnimaPay App", w2: "Guthaben-Aufladung" };
     return { gruppe: "bank", w1: "Bank", w2: "Überweisung" };
   }
 

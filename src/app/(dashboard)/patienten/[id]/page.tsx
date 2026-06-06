@@ -62,7 +62,9 @@ export default function PatientDetailPage() {
         liste.push({
           id: `b-${b.id}`,
           datum: b.datum,
-          quelle: b.matching_details?.methode === "animapay_kasse" ? "AnimaPay · QR" : "Bank",
+          quelle: b.matching_details?.methode === "animapay_kasse" ? "AnimaPay · QR"
+            : b.matching_details?.methode === "animapay_aufladung" ? "AnimaPay · Aufladung"
+            : "Bank",
           zweck: b.verwendungszweck || "",
           betrag: Number(b.betrag),
           status: "bestätigt",
