@@ -225,12 +225,25 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       if (!("PushManager" in window)) return;
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
       if (!vapidKey) return;
+      const b64ToBytes = (b64: string) => {
+        const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+        const base = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+        return Uint8Array.from(atob(base), c => c.charCodeAt(0));
+      };
       try {
         let sub = await reg.pushManager.getSubscription();
+        // Schluessel-Rotation abfangen: passt das bestehende Abo nicht mehr
+        // zum aktuellen VAPID-Key, wird es verworfen und frisch abgeschlossen.
+        if (sub) {
+          const aktuell = b64ToBytes(vapidKey);
+          const vorhanden = sub.options.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
+          const passt = !!vorhanden && vorhanden.length === aktuell.length && vorhanden.every((v, i) => v === aktuell[i]);
+          if (!passt) { await sub.unsubscribe(); sub = null; }
+        }
         if (!sub) {
           const perm = await Notification.requestPermission();
           if (perm !== "granted") return;
-          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) });
         }
         if (sub && patientId) {
           await fetch("/api/patient/push", {
