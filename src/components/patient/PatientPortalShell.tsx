@@ -1291,7 +1291,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 {/* Phasen-Video: direkte Datei im eigenen Player, sonst eingebetteter Rahmen */}
                 {phaseDrawer.video_url && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} style={{ padding: "0 24px 16px" }}>
-                    {/\.(mp4|webm|mov)(\?|$)/i.test(phaseDrawer.video_url) ? (
+                    {/\.(mp4|m4v|webm|mov)(\?|$)/i.test(phaseDrawer.video_url) ? (
                       <video src={phaseDrawer.video_url} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 14, display: "block", background: "#000" }} />
                     ) : (
                       <iframe src={phaseDrawer.video_url} allowFullScreen style={{ width: "100%", aspectRatio: "16 / 9", border: "none", borderRadius: 14, display: "block", background: "#000" }} title="Phasen-Video" />
