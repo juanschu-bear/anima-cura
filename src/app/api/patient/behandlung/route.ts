@@ -27,6 +27,7 @@ export async function GET() {
       reihenfolge: p.reihenfolge,
       start_datum: p.start_datum,
       end_datum: p.end_datum,
+      video_url: p.video_url,
     })),
   });
 }
