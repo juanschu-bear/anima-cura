@@ -462,7 +462,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     <button
                       onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); }}
                       style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}
-                    >\u2713 {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
+                    >{"\u2713"} {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
                   )}
                 </div>
               </div>
