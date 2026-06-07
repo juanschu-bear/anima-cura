@@ -370,7 +370,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ── HEADER ──
   const Header = (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 20px 0" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "30px 20px 0" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#fff", ...hd }}>A</div>
         <span style={{ ...hd, fontSize: 22, fontWeight: 700, color: fg }}>Anima Cura</span>
@@ -592,7 +592,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const circ = 2 * Math.PI * 76;
   const off = circ - (pct / 100) * circ;
   const saldoStr = (balance?.saldo ?? 0).toLocaleString("de-DE", { minimumFractionDigits: 2 });
-  const saldoFont = saldoStr.length >= 10 ? 26 : saldoStr.length >= 8 ? 31 : 38;
+  const saldoFont = saldoStr.length >= 10 ? 21 : saldoStr.length >= 8 ? 25 : 29;
 
   const goldRing: React.CSSProperties = {
     width: "min(190px, 56vw)", height: "min(190px, 56vw)", margin: "4px auto 14px", borderRadius: "50%", position: "relative",
@@ -618,9 +618,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, margin: "0 20px 12px" }}>
-        <button onClick={() => { setAufladenSheet(true); hapticLight(); }} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 700, fontSize: 14, fontFamily: "inherit", background: "linear-gradient(180deg, #ffd97a, #f6c453)", color: "#231a04", boxShadow: "0 8px 20px rgba(246,196,83,0.25)" }}>Aufladen</button>
-        <button onClick={() => setRueckholHinweis(!rueckholHinweis)} style={{ flex: 1, cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 600, fontSize: 14, fontFamily: "inherit", background: "transparent", border: `1px solid ${dk ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.15)"}`, color: muted }}>Zurückholen</button>
+      <div style={{ margin: "0 20px 4px" }}>
+        <button onClick={() => { setAufladenSheet(true); hapticLight(); }} style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: 14, padding: "14px 0", fontWeight: 700, fontSize: 15, fontFamily: "inherit", background: "linear-gradient(180deg, #ffd97a, #f6c453)", color: "#231a04", boxShadow: "0 8px 20px rgba(246,196,83,0.25)" }}>Aufladen</button>
+      </div>
+      <div style={{ textAlign: "center", marginBottom: 10 }}>
+        <button onClick={() => setRueckholHinweis(!rueckholHinweis)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12, color: muted, textDecoration: "underline", textUnderlineOffset: 3, padding: 6 }}>Guthaben zurückholen</button>
       </div>
       {rueckholHinweis && (
         <div style={{ ...card, padding: "12px 14px", margin: "0 20px 12px", fontSize: 13, color: muted }}>
@@ -1537,6 +1539,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             overflow-y: auto !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
+          .portal-content { padding-bottom: 24px !important; }
           .portal-nav {
             position: sticky !important;
             bottom: 0 !important;
