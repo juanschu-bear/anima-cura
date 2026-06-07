@@ -21,7 +21,7 @@ interface RpData {
 interface Phase { id: string; name: string; beschreibung: string | null; status: string; reihenfolge: number; start_datum: string | null; end_datum: string | null; video_url?: string | null }
 interface Badge { id: string; icon: string; titel: string; beschreibung: string; freigeschaltet: boolean }
 interface Msg { id: string; sender_type: string; sender_name: string | null; text: string; created_at: string }
-interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; created_at: string }
+interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; geoeffnet_am?: string | null; bestaetigt_am?: string | null; created_at: string }
 interface Doc { id: string; name: string; typ: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
@@ -338,7 +338,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   const firstName = patientName.split(" ")[0];
   const activePhase = phasen.find(p => p.status === "aktiv");
-  const unread = notifs.filter(n => !n.gelesen).length;
+  const unread = notifs.filter(n => !n.bestaetigt_am).length;
+  const [expandedNotif, setExpandedNotif] = useState<string | null>(null);
+  const markNotif = (id: string, aktion: "geoeffnet" | "bestaetigt") => {
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, ...(aktion === "geoeffnet" ? { geoeffnet_am: new Date().toISOString() } : { bestaetigt_am: new Date().toISOString() }) } : n));
+    fetch("/api/patient/benachrichtigungen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, aktion }),
+    }).catch(() => {});
+  };
   const isOverdue = !!(rp && rp.ueberfaellig);
   const dl = rp && rp.naechste_rate ? daysTill(rp.naechste_rate.faellig_am) : 99;
   const pct = rp ? rp.prozent : 0;
@@ -424,17 +433,40 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {notifs.map(n => (
         <div
           key={n.id}
-          onClick={() => {
-            hapticLight();
-            setNOpen(false);
-            if (n.typ === "balance") { setBalanceView(true); setTab("progress"); }
-          }}
-          style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer", background: cardBg, border: "1px solid " + (!n.gelesen ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
+          style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", opacity: n.bestaetigt_am ? 0.55 : 1, background: cardBg, border: "1px solid " + (!n.bestaetigt_am ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: fg }}>{n.titel}</div>
-            <div style={{ fontSize: 12, color: soft, lineHeight: 1.5 }}>{n.text}</div>
-            <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{fmtDateL(n.created_at, lang)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              onClick={() => {
+                hapticLight();
+                const auf = expandedNotif === n.id ? null : n.id;
+                setExpandedNotif(auf);
+                if (auf && !n.geoeffnet_am) markNotif(n.id, "geoeffnet");
+              }}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", gap: 8 }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{n.titel}</span>
+              <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>{fmtDateL(n.created_at, lang)} {expandedNotif === n.id ? "\u25b4" : "\u25be"}</span>
+            </div>
+            {expandedNotif === n.id && (
+              <div>
+                <div style={{ fontSize: 12, color: soft, lineHeight: 1.5, marginTop: 6 }}>{n.text}</div>
+                <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
+                  {n.typ === "balance" && (
+                    <button
+                      onClick={() => { hapticLight(); setNOpen(false); setBalanceView(true); setTab("progress"); }}
+                      style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#f6c453" }}
+                    >{lang === "en" ? "View balance \u2192" : lang === "es" ? "Ver saldo \u2192" : "Zum Guthaben \u2192"}</button>
+                  )}
+                  {!n.bestaetigt_am && (
+                    <button
+                      onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); }}
+                      style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}
+                    >\u2713 {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ))}
