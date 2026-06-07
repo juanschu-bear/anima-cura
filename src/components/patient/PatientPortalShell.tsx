@@ -370,7 +370,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // ── HEADER ──
   const Header = (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "30px 20px 0" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 20px 0" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#fff", ...hd }}>A</div>
         <span style={{ ...hd, fontSize: 22, fontWeight: 700, color: fg }}>Anima Cura</span>
@@ -1060,7 +1060,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div className="phone-notch" style={{ display: "none", position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)", width: deviceSize === "tablet" ? 180 : 140, height: 28, borderRadius: "0 0 18px 18px", background: "#0a0a0a", zIndex: 51, boxShadow: "0 2px 8px rgba(0,0,0,0.3)", transition: "width 0.4s ease" }}>
           <div style={{ width: 60, height: 5, borderRadius: 3, background: dk ? "#222" : "#ccc", margin: "14px auto 0" }} />
         </div>
-    <div className={`phone-app-container ${deviceSize === "tablet" ? "tablet-mode" : ""}`} style={{ maxWidth: deviceSize === "tablet" ? 720 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
+    <div className="phone-app-container" style={{ maxWidth: deviceSize === "tablet" ? 720 : 430, margin: "0 auto", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: dk ? "#030806" : "#f5f1eb", color: fg, position: "relative", boxShadow: "0 0 80px rgba(0,0,0,0.5), 0 0 200px rgba(74,222,128,0.03)", overflow: "hidden", borderRadius: 0, transition: "max-width 0.4s ease" }}>
       {/* Lava lamp animated gradient blobs - warm ambient glow, corners lit, middle dark */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         {/* Top-left: warm green-teal glow */}
@@ -1099,7 +1099,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
       {/* Finanzen-Auswahl: Fortschritt oder Anima Balance */}
       {finSheet && (
-        <div onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+        <div className="portal-overlay" onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
@@ -1119,7 +1119,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
       {/* Aufladen-Sheet mit Betragsleiter und GiroCode */}
       {aufladenSheet && (
-        <div onClick={() => setAufladenSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+        <div className="portal-overlay" onClick={() => setAufladenSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px", maxHeight: "85%", overflowY: "auto" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Guthaben aufladen</h3>
@@ -1151,7 +1151,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       )}
 
       {popup && (
-        <div onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+        <div className="portal-overlay" onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
           <div onClick={e => e.stopPropagation()} style={{ borderRadius: 24, padding: "36px 28px", textAlign: "center", maxWidth: 300, width: "100%", background: cardBg, border: "1px solid " + border }}>
             <span style={{ fontSize: 56, display: "block", marginBottom: 16 }}>{popup.icon}</span>
             <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{translateBadge(popup.titel, lang).titel}</h3>
@@ -1530,7 +1530,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           .phone-bezel { display: block !important; }
           .phone-notch { display: block !important; }
         }
+        .portal-overlay { position: fixed !important; }
         @media (min-width: 768px) {
+          .portal-overlay { position: absolute !important; }
           .phone-app-container {
             border-radius: 32px !important;
             height: 88vh !important;
@@ -1539,8 +1541,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             overflow-y: auto !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
-          .phone-app-container:not(.tablet-mode) { width: min(430px, 41vh) !important; }
-          .portal-content { padding-bottom: 24px !important; min-height: calc(88vh - 112px); }
           .portal-nav {
             position: sticky !important;
             bottom: 0 !important;
