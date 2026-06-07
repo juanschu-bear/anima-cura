@@ -227,7 +227,7 @@ export default function KassePage() {
         patient_id: patient.id,
         betrag: -b,
         typ: "verrechnung",
-        beschreibung: `Kasse: ${leistung}`,
+        beschreibung: `An der Praxis-Kasse: ${leistung}`,
         referenz_kassen_zahlung_id: kz.id,
       });
       if (balFehler) {
@@ -237,6 +237,12 @@ export default function KassePage() {
         return;
       }
       setGuthaben(g => Math.max(0, (g ?? 0) - b));
+      // Patient informieren (Glocke + Push), darf die Zahlung nie blockieren
+      fetch("/api/praxis/balance-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: patient.id, betrag: b, leistung, rest: Math.max(0, (guthaben ?? 0) - b) }),
+      }).catch(() => {});
     }
 
     if (zahlart === "qr_ueberweisung" && zweckFinal) {
