@@ -422,8 +422,15 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const NotifsDD = nOpen ? (
     <div style={{ padding: "12px 20px 0" }}>
       {notifs.map(n => (
-        <div key={n.id} style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", background: cardBg, border: "1px solid " + (!n.gelesen ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : warn }} />
+        <div
+          key={n.id}
+          onClick={() => {
+            hapticLight();
+            setNOpen(false);
+            if (n.typ === "balance") { setBalanceView(true); setTab("progress"); }
+          }}
+          style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer", background: cardBg, border: "1px solid " + (!n.gelesen ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: fg }}>{n.titel}</div>
             <div style={{ fontSize: 12, color: soft, lineHeight: 1.5 }}>{n.text}</div>

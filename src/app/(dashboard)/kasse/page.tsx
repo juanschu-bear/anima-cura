@@ -66,6 +66,7 @@ export default function KassePage() {
   const [betrag, setBetrag] = useState("");
   const [zahlart, setZahlart] = useState<(typeof ZAHLARTEN)[number]["key"]>("qr_ueberweisung");
   const [guthaben, setGuthaben] = useState<number | null>(null);
+  const [bestaetigung, setBestaetigung] = useState<{ kzId: string; name: string; betrag: number; zahlart: string; rest: number | null } | null>(null);
   const [notiz, setNotiz] = useState("");
   const [leistung, setLeistung] = useState<string>(LEISTUNGEN[0]);
   const [zweckManuell, setZweckManuell] = useState<string | null>(null);
@@ -252,6 +253,13 @@ export default function KassePage() {
     } else {
       setQrDataUrl(null);
       setQrInfo(null);
+      setBestaetigung({
+        kzId: kz.id,
+        name: `${patient.nachname}, ${patient.vorname}`,
+        betrag: b,
+        zahlart: ZAHLARTEN.find(a => a.key === zahlart)?.label || zahlart,
+        rest: zahlart === "guthaben" ? Math.max(0, (guthaben ?? 0) - b) : null,
+      });
     }
 
     setHinweis(`Erfasst: ${patient.nachname}, ${patient.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}`);
@@ -589,6 +597,27 @@ export default function KassePage() {
             )}
           </div>
         ) : null}
+      </Modal>
+      <Modal open={!!bestaetigung} onClose={() => setBestaetigung(null)} title="Zahlung erfasst">
+        {bestaetigung && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={20} /></span>
+              <div>
+                <div className="text-sm font-semibold">{bestaetigung.name}</div>
+                <div className="text-xs text-praxis-500">{bestaetigung.zahlart}</div>
+              </div>
+            </div>
+            <div className="text-2xl font-bold">{bestaetigung.betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
+            {bestaetigung.rest !== null && (
+              <div className="text-sm" style={{ color: "#b88a2e" }}>Verbleibendes Anima-Balance-Guthaben: {bestaetigung.rest.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <a className="ac-btn-primary" href={`/kasse/beleg?id=${bestaetigung.kzId}`} target="_blank" rel="noreferrer">Beleg öffnen</a>
+              <button className="ac-chip" onClick={() => setBestaetigung(null)}>Schließen</button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
