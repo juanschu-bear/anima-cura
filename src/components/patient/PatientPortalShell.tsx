@@ -1117,7 +1117,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
       {/* Finanzen-Auswahl: Fortschritt oder Anima Balance */}
       {finSheet && (
-        <div onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+        <div className="ac-ovl" onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
@@ -1137,7 +1137,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
       {/* Aufladen-Sheet mit Betragsleiter und GiroCode */}
       {aufladenSheet && (
-        <div onClick={() => setAufladenSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
+        <div className="ac-ovl" onClick={() => setAufladenSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px", maxHeight: "85%", overflowY: "auto" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Guthaben aufladen</h3>
@@ -1169,7 +1169,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       )}
 
       {popup && (
-        <div onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+        <div className="ac-ovl" onClick={() => setPopup(null)} style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
           <div onClick={e => e.stopPropagation()} style={{ borderRadius: 24, padding: "36px 28px", textAlign: "center", maxWidth: 300, width: "100%", background: cardBg, border: "1px solid " + border }}>
             <span style={{ fontSize: 56, display: "block", marginBottom: 16 }}>{popup.icon}</span>
             <h3 style={{ ...hd, fontSize: 22, fontWeight: 700, marginBottom: 8, color: fg }}>{translateBadge(popup.titel, lang).titel}</h3>
@@ -1186,6 +1186,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {docDrawer && (
           <motion.div
             key="doc-backdrop"
+            className="ac-ovl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1204,7 +1205,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               dragElastic={0.1}
               onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setDocDrawer(null); }}
               onClick={e => e.stopPropagation()}
-              style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), borderBottom: "none", overflow: "hidden" }}
+              className="ac-ovl-panel" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), borderBottom: "none", overflow: "hidden" }}
             >
               {/* Handle bar */}
               <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", cursor: "grab" }}>
@@ -1269,6 +1270,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           return (
             <motion.div
               key="phase-backdrop"
+              className="ac-ovl"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -1285,7 +1287,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 dragElastic={0.1}
                 onDragEnd={(_e, i) => { if (i.offset.y > 100 || i.velocity.y > 500) setPhaseDrawer(null); }}
                 onClick={e => e.stopPropagation()}
-                style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "90vh", overflowY: "auto", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") }}
+                className="ac-ovl-panel" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "90vh", overflowY: "auto", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") }}
               >
                 <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", position: "sticky", top: 0 }}>
                   <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
@@ -1392,6 +1394,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {showIBAN && (
           <motion.div
             key="iban-backdrop"
+            className="ac-ovl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1408,7 +1411,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               dragElastic={0.1}
               onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setShowIBAN(false); }}
               onClick={e => e.stopPropagation()}
-              style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), overflow: "hidden" }}
+              className="ac-ovl-panel" style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), overflow: "hidden" }}
             >
               <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px" }}>
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
@@ -1457,7 +1460,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Deactivation Confirmation Popup */}
       <AnimatePresence>
         {deactivatePopup && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeactivatePopup(null)} style={{ position: "absolute", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ac-ovl" onClick={() => setDeactivatePopup(null)} style={{ position: "absolute", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} style={{ background: dk ? "#1a1d2b" : "#fff", borderRadius: 20, padding: 24, maxWidth: 360, width: "100%" }}>
               <div style={{ fontSize: 28, textAlign: "center", marginBottom: 12 }}>{deactivatePopup === "push" ? "🔕" : "📭"}</div>
               <h3 style={{ ...hd, fontSize: 18, fontWeight: 700, color: fg, textAlign: "center", marginBottom: 12 }}>
