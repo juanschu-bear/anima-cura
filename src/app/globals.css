@@ -3708,3 +3708,13 @@ body::after {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Mobile: Finger-Scrollen im Sheet hat Vorrang vor der Zieh-Geste.
+   Die Drag-Mechanik setzt touch-action:none und blockiert sonst
+   jedes native Scrollen. Schliessen am Handy: X oder Schleier-Tipp. */
+@media (max-width: 767px) {
+  .ac-ovl-panel {
+    touch-action: pan-y !important;
+    overscroll-behavior: contain;
+  }
+}
