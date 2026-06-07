@@ -1530,8 +1530,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             max-height: 88vh !important;
             min-height: 88vh !important;
             overflow-y: auto !important;
-            display: flex !important;
-            flex-direction: column !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
           .portal-nav {
@@ -1539,9 +1537,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             bottom: 0 !important;
             left: auto !important;
             right: auto !important;
-            margin-top: auto !important;
             border-radius: 0 0 32px 32px !important;
-            flex-shrink: 0;
           }
         }
       `}</style>
