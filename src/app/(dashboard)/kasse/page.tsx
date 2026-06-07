@@ -346,6 +346,7 @@ export default function KassePage() {
                   key={key}
                   onClick={() => setZahlart(key)}
                   className={`ac-chip justify-center gap-2 py-3 ${zahlart === key ? "ac-chip-active" : ""}`}
+                  style={key === "guthaben" ? { gridColumn: "span 2", fontWeight: 700, color: "#b88a2e", border: "1px solid " + (zahlart === "guthaben" ? "#b88a2e" : "rgba(184,138,46,0.45)"), background: zahlart === "guthaben" ? "rgba(246,196,83,0.14)" : undefined } : undefined}
                 >
                   <Icon size={16} /> {label}
                 </button>

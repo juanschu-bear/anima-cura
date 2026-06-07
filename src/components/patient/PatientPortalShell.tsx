@@ -88,6 +88,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consentCheck2, setConsentCheck2] = useState(false);
   const [consentIsGuardian, setConsentIsGuardian] = useState(false);
   const [deactivatePopup, setDeactivatePopup] = useState<"rechnungen" | "push" | null>(null);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
   // ── Anima Balance ──
@@ -224,7 +225,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     navigator.serviceWorker.register("/sw.js").then(async (reg) => {
       if (!("PushManager" in window)) return;
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-      if (!vapidKey) return;
+      if (!vapidKey) { setPushStatus("\u2717 Kein VAPID-Key im Build"); return; }
       const b64ToBytes = (b64: string) => {
         const pad = "=".repeat((4 - (b64.length % 4)) % 4);
         const base = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
@@ -242,7 +243,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         }
         if (!sub) {
           const perm = await Notification.requestPermission();
-          if (perm !== "granted") return;
+          if (perm !== "granted") { setPushStatus("\u2717 Mitteilungen nicht erlaubt (iOS-Einstellungen pruefen)"); return; }
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) });
         }
         if (sub && patientId) {
@@ -251,8 +252,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ subscription: sub.toJSON(), patient_id: patientId }),
           });
+          setPushStatus("\u2713 Abo aktiv und gemeldet");
         }
-      } catch (e) { console.log("Push setup skipped:", e); }
+      } catch (e) { console.log("Push setup skipped:", e); setPushStatus("\u2717 Abo-Aufbau gescheitert: " + String((e as Error)?.message || e)); }
     }).catch(() => {});
   }, [patientId]);
 
@@ -990,6 +992,22 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <button onClick={() => { if (consent?.push_benachrichtigungen) { setDeactivatePopup("push"); } else { acceptConsent({ portal: true, rechnungen: consent?.digitaler_rechnungsempfang || false, push: true, datenschutz: true }); } }} style={{ width: 48, height: 28, borderRadius: 14, border: "none", background: consent?.push_benachrichtigungen ? grn : (dk ? "#333" : "#ddd"), cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
             <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", position: "absolute", top: 3, left: consent?.push_benachrichtigungen ? 23 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
           </button>
+        </div>
+        {/* Push-Diagnose: Status sichtbar statt stilles Scheitern */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: muted, flex: 1, lineHeight: 1.4 }}>{pushStatus || "Push-Status: noch nicht gemeldet"}</span>
+          <button
+            onClick={async () => {
+              hapticLight();
+              setPushStatus("Teste\u2026");
+              try {
+                const r = await fetch("/api/patient/push-test", { method: "POST" });
+                const j = await r.json();
+                setPushStatus((j.ok ? "\u2713 " : "\u2717 ") + (j.detail || j.grund));
+              } catch { setPushStatus("\u2717 Test nicht erreichbar"); }
+            }}
+            style={{ border: "1px solid " + border, background: "none", color: fg, borderRadius: 10, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+          >Push testen</button>
         </div>
       </div>
       <div style={{ padding: "0 20px 16px", textAlign: "center", marginTop: 8 }}>
