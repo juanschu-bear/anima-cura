@@ -591,8 +591,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ═══ PROGRESS TAB ═══
   const circ = 2 * Math.PI * 76;
   const off = circ - (pct / 100) * circ;
+  const saldoStr = (balance?.saldo ?? 0).toLocaleString("de-DE", { minimumFractionDigits: 2 });
+  const saldoFont = saldoStr.length >= 10 ? 26 : saldoStr.length >= 8 ? 31 : 38;
+
   const goldRing: React.CSSProperties = {
-    width: 220, height: 220, margin: "8px auto 16px", borderRadius: "50%", position: "relative",
+    width: "min(190px, 56vw)", height: "min(190px, 56vw)", margin: "4px auto 14px", borderRadius: "50%", position: "relative",
     display: "flex", alignItems: "center", justifyContent: "center",
     background: "radial-gradient(circle at 32% 26%, rgba(255,235,180,0.35), transparent 42%), radial-gradient(circle at 70% 80%, rgba(0,0,0,0.5), transparent 55%), conic-gradient(from 210deg, #b88a2e, #f6c453, #fff0c2, #f6c453, #9a7224, #b88a2e)",
     boxShadow: "0 22px 46px rgba(0,0,0,0.5), 0 0 38px rgba(246,196,83,0.16), inset 0 2px 6px rgba(255,255,255,0.35), inset 0 -10px 22px rgba(0,0,0,0.45)",
@@ -601,29 +604,31 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const BalanceTab = (
     <div>
       {Header}
-      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 600, color: fg }}>Anima Balance</h1>
-      <p style={{ fontSize: 14, color: muted, margin: "4px 0 14px" }}>Dein Geld bleibt deins, bis behandelt wurde.</p>
+      <div style={{ padding: "16px 20px 0", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: fg }}>Anima Balance</h1>
+        <p style={{ fontSize: 13, color: muted, margin: "4px 0 14px" }}>Dein Geld bleibt deins, bis behandelt wurde.</p>
+      </div>
 
       <div style={goldRing}>
-        <div style={{ width: 176, height: 176, borderRadius: "50%", background: dk ? "radial-gradient(circle at 40% 30%, #1b2018, #0c0f0b 70%)" : "radial-gradient(circle at 40% 30%, #fffdf6, #f3ecd9 70%)", boxShadow: "inset 0 6px 16px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+        <div style={{ width: "min(150px, 44vw)", height: "min(150px, 44vw)", borderRadius: "50%", background: dk ? "radial-gradient(circle at 40% 30%, #1b2018, #0c0f0b 70%)" : "radial-gradient(circle at 40% 30%, #fffdf6, #f3ecd9 70%)", boxShadow: "inset 0 6px 16px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
           <span style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: "#f6c453" }}>Guthaben</span>
-          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 600, color: fg }}>
-            {(balance?.saldo ?? 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })}&nbsp;€
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: saldoFont, fontWeight: 600, color: fg }}>
+            {saldoStr}&nbsp;€
           </span>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 10, margin: "0 20px 12px" }}>
         <button onClick={() => { setAufladenSheet(true); hapticLight(); }} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 700, fontSize: 14, fontFamily: "inherit", background: "linear-gradient(180deg, #ffd97a, #f6c453)", color: "#231a04", boxShadow: "0 8px 20px rgba(246,196,83,0.25)" }}>Aufladen</button>
         <button onClick={() => setRueckholHinweis(!rueckholHinweis)} style={{ flex: 1, cursor: "pointer", borderRadius: 14, padding: "13px 0", fontWeight: 600, fontSize: 14, fontFamily: "inherit", background: "transparent", border: `1px solid ${dk ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.15)"}`, color: muted }}>Zurückholen</button>
       </div>
       {rueckholHinweis && (
-        <div style={{ ...card, padding: "12px 14px", marginBottom: 12, fontSize: 13, color: muted }}>
+        <div style={{ ...card, padding: "12px 14px", margin: "0 20px 12px", fontSize: 13, color: muted }}>
           Nicht genutztes Guthaben bekommst du jederzeit zurück. Sag der Praxis kurz Bescheid (Chat oder am Tresen), die Rücküberweisung geht auf dein Konto.
         </div>
       )}
 
-      <div style={{ ...card, padding: "14px 16px" }}>
+      <div style={{ ...card, padding: "14px 16px", margin: "0 20px 24px" }}>
         <span style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: muted }}>Bewegungen</span>
         {!balance || balance.buchungen.length === 0 ? (
           <p style={{ fontSize: 13, color: muted, marginTop: 8 }}>
