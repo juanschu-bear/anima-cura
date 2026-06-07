@@ -38,6 +38,21 @@ const docIc: Record<string, string> = { kostenplan: "📋", vertrag: "📝", rat
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("home");
+  // Tab-Persistenz: nach einem Seiten-Refresh dort weitermachen, wo man war.
+  // sessionStorage statt localStorage: ueberlebt den Refresh, aber nicht das
+  // Schliessen des Browsers (Familien-Geraete starten neutral auf Start).
+  const TABS: Tab[] = ["home", "journey", "progress", "chat", "more"];
+  useEffect(() => {
+    try {
+      const savedTab = sessionStorage.getItem("ac_tab");
+      if (savedTab && (TABS as string[]).includes(savedTab)) setTab(savedTab as Tab);
+      if (sessionStorage.getItem("ac_balance") === "1") setBalanceView(true);
+    } catch { /* Storage gesperrt: neutral starten */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem("ac_tab", tab); } catch { /* ignorieren */ }
+  }, [tab]);
   const [dk, setDk] = useState(true);
   const [lang, setLang] = useState<Lang>("de");
   const [loading, setLoading] = useState(true);
@@ -78,6 +93,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ── Anima Balance ──
   const [finSheet, setFinSheet] = useState(false);
   const [balanceView, setBalanceView] = useState(false);
+  useEffect(() => {
+    try { sessionStorage.setItem("ac_balance", balanceView ? "1" : "0"); } catch { /* ignorieren */ }
+  }, [balanceView]);
   const [balance, setBalance] = useState<{ saldo: number; buchungen: any[]; ivoris_nummer: string; nachname: string } | null>(null);
   const [aufladenSheet, setAufladenSheet] = useState(false);
   const [aufladeBetrag, setAufladeBetrag] = useState<number | "frei">(300);
