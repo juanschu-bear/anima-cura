@@ -1173,6 +1173,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={() => setDocDrawer(null)}
+            className="portal-overlay"
             style={{ position: "absolute", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
           >
             <motion.div
@@ -1186,7 +1187,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               dragElastic={0.1}
               onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setDocDrawer(null); }}
               onClick={e => e.stopPropagation()}
-              style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), borderBottom: "none", overflow: "hidden" }}
+              className="portal-overlay" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), borderBottom: "none", overflow: "hidden" }}
             >
               {/* Handle bar */}
               <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", cursor: "grab" }}>
@@ -1255,6 +1256,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setPhaseDrawer(null)}
+              className="portal-overlay"
               style={{ position: "absolute", inset: 0, zIndex: 215, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
             >
               <motion.div
@@ -1267,7 +1269,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 dragElastic={0.1}
                 onDragEnd={(_e, i) => { if (i.offset.y > 100 || i.velocity.y > 500) setPhaseDrawer(null); }}
                 onClick={e => e.stopPropagation()}
-                style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "90vh", overflowY: "auto", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") }}
+                className="portal-overlay" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "90vh", overflowY: "auto", borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") }}
               >
                 <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px", position: "sticky", top: 0 }}>
                   <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
@@ -1368,6 +1370,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowIBAN(false)}
+            className="portal-overlay"
             style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
           >
             <motion.div
@@ -1380,7 +1383,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               dragElastic={0.1}
               onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setShowIBAN(false); }}
               onClick={e => e.stopPropagation()}
-              style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), overflow: "hidden" }}
+              className="portal-overlay" style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderRadius: "24px 24px 0 0", background: dk ? "rgba(18,18,18,0.95)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"), overflow: "hidden" }}
             >
               <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px" }}>
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: dk ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" }} />
@@ -1429,7 +1432,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Deactivation Confirmation Popup */}
       <AnimatePresence>
         {deactivatePopup && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeactivatePopup(null)} style={{ position: "absolute", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeactivatePopup(null)} className="portal-overlay" style={{ position: "absolute", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} style={{ background: dk ? "#1a1d2b" : "#fff", borderRadius: 20, padding: 24, maxWidth: 360, width: "100%" }}>
               <div style={{ fontSize: 28, textAlign: "center", marginBottom: 12 }}>{deactivatePopup === "push" ? "🔕" : "📭"}</div>
               <h3 style={{ ...hd, fontSize: 18, fontWeight: 700, color: fg, textAlign: "center", marginBottom: 12 }}>
@@ -1468,7 +1471,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {/* Privacy Policy Overlay */}
       <AnimatePresence>
         {showPrivacy && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "absolute", inset: 0, zIndex: 240, background: dk ? "#030806" : "#f5f1eb", overflowY: "auto" }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="portal-overlay" style={{ position: "absolute", inset: 0, zIndex: 240, background: dk ? "#030806" : "#f5f1eb", overflowY: "auto" }}>
             <div style={{ padding: "24px 20px 100px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <h2 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg, margin: 0 }}>
