@@ -1,6 +1,7 @@
 "use client";
 import { trackEvent } from "@/lib/useTracking";
 import QRCode from "qrcode";
+import { createPortal } from "react-dom";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,6 +35,16 @@ const fmtTimeL = (d: string, l: string) => { try { return new Date(d).toLocaleTi
 const fmtEuro = (n: number) => n.toLocaleString("de-DE") + " €";
 const daysTill = (d: string) => Math.max(0, Math.ceil((new Date(d).getTime() - Date.now()) / 864e5));
 const docIc: Record<string, string> = { kostenplan: "📋", vertrag: "📝", ratenzahlung: "📝", datenschutz: "🔒", sonstiges: "📄" };
+
+// Overlays werden per Portal direkt an document.body gehaengt. Nur so
+// koennen position:fixed-Schichten von KEINEM Vorfahren (Blur, Transform
+// der Animationen, scrollender Telefon-Rahmen) mehr eingefangen werden.
+function OverlayPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+  return createPortal(children, document.body);
+}
 
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
@@ -1097,6 +1108,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       </div>
       {Nav}
 
+      <OverlayPortal>
       {/* Finanzen-Auswahl: Fortschritt oder Anima Balance */}
       {finSheet && (
         <div className="portal-overlay" onClick={() => setFinSheet(false)} style={{ position: "absolute", inset: 0, zIndex: 220, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "flex-end" }}>
@@ -1509,6 +1521,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           lang={lang}
         />
       )}
+      </OverlayPortal>
 
       <style>{fontCss}{`
         @keyframes animapayGlowRed {
@@ -1535,7 +1548,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         }
         .portal-overlay { position: fixed !important; }
         @media (min-width: 768px) {
-          .portal-overlay { position: absolute !important; }
           .phone-app-container {
             border-radius: 32px !important;
             height: 88vh !important;
