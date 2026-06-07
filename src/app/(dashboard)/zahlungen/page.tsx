@@ -229,6 +229,7 @@ export default function ZahlungenPage() {
   const KASSE_ZAHLART: Record<string, string> = {
     qr_ueberweisung: "QR-Überweisung",
     girocard: "Girocard",
+    guthaben: "Guthaben",
     kreditkarte: "Kreditkarte",
     bar: "Bar",
   };
@@ -439,7 +440,7 @@ export default function ZahlungenPage() {
                 <td className="table-cell py-3 text-sm">
                   <span>
                     <span className="block font-bold" style={{ color: "#4ade80" }}>AnimaPay Kasse</span>
-                    <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.zahlart === "qr_ueberweisung" ? "QR-Überweisung" : z.zahlart === "girocard" ? "Girocard" : z.zahlart === "kreditkarte" ? "Kreditkarte" : "Bar"}</span>
+                    <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.zahlart === "qr_ueberweisung" ? "QR-Überweisung" : z.zahlart === "girocard" ? "Girocard" : z.zahlart === "kreditkarte" ? "Kreditkarte" : z.zahlart === "guthaben" ? "Guthaben" : "Bar"}</span>
                   </span>
                 </td>
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(z.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>

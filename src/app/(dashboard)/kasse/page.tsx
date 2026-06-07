@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Check, CreditCard, Info, QrCode, Search, X } from "lucide-react";
+import { Banknote, Check, CreditCard, Info, QrCode, Search, Wallet, X } from "lucide-react";
 import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
@@ -28,6 +28,7 @@ const ZAHLARTEN = [
   { key: "girocard", label: "Girocard", icon: CreditCard },
   { key: "kreditkarte", label: "Kreditkarte", icon: CreditCard },
   { key: "bar", label: "Bar", icon: Banknote },
+  { key: "guthaben", label: "Guthaben", icon: Wallet },
 ] as const;
 
 function istMinderjaehrig(geburtsdatum?: string | null): boolean | null {
@@ -64,6 +65,7 @@ export default function KassePage() {
   const [patient, setPatient] = useState<any | null>(null);
   const [betrag, setBetrag] = useState("");
   const [zahlart, setZahlart] = useState<(typeof ZAHLARTEN)[number]["key"]>("qr_ueberweisung");
+  const [guthaben, setGuthaben] = useState<number | null>(null);
   const [notiz, setNotiz] = useState("");
   const [leistung, setLeistung] = useState<string>(LEISTUNGEN[0]);
   const [zweckManuell, setZweckManuell] = useState<string | null>(null);
@@ -95,6 +97,15 @@ export default function KassePage() {
   }
   useEffect(() => { ladeTagesliste(); }, [kassenTag]);
   useEffect(() => { setSeite(1); }, [kassenTag, filterArt]);
+  // Anima-Balance-Saldo des gewaehlten Patienten laden
+  useEffect(() => {
+    if (!patient) { setGuthaben(null); return; }
+    let aktiv = true;
+    supabase.from("anima_balance_salden").select("saldo").eq("patient_id", patient.id).maybeSingle()
+      .then(({ data }) => { if (aktiv) setGuthaben(Number(data?.saldo ?? 0)); });
+    return () => { aktiv = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient]);
 
   const tagesSummen = useMemo(() => {
     const s: Record<string, number> = {};
@@ -186,6 +197,11 @@ export default function KassePage() {
     const b = parseBetrag(betrag);
     if (!patient) { setHinweis("Bitte zuerst einen Patienten wählen."); return; }
     if (!b) { setHinweis("Bitte einen gültigen Betrag eingeben, z. B. 36,23."); return; }
+    if (zahlart === "guthaben") {
+      const verf = guthaben ?? 0;
+      if (verf <= 0) { setHinweis("Kein Guthaben vorhanden."); return; }
+      if (b > verf + 0.001) { setHinweis(`Guthaben reicht nicht: verfügbar ${verf.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €.`); return; }
+    }
 
     setSaving(true);
     const zeichen = patient.ivoris_nummer || null;
@@ -206,6 +222,23 @@ export default function KassePage() {
       return;
     }
 
+    if (zahlart === "guthaben") {
+      const { error: balFehler } = await supabase.from("anima_balance_buchungen").insert({
+        patient_id: patient.id,
+        betrag: -b,
+        typ: "verrechnung",
+        beschreibung: `Kasse: ${leistung}`,
+        referenz_kassen_zahlung_id: kz.id,
+      });
+      if (balFehler) {
+        await supabase.from("kassen_zahlungen").delete().eq("id", kz.id);
+        setHinweis(`Guthaben-Verrechnung fehlgeschlagen, Zahlung NICHT erfasst: ${balFehler.message}`);
+        setSaving(false);
+        return;
+      }
+      setGuthaben(g => Math.max(0, (g ?? 0) - b));
+    }
+
     if (zahlart === "qr_ueberweisung" && zweckFinal) {
       const url = await QRCode.toDataURL(epcPayload(b, zweckFinal), { width: 280, margin: 1 });
       setQrDataUrl(url);
@@ -215,7 +248,7 @@ export default function KassePage() {
       setQrInfo(null);
     }
 
-    setHinweis(`Erfasst: ${patient.nachname}, ${patient.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`);
+    setHinweis(`Erfasst: ${patient.nachname}, ${patient.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}`);
     setPatient(null);
     setPatSearch("");
     setBetrag("");
@@ -290,6 +323,9 @@ export default function KassePage() {
 
           <div>
             <span className="mb-1 block text-xs font-medium text-praxis-500">Zahlart</span>
+            {patient && guthaben !== null && (
+              <span className="mb-1 block text-xs" style={{ color: "#b88a2e" }}>Anima-Balance-Guthaben: {guthaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+            )}
             <div className="grid grid-cols-2 gap-2">
               {ZAHLARTEN.map(({ key, label, icon: Icon }) => (
                 <button

@@ -19,6 +19,7 @@ const ZAHLART_LABEL: Record<string, string> = {
   girocard: "Girocard",
   kreditkarte: "Kreditkarte",
   bar: "Bar",
+  guthaben: "Guthaben (Anima Balance)",
 };
 
 function BelegInhalt() {
