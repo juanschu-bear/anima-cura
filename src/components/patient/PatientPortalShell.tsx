@@ -18,7 +18,7 @@ interface RpData {
   naechste_rate: { betrag: number; faellig_am: string } | null;
   ueberfaellig: { betrag: number; faellig_am: string; anzahl: number } | null;
 }
-interface Phase { id: string; name: string; beschreibung: string | null; status: string; reihenfolge: number; start_datum: string | null; end_datum: string | null }
+interface Phase { id: string; name: string; beschreibung: string | null; status: string; reihenfolge: number; start_datum: string | null; end_datum: string | null; video_url?: string | null }
 interface Badge { id: string; icon: string; titel: string; beschreibung: string; freigeschaltet: boolean }
 interface Msg { id: string; sender_type: string; sender_name: string | null; text: string; created_at: string }
 interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; created_at: string }
@@ -1288,6 +1288,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ padding: "0 24px 16px" }}>
                   <p style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>{info.summary}</p>
                 </motion.div>
+                {/* Phasen-Video: direkte Datei im eigenen Player, sonst eingebetteter Rahmen */}
+                {phaseDrawer.video_url && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} style={{ padding: "0 24px 16px" }}>
+                    {/\.(mp4|webm|mov)(\?|$)/i.test(phaseDrawer.video_url) ? (
+                      <video src={phaseDrawer.video_url} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 14, display: "block", background: "#000" }} />
+                    ) : (
+                      <iframe src={phaseDrawer.video_url} allowFullScreen style={{ width: "100%", aspectRatio: "16 / 9", border: "none", borderRadius: 14, display: "block", background: "#000" }} title="Phasen-Video" />
+                    )}
+                  </motion.div>
+                )}
                 {/* Interactive detail buttons - Claude answers inline */}
                 {info.details.map((d, i) => {
                   const answerKey = phaseDrawer.name + "::" + d.title;

@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data: phasen, error } = await supabase
     .from("behandlungsphasen")
-    .select("id, name, beschreibung, status, reihenfolge, start_datum, end_datum")
+    .select("id, name, beschreibung, status, reihenfolge, start_datum, end_datum, video_url")
     .eq("patient_id", patient.patientId)
     .order("reihenfolge", { ascending: true });
 
