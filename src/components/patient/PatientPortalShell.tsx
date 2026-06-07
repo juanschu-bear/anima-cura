@@ -599,7 +599,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   };
 
   const BalanceTab = (
-    <div style={{ padding: "0 4px" }}>
+    <div>
+      {Header}
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 600, color: fg }}>Anima Balance</h1>
       <p style={{ fontSize: 14, color: muted, margin: "4px 0 14px" }}>Dein Geld bleibt deins, bis behandelt wurde.</p>
 
@@ -1533,7 +1534,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             flex-direction: column !important;
           }
           .phone-app-container::-webkit-scrollbar { width: 0; }
-          .portal-content { flex: 1 0 auto; }
           .portal-nav {
             position: sticky !important;
             bottom: 0 !important;
