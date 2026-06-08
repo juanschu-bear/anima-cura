@@ -89,6 +89,31 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [consentIsGuardian, setConsentIsGuardian] = useState(false);
   const [deactivatePopup, setDeactivatePopup] = useState<"rechnungen" | "push" | null>(null);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
+  // Mitteilungen per Fingertipp aktivieren: Apple zeigt den Erlaubnis-
+  // Dialog nur bei direkter Nutzer-Geste, nie beim automatischen Laden.
+  const aktiviereMitteilungen = async () => {
+    try {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+      if (!vapidKey) { setPushStatus("\u2717 Kein VAPID-Key im Build"); return; }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) { setPushStatus("\u2717 Kein Push-Modul: App laeuft nicht als Home-Bildschirm-App"); return; }
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { setPushStatus("\u2717 Erlaubnis abgelehnt, aenderbar in den iOS-Einstellungen unter Mitteilungen"); return; }
+      const b64ToBytes = (b64: string) => {
+        const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+        const base = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+        return Uint8Array.from(atob(base), c => c.charCodeAt(0));
+      };
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) });
+      await fetch("/api/patient/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON(), patient_id: patientId }),
+      });
+      setPushStatus("\u2713 Abo aktiv und gemeldet");
+    } catch (e) { setPushStatus("\u2717 Aktivierung gescheitert: " + String((e as Error)?.message || e)); }
+  };
   const [showPrivacy, setShowPrivacy] = useState(false);
 
   // ── Anima Balance ──
@@ -997,6 +1022,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {/* Push-Diagnose: Status sichtbar statt stilles Scheitern */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8 }}>
           <span style={{ fontSize: 11, color: muted, flex: 1, lineHeight: 1.4 }}>{pushStatus || "Push-Status: noch nicht gemeldet"}</span>
+          <button
+            onClick={() => { hapticLight(); aktiviereMitteilungen(); }}
+            style={{ border: "none", background: grn, color: "#06220f", borderRadius: 10, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+          >Mitteilungen aktivieren</button>
           <button
             onClick={async () => {
               hapticLight();
