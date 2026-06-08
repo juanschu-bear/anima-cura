@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   // Push ist bewusst nur ein Anreisser ohne Details: Er soll zum Oeffnen
   // bewegen, damit das Lesen (geoeffnet/bestaetigt) in der App getrackt
   // wird. Der volle Text steht in der Glocke (patient_notifications).
-  const pushBody = "Tipp hier, um zu sehen, was gerade mit deinem Guthaben passiert ist.";
+  const pushBody = "Tipp, um Betrag und deinen neuen Reststand zu sehen.";
   for (const sub of subs ?? []) {
     if (sub.subscription_json) {
       await sendPushNotification(sub.subscription_json, { title: titel, body: pushBody, url: "/patient/portal" });
