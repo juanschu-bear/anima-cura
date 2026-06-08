@@ -221,9 +221,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   // Register Service Worker + Push subscription
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) { setPushStatus("\u2717 Kein Service-Worker-Support in diesem Browser"); return; }
     navigator.serviceWorker.register("/sw.js").then(async (reg) => {
-      if (!("PushManager" in window)) return;
+      if (!("PushManager" in window)) { setPushStatus("\u2717 Kein Push-Modul: App laeuft nicht als Home-Bildschirm-App"); return; }
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
       if (!vapidKey) { setPushStatus("\u2717 Kein VAPID-Key im Build"); return; }
       const b64ToBytes = (b64: string) => {
@@ -255,7 +256,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           setPushStatus("\u2713 Abo aktiv und gemeldet");
         }
       } catch (e) { console.log("Push setup skipped:", e); setPushStatus("\u2717 Abo-Aufbau gescheitert: " + String((e as Error)?.message || e)); }
-    }).catch(() => {});
+    }).catch((e) => { setPushStatus("\u2717 Service-Worker-Start gescheitert: " + String((e as Error)?.message || e)); });
   }, [patientId]);
 
   // Track app open with device context + notification click + session tracking
