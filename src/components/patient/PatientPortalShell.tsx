@@ -57,6 +57,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [lang, setLang] = useState<Lang>("de");
   const [loading, setLoading] = useState(true);
   const [nOpen, setNOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [popup, setPopup] = useState<Badge | null>(null);
   const [msgInput, setMsgInput] = useState("");
   const [typing, setTyping] = useState(false);
@@ -469,49 +470,57 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   ) : null;
 
   // ── NOTIFICATIONS ──
-  const NotifsDD = nOpen ? (
-    <div style={{ padding: "12px 20px 0" }}>
-      {notifs.map(n => (
+  const renderNotif = (n: Notif, frueher: boolean) => (
+    <div key={n.id} style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", opacity: frueher ? 0.6 : 1, background: cardBg, border: "1px solid " + (!frueher ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
-          key={n.id}
-          style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", opacity: n.bestaetigt_am ? 0.55 : 1, background: cardBg, border: "1px solid " + (!n.bestaetigt_am ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              onClick={() => {
-                hapticLight();
-                const auf = expandedNotif === n.id ? null : n.id;
-                setExpandedNotif(auf);
-                if (auf && !n.geoeffnet_am) markNotif(n.id, "geoeffnet");
-              }}
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", gap: 8 }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{n.titel}</span>
-              <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>{fmtDateL(n.created_at, lang)} {expandedNotif === n.id ? "\u25b4" : "\u25be"}</span>
-            </div>
-            {expandedNotif === n.id && (
-              <div>
-                <div style={{ fontSize: 12, color: soft, lineHeight: 1.5, marginTop: 6 }}>{n.text}</div>
-                <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
-                  {n.typ === "balance" && (
-                    <button
-                      onClick={() => { hapticLight(); setNOpen(false); setBalanceView(true); setTab("progress"); }}
-                      style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#f6c453" }}
-                    >{lang === "en" ? "View balance \u2192" : lang === "es" ? "Ver saldo \u2192" : "Zum Guthaben \u2192"}</button>
-                  )}
-                  {!n.bestaetigt_am && (
-                    <button
-                      onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); }}
-                      style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}
-                    >{"\u2713"} {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          onClick={() => { hapticLight(); const auf = expandedNotif === n.id ? null : n.id; setExpandedNotif(auf); if (auf && !n.geoeffnet_am) markNotif(n.id, "geoeffnet"); }}
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", gap: 8 }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: fg }}>{n.titel}</span>
+          <span style={{ fontSize: 16, color: muted, flexShrink: 0, lineHeight: 1 }}>{expandedNotif === n.id ? "\u25b4" : "\u25be"}</span>
         </div>
-      ))}
+        {expandedNotif !== n.id && (
+          <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>{fmtDateL(n.created_at, lang)} \u00b7 {lang === "en" ? "Tap to open" : lang === "es" ? "Toca para abrir" : "Tippen zum \u00d6ffnen"}</div>
+        )}
+        {expandedNotif === n.id && (
+          <div>
+            <div style={{ fontSize: 12, color: soft, lineHeight: 1.5, marginTop: 6 }}>{n.text}</div>
+            <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
+              {n.typ === "balance" && (
+                <button onClick={() => { hapticLight(); setNOpen(false); setBalanceView(true); setTab("progress"); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#f6c453" }}>{lang === "en" ? "View balance \u2192" : lang === "es" ? "Ver saldo \u2192" : "Zum Guthaben \u2192"}</button>
+              )}
+              {!n.bestaetigt_am && (
+                <button onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); setExpandedNotif(null); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}>{"\u2713"} {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
+  );
+
+  const offeneNotifs = notifs.filter(n => !n.bestaetigt_am);
+  const fruehereNotifs = notifs.filter(n => n.bestaetigt_am);
+  const NotifsSheet = nOpen ? (
+    <>
+      <div className="ac-ovl" onClick={() => { setNOpen(false); setShowHistory(false); }} style={{ position: "absolute", inset: 0, zIndex: 240, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }} />
+      <div className="ac-ovl-panel" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", overflowY: "auto", zIndex: 241, background: dk ? "#12151f" : "#fff", borderRadius: "24px 24px 0 0", padding: "16px 20px 24px", boxShadow: "0 -8px 30px rgba(0,0,0,0.3)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <span style={{ fontSize: 17, fontWeight: 700, color: fg, fontFamily: "'Fraunces', serif" }}>{lang === "en" ? "Notifications" : lang === "es" ? "Notificaciones" : "Benachrichtigungen"}</span>
+          <button onClick={() => { setNOpen(false); setShowHistory(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", cursor: "pointer", fontSize: 14, color: muted }}>{"\u2715"}</button>
+        </div>
+        {offeneNotifs.length === 0 && (
+          <div style={{ fontSize: 13, color: muted, padding: "8px 0 4px" }}>{lang === "en" ? "Nothing new." : lang === "es" ? "Nada nuevo." : "Nichts Neues."}</div>
+        )}
+        {offeneNotifs.map(n => renderNotif(n, false))}
+        {fruehereNotifs.length > 0 && (
+          <button onClick={() => { hapticLight(); setShowHistory(!showHistory); }} style={{ border: "none", background: "none", cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: muted }}>{showHistory ? (lang === "en" ? "Hide earlier" : lang === "es" ? "Ocultar anteriores" : "Fr\u00fchere verbergen") : (lang === "en" ? "Show earlier" : lang === "es" ? "Ver anteriores" : "Fr\u00fchere anzeigen")} ({fruehereNotifs.length})</button>
+        )}
+        {showHistory && fruehereNotifs.map(n => renderNotif(n, true))}
+      </div>
+    </>
   ) : null;
 
   // ── BOTTOM NAV ──
@@ -549,7 +558,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     <div>
       {Header}
       {HintBanner}
-      {NotifsDD}
       <div style={{ padding: "16px 20px 0" }}>
         <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
         <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
@@ -1214,6 +1222,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {tab === "more" && MoreTab}
       </div>
       {Nav}
+      {NotifsSheet}
 
       {/* Finanzen-Auswahl: Fortschritt oder Anima Balance */}
       {finSheet && (
