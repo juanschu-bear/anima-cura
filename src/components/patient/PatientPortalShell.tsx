@@ -120,6 +120,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ── Anima Balance ──
   const [finSheet, setFinSheet] = useState(false);
   const [balanceView, setBalanceView] = useState(false);
+  const [balPage, setBalPage] = useState(0);
   useEffect(() => {
     try { sessionStorage.setItem("ac_balance", balanceView ? "1" : "0"); } catch { /* ignorieren */ }
   }, [balanceView]);
@@ -482,7 +483,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <span style={{ fontSize: 16, color: muted, flexShrink: 0, lineHeight: 1 }}>{expandedNotif === n.id ? "\u25b4" : "\u25be"}</span>
         </div>
         {expandedNotif !== n.id && (
-          <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>{fmtDateL(n.created_at, lang)} \u00b7 {lang === "en" ? "Tap to open" : lang === "es" ? "Toca para abrir" : "Tippen zum \u00d6ffnen"}</div>
+          <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>{fmtDateL(n.created_at, lang)}, {new Date(n.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} {lang === "de" ? "Uhr \u00b7 " : "\u00b7 "}{lang === "en" ? "Tap to open" : lang === "es" ? "Toca para abrir" : "Tippen zum \u00d6ffnen"}</div>
         )}
         {expandedNotif === n.id && (
           <div>
@@ -505,8 +506,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const fruehereNotifs = notifs.filter(n => n.bestaetigt_am);
   const NotifsSheet = nOpen ? (
     <>
-      <div className="ac-ovl" onClick={() => { setNOpen(false); setShowHistory(false); }} style={{ position: "absolute", inset: 0, zIndex: 240, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }} />
-      <div className="ac-ovl-panel" style={{ position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "85vh", overflowY: "auto", zIndex: 241, background: dk ? "#12151f" : "#fff", borderRadius: "24px 24px 0 0", padding: "16px 20px 24px", boxShadow: "0 -8px 30px rgba(0,0,0,0.3)" }}>
+      <div onClick={() => { setNOpen(false); setShowHistory(false); }} style={{ position: "absolute", inset: 0, zIndex: 240, background: "transparent" }} />
+      <div style={{ position: "absolute", top: 64, right: 16, width: "min(340px, calc(100% - 32px))", maxHeight: "70vh", overflowY: "auto", zIndex: 241, background: dk ? "#12151f" : "#fff", borderRadius: 18, padding: "14px 16px 16px", border: "1px solid " + border, boxShadow: "0 12px 40px rgba(0,0,0,0.35)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <span style={{ fontSize: 17, fontWeight: 700, color: fg, fontFamily: "'Fraunces', serif" }}>{lang === "en" ? "Notifications" : lang === "es" ? "Notificaciones" : "Benachrichtigungen"}</span>
           <button onClick={() => { setNOpen(false); setShowHistory(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)", cursor: "pointer", fontSize: 14, color: muted }}>{"\u2715"}</button>
@@ -743,17 +744,35 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             Noch keine Bewegungen. Dein Guthaben entsteht durch Aufladen, Überzahlungen oder Erstattungen, ganz von selbst.
           </p>
         ) : (
-          balance.buchungen.map((b: any) => (
-            <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 0", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`, fontSize: 13 }}>
-              <span>
-                <span style={{ fontWeight: 600, color: fg }}>{BAL_TYP[b.typ] || b.typ}{b.beschreibung ? ` · ${b.beschreibung}` : ""}</span>
-                <span style={{ display: "block", fontSize: 11, color: muted, marginTop: 1 }}>{new Date(b.created_at).toLocaleDateString("de-DE")}</span>
-              </span>
-              <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, whiteSpace: "nowrap", color: Number(b.betrag) >= 0 ? grn : "#f08c8c" }}>
-                {Number(b.betrag) >= 0 ? "+" : ""}{Number(b.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })}&nbsp;€
-              </span>
-            </div>
-          ))
+          (() => {
+            const proSeite = 6;
+            const ges = balance.buchungen.length;
+            const seiten = Math.ceil(ges / proSeite);
+            const seite = Math.min(balPage, seiten - 1);
+            const teil = balance.buchungen.slice(seite * proSeite, seite * proSeite + proSeite);
+            return (
+              <>
+                {teil.map((b: any) => (
+                  <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 0", borderBottom: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`, fontSize: 13 }}>
+                    <span>
+                      <span style={{ fontWeight: 600, color: fg }}>{BAL_TYP[b.typ] || b.typ}{b.beschreibung ? ` · ${b.beschreibung}` : ""}</span>
+                      <span style={{ display: "block", fontSize: 11, color: muted, marginTop: 1 }}>{new Date(b.created_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} Uhr</span>
+                    </span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, whiteSpace: "nowrap", color: Number(b.betrag) >= 0 ? grn : "#f08c8c" }}>
+                      {Number(b.betrag) >= 0 ? "+" : ""}{Number(b.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })}&nbsp;€
+                    </span>
+                  </div>
+                ))}
+                {seiten > 1 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                    <button disabled={seite === 0} onClick={() => { hapticLight(); setBalPage(seite - 1); }} style={{ border: "1px solid " + border, background: "none", color: seite === 0 ? muted : fg, borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: seite === 0 ? "default" : "pointer", fontFamily: "inherit", opacity: seite === 0 ? 0.4 : 1 }}>← {lang === "en" ? "Back" : lang === "es" ? "Atrás" : "Zurück"}</button>
+                    <span style={{ fontSize: 11, color: muted }}>{lang === "en" ? "Page" : lang === "es" ? "Página" : "Seite"} {seite + 1} / {seiten}</span>
+                    <button disabled={seite >= seiten - 1} onClick={() => { hapticLight(); setBalPage(seite + 1); }} style={{ border: "1px solid " + border, background: "none", color: seite >= seiten - 1 ? muted : fg, borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: seite >= seiten - 1 ? "default" : "pointer", fontFamily: "inherit", opacity: seite >= seiten - 1 ? 0.4 : 1 }}>{lang === "en" ? "Next" : lang === "es" ? "Siguiente" : "Weiter"} →</button>
+                  </div>
+                )}
+              </>
+            );
+          })()
         )}
       </div>
     </div>
