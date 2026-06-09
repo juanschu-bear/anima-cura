@@ -137,6 +137,7 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
 
 interface Props {
   patientId: string;
+  modus?: "patient" | "praxis";
 }
 
 type StepName =
@@ -173,13 +174,13 @@ const MEDS: MedQ[] = [
   { key: "g_physio", t: "Wurde eine physiotherapeutische oder osteopathische Behandlung durchgeführt?" },
   { key: "g_hno", t: "Bestand eine Behandlung bei einem HNO-Arzt?" },
   { key: "g_atmung", t: "Wird durch die Nase oder den Mund geatmet?", choice: ["Nase", "Mund"] },
-  { key: "g_kfo_frueher", t: "Gab es schon einmal eine kieferorthopädische Behandlung?" },
+  { key: "g_kfo_frueher", t: "Gab es schon einmal eine kieferorthopädische Behandlung?", f: "Wenn ja, wann?" },
   { key: "g_op_mund", t: "Operationen im Mund-/Kieferbereich (z. B. Lippenbändchen, Gaumenspalte)?" },
   { key: "g_kiefergelenk", t: "Bestehen Kiefergelenkbeschwerden oder -knacken?" },
   { key: "g_kopfschmerzen", t: "Bestehen häufige Kopf- oder Nackenschmerzen?" },
   { key: "g_knirschen", t: "Besteht nächtliches Zähneknirschen?" },
   { key: "g_logopaedie", t: "Bestand eine logopädische Behandlung?" },
-  { key: "g_unfaelle", t: "Gab es Unfälle mit Beteiligung der Zähne oder des Kiefers?" },
+  { key: "g_unfaelle", t: "Gab es Unfälle mit Beteiligung der Zähne oder des Kiefers?", f: "Wenn ja, wann?" },
   { key: "g_lutschen", t: "Besteht eine Lutschgewohnheit (Daumen, Finger, Schnuller), Lippen- oder Nägelbeißen?", f: "Wenn ja, bitte beschreiben und in welchem Alter." },
   { key: "g_geschwister_kfo", t: "Sind Geschwister in kieferorthopädischer Behandlung?" },
   { key: "g_instrument", t: "Wird ein Musikinstrument gespielt?", f: "Wenn ja, welches?" },
@@ -278,7 +279,7 @@ const SignaturePad = forwardRef<HTMLCanvasElement>(function SignaturePad(_props,
   );
 });
 
-export function AnamneseForm({ patientId }: Props) {
+export function AnamneseForm({ patientId, modus = "patient" }: Props) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [data, setData] = useState<Record<string, unknown>>({});
   const [stepName, setStepName] = useState<StepName>("versicherung");
@@ -324,6 +325,13 @@ export function AnamneseForm({ patientId }: Props) {
       body: JSON.stringify({ patientId, answers: payload, schema }),
     }).catch((error) => console.error("Anamnese-Übermittlung fehlgeschlagen:", error));
     setDone(true);
+    scrollTop();
+  };
+
+  const resetForm = () => {
+    setData({});
+    setStepName("versicherung");
+    setDone(false);
     scrollTop();
   };
 
@@ -562,8 +570,12 @@ export function AnamneseForm({ patientId }: Props) {
             <div className="done-screen show">
               <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
               <h2>Vielen Dank!</h2>
-              <p>Ihr Bogen ist eingegangen. Sie erhalten Ihre unterschriebenen Unterlagen per E-Mail, und unsere Praxis hat alles vorliegen.</p>
-              <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
+              <p>Ihr Bogen ist bei uns eingegangen. Unsere Praxis hat Ihre Angaben jetzt vorliegen.</p>
+              {modus === "praxis" ? (
+                <button type="button" className="btn primary" onClick={resetForm}>Nächster Patient</button>
+              ) : (
+                <p>Sie können diese Seite jetzt einfach schließen.</p>
+              )}
             </div>
           ) : (
             renderStep()
