@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import {
+  createAndDistribute,
+  type DocumensoField,
+} from "@/lib/documenso/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,6 +19,18 @@ type SubmitBody = {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+// Seitenzahl aus dem PDF zaehlen (WeasyPrint liefert klassische Seitenobjekte).
+function countPdfPages(pdf: Buffer): number {
+  try {
+    const text = pdf.toString("latin1");
+    const matches = text.match(/\/Type\s*\/Page(?![s])/g);
+    const n = matches ? matches.length : 0;
+    return n > 0 ? n : 1;
+  } catch {
+    return 1;
+  }
 }
 
 export async function POST(request: Request) {
@@ -90,6 +106,7 @@ export async function POST(request: Request) {
       /[^A-Za-z0-9\u00C0-\u017F_-]/g,
       "_"
     );
+    const pdfFilename = `Anamnesebogen_${dateipart}.pdf`;
 
     let pdfBuffer: Buffer;
     try {
@@ -102,7 +119,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           answers,
           schema: body.schema ?? null,
-          filename: `Anamnesebogen_${dateipart}.pdf`,
+          filename: pdfFilename,
         }),
       });
 
@@ -126,40 +143,77 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3) PDF im Supabase-Storage ablegen
-    const pdfPath = `${submissionId}/Anamnesebogen.pdf`;
-    const { error: uploadError } = await supabase.storage
+    // 3) Unsigniertes PDF im Storage ablegen (unser Beleg + Vorlage fuer Documenso)
+    const unsignedPath = `${submissionId}/Anamnesebogen.pdf`;
+    await supabase.storage
       .from("anamnese-dokumente")
-      .upload(pdfPath, pdfBuffer, {
+      .upload(unsignedPath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
 
-    if (uploadError) {
+    // 4) Documenso-Envelope anlegen, verteilen, Signier-Link holen
+    const patientName =
+      [vorname, nachname].filter(Boolean).join(" ").trim() || "Patient";
+    const lastPage = countPdfPages(pdfBuffer);
+    const fields: DocumensoField[] = [
+      { type: "SIGNATURE", page: lastPage, positionX: 8, positionY: 80, width: 38, height: 9 },
+      { type: "DATE", page: lastPage, positionX: 55, positionY: 82, width: 28, height: 5 },
+    ];
+
+    try {
+      const signing = await createAndDistribute({
+        title: `Anamnesebogen ${patientName}`.trim(),
+        externalId: submissionId,
+        recipient: { email: email ?? "", name: patientName },
+        fields,
+        pdf: pdfBuffer,
+        pdfFilename,
+        language: "de",
+      });
+
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          status: "signatur_ausstehend",
+          documenso_envelope_id: signing.envelopeId,
+          documenso_recipient_token: signing.token,
+        })
+        .eq("id", submissionId);
+
+      // Host fuer die Einbettung (Basis ohne /api/v2), damit der Client weiss,
+      // welche Documenso-Instanz das Signier-Fenster laedt.
+      const documensoHost = (process.env.DOCUMENSO_BASE_URL ?? "")
+        .trim()
+        .replace(/\/+$/, "")
+        .replace(/\/api\/v2$/, "");
+
+      return NextResponse.json({
+        ok: true,
+        id: submissionId,
+        token: signing.token,
+        host: documensoHost,
+      });
+    } catch (documensoError) {
+      // Daten sind gespeichert. Ohne Signier-Link faellt das Frontend auf die
+      // Eingangsbestaetigung zurueck, die Praxis kann die Signatur nachholen.
       await supabase
         .from("anamnese_submissions")
         .update({
           status: "fehler",
-          fehler_text: `Storage: ${uploadError.message}`,
+          fehler_text: `Documenso: ${String(documensoError)}`,
         })
         .eq("id", submissionId);
+
       return NextResponse.json(
         {
           ok: false,
           id: submissionId,
-          error: `Speichern des PDF fehlgeschlagen: ${uploadError.message}`,
+          error: `Signaturanforderung fehlgeschlagen: ${String(documensoError)}`,
         },
-        { status: 500 }
+        { status: 502 }
       );
     }
-
-    // 4) Einreichung aktualisieren
-    await supabase
-      .from("anamnese_submissions")
-      .update({ signed_pdf_path: pdfPath, status: "signatur_ausstehend" })
-      .eq("id", submissionId);
-
-    return NextResponse.json({ ok: true, id: submissionId, pdf_path: pdfPath });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }

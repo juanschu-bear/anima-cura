@@ -137,7 +137,6 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
 
 interface Props {
   patientId: string;
-  modus?: "patient" | "praxis";
 }
 
 type StepName =
@@ -174,13 +173,13 @@ const MEDS: MedQ[] = [
   { key: "g_physio", t: "Wurde eine physiotherapeutische oder osteopathische Behandlung durchgeführt?" },
   { key: "g_hno", t: "Bestand eine Behandlung bei einem HNO-Arzt?" },
   { key: "g_atmung", t: "Wird durch die Nase oder den Mund geatmet?", choice: ["Nase", "Mund"] },
-  { key: "g_kfo_frueher", t: "Gab es schon einmal eine kieferorthopädische Behandlung?", f: "Wenn ja, wann?" },
+  { key: "g_kfo_frueher", t: "Gab es schon einmal eine kieferorthopädische Behandlung?" },
   { key: "g_op_mund", t: "Operationen im Mund-/Kieferbereich (z. B. Lippenbändchen, Gaumenspalte)?" },
   { key: "g_kiefergelenk", t: "Bestehen Kiefergelenkbeschwerden oder -knacken?" },
   { key: "g_kopfschmerzen", t: "Bestehen häufige Kopf- oder Nackenschmerzen?" },
   { key: "g_knirschen", t: "Besteht nächtliches Zähneknirschen?" },
   { key: "g_logopaedie", t: "Bestand eine logopädische Behandlung?" },
-  { key: "g_unfaelle", t: "Gab es Unfälle mit Beteiligung der Zähne oder des Kiefers?", f: "Wenn ja, wann?" },
+  { key: "g_unfaelle", t: "Gab es Unfälle mit Beteiligung der Zähne oder des Kiefers?" },
   { key: "g_lutschen", t: "Besteht eine Lutschgewohnheit (Daumen, Finger, Schnuller), Lippen- oder Nägelbeißen?", f: "Wenn ja, bitte beschreiben und in welchem Alter." },
   { key: "g_geschwister_kfo", t: "Sind Geschwister in kieferorthopädischer Behandlung?" },
   { key: "g_instrument", t: "Wird ein Musikinstrument gespielt?", f: "Wenn ja, welches?" },
@@ -203,25 +202,10 @@ const CONSENTS: ConsentDef[] = [
   { key: "ew_anima", label: "Ich stimme zu, dass meine Daten in der Anima Cura Plattform gespeichert und verarbeitet werden, damit ich Unterlagen, Termine und Rechnungen dort einsehen kann, und dass ich über die Plattform für Folgetermine kontaktiert werden darf.", pflicht: false },
 ];
 
-const REQUIRED_FIELDS: Record<StepName, string[]> = {
-  versicherung: ["versicherungsart", "krankenkasse"],
-  patient: [
-    "patient_vorname", "patient_nachname", "patient_geburtsdatum", "patient_geschlecht",
-    "patient_telefon", "patient_strasse", "patient_hausnummer", "patient_plz",
-    "patient_wohnort", "patient_email", "patient_mobil",
-  ],
-  versicherter: ["vp_vorname", "vp_nachname", "vp_telefon"],
-  behandlung: ["besuchsgrund"],
-  gesundheit: [...MEDS.map((m) => m.key), "g_zaehneputzen"],
-  einwilligungen: CONSENTS.filter((c) => c.pflicht).map((c) => c.key),
-  abschluss: ["abschluss_datum", "abschluss_ort"],
-};
-
-const SignaturePad = forwardRef<HTMLCanvasElement, { onInk?: (has: boolean) => void }>(function SignaturePad({ onInk }, ref) {
+const SignaturePad = forwardRef<HTMLCanvasElement>(function SignaturePad(_props, ref) {
   const innerRef = useRef<HTMLCanvasElement | null>(null);
   useImperativeHandle(ref, () => innerRef.current as HTMLCanvasElement, []);
   const drawing = useRef(false);
-  const inked = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -263,7 +247,6 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { onInk?: (has: boolean) => v
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
     last.current = p;
-    if (!inked.current) { inked.current = true; if (onInk) onInk(true); }
   };
 
   const end = () => {
@@ -275,8 +258,6 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { onInk?: (has: boolean) => v
     const c = innerRef.current;
     const ctx = c?.getContext("2d");
     if (c && ctx) ctx.clearRect(0, 0, c.width, c.height);
-    inked.current = false;
-    if (onInk) onInk(false);
   };
 
   return (
@@ -297,12 +278,11 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { onInk?: (has: boolean) => v
   );
 });
 
-export function AnamneseForm({ patientId, modus = "patient" }: Props) {
+export function AnamneseForm({ patientId }: Props) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [data, setData] = useState<Record<string, unknown>>({});
   const [stepName, setStepName] = useState<StepName>("versicherung");
   const [done, setDone] = useState(false);
-  const [sig1Inked, setSig1Inked] = useState(false);
 
   const sig1 = useRef<HTMLCanvasElement | null>(null);
   const sig2 = useRef<HTMLCanvasElement | null>(null);
@@ -320,20 +300,6 @@ export function AnamneseForm({ patientId, modus = "patient" }: Props) {
   const visibleSteps = STEPS.filter((s) => s !== "versicherter" || isMinor);
   const pos = visibleSteps.indexOf(stepName);
   const total = visibleSteps.length;
-
-  const stepValid = (step: StepName): boolean => {
-    for (const key of REQUIRED_FIELDS[step]) {
-      const v = data[key];
-      if (step === "einwilligungen") {
-        if (v !== true) return false;
-      } else if (typeof v !== "string" || v.trim() === "") {
-        return false;
-      }
-    }
-    if (step === "abschluss" && !sig1Inked) return false;
-    return true;
-  };
-  const currentValid = stepValid(stepName);
 
   const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -361,16 +327,7 @@ export function AnamneseForm({ patientId, modus = "patient" }: Props) {
     scrollTop();
   };
 
-  const resetForm = () => {
-    setData({});
-    setStepName("versicherung");
-    setDone(false);
-    setSig1Inked(false);
-    scrollTop();
-  };
-
   const goNext = () => {
-    if (!stepValid(stepName)) return;
     if (pos >= total - 1) { submit(); return; }
     setStepName(visibleSteps[pos + 1]);
     scrollTop();
@@ -557,7 +514,7 @@ export function AnamneseForm({ patientId, modus = "patient" }: Props) {
               <div className="field"><label>Datum <span className="req">*</span></label><input type="date" value={txt("abschluss_datum")} onChange={(e) => set("abschluss_datum", e.target.value)} /></div>
               <div className="field"><label>Ort <span className="req">*</span></label><input type="text" value={txt("abschluss_ort")} onChange={(e) => set("abschluss_ort", e.target.value)} /></div>
             </div>
-            <div className="field col-2"><label>Unterschrift des/der Versicherten <span className="req">*</span></label><SignaturePad ref={sig1} onInk={setSig1Inked} /></div>
+            <div className="field col-2"><label>Unterschrift des/der Versicherten <span className="req">*</span></label><SignaturePad ref={sig1} /></div>
             {data.vp2_vorhanden === "ja" && (
               <div className="field col-2"><label>Unterschrift des weiteren Erziehungsberechtigten</label><SignaturePad ref={sig2} /></div>
             )}
@@ -605,12 +562,8 @@ export function AnamneseForm({ patientId, modus = "patient" }: Props) {
             <div className="done-screen show">
               <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
               <h2>Vielen Dank!</h2>
-              <p>Ihr Bogen ist bei uns eingegangen. Unsere Praxis hat Ihre Angaben jetzt vorliegen.</p>
-              {modus === "praxis" ? (
-                <button type="button" className="btn primary" onClick={resetForm}>Nächster Patient</button>
-              ) : (
-                <p>Sie können diese Seite jetzt einfach schließen.</p>
-              )}
+              <p>Ihr Bogen ist eingegangen. Sie erhalten Ihre unterschriebenen Unterlagen per E-Mail, und unsere Praxis hat alles vorliegen.</p>
+              <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
             </div>
           ) : (
             renderStep()
@@ -622,8 +575,8 @@ export function AnamneseForm({ patientId, modus = "patient" }: Props) {
         <div className="nav">
           <div className="inner">
             <button className="btn" type="button" onClick={goBack} disabled={pos === 0}>Zurück</button>
-            <span className="plabel">{currentValid ? "Schritt " + (pos + 1) + " von " + total : "Bitte Pflichtfelder ausfüllen"}</span>
-            <button className="btn primary" type="button" onClick={goNext} disabled={!currentValid}>{pos === total - 1 ? "Absenden" : "Weiter"}</button>
+            <span className="plabel">{"Schritt " + (pos + 1) + " von " + total}</span>
+            <button className="btn primary" type="button" onClick={goNext}>{pos === total - 1 ? "Absenden" : "Weiter"}</button>
           </div>
         </div>
       )}
