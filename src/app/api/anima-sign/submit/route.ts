@@ -86,9 +86,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const dateipart = nachname
-      ? nachname.replace(/[^\p{L}\p{N}_-]/gu, "_")
-      : submissionId;
+    const dateipart = (nachname ?? submissionId).replace(
+      /[^A-Za-z0-9\u00C0-\u017F_-]/g,
+      "_"
+    );
 
     let pdfBuffer: Buffer;
     try {
