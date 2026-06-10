@@ -100,8 +100,8 @@
 .scribe .einleitung{font-size:15.5px;color:var(--gedeckt);max-width:74ch;margin:0}
 
 .scribe .buehne{max-width:1160px;margin:0 auto;padding:8px 26px 110px}
-.scribe .abschnitt{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--dunkler);margin:38px 0 14px;display:flex;align-items:center;gap:12px}
+.scribe .abschnitt{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--schrift);margin:38px 0 14px;display:flex;align-items:center;gap:12px}
 .scribe .abschnitt::after{content:"";flex:1;height:1px;
   background:linear-gradient(90deg,var(--kante),transparent)}
 
@@ -333,3 +333,10 @@
   .scribe .attachment-anim{animation:attach-pop .4s cubic-bezier(.2,1.7,.4,1) both}
   @keyframes attach-pop{from{opacity:0;transform:scale(2.4)}to{opacity:1;transform:scale(1)}}
 }
+
+/* ===== Ausgangs-Unterzeilen & Spickzettel ===== */
+.scribe .ounter{display:block;font-family:var(--mono);font-size:9.5px;font-weight:500;
+  letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin-top:3px}
+.scribe .spick-eintrag{margin-top:16px}
+.scribe .spick-frage{font-family:var(--display);font-weight:700;font-size:14px}
+.scribe .spick-antwort{font-size:13.5px;color:var(--gedeckt);margin-top:3px;line-height:1.55}

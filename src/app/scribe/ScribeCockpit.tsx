@@ -65,6 +65,23 @@ const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   removable: [],
 };
 
+/* Spickzettel: alles, was man fragen koennte. Durchsuchbar. */
+const SPICKZETTEL: { frage: string; antwort: string }[] = [
+  { frage: "Was macht Anima Scribe?", antwort: "Es legt den Karteieintrag fuer den laufenden Termin fertig vor. Sie bestaetigen, klicken Abweichungen an, fertig. Daraus entstehen zwei Dinge: der Verlaufstext fuer die Akte und die Abrechnungspositionen." },
+  { frage: "Was passiert beim Bestaetigen?", antwort: "Der Eintrag wird als Version 1 revisionssicher in Anima gespeichert. Er ist damit Teil der Akte (Aufbewahrung 10 Jahre), aber noch NICHT in ivoris." },
+  { frage: "Wann ist der Eintrag in ivoris?", antwort: "Erst nach Klick auf 'In ivoris-Akte schreiben'. Solange zeigt die Tagesliste 'noch nicht in ivoris'. Nachholen geht jederzeit: Patientenkarte in der Tagesliste anklicken, dort steht der Knopf." },
+  { frage: "Was bedeuten die Pillen in der Tagesliste?", antwort: "Rot pulsierend: handeln (Doku offen oder Push-Fehler). Bernstein: bestaetigt, aber noch nicht in ivoris. Gruen: in ivoris angekommen." },
+  { frage: "Ich habe etwas falsch eingetragen. Wie korrigiere ich?", antwort: "Einfach aendern. Der Knopf wird zu 'Als Version v2 bestaetigen', ein Aenderungsgrund ist Pflicht. Die alte Fassung bleibt sichtbar in der Historie, nichts wird geloescht. In ivoris erscheint die Korrektur als neuer Eintrag mit KORREKTUR-Vermerk." },
+  { frage: "Warum kann ich nichts loeschen?", antwort: "Patientenakten sind gesetzlich revisionssicher (Paragraf 630f BGB). Eintraege werden versioniert, nie geloescht. Das schuetzt die Praxis bei Pruefungen und Streitfaellen." },
+  { frage: "Was ist die Schnellwahl mit dem Plus, z. B. Erstberatung (Anfangsdiagnostik)?", antwort: "Eine Kombi: zwei Leistungen in einer Sitzung, ein Eintrag. Sie koennen auch selbst stapeln, einfach mehrere Leistungen anklicken." },
+  { frage: "Warum ist der Bestaetigen-Knopf gesperrt?", antwort: "Es fehlt etwas Pflichtiges. Daneben steht genau was, z. B. 'Gesperrt, fehlt: Befund, Patient'. Pflichtgruppen sind mit 'Pflicht' markiert." },
+  { frage: "Wie setze ich Zaehne?", antwort: "Im Zahnbogen oder im FDI-Raster anklicken, beides ist synchron. Gewaehlte Zaehne bekommen im Bogen ein goldenes Attachment aufgesetzt. Die Zahnliste landet automatisch im Text." },
+  { frage: "Warum sehe ich manche Leistungen bei diesem Patienten nicht?", antwort: "Altersregeln. Beispiel: IP-Prophylaxe ist Kassenleistung fuer 6- bis 17-Jaehrige und erscheint nur bei passendem Alter. Das Alter steht am Patienten." },
+  { frage: "Was bedeuten die zwei Karten unter Ausgaenge?", antwort: "Ein Eintrag, zwei Artefakte. Links der Verlaufstext fuer die ivoris-Akte (rechtsverbindlich). Rechts die nackten Positionen fuer KZV bzw. Privatliquidation, dort gehen keine Texte hin." },
+  { frage: "Hell oder dunkel?", antwort: "Oben rechts umschalten. Die Wahl merkt sich der Browser." },
+  { frage: "Sind das dieselben Zugangsdaten wie bei Anima Cura?", antwort: "Ja, ein Konto fuer beides. Abmelden hier beendet auch die Cura-Sitzung in diesem Browser." },
+];
+
 function berechneAlter(geburtsdatum: string | null): number | null {
   if (!geburtsdatum) return null;
   const g = new Date(geburtsdatum);
@@ -122,6 +139,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const router = useRouter();
   const { thema, wechseln } = useThema();
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
+  const [detailLaeuft, setDetailLaeuft] = useState(false);
+  const [detailFehler, setDetailFehler] = useState<string | null>(null);
+  const [spickOffen, setSpickOffen] = useState(false);
+  const [spickSuche, setSpickSuche] = useState("");
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
@@ -506,11 +527,33 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       .join(" + ");
   }
 
+  function oeffneDetail(e: TagesEintrag) {
+    setDetailFehler(null);
+    setDetailLaeuft(false);
+    setDetail(e);
+  }
+
+  async function detailPush() {
+    if (!detail) return;
+    setDetailLaeuft(true);
+    setDetailFehler(null);
+    const res = await fetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setDetailLaeuft(false);
+    if (!res.ok) {
+      setDetailFehler(json.error ?? "Push fehlgeschlagen.");
+      await ladeHeute();
+      return;
+    }
+    setDetail({ ...detail, ivoris_push_status: "gepusht" });
+    await ladeHeute();
+  }
+
   function wachePille(e: TagesEintrag): { cls: string; text: string } {
     if (e.status === "entwurf") return { cls: "rot", text: "Doku ausstehend" };
     if (e.ivoris_push_status === "fehler") return { cls: "rot", text: "Push-Fehler" };
     if (e.ivoris_push_status === "gepusht") return { cls: "gruen", text: "✓ in ivoris" };
-    return { cls: "bernstein", text: `v${e.version} bestätigt` };
+    return { cls: "bernstein", text: `v${e.version} · noch nicht in ivoris` };
   }
 
   const heuteDatum = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
@@ -522,6 +565,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickOffen(true); }}>Spickzettel</button>
           <button className="thema-toggle" onClick={wechseln}>
             {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
           </button>
@@ -553,7 +597,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
                 : "–";
               return (
-                <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => setDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && setDetail(e)}>
+                <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => oeffneDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && oeffneDetail(e)}>
                   <div className="zeit">{am}</div>
                   <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
                   <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
@@ -802,7 +846,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <div className={`ausgaenge${bestaetigt ? " live" : ""}`}>
           <div className="ausgang akte">
             <div className="ohead">
-              <span className="otitel">Verlaufsdokumentation → Akte (ivoris)</span>
+              <span className="otitel">Verlaufsdokumentation → Akte (ivoris)<span className="ounter">Memory · das Gedächtnis der Behandlung</span></span>
               <span className="marke">rechtsverbindlich · § 630f BGB</span>
             </div>
             {bestaetigt ? (
@@ -821,7 +865,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           </div>
           <div className="ausgang geld">
             <div className="ohead">
-              <span className="otitel">{abrechnungTitel}</span>
+              <span className="otitel">{abrechnungTitel}<span className="ounter">Cash Cow · ohne Doku kein Geld</span></span>
               <span className="marke">nur Positionen · keine Texte</span>
             </div>
             <div className="geldtabelle">
@@ -848,6 +892,38 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             </div>
           )}
         </div>
+
+        {spickOffen && (
+          <div className="deckel" onClick={() => setSpickOffen(false)}>
+            <div className="detailkarte" onClick={(ev) => ev.stopPropagation()}>
+              <div className="ohead">
+                <span className="otitel">Spickzettel</span>
+                <span className="detailmeta">Alles, was man fragen könnte</span>
+              </div>
+              <input
+                type="text"
+                placeholder="Suchen, z. B. ivoris, Version, gesperrt ..."
+                value={spickSuche}
+                onChange={(e) => setSpickSuche(e.target.value)}
+                aria-label="Spickzettel durchsuchen"
+              />
+              {SPICKZETTEL.filter((s) => {
+                const q = spickSuche.trim().toLowerCase();
+                return !q || s.frage.toLowerCase().includes(q) || s.antwort.toLowerCase().includes(q);
+              }).map((s) => (
+                <div className="spick-eintrag" key={s.frage}>
+                  <div className="spick-frage">{s.frage}</div>
+                  <div className="spick-antwort">{s.antwort}</div>
+                </div>
+              ))}
+              {SPICKZETTEL.every((s) => {
+                const q = spickSuche.trim().toLowerCase();
+                return q && !s.frage.toLowerCase().includes(q) && !s.antwort.toLowerCase().includes(q);
+              }) && <p className="leer" style={{ marginTop: 14 }}>Nichts gefunden. Anders formulieren, oder kurz Juan fragen.</p>}
+              <button className="neben schliessen" onClick={() => setSpickOffen(false)}>Schließen</button>
+            </div>
+          </div>
+        )}
 
         {detail && (
           <div className="deckel" onClick={() => setDetail(null)}>
@@ -882,7 +958,18 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <p className="detailmeta" style={{ marginTop: 10 }}>
                 Nur Ansicht. Änderungen laufen über den Eintrag selbst als neue Version.
               </p>
-              <button className="neben schliessen" onClick={() => setDetail(null)}>Schließen</button>
+              <div className="aktionen" style={{ marginTop: 14 }}>
+                {detail.status === "bestaetigt" && detail.ivoris_push_status !== "gepusht" && (
+                  <button className="haupt" onClick={detailPush} disabled={detailLaeuft}>
+                    {detailLaeuft ? "Schreibt in ivoris ..." : "In ivoris-Akte schreiben"}
+                  </button>
+                )}
+                {detail.ivoris_push_status === "gepusht" && (
+                  <span className="hinweis-ok">✓ In ivoris angekommen</span>
+                )}
+                {detailFehler && <span className="hinweis-fehlt">{detailFehler}</span>}
+                <button className="neben" onClick={() => setDetail(null)}>Schließen</button>
+              </div>
             </div>
           </div>
         )}
