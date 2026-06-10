@@ -464,3 +464,11 @@
 .scribe .otitel.gross{font-size:21px;letter-spacing:-.01em}
 .scribe .o-unter{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;color:var(--gedeckt)}
+
+/* ===== Rechte-Matrix (Permissions Stufe 2) ===== */
+.scribe .team-matrix{padding:14px 0 16px;border-bottom:1px solid var(--kante)}
+.scribe .team-matrix-titel{font-family:var(--display);font-weight:700;font-size:14px;margin:0 0 2px}
+.scribe .team-matrix-hinweis{font-size:12px;color:var(--gedeckt);margin:0 0 12px;max-width:64ch}
+.scribe .team-matrix-raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px 14px}
+.scribe .team-matrix-zelle{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.scribe .team-matrix-zelle select{width:118px;padding:6px 10px;font-size:12.5px}

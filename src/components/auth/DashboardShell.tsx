@@ -124,16 +124,16 @@ export default function DashboardShell({
     month: "short",
   });
   const visibleStandalone = NAV_STANDALONE.filter((item) =>
-    canAccessPath(activeUser.role, item.href)
+    canAccessPath(activeUser.role, item.href, activeUser.permissions)
   );
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canAccessPath(activeUser.role, item.href)),
+    items: group.items.filter((item) => canAccessPath(activeUser.role, item.href, activeUser.permissions)),
   })).filter((group) => group.items.length > 0);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const toggleGroup = (key: string) =>
     setOpenGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
-  const hasAccess = pathname ? canAccessPath(activeUser.role, pathname) : true;
+  const hasAccess = pathname ? canAccessPath(activeUser.role, pathname, activeUser.permissions) : true;
   const fallbackHref = getDefaultDashboardPath(activeUser.role);
   const isReadOnly = isReadOnlyRole(activeUser.role);
 

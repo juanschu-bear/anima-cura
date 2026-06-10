@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { effektiveStufe, modulFuerPfad, type ProfilPermissions } from "./permissions";
 
 export type AppRole = "admin" | "verwaltung" | "lesezugriff" | "patient";
 
@@ -7,17 +8,18 @@ export interface AuthenticatedAppUser {
   email: string;
   fullName: string;
   role: AppRole;
+  permissions?: ProfilPermissions;
 }
 
 export interface UserProfileRecord {
   display_name?: string | null;
   full_name?: string | null;
   role?: string | null;
+  permissions?: ProfilPermissions;
 }
 
 export interface DefaultAuthUser {
   email: string;
-  password: string;
   role: AppRole;
   fullName: string;
 }
@@ -25,19 +27,16 @@ export interface DefaultAuthUser {
 export const DEFAULT_AUTH_USERS: DefaultAuthUser[] = [
   {
     email: "maria@praxis-schubert.de",
-    password: "ms13sr06?!",
     role: "admin",
     fullName: "Dr. Maria Schubert",
   },
   {
     email: "sabine@praxis-schubert.de",
-    password: "sabine2026!",
     role: "verwaltung",
     fullName: "Sabine",
   },
   {
     email: "empfang@praxis-schubert.de",
-    password: "empfang2026!",
     role: "lesezugriff",
     fullName: "Empfang",
   },
@@ -112,7 +111,10 @@ export function getProfileDisplayName(profile: UserProfileRecord | null | undefi
   return value ? value.trim() : null;
 }
 
-export function canAccessPath(role: AppRole, pathname: string): boolean {
+export function canAccessPath(role: AppRole, pathname: string, permissions?: ProfilPermissions): boolean {
+  const modul = modulFuerPfad(pathname);
+  if (modul) return effektiveStufe(role, permissions ?? null, modul) !== "keine";
+
   const accessEntry = [...DASHBOARD_ROUTE_ACCESS]
     .sort((a, b) => b.path.length - a.path.length)
     .find((entry) => pathname === entry.path || pathname.startsWith(`${entry.path}/`));

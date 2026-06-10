@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { MODULE, STUFEN, type Stufe } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Nur für Admins" }, { status: 403 });
   }
 
-  let body: { name?: string; rolle?: string; kuerzel?: string | null; scribe_schreiben?: boolean };
+  let body: { name?: string; rolle?: string; kuerzel?: string | null; scribe_schreiben?: boolean; module_stufen?: Record<string, string> };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Ungueltiger JSON-Body" }, { status: 400 });
   }
@@ -39,12 +40,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     update.kuerzel = (body.kuerzel ?? "").trim().toLowerCase() || null;
   }
   const service = createServerClient();
-  if (body.scribe_schreiben !== undefined) {
+  if (body.scribe_schreiben !== undefined || body.module_stufen !== undefined) {
     const { data: aktuell } = await service.from("user_profiles").select("permissions").eq("id", params.id).single();
-    update.permissions = {
-      ...((aktuell?.permissions as Record<string, unknown>) ?? {}),
-      scribe_schreiben: body.scribe_schreiben === true,
-    };
+    const bisher = (aktuell?.permissions as Record<string, unknown>) ?? {};
+    const neuePermissions: Record<string, unknown> = { ...bisher };
+    if (body.scribe_schreiben !== undefined) {
+      neuePermissions.scribe_schreiben = body.scribe_schreiben === true;
+    }
+    if (body.module_stufen !== undefined) {
+      const gueltigeModule = new Set(MODULE.map((m) => m.schluessel));
+      const bisherModule = (bisher.module as Record<string, string>) ?? {};
+      const validiert: Record<string, string> = { ...bisherModule };
+      for (const [modul, stufe] of Object.entries(body.module_stufen)) {
+        if (!gueltigeModule.has(modul)) {
+          return NextResponse.json({ error: `Unbekanntes Modul: ${modul}` }, { status: 400 });
+        }
+        if (!STUFEN.includes(stufe as Stufe)) {
+          return NextResponse.json({ error: `Ungültige Stufe für ${modul}: ${stufe}` }, { status: 400 });
+        }
+        validiert[modul] = stufe;
+      }
+      neuePermissions.module = validiert;
+    }
+    update.permissions = neuePermissions;
   }
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nichts zu ändern." }, { status: 400 });
 

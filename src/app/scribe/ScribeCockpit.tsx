@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useThema } from "./ScribeShell";
+import { MODULE, STUFEN, effektiveStufe, type Stufe } from "@/lib/permissions";
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean };
@@ -191,7 +192,7 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
   );
 }
 
-type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null; permissions?: { scribe_schreiben?: boolean } | null };
+type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null; permissions?: { scribe_schreiben?: boolean; module?: Record<string, string> } | null };
 
 function PwFeld({ wert, setzen, platzhalter, label, klein, onEnter }: { wert: string; setzen: (v: string) => void; platzhalter: string; label: string; klein?: boolean; onEnter?: () => void }) {
   const [sichtbar, setSichtbar] = useState(false);
@@ -265,6 +266,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
   const [editRolle, setEditRolle] = useState("verwaltung");
   const [editKuerzel, setEditKuerzel] = useState("");
   const [editScribe, setEditScribe] = useState(false);
+  const [editModule, setEditModule] = useState<Record<string, Stufe>>({});
   const [resetId, setResetId] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState("");
   const [pushInfo, setPushInfo] = useState<string | null>(null);
@@ -693,7 +695,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
     const res = await fetch(`/api/team/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel, scribe_schreiben: editScribe }),
+      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel, scribe_schreiben: editScribe, module_stufen: editModule }),
     });
     const json = await res.json().catch(() => ({}));
     setTeamLaeuft(false);
@@ -1191,12 +1193,39 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
                     </span>
                   ) : (
                     <span className="team-edit">
-                      <button className="neben klein" onClick={() => { setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? ""); setEditScribe(m.permissions?.scribe_schreiben ?? ["admin", "verwaltung"].includes(m.role)); setResetId(null); }}>Bearbeiten</button>
+                      <button className="neben klein" onClick={() => {
+                        setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? "");
+                        setEditScribe(m.permissions?.scribe_schreiben ?? ["admin", "verwaltung"].includes(m.role));
+                        const stufen: Record<string, Stufe> = {};
+                        for (const mod of MODULE) stufen[mod.schluessel] = effektiveStufe(m.role as never, m.permissions ?? null, mod.schluessel);
+                        setEditModule(stufen);
+                        setResetId(null);
+                      }}>Bearbeiten</button>
                       <button className="neben klein" onClick={() => { setResetId(m.id); setResetPw(""); setEditId(null); }}>Passwort</button>
                     </span>
                   )}
                 </div>
               ))}
+              {editId && (
+                <div className="team-matrix">
+                  <p className="team-matrix-titel">Anima-Cura-Rechte für {team.find((m) => m.id === editId)?.display_name ?? "Konto"}</p>
+                  <p className="team-matrix-hinweis">Stufe pro Modul, übersteuert die Rolle. Sichtbarkeit und Seitenzugriff gelten sofort, die Schreib-Sperren in den Modulen folgen schrittweise.</p>
+                  <div className="team-matrix-raster">
+                    {MODULE.map((mod) => (
+                      <label className="team-matrix-zelle" key={mod.schluessel}>
+                        <span>{mod.label}</span>
+                        <select
+                          value={editModule[mod.schluessel] ?? "keine"}
+                          onChange={(e) => setEditModule({ ...editModule, [mod.schluessel]: e.target.value as Stufe })}
+                          aria-label={`Stufe für ${mod.label}`}
+                        >
+                          {STUFEN.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <p className="spick-bereich" style={{ marginTop: 24 }}>Neues Teammitglied</p>
               <div className="team-form">
