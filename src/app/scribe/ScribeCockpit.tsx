@@ -1156,7 +1156,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
                 <span className="otitel gross">Team &amp; Zugänge</span>
               </div>
               <div className="team-kopfzeile">
-                <span>Konto</span><span>K\u00fcrzel</span><span>Rolle</span><span>Passwort &amp; Rechte</span>
+                <span>Konto</span><span>Kürzel</span><span>Rolle</span><span>Passwort &amp; Rechte</span>
               </div>
               {team.map((m) => (
                 <div className="team-zeile" key={m.id}>
@@ -1175,7 +1175,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
                       <select value={editRolle} onChange={(e) => setEditRolle(e.target.value)} aria-label="Rolle">
                         {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
                       </select>
-                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="K\u00fcrzel" style={{ width: 70 }} aria-label="K\u00fcrzel" />
+                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="Kürzel" style={{ width: 70 }} aria-label="Kürzel" />
                       <label className="perm-schalter">
                         <input type="checkbox" checked={editScribe} onChange={(e) => setEditScribe(e.target.checked)} />
                         Scribe: dokumentieren &amp; ivoris
