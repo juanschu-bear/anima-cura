@@ -183,8 +183,9 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
         })}
       </svg>
       <div className="kiefer-legende">
-        <span className="l-aussen">außen · bukkal</span>
-        <span className="l-innen">innen · palatinal (OK) / lingual (UK)</span>
+        <span className="l-aussen">1. Klick: außen (bukkal)</span>
+        <span className="l-innen">2. Klick: innen (palatinal OK / lingual UK)</span>
+        <span className="l-ab">3. Klick: abwählen</span>
       </div>
     </div>
   );
@@ -789,7 +790,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <div className="feld" style={{ marginTop: 14 }}>
             {brauchtZaehne && (
               <div className="gruppe">
-                <div className="gname">Zahnschema (FDI)</div>
+                <div className="gname">Zahnschema · klickbares Kieferbild</div>
+                <p className="kiefer-hilfe">Zahn oder Zahl anklicken, beides geht, für die Attachment-Simulation. Das FDI-Raster darunter bleibt synchron.</p>
                 <KieferSchema zaehne={zaehne} seiten={seiten} toggle={toggleZahn} />
                 <div className="zahnschema">
                   {FDI_OK.map((n) => (
