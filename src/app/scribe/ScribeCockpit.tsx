@@ -191,7 +191,14 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
   );
 }
 
-export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
+type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null };
+const ROLLEN_INFO: { wert: string; label: string; rechte: string }[] = [
+  { wert: "admin", label: "Admin", rechte: "Alles: dokumentieren, ivoris, Team & Zugänge verwalten" },
+  { wert: "verwaltung", label: "Verwaltung", rechte: "Dokumentieren und ivoris-Push, keine Team-Verwaltung" },
+  { wert: "lesezugriff", label: "Lesezugriff", rechte: "Nur ansehen, kein Bestätigen, kein ivoris" },
+];
+
+export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: string; rolle: string }) {
   const router = useRouter();
   const { thema, wechseln } = useThema();
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
@@ -223,6 +230,22 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
   const [demo, setDemo] = useState(false);
+  const [pwOffen, setPwOffen] = useState(false);
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [pwLaeuft, setPwLaeuft] = useState(false);
+  const [pwHinweis, setPwHinweis] = useState<{ ok: boolean; text: string } | null>(null);
+  const [teamOffen, setTeamOffen] = useState(false);
+  const [team, setTeam] = useState<TeamMitglied[]>([]);
+  const [mailDomain, setMailDomain] = useState("praxis-schubert.de");
+  const [teamHinweis, setTeamHinweis] = useState<{ ok: boolean; text: string } | null>(null);
+  const [teamLaeuft, setTeamLaeuft] = useState(false);
+  const [neu, setNeu] = useState({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editRolle, setEditRolle] = useState("verwaltung");
+  const [editKuerzel, setEditKuerzel] = useState("");
+  const [resetId, setResetId] = useState<string | null>(null);
+  const [resetPw, setResetPw] = useState("");
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -601,6 +624,79 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     await ladeHeute();
   }
 
+  async function eigenesPasswortSpeichern() {
+    setPwHinweis(null);
+    if (pw1.length < 8) { setPwHinweis({ ok: false, text: "Mindestens 8 Zeichen." }); return; }
+    if (pw1 !== pw2) { setPwHinweis({ ok: false, text: "Die Passwörter stimmen nicht überein." }); return; }
+    setPwLaeuft(true);
+    const res = await fetch("/api/konto/passwort", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passwort: pw1 }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setPwLaeuft(false);
+    if (!res.ok) { setPwHinweis({ ok: false, text: json.error ?? "Speichern fehlgeschlagen." }); return; }
+    setPw1(""); setPw2("");
+    setPwHinweis({ ok: true, text: "Passwort geändert. Gilt ab der nächsten Anmeldung." });
+  }
+
+  async function teamLaden() {
+    setTeamHinweis(null);
+    const res = await fetch("/api/team");
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Team konnte nicht geladen werden." }); return; }
+    setTeam(json.mitglieder ?? []);
+    if (json.mail_domain) setMailDomain(json.mail_domain);
+  }
+
+  async function teamAnlegen() {
+    setTeamHinweis(null);
+    setTeamLaeuft(true);
+    const res = await fetch("/api/team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(neu),
+    });
+    const json = await res.json().catch(() => ({}));
+    setTeamLaeuft(false);
+    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Anlegen fehlgeschlagen." }); return; }
+    setNeu({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
+    setTeamHinweis({ ok: true, text: `${json.mitglied.email} angelegt.` });
+    await teamLaden();
+  }
+
+  async function teamSpeichern(id: string) {
+    setTeamHinweis(null);
+    setTeamLaeuft(true);
+    const res = await fetch(`/api/team/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setTeamLaeuft(false);
+    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Speichern fehlgeschlagen." }); return; }
+    setEditId(null);
+    await teamLaden();
+  }
+
+  async function teamPasswortSetzen(id: string) {
+    setTeamHinweis(null);
+    if (resetPw.length < 8) { setTeamHinweis({ ok: false, text: "Passwort: mindestens 8 Zeichen." }); return; }
+    setTeamLaeuft(true);
+    const res = await fetch(`/api/team/${id}/passwort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passwort: resetPw }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setTeamLaeuft(false);
+    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Passwort-Reset fehlgeschlagen." }); return; }
+    setResetId(null); setResetPw("");
+    setTeamHinweis({ ok: true, text: "Passwort gesetzt." });
+  }
+
   async function abmelden() {
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
@@ -671,6 +767,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          {rolle === "admin" && (
+            <button className="thema-toggle" onClick={() => { setTeamOffen(true); setTeamHinweis(null); teamLaden(); }}>Team</button>
+          )}
+          <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>
           <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
           <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>
           <button className="thema-toggle" onClick={wechseln}>
@@ -1007,6 +1107,83 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             </div>
           )}
         </div>
+
+        {pwOffen && (
+          <div className="deckel" onClick={() => setPwOffen(false)}>
+            <div className="detailkarte" style={{ maxWidth: 420 }} onClick={(ev) => ev.stopPropagation()}>
+              <div className="ohead"><span className="otitel" style={{ fontSize: 18 }}>Passwort ändern</span></div>
+              <p className="detailmeta" style={{ marginTop: 4 }}>Kein altes Passwort nötig, die Anmeldung ist der Nachweis.</p>
+              <input type="password" placeholder="Neues Passwort (mind. 8 Zeichen)" value={pw1} onChange={(e) => setPw1(e.target.value)} aria-label="Neues Passwort" />
+              <input type="password" placeholder="Neues Passwort bestätigen" value={pw2} onChange={(e) => setPw2(e.target.value)} aria-label="Neues Passwort bestätigen" style={{ marginTop: 8 }} />
+              {pwHinweis && <p className={pwHinweis.ok ? "hinweis-ok" : "hinweis-fehlt"} style={{ marginTop: 10 }}>{pwHinweis.text}</p>}
+              <div className="aktionen" style={{ marginTop: 14 }}>
+                <button className="haupt" onClick={eigenesPasswortSpeichern} disabled={pwLaeuft}>{pwLaeuft ? "Speichert ..." : "Speichern"}</button>
+                <button className="neben" onClick={() => setPwOffen(false)}>Schließen</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {teamOffen && (
+          <div className="deckel" onClick={() => setTeamOffen(false)}>
+            <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
+              <div className="ohead">
+                <span className="otitel" style={{ fontSize: 18 }}>Team &amp; Zugänge</span>
+                <span className="detailmeta">Konten, Rollen, Kürzel, Passwörter</span>
+              </div>
+              {team.map((m) => (
+                <div className="team-zeile" key={m.id}>
+                  <div className="team-info">
+                    <div className="team-name">{m.display_name}{m.kuerzel && <span className="team-kuerzel"> · {m.kuerzel}</span>}</div>
+                    <div className="team-mail">{m.email}</div>
+                  </div>
+                  <span className={`pille rollen-${m.role}`} style={{ position: "static" }}>{m.role}</span>
+                  {editId === m.id ? (
+                    <span className="team-edit">
+                      <select value={editRolle} onChange={(e) => setEditRolle(e.target.value)} aria-label="Rolle">
+                        {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
+                      </select>
+                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="Kürzel" style={{ width: 70 }} aria-label="Kürzel" />
+                      <button className="neben klein" disabled={teamLaeuft} onClick={() => teamSpeichern(m.id)}>OK</button>
+                      <button className="neben klein" onClick={() => setEditId(null)}>Abbruch</button>
+                    </span>
+                  ) : resetId === m.id ? (
+                    <span className="team-edit">
+                      <input type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="Neues Passwort" aria-label="Neues Passwort" />
+                      <button className="neben klein" disabled={teamLaeuft} onClick={() => teamPasswortSetzen(m.id)}>OK</button>
+                      <button className="neben klein" onClick={() => { setResetId(null); setResetPw(""); }}>Abbruch</button>
+                    </span>
+                  ) : (
+                    <span className="team-edit">
+                      <button className="neben klein" onClick={() => { setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? ""); setResetId(null); }}>Bearbeiten</button>
+                      <button className="neben klein" onClick={() => { setResetId(m.id); setResetPw(""); setEditId(null); }}>Passwort</button>
+                    </span>
+                  )}
+                </div>
+              ))}
+
+              <p className="spick-bereich" style={{ marginTop: 24 }}>Neues Teammitglied</p>
+              <div className="team-form">
+                <input value={neu.name} onChange={(e) => setNeu({ ...neu, name: e.target.value })} placeholder="Name, z. B. Dr. Maria Schubert" aria-label="Name" />
+                <span className="mail-feld">
+                  <input value={neu.lokal} onChange={(e) => setNeu({ ...neu, lokal: e.target.value })} placeholder="vorname" aria-label="E-Mail vor dem @" />
+                  <span className="mail-suffix">@{mailDomain}</span>
+                </span>
+                <select value={neu.rolle} onChange={(e) => setNeu({ ...neu, rolle: e.target.value })} aria-label="Rolle">
+                  {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
+                </select>
+                <input value={neu.kuerzel} onChange={(e) => setNeu({ ...neu, kuerzel: e.target.value })} placeholder="Kürzel, z. B. ms" aria-label="Kürzel" />
+                <input type="password" value={neu.passwort} onChange={(e) => setNeu({ ...neu, passwort: e.target.value })} placeholder="Startpasswort (mind. 8 Zeichen)" aria-label="Startpasswort" />
+              </div>
+              <p className="detailmeta" style={{ marginTop: 6 }}>{ROLLEN_INFO.find((r) => r.wert === neu.rolle)?.rechte}</p>
+              {teamHinweis && <p className={teamHinweis.ok ? "hinweis-ok" : "hinweis-fehlt"} style={{ marginTop: 8 }}>{teamHinweis.text}</p>}
+              <div className="aktionen" style={{ marginTop: 12 }}>
+                <button className="haupt" disabled={teamLaeuft} onClick={teamAnlegen}>{teamLaeuft ? "Arbeitet ..." : "Anlegen"}</button>
+                <button className="neben" onClick={() => setTeamOffen(false)}>Schließen</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {spickOffen && (
           <div className="deckel" onClick={() => setSpickOffen(false)}>

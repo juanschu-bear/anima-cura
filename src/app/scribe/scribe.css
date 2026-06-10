@@ -405,3 +405,22 @@
   box-shadow:0 0 24px -8px var(--gold)}
 .scribe .neben.verwerfen{border-color:var(--rot);color:var(--rot)}
 .scribe .neben.verwerfen:hover{background:rgba(255,107,82,.12)}
+
+/* ===== Team & Zugänge + Passwort ===== */
+.scribe .team-zeile{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--kante);flex-wrap:wrap}
+.scribe .team-info{min-width:200px;flex:1}
+.scribe .team-name{font-family:var(--display);font-weight:700;font-size:14px}
+.scribe .team-kuerzel{font-family:var(--mono);font-weight:600;color:var(--gedeckt);font-size:12px}
+.scribe .team-mail{font-family:var(--mono);font-size:11.5px;color:var(--gedeckt)}
+.scribe .pille.rollen-admin{background:var(--primaer-soft);color:var(--primaer)}
+.scribe .pille.rollen-verwaltung{background:rgba(242,181,68,.14);color:var(--gold)}
+.scribe .pille.rollen-lesezugriff{background:rgba(255,255,255,.07);color:var(--gedeckt)}
+.scribe[data-thema="hell"] .pille.rollen-admin{color:var(--primaer-tief)}
+.scribe[data-thema="hell"] .pille.rollen-lesezugriff{background:rgba(16,32,26,.07)}
+.scribe .team-edit{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.scribe .neben.klein{padding:7px 12px;font-size:12px}
+.scribe .team-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.scribe .mail-feld{display:flex;align-items:center;gap:6px}
+.scribe .mail-feld input{flex:1}
+.scribe .mail-suffix{font-family:var(--mono);font-size:12px;color:var(--gedeckt);white-space:nowrap}
+@media(max-width:700px){.scribe .team-form{grid-template-columns:1fr}}
