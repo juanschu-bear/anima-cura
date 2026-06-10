@@ -463,7 +463,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
       <section className="held">
         <p className="augenbraue">Behandlungscockpit</p>
-        <h1>Termin vorbei. Doku fertig.<br />Bevor der Patient an der Tür ist.</h1>
+        <h1>Termin vorbei. <span className="glanz">Doku fertig.</span><br />Bevor der Patient an der Tür ist.</h1>
         <p className="einleitung">
           Das System weiß aus dem Behandlungsfall, welcher Termin gerade läuft, und legt den Eintrag fertig vor.
           Bestätigen, Abweichung anklicken, fertig. Die Akte ist sauber, die Abrechnung hat ihre Beweisgrundlage,
