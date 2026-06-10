@@ -316,3 +316,20 @@
   background:linear-gradient(135deg,rgba(43,217,164,.45),rgba(242,181,68,.28) 42%,transparent 72%);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;mask-composite:exclude}
+
+/* ===== Zahnbogen ===== */
+.scribe .zahnbogen{width:100%;max-width:430px;display:block;margin:2px 0 12px}
+.scribe .zahn-g{cursor:pointer}
+.scribe .zahnform{fill:var(--flaeche-flach);stroke:var(--kante);stroke-width:1;
+  transition:fill .15s ease,stroke .15s ease}
+.scribe .zahn-g:hover .zahnform{stroke:var(--primaer)}
+.scribe .zahnform.aktiv{fill:var(--primaer);stroke:transparent;
+  filter:drop-shadow(0 0 6px var(--primaer-glow))}
+.scribe .zahnnr{font-family:var(--mono);font-size:6.8px;fill:var(--gedeckt);
+  text-anchor:middle;pointer-events:none}
+.scribe .zahnnr.aktiv{fill:var(--auf-primaer);font-weight:700}
+.scribe .attachment{fill:var(--gold);stroke:rgba(0,0,0,.3);stroke-width:.5}
+@media(prefers-reduced-motion:no-preference){
+  .scribe .attachment-anim{animation:attach-pop .4s cubic-bezier(.2,1.7,.4,1) both}
+  @keyframes attach-pop{from{opacity:0;transform:scale(2.4)}to{opacity:1;transform:scale(1)}}
+}

@@ -14,6 +14,8 @@ type Struktur = {
   groups: Record<string, Gruppe>;
   vars: string[];
   kontext?: string;
+  alter_min?: number;
+  alter_max?: number;
   abrechnung_titel?: string;
   abrechnung_hinweis?: string;
   anima_kopplung?: string;
@@ -28,7 +30,7 @@ type Vorlage = {
   struktur: Struktur;
   positionen: PositionsRegel[];
 };
-type PatientTreffer = { id: string; name: string };
+type PatientTreffer = { id: string; name: string; alter: number | null };
 type TagesEintrag = {
   id: string;
   status: string;
@@ -62,6 +64,59 @@ const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   multiband: [{ label: "Erstuntersuchung (Anfangsdiagnostik)", slugs: ["erstuntersuchung", "diagnostik"] }],
   removable: [],
 };
+
+function berechneAlter(geburtsdatum: string | null): number | null {
+  if (!geburtsdatum) return null;
+  const g = new Date(geburtsdatum);
+  if (isNaN(g.getTime())) return null;
+  const h = new Date();
+  let alter = h.getFullYear() - g.getFullYear();
+  const m = h.getMonth() - g.getMonth();
+  if (m < 0 || (m === 0 && h.getDate() < g.getDate())) alter--;
+  return alter;
+}
+
+function passtAlter(v: Vorlage, alter: number | null): boolean {
+  if (alter === null) return true;
+  if (v.struktur.alter_min != null && alter < v.struktur.alter_min) return false;
+  if (v.struktur.alter_max != null && alter > v.struktur.alter_max) return false;
+  return true;
+}
+
+/* Visueller Zahnbogen: OK oben, UK unten, Klick setzt den Zahn,
+   gewaehlte Zaehne bekommen ein animiert aufgesetztes Attachment (Gold-Raute). */
+function ZahnBogen({ zaehne, toggle }: { zaehne: number[]; toggle: (n: number) => void }) {
+  const punkte = (fdi: number[], cy: number, unten: boolean) =>
+    fdi.map((n, i) => {
+      const t = (i + 0.5) / fdi.length;
+      const ang = Math.PI * (1 - t);
+      const x = 160 + 140 * Math.cos(ang);
+      const y = cy + (unten ? 1 : -1) * 80 * Math.sin(ang);
+      return { n, x, y };
+    });
+  const alle = [...punkte(FDI_OK, 97, false), ...punkte(FDI_UK, 115, true)];
+  return (
+    <svg className="zahnbogen" viewBox="0 0 320 212" aria-label="Zahnbogen, Klick setzt Zahn">
+      {alle.map(({ n, x, y }) => {
+        const aktiv = zaehne.includes(n);
+        return (
+          <g key={n} className="zahn-g" onClick={() => toggle(n)}>
+            <title>{`Zahn ${n}`}</title>
+            <circle cx={x} cy={y} r={9.5} className={aktiv ? "zahnform aktiv" : "zahnform"} />
+            <text x={x} y={y + 2.6} className={aktiv ? "zahnnr aktiv" : "zahnnr"}>{n}</text>
+            {aktiv && (
+              <g transform={`translate(${x + 6.5} ${y - 7})`}>
+                <g className="attachment-anim">
+                  <rect x={-3.2} y={-3.2} width={6.4} height={6.4} transform="rotate(45)" className="attachment" />
+                </g>
+              </g>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const router = useRouter();
@@ -127,7 +182,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
       if (res.ok) {
         const json = await res.json();
-        setTreffer((json.results ?? []).map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })));
+        setTreffer((json.results ?? []).map((r: { id: string; name: string; geburtsdatum?: string | null }) => ({ id: r.id, name: r.name, alter: berechneAlter(r.geburtsdatum ?? null) })));
       }
     }, 250);
     return () => clearTimeout(t);
@@ -145,6 +200,20 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     () => gewaehlt.map(vorlageVon).filter((v): v is Vorlage => v !== null),
     [gewaehlt, vorlageVon]
   );
+  const sichtbareVorlagen = useMemo(
+    () => artVorlagen.filter((v) => passtAlter(v, patient?.alter ?? null)),
+    [artVorlagen, patient]
+  );
+  /* Wenn ein Patient gewaehlt wird, fliegen altersfremde Leistungen aus der Auswahl */
+  useEffect(() => {
+    setGewaehlt((alt) => {
+      const erlaubt = alt.filter((slug) => sichtbareVorlagen.some((v) => v.termin_typ === slug));
+      if (erlaubt.length === alt.length) return alt;
+      if (erlaubt.length > 0) return erlaubt;
+      return sichtbareVorlagen[0] ? [sichtbareVorlagen[0].termin_typ] : [];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sichtbareVorlagen.map((v) => v.id).join(",")]);
   const kontext = artVorlagen[0]?.struktur.kontext ?? "";
   const abrechnungTitel = artVorlagen[0]?.struktur.abrechnung_titel ?? "Abrechnung";
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
@@ -506,7 +575,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <span className="stufe">Patient</span>
           {patient ? (
             <div className="gewaehlt">
-              {patient.name}
+              {patient.name}{patient.alter !== null && <span style={{ color: "var(--gedeckt)", fontWeight: 400 }}>&nbsp;· {patient.alter} J.</span>}
               <button onClick={() => { setPatient(null); setSuche(""); resetSitzung(); }}>wechseln</button>
             </div>
           ) : (
@@ -522,7 +591,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 <ul className="suchliste">
                   {treffer.map((t) => (
                     <li key={t.id}>
-                      <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}</button>
+                      <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
                     </li>
                   ))}
                 </ul>
@@ -553,7 +622,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             </div>
           )}
           {PHASEN.map((phase) => {
-            const inPhase = artVorlagen.filter((v) => phase.slugs.includes(v.termin_typ));
+            const inPhase = sichtbareVorlagen.filter((v) => phase.slugs.includes(v.termin_typ));
             if (inPhase.length === 0) return null;
             return (
               <div key={phase.name}>
@@ -610,6 +679,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {brauchtZaehne && (
               <div className="gruppe">
                 <div className="gname">Zahnschema (FDI)</div>
+                <ZahnBogen zaehne={zaehne} toggle={toggleZahn} />
                 <div className="zahnschema">
                   {FDI_OK.map((n) => (
                     <button key={n} className="zahn" aria-pressed={zaehne.includes(n)} onClick={() => toggleZahn(n)}>{n}</button>

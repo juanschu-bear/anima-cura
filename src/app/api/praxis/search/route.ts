@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const sc = createServerClient();
   const { data: patients } = await sc
     .from("patients")
-    .select("id, vorname, nachname, email, telefon")
+    .select("id, vorname, nachname, email, telefon, geburtsdatum")
     .or(`vorname.ilike.%${q}%,nachname.ilike.%${q}%,email.ilike.%${q}%`)
     .limit(8);
 
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       name: `${p.vorname} ${p.nachname}`,
       email: p.email || "",
       telefon: p.telefon || "",
+      geburtsdatum: p.geburtsdatum || null,
     })),
   });
 }
