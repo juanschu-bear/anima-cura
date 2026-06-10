@@ -84,6 +84,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [aenderungsgrund, setAenderungsgrund] = useState("");
 
   const ladeHeute = useCallback(async () => {
     const res = await fetch("/api/doku/heute");
@@ -142,8 +144,19 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
   const animaKopplung = artVorlagen[0]?.struktur.anima_kopplung ?? "";
 
-  function frisch() {
+  function bearbeitet() {
+    setAktionsFehler(null);
+    if (bestaetigt) {
+      setDirty(true);
+      setPushStatus("offen");
+      setPushInfo(null);
+    }
+  }
+
+  function resetSitzung() {
     setBestaetigt(null);
+    setDirty(false);
+    setAenderungsgrund("");
     setPushStatus("offen");
     setPushInfo(null);
     setAktionsFehler(null);
@@ -166,7 +179,6 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       });
       return neu;
     });
-    frisch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [module.map((m) => m.id).join(",")]);
 
@@ -176,11 +188,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setGewaehlt(erste ? [erste.termin_typ] : []);
     setZaehne([]);
     setAusnahme("");
-    frisch();
+    resetSitzung();
   }
 
   function leistungToggle(slug: string) {
-    frisch();
+    bearbeitet();
     setGewaehlt((alt) => {
       if (alt.includes(slug)) {
         const rest = alt.filter((s) => s !== slug);
@@ -193,7 +205,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   }
 
   function kombiWaehlen(slugs: string[]) {
-    frisch();
+    bearbeitet();
     const reihenfolge = artVorlagen.map((v) => v.termin_typ);
     setGewaehlt(reihenfolge.filter((s) => slugs.includes(s)));
   }
@@ -201,7 +213,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   function toggleOpt(slug: string, g: string, i: number) {
     const m = vorlageVon(slug);
     if (!m) return;
-    frisch();
+    bearbeitet();
     const grp = m.struktur.groups[g];
     setAuswahl((alt) => {
       const modul = alt[slug] ?? {};
@@ -215,7 +227,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   }
 
   function toggleZahn(n: number) {
-    frisch();
+    bearbeitet();
     setZaehne((alt) => (alt.includes(n) ? alt.filter((x) => x !== n) : [...alt, n].sort((a, b) => a - b)));
   }
 
@@ -288,7 +300,64 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
 
+  async function neueVersion() {
+    if (!bestaetigt || !aenderungsgrund.trim() || komposition.fehlt.length > 0) return;
+    setSendet(true);
+    setAktionsFehler(null);
+    const res = await fetch(`/api/doku/eintrag/${bestaetigt.id}/version`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: komposition.text,
+        zaehne: zaehne.map(String),
+        variablen: {
+          schienen_von: schienenVon,
+          schienen_bis: schienenBis,
+          bogen,
+          leistungen: module.map((m) => m.name),
+        },
+        auswahl,
+        positionen,
+        ausnahme_freitext: ausnahme.trim() || null,
+        aenderungsgrund: aenderungsgrund.trim(),
+      }),
+    });
+    setSendet(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setAktionsFehler(json.error ?? "Neue Version konnte nicht gespeichert werden.");
+      return;
+    }
+    const json = await res.json();
+    setBestaetigt({
+      id: json.eintrag.id,
+      version: json.eintrag.version,
+      am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+    });
+    setDirty(false);
+    setAenderungsgrund("");
+    setPushStatus("offen");
+    setPushInfo(null);
+    await ladeHeute();
+  }
+
+  function naechsterPatient() {
+    resetSitzung();
+    setPatient(null);
+    setSuche("");
+    setZaehne([]);
+    setAusnahme("");
+    const erste = artVorlagen[0];
+    setGewaehlt(erste ? [erste.termin_typ] : []);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function bestaetigen() {
+    if (bestaetigt && dirty) {
+      await neueVersion();
+      return;
+    }
+    if (bestaetigt) return;
     if (!patient || module.length === 0 || komposition.fehlt.length > 0) return;
     setSendet(true);
     setAktionsFehler(null);
@@ -429,7 +498,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           {patient ? (
             <div className="gewaehlt">
               {patient.name}
-              <button onClick={() => { setPatient(null); setSuche(""); frisch(); }}>wechseln</button>
+              <button onClick={() => { setPatient(null); setSuche(""); resetSitzung(); }}>wechseln</button>
             </div>
           ) : (
             <>
@@ -444,7 +513,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 <ul className="suchliste">
                   {treffer.map((t) => (
                     <li key={t.id}>
-                      <button onClick={() => { setPatient(t); setTreffer([]); frisch(); }}>{t.name}</button>
+                      <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}</button>
                     </li>
                   ))}
                 </ul>
@@ -513,7 +582,13 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {bestaetigt ? (
               <>
                 <span className="stempel">Bestätigt · v{bestaetigt.version} · {bestaetigt.am}</span>
-                <span>Änderungen nur als neue Version, Historie bleibt sichtbar (§ 630f BGB)</span>
+                {dirty ? (
+                  <span style={{ color: "var(--bernstein)", fontWeight: 600 }}>
+                    Geändert, wird erst mit neuer Version Teil der Akte
+                  </span>
+                ) : (
+                  <span>Änderungen nur als neue Version, Historie bleibt sichtbar (§ 630f BGB)</span>
+                )}
               </>
             ) : (
               <span>Entwurf. Wird mit Bestätigung Teil der Akte, Aufbewahrung 10 Jahre.</span>
@@ -541,15 +616,15 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <div className="gruppe">
                 <div className="gname">Schienen-Nr.</div>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--schrift-mono), monospace", fontSize: 13 }}>
-                  Nr. <input type="number" min={1} value={schienenVon} onChange={(e) => { frisch(); setSchienenVon(e.target.value); }} aria-label="Schiene von" />
-                  – <input type="number" min={1} value={schienenBis} onChange={(e) => { frisch(); setSchienenBis(e.target.value); }} aria-label="Schiene bis" />
+                  Nr. <input type="number" min={1} value={schienenVon} onChange={(e) => { bearbeitet(); setSchienenVon(e.target.value); }} aria-label="Schiene von" />
+                  – <input type="number" min={1} value={schienenBis} onChange={(e) => { bearbeitet(); setSchienenBis(e.target.value); }} aria-label="Schiene bis" />
                 </span>
               </div>
             )}
             {brauchtBogen && (
               <div className="gruppe">
                 <div className="gname">Bogen</div>
-                <select value={bogen} onChange={(e) => { frisch(); setBogen(e.target.value); }} aria-label="Bogendimension">
+                <select value={bogen} onChange={(e) => { bearbeitet(); setBogen(e.target.value); }} aria-label="Bogendimension">
                   {BOGEN.map((b) => <option key={b}>{b}</option>)}
                 </select>
               </div>
@@ -587,18 +662,53 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             type="text"
             placeholder="Ausnahme (Freitext, optional)"
             value={ausnahme}
-            onChange={(e) => { frisch(); setAusnahme(e.target.value); }}
+            onChange={(e) => { bearbeitet(); setAusnahme(e.target.value); }}
           />
         </div>
 
         <div className="aktionen">
-          <button className="haupt" onClick={bestaetigen} disabled={sendet || komposition.fehlt.length > 0 || !!bestaetigt}>
-            {sendet ? "Speichert ..." : bestaetigt ? "Eingetragen ✓" : "Bestätigen & eintragen"}
+          {bestaetigt && dirty && (
+            <input
+              className="freitext"
+              style={{ marginTop: 0, maxWidth: 420 }}
+              type="text"
+              placeholder="Änderungsgrund (Pflicht für neue Version)"
+              value={aenderungsgrund}
+              onChange={(e) => setAenderungsgrund(e.target.value)}
+              aria-label="Änderungsgrund"
+            />
+          )}
+          <button
+            className="haupt"
+            onClick={bestaetigen}
+            disabled={
+              sendet ||
+              komposition.fehlt.length > 0 ||
+              (!!bestaetigt && !dirty) ||
+              (!!bestaetigt && dirty && !aenderungsgrund.trim())
+            }
+          >
+            {sendet
+              ? "Speichert ..."
+              : bestaetigt
+                ? dirty
+                  ? `Als Version v${bestaetigt.version + 1} bestätigen`
+                  : "Eingetragen ✓"
+                : "Bestätigen & eintragen"}
           </button>
-          {bestaetigt && (
+          {bestaetigt && !dirty && (
             <button className="neben" onClick={ivorisPush} disabled={pushStatus === "laeuft" || pushStatus === "gepusht"}>
-              {pushStatus === "laeuft" ? "Schreibt in ivoris ..." : pushStatus === "gepusht" ? "In ivoris übernommen ✓" : "In ivoris-Akte schreiben"}
+              {pushStatus === "laeuft"
+                ? "Schreibt in ivoris ..."
+                : pushStatus === "gepusht"
+                  ? "In ivoris übernommen ✓"
+                  : bestaetigt.version > 1
+                    ? "Korrektur in ivoris schreiben"
+                    : "In ivoris-Akte schreiben"}
             </button>
+          )}
+          {bestaetigt && !dirty && (
+            <button className="neben" onClick={naechsterPatient}>Nächster Patient →</button>
           )}
           {komposition.fehlt.length > 0 && (
             <span className="hinweis-fehlt">Gesperrt, fehlt: {komposition.fehlt.join(", ")}</span>

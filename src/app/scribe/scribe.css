@@ -183,9 +183,10 @@
   display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 
 /* Stempel mit Auftritt */
-.scribe .stempel { display: inline-block; transform: rotate(-7deg); border: 2px solid var(--gruen);
-  color: var(--gruen-tief); border-radius: 7px; padding: 3px 10px; font-size: 11px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase; }
+.scribe .stempel { display: inline-block; transform: rotate(-7deg); border: 3px solid #17934F;
+  color: #0F7A3F; background: rgba(23, 147, 79, 0.08); border-radius: 8px; padding: 6px 16px;
+  font-size: 14px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  box-shadow: 0 0 0 4px rgba(23, 147, 79, 0.12); }
 @media (prefers-reduced-motion: no-preference) {
   .scribe .stempel { animation: stempel-auftritt 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
   @keyframes stempel-auftritt {
