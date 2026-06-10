@@ -114,13 +114,13 @@ async function sichern(konto) {
     console.log(`VORHANDEN  ${konto.email}`);
   }
 
+  // Produktive Tabelle: id, email, display_name (NOT NULL), role, created_at, patient_id, kuerzel
   const { error: profilFehler } = await admin
     .from("user_profiles")
     .upsert(
       {
         id: user.id,
         email: konto.email,
-        full_name: konto.fullName,
         display_name: konto.fullName,
         role: konto.role,
         kuerzel: konto.kuerzel,
