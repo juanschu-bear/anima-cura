@@ -1,280 +1,306 @@
-/* ============ Anima Scribe v2 – Designsystem ============
-   Anima-Familie (hell, warm, Grün) mit Scribe-Charakter:
-   Karteikarte mit Lineatur, Tinten-Stempel, leiser Glow.
+/* ============ Anima Scribe v3 – zwei Themen, eine Sprache ============
+   Dunkel "Obsidian": warmer Stein, Smaragd-Gold-Licht, Leuchtkanten.
+   Hell "Glas & Tiefe": Mesh-Verlauf, milchige Glasschichten.
+   Signatur in beiden: die Karteikarte als Papier, der Stempel.
 */
-.scribe {
-  --papier: #F1F5F3;
-  --karte: #FBFCFB;
-  --tinte: #16241F;
-  --gedeckt: #5C6E68;
-  --nebel: #93A39C;
-  --linie: #D6E0DA;
-  --gruen: #2F6B5E;
-  --gruen-tief: #214E45;
-  --gruen-hauch: #DEEBE6;
-  --bernstein: #CC822B;
-  --bernstein-hauch: #FBEBD2;
-  --rot: #A6453B;
-  --rot-hauch: #F6E4E1;
-  --lineatur: #DEE7E2;
-  --rand: #D8654F;
-  --glow-gruen: rgba(47, 107, 94, 0.16);
-  --glow-bernstein: rgba(204, 130, 43, 0.14);
-
-  position: relative;
-  background: var(--papier);
-  color: var(--tinte);
-  min-height: 100vh;
-  font-size: 15px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+.scribe{
+  --display:var(--schrift-display),sans-serif;
+  --text:var(--schrift-text),sans-serif;
+  --mono:var(--schrift-mono),monospace;
+  position:relative;min-height:100vh;font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  background:var(--grund);color:var(--schrift);
+  transition:background .3s ease,color .3s ease;
 }
-.scribe *, .scribe *::before, .scribe *::after { box-sizing: border-box; }
+.scribe *,.scribe *::before,.scribe *::after{box-sizing:border-box}
 
-/* ---- Aurora: leiser Zukunfts-Glow im Hintergrund ---- */
-.scribe .aurora { position: fixed; inset: -20%; pointer-events: none; z-index: 0; opacity: 0.8;
+/* ===== Thema: Obsidian (Standard) ===== */
+.scribe[data-thema="dunkel"]{
+  --grund:#0B0F0D; --schrift:#EAF2ED; --gedeckt:#93A69C; --dunkler:#5E6F66;
+  --flaeche:linear-gradient(180deg,#161D19,#111613); --flaeche-flach:#131916;
+  --kante:rgba(255,255,255,.08); --kante-hover:rgba(255,255,255,.16);
+  --primaer:#2BD9A4; --primaer-tief:#16A87B; --auf-primaer:#06231A;
+  --primaer-soft:rgba(43,217,164,.13); --primaer-glow:rgba(43,217,164,.85);
+  --gold:#F2B544; --gold-soft:rgba(242,181,68,.14); --gold-textton:#F2B544; --auf-gold:#231602;
+  --rot:#FF6B52; --rot-soft:rgba(255,107,82,.14);
+  --eingabe:#101512; --schatten:0 30px 60px -40px rgba(0,0,0,.9);
+  --lineatur:rgba(140,130,104,.35);
+}
+/* ===== Thema: Glas & Tiefe ===== */
+.scribe[data-thema="hell"]{
+  --grund:#EDF3EF; --schrift:#10201A; --gedeckt:#4E6259; --dunkler:#8AA096;
+  --flaeche:rgba(255,255,255,.58); --flaeche-flach:rgba(255,255,255,.7);
+  --kante:rgba(255,255,255,.85); --kante-hover:rgba(14,138,106,.5);
+  --primaer:#0E8A6A; --primaer-tief:#0A6B53; --auf-primaer:#FFFFFF;
+  --primaer-soft:rgba(14,138,106,.13); --primaer-glow:rgba(14,138,106,.7);
+  --gold:#D99A2B; --gold-soft:rgba(217,154,43,.16); --gold-textton:#8C5A1D; --auf-gold:#FFFFFF;
+  --rot:#D6543C; --rot-soft:rgba(214,84,60,.14);
+  --eingabe:rgba(255,255,255,.8); --schatten:0 24px 60px -36px rgba(16,32,26,.45);
+  --lineatur:rgba(140,160,150,.35);
+}
+
+/* ===== Aurora / Mesh ===== */
+.scribe .aurora{position:fixed;inset:-22%;z-index:0;pointer-events:none;transition:opacity .3s ease}
+.scribe[data-thema="dunkel"] .aurora{opacity:.85;filter:blur(40px);
   background:
-    radial-gradient(42% 34% at 12% 8%, var(--glow-gruen), transparent 70%),
-    radial-gradient(36% 30% at 88% 14%, var(--glow-bernstein), transparent 70%),
-    radial-gradient(40% 36% at 70% 92%, var(--glow-gruen), transparent 72%);
-  filter: blur(10px);
+    radial-gradient(34% 26% at 18% 6%, rgba(43,217,164,.16), transparent 70%),
+    radial-gradient(28% 24% at 86% 12%, rgba(242,181,68,.12), transparent 70%),
+    radial-gradient(38% 32% at 74% 92%, rgba(43,217,164,.1), transparent 72%);}
+.scribe[data-thema="hell"] .aurora{opacity:.9;filter:blur(54px) saturate(1.15);
+  background:
+    radial-gradient(38% 30% at 16% 12%, rgba(14,138,106,.34), transparent 70%),
+    radial-gradient(30% 26% at 84% 8%, rgba(217,154,43,.30), transparent 70%),
+    radial-gradient(36% 32% at 78% 86%, rgba(94,201,255,.22), transparent 72%),
+    radial-gradient(30% 26% at 8% 88%, rgba(14,138,106,.26), transparent 70%);}
+@media (prefers-reduced-motion:no-preference){
+  .scribe .aurora{animation:aurora-drift 28s ease-in-out infinite alternate}
+  @keyframes aurora-drift{from{transform:translate3d(-1.8%,-1%,0)}to{transform:translate3d(1.8%,2%,0)}}
 }
-@media (prefers-reduced-motion: no-preference) {
-  .scribe .aurora { animation: aurora-drift 26s ease-in-out infinite alternate; }
-  @keyframes aurora-drift {
-    from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
-    to { transform: translate3d(1.5%, 1.5%, 0) scale(1.04); }
-  }
-}
-.scribe > *:not(.aurora) { position: relative; z-index: 1; }
+.scribe>*:not(.aurora){position:relative;z-index:1}
 
-/* ---- Kopfzeile ---- */
-.scribe .kopf { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
-  padding: 18px 28px 0; max-width: 1180px; margin: 0 auto; }
-.scribe .wortmarke { font-family: var(--schrift-display), sans-serif; font-size: 22px; font-weight: 700;
-  letter-spacing: -0.01em; }
-.scribe .wortmarke .anima { font-weight: 400; color: var(--gedeckt); }
-.scribe .kopf .datum { color: var(--gedeckt); font-size: 13.5px; }
-.scribe .kopf .rechts { margin-left: auto; display: flex; align-items: baseline; gap: 14px; }
-.scribe .kopf .nutzer { color: var(--gedeckt); font-size: 13px; }
-.scribe .abmelden { border: 0; background: none; color: var(--gruen); font: inherit; font-size: 13px;
-  font-weight: 600; cursor: pointer; padding: 0; }
-.scribe .abmelden:hover { color: var(--gruen-tief); text-decoration: underline; }
+/* ===== Flächen ===== */
+.scribe .feld,.scribe .wache,.scribe .ausgang.geld,.scribe .kopplung,.scribe .login-karte,.scribe .detailkarte{
+  background:var(--flaeche);border:1px solid var(--kante);border-radius:18px;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset,var(--schatten);
+  transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.scribe[data-thema="hell"] .feld,.scribe[data-thema="hell"] .wache,
+.scribe[data-thema="hell"] .ausgang.geld,.scribe[data-thema="hell"] .kopplung,
+.scribe[data-thema="hell"] .login-karte,.scribe[data-thema="hell"] .detailkarte{
+  backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,var(--schatten)}
+.scribe .feld{padding:20px 22px}
 
-/* ---- Held: Selbsterklärung wie im Entwurf ---- */
-.scribe .held { max-width: 1180px; margin: 0 auto; padding: 26px 28px 6px; }
-.scribe .augenbraue { font-family: var(--schrift-display), sans-serif; font-size: 12px;
-  letter-spacing: 0.18em; text-transform: uppercase; color: var(--gruen); font-weight: 600; margin: 0 0 10px; }
-.scribe .held h1 { font-family: var(--schrift-display), sans-serif; font-size: clamp(24px, 3.6vw, 34px);
-  line-height: 1.1; letter-spacing: -0.015em; font-weight: 700; margin: 0 0 10px; }
-.scribe .held .einleitung { font-size: 15px; color: var(--gedeckt); max-width: 76ch; margin: 0; }
+/* ===== Kopf ===== */
+.scribe .kopf{display:flex;align-items:center;gap:16px;flex-wrap:wrap;max-width:1160px;
+  margin:16px auto 0;padding:14px 22px;border-radius:999px;
+  background:var(--flaeche);border:1px solid var(--kante);
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset,var(--schatten);
+  position:sticky;top:12px;z-index:6}
+.scribe[data-thema="hell"] .kopf{backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3)}
+.scribe .wortmarke{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em}
+.scribe .wortmarke .anima{font-weight:400;color:var(--gedeckt)}
+.scribe .kopf .datum{color:var(--gedeckt);font-size:13px}
+.scribe .kopf .rechts{margin-left:auto;display:flex;align-items:center;gap:14px}
+.scribe .kopf .nutzer{color:var(--gedeckt);font-size:13px}
+.scribe .thema-toggle,.scribe .abmelden{border:0;background:none;color:var(--primaer);font:inherit;
+  font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.scribe .thema-toggle:hover,.scribe .abmelden:hover{text-decoration:underline}
 
-.scribe .buehne { max-width: 1180px; margin: 0 auto; padding: 10px 28px 110px; }
+/* ===== Held ===== */
+.scribe .held{max-width:1160px;margin:0 auto;padding:50px 26px 6px}
+.scribe .augenbraue{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--primaer);margin:0 0 12px}
+.scribe .held h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4.8vw,48px);line-height:1.04;
+  letter-spacing:-.022em;margin:0 0 14px}
+.scribe .held h1 .glanz{background:linear-gradient(92deg,var(--primaer) 8%,var(--gold) 92%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.scribe .einleitung{font-size:15.5px;color:var(--gedeckt);max-width:74ch;margin:0}
 
-/* ---- Abschnitts-Etikett mit Linie (wie v4) ---- */
-.scribe .abschnitt { font-family: var(--schrift-mono), monospace; font-size: 11px; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--gedeckt); margin: 32px 0 12px; display: flex; align-items: center; gap: 10px; }
-.scribe .abschnitt::after { content: ""; flex: 1; height: 1px; background: var(--linie); }
+.scribe .buehne{max-width:1160px;margin:0 auto;padding:8px 26px 110px}
+.scribe .abschnitt{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dunkler);margin:38px 0 14px;display:flex;align-items:center;gap:12px}
+.scribe .abschnitt::after{content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,var(--kante),transparent)}
 
-/* ---- Karten / Felder ---- */
-.scribe .feld { background: var(--karte); border: 1px solid var(--linie); border-radius: 14px;
-  padding: 18px 20px; box-shadow: 0 1px 0 rgba(22, 36, 31, 0.03), 0 14px 30px -26px rgba(22, 36, 31, 0.35);
-  transition: box-shadow 0.2s ease, transform 0.2s ease; }
-.scribe .raster { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-@media (max-width: 880px) { .scribe .raster { grid-template-columns: 1fr; } }
+/* ===== Doku-Wache ===== */
+.scribe .raster{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:880px){.scribe .raster{grid-template-columns:1fr}}
+.scribe .wache{padding:15px 17px;position:relative;cursor:pointer}
+.scribe .wache:hover{border-color:var(--kante-hover);transform:translateY(-2px)}
+.scribe .wache .zeit{font-family:var(--mono);font-size:12px;color:var(--gedeckt)}
+.scribe .wache .wer{font-family:var(--display);font-weight:600;font-size:16px;margin:2px 0}
+.scribe .wache .was{font-size:12.5px;color:var(--gedeckt)}
+.scribe .pille{position:absolute;top:13px;right:14px;font-family:var(--display);font-size:10px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:4px 10px}
+.scribe .pille.gruen{background:var(--primaer-soft);color:var(--primaer);box-shadow:0 0 18px -6px var(--primaer-glow)}
+.scribe[data-thema="hell"] .pille.gruen{color:var(--primaer-tief)}
+.scribe .pille.bernstein{background:var(--gold-soft);color:var(--gold-textton)}
+.scribe .pille.rot{background:var(--rot-soft);color:var(--rot);box-shadow:0 0 18px -6px var(--rot);
+  animation:puls 1.3s ease-in-out infinite}
+@keyframes puls{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){.scribe .pille.rot{animation:none}}
+.scribe .wachenotiz{margin-top:10px;font-size:12.5px;color:var(--gedeckt)}
+.scribe .wachenotiz b{color:var(--rot);font-weight:600}
+.scribe .leer{color:var(--gedeckt);font-size:13.5px;font-style:italic}
 
-/* ---- Doku-Wache: Tageskarten ---- */
-.scribe .wache { background: var(--karte); border: 1px solid var(--linie); border-radius: 13px;
-  padding: 13px 15px; position: relative; transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease; }
-.scribe .wache:hover { border-color: var(--gruen); transform: translateY(-1px);
-  box-shadow: 0 10px 24px -18px rgba(47, 107, 94, 0.5); }
-.scribe .wache .zeit { font-family: var(--schrift-mono), monospace; font-size: 12px; color: var(--gedeckt); }
-.scribe .wache .wer { font-family: var(--schrift-display), sans-serif; font-weight: 600; font-size: 15px; margin: 2px 0; }
-.scribe .wache .was { font-size: 12.5px; color: var(--gedeckt); }
-.scribe .pille { position: absolute; top: 11px; right: 12px; font-family: var(--schrift-display), sans-serif;
-  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 600;
-  border-radius: 999px; padding: 3px 9px; }
-.scribe .pille.gruen { background: var(--gruen-hauch); color: var(--gruen-tief); }
-.scribe .pille.bernstein { background: var(--bernstein-hauch); color: #8C5A1D; }
-.scribe .pille.rot { background: var(--rot-hauch); color: var(--rot); animation: puls 1.4s ease-in-out infinite; }
-@keyframes puls { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-@media (prefers-reduced-motion: reduce) { .scribe .pille.rot { animation: none; } }
-.scribe .wachenotiz { margin-top: 8px; font-size: 12.5px; color: var(--gedeckt); }
-.scribe .wachenotiz b { color: var(--rot); font-weight: 600; }
-.scribe .leer { color: var(--gedeckt); font-size: 13.5px; font-style: italic; }
+/* ===== Eingaben ===== */
+.scribe input[type="text"],.scribe input[type="email"],.scribe input[type="password"],
+.scribe input[type="number"],.scribe select{
+  width:100%;border:1px solid var(--kante);border-radius:10px;background:var(--eingabe);
+  color:var(--schrift);padding:9px 12px;font:inherit;font-size:14px;
+  transition:border-color .15s ease,box-shadow .15s ease}
+.scribe input:focus,.scribe select:focus{outline:none;border-color:var(--primaer);
+  box-shadow:0 0 0 3px var(--primaer-soft)}
+.scribe button:focus-visible{outline:2px solid var(--primaer);outline-offset:2px}
+.scribe input[type="number"]{width:78px}
+.scribe select{width:auto}
+.scribe select option{background:var(--flaeche-flach);color:var(--schrift)}
 
-/* ---- Eingaben ---- */
-.scribe input[type="text"], .scribe input[type="email"], .scribe input[type="password"],
-.scribe input[type="number"], .scribe select {
-  width: 100%; border: 1px solid var(--linie); border-radius: 9px; background: #fff;
-  color: var(--tinte); padding: 9px 12px; font: inherit; font-size: 14px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-.scribe input:focus, .scribe select:focus { outline: none; border-color: var(--gruen);
-  box-shadow: 0 0 0 3px var(--gruen-hauch); }
-.scribe button:focus-visible { outline: 2px solid var(--gruen); outline-offset: 2px; }
-.scribe input[type="number"] { width: 78px; }
-.scribe select { width: auto; }
+.scribe .suchliste{margin:8px 0 0;padding:0;list-style:none;border:1px solid var(--kante);
+  border-radius:10px;overflow:hidden}
+.scribe .suchliste li button{display:block;width:100%;text-align:left;border:0;
+  background:var(--flaeche-flach);color:var(--schrift);padding:9px 12px;font:inherit;font-size:14px;
+  cursor:pointer;transition:background .12s ease}
+.scribe .suchliste li+li button{border-top:1px solid var(--kante)}
+.scribe .suchliste li button:hover{background:var(--primaer-soft)}
+.scribe .gewaehlt{display:inline-flex;align-items:center;gap:12px;padding:9px 16px;border-radius:999px;
+  background:var(--primaer-soft);border:1px solid var(--primaer);font-weight:600;font-size:14px}
+.scribe .gewaehlt button{border:0;background:none;color:var(--primaer);cursor:pointer;font-size:12.5px;font-weight:600}
 
-.scribe .suchliste { margin: 8px 0 0; padding: 0; list-style: none; border: 1px solid var(--linie);
-  border-radius: 9px; overflow: hidden; }
-.scribe .suchliste li button { display: block; width: 100%; text-align: left; border: 0;
-  background: var(--karte); padding: 9px 12px; font: inherit; font-size: 14px; cursor: pointer;
-  transition: background 0.12s ease; }
-.scribe .suchliste li + li button { border-top: 1px solid var(--linie); }
-.scribe .suchliste li button:hover { background: var(--gruen-hauch); }
-.scribe .gewaehlt { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
-  background: var(--gruen-hauch); border-radius: 9px; font-weight: 600; font-size: 14px; }
-.scribe .gewaehlt button { margin-left: auto; border: 0; background: none; color: var(--gruen);
-  cursor: pointer; font-size: 13px; font-weight: 600; }
+/* ===== Stufen, Phasen, Kontext ===== */
+.scribe .stufe{display:block;font-size:12.5px;font-weight:700;margin:16px 0 8px}
+.scribe .stufe:first-child{margin-top:0}
+.scribe .phase{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dunkler);margin:13px 0 7px}
+.scribe .kontext{margin-top:15px;font-size:12.5px;color:var(--gedeckt);
+  border-top:1px dashed var(--kante);padding-top:12px}
+.scribe .kontext b{color:var(--schrift)}
 
-/* ---- Stufen-Etiketten & Kontext ---- */
-.scribe .stufe { display: block; font-size: 12.5px; font-weight: 600; color: var(--tinte); margin: 14px 0 7px; }
-.scribe .stufe:first-child { margin-top: 0; }
-.scribe .kontext { margin-top: 13px; font-size: 12.5px; color: var(--gedeckt);
-  border-top: 1px dashed var(--linie); padding-top: 11px; }
-.scribe .kontext b { color: var(--tinte); }
-.scribe .phase { font-family: var(--schrift-mono), monospace; font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--nebel); margin: 12px 0 6px; }
-.scribe .phase:first-of-type { margin-top: 0; }
+/* ===== Chips ===== */
+.scribe .wahlzeile{display:flex;flex-wrap:wrap;gap:8px}
+.scribe .wahl{font-family:var(--text);font-size:13px;font-weight:500;cursor:pointer;color:var(--schrift);
+  border:1px solid var(--kante);background:var(--flaeche-flach);border-radius:999px;padding:8px 15px;
+  transition:all .16s ease}
+.scribe .wahl:hover{border-color:var(--primaer);transform:translateY(-1px)}
+.scribe .wahl[aria-pressed="true"]{color:var(--auf-primaer);border-color:transparent;font-weight:700;
+  background:linear-gradient(135deg,var(--primaer),var(--primaer-tief));
+  box-shadow:0 0 24px -6px var(--primaer-glow),0 0 0 1px var(--primaer)}
+.scribe .wahl.bernstein[aria-pressed="true"]{color:var(--auf-gold);
+  background:linear-gradient(135deg,var(--gold),#B97E18);
+  box-shadow:0 0 24px -6px var(--gold),0 0 0 1px var(--gold)}
+.scribe .wahl.kombi{border-style:dashed;border-color:var(--primaer);color:var(--primaer)}
+.scribe .wahl.kombi[aria-pressed="true"]{border-style:solid;color:var(--auf-primaer)}
 
-/* ---- Wahl-Knöpfe mit Glow ---- */
-.scribe .wahlzeile { display: flex; flex-wrap: wrap; gap: 7px; }
-.scribe .wahl { font-family: var(--schrift-text), sans-serif; font-size: 13px; font-weight: 500;
-  cursor: pointer; border: 1px solid var(--linie); background: #fff; color: var(--tinte);
-  border-radius: 9px; padding: 8px 13px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease,
-    background 0.15s ease, color 0.15s ease; }
-.scribe .wahl:hover { border-color: var(--gruen); transform: translateY(-1px); }
-.scribe .wahl[aria-pressed="true"] { background: var(--gruen); border-color: var(--gruen); color: #fff;
-  font-weight: 600; box-shadow: 0 0 0 3px var(--gruen-hauch), 0 6px 16px -8px rgba(47, 107, 94, 0.6); }
-.scribe .wahl.bernstein[aria-pressed="true"] { background: var(--bernstein); border-color: var(--bernstein);
-  box-shadow: 0 0 0 3px var(--bernstein-hauch), 0 6px 16px -8px rgba(204, 130, 43, 0.55); }
-.scribe .wahl.kombi { border-style: dashed; border-color: var(--gruen); color: var(--gruen-tief); }
+/* ===== Zahnschema ===== */
+.scribe .zahnschema{display:grid;grid-template-columns:repeat(16,24px);gap:3px}
+.scribe .zahn{font-family:var(--mono);font-size:10px;padding:5px 0;text-align:center;cursor:pointer;
+  border:1px solid var(--kante);background:var(--flaeche-flach);color:var(--gedeckt);border-radius:5px;
+  transition:all .12s ease}
+.scribe .zahn:hover{border-color:var(--primaer);transform:translateY(-1px)}
+.scribe .zahn[aria-pressed="true"]{background:linear-gradient(135deg,var(--primaer),var(--primaer-tief));
+  border-color:transparent;color:var(--auf-primaer);font-weight:700;box-shadow:0 0 14px -4px var(--primaer-glow)}
+.scribe .zahnluecke{grid-column:span 16;height:3px}
+@media(max-width:560px){.scribe .zahnschema{grid-template-columns:repeat(8,24px)}
+  .scribe .zahnluecke{grid-column:span 8}}
 
-/* ---- Zahnschema ---- */
-.scribe .zahnschema { display: grid; grid-template-columns: repeat(16, 24px); gap: 3px; }
-.scribe .zahn { font-family: var(--schrift-mono), monospace; font-size: 10px; padding: 5px 0;
-  text-align: center; border: 1px solid var(--linie); background: #fff; color: var(--gedeckt);
-  border-radius: 5px; cursor: pointer; transition: all 0.12s ease; }
-.scribe .zahn:hover { border-color: var(--gruen); transform: translateY(-1px); }
-.scribe .zahn[aria-pressed="true"] { background: var(--gruen); border-color: var(--gruen); color: #fff;
-  font-weight: 700; box-shadow: 0 0 0 2px var(--gruen-hauch); }
-.scribe .zahnluecke { grid-column: span 16; height: 3px; }
-@media (max-width: 560px) { .scribe .zahnschema { grid-template-columns: repeat(8, 24px); }
-  .scribe .zahnluecke { grid-column: span 8; } }
-
-/* ---- Karteikarte (Scribe-Signatur) ---- */
-.scribe .karteikarte { position: relative; background: #FFFDF8; border: 1px solid #E5DEC9;
-  border-radius: 14px; padding: 18px 22px 20px 74px; overflow: hidden;
-  box-shadow: 0 1px 0 rgba(22, 36, 31, 0.04), 0 18px 38px -28px rgba(22, 36, 31, 0.4); }
-.scribe .karteikarte::before { content: ""; position: absolute; left: 54px; top: 0; bottom: 0;
-  width: 1.5px; background: var(--rand); opacity: 0.5; }
-.scribe .schreibflaeche { background-image:
-  repeating-linear-gradient(transparent 0 31px, var(--lineatur) 31px 32px);
-  line-height: 32px; min-height: 96px; font-size: 15.5px; }
-.scribe .kartenkopf { font-family: var(--schrift-mono), monospace; font-size: 11px; color: #8A8268;
-  margin-bottom: 8px; }
-.scribe .seg-var { background: var(--bernstein-hauch); border-radius: 3px; padding: 0 3px; }
-.scribe .seg-fehlt { background: var(--rot-hauch); color: var(--rot); border-radius: 3px; padding: 0 7px;
-  font-family: var(--schrift-mono), monospace; font-size: 12.5px; font-weight: 600; }
-.scribe .kartenfuss { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #DFD6BE;
-  font-family: var(--schrift-mono), monospace; font-size: 10.5px; color: #8A8268;
-  display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-
-/* Stempel mit Auftritt */
-.scribe .stempel { display: inline-block; transform: rotate(-7deg); border: 3px solid #17934F;
-  color: #0F7A3F; background: rgba(23, 147, 79, 0.08); border-radius: 8px; padding: 6px 16px;
-  font-size: 14px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-  box-shadow: 0 0 0 4px rgba(23, 147, 79, 0.12); }
-@media (prefers-reduced-motion: no-preference) {
-  .scribe .stempel { animation: stempel-auftritt 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-  @keyframes stempel-auftritt {
-    0% { transform: rotate(-20deg) scale(2.4); opacity: 0; }
-    60% { transform: rotate(-5deg) scale(0.96); opacity: 1; }
-    100% { transform: rotate(-7deg) scale(1); }
-  }
+/* ===== Karteikarte: das Papier ===== */
+.scribe .karteikarte{position:relative;background:#FBF7EE;color:#23201A;border:0;border-radius:18px;
+  padding:20px 24px 22px 78px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(242,181,68,.25),0 0 70px -22px rgba(242,181,68,.35),0 40px 80px -44px rgba(0,0,0,.55)}
+.scribe[data-thema="hell"] .karteikarte{background:rgba(255,253,247,.94);
+  box-shadow:0 0 0 1px rgba(229,222,201,.9),0 30px 70px -40px rgba(16,32,26,.5)}
+.scribe .karteikarte::before{content:"";position:absolute;left:56px;top:0;bottom:0;width:1.5px;
+  background:#D8654F;opacity:.55}
+.scribe .kartenkopf{font-family:var(--mono);font-size:11px;color:#8A8268;margin-bottom:8px}
+.scribe .schreibflaeche{background-image:repeating-linear-gradient(transparent 0 31px,var(--lineatur) 31px 32px);
+  line-height:32px;min-height:96px;font-size:15.5px}
+.scribe .seg-var{background:rgba(217,154,43,.22);border-radius:4px;padding:0 4px}
+.scribe .seg-fehlt{background:rgba(214,84,60,.16);color:#B23A24;border-radius:4px;padding:0 7px;
+  font-family:var(--mono);font-size:12.5px;font-weight:600}
+.scribe .kartenfuss{margin-top:14px;padding-top:11px;border-top:1px dashed rgba(140,130,104,.45);
+  font-family:var(--mono);font-size:10.5px;color:#8A8268;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.scribe .stempel{display:inline-block;margin-left:auto;transform:rotate(-6deg);
+  border:3px solid #1FC78D;color:#0E9966;background:rgba(31,199,141,.1);border-radius:9px;
+  padding:7px 17px;font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  box-shadow:0 0 0 4px rgba(31,199,141,.16),0 0 26px -8px rgba(31,199,141,.8)}
+@media(prefers-reduced-motion:no-preference){
+  .scribe .stempel{animation:stempel-auftritt .5s cubic-bezier(.2,1.5,.4,1) both}
+  @keyframes stempel-auftritt{0%{transform:rotate(-22deg) scale(2.6);opacity:0}
+    60%{transform:rotate(-4deg) scale(.95);opacity:1}100%{transform:rotate(-6deg) scale(1)}}
 }
 
-/* ---- Gruppen ---- */
-.scribe .gruppe { margin-top: 14px; }
-.scribe .gruppe:first-child { margin-top: 0; }
-.scribe .gname { font-family: var(--schrift-mono), monospace; font-size: 10.5px; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--gedeckt); font-weight: 600; margin-bottom: 7px; }
-.scribe .gname .pflicht { color: var(--rot); }
-.scribe .gname .modul { color: var(--gruen-tief); }
-.scribe .freitext { width: 100%; margin-top: 14px; border: 1px dashed var(--linie); border-radius: 9px;
-  background: #fff; padding: 9px 12px; font: inherit; font-size: 14px; }
+/* ===== Gruppen ===== */
+.scribe .gruppe{margin-top:14px}
+.scribe .gruppe:first-child{margin-top:0}
+.scribe .gname{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--gedeckt);font-weight:600;margin-bottom:7px}
+.scribe .gname .pflicht{color:var(--rot)}
+.scribe .gname .modul{color:var(--primaer)}
+.scribe .freitext{width:100%;margin-top:14px;border:1px dashed var(--kante);border-radius:10px;
+  background:var(--eingabe);color:var(--schrift);padding:9px 12px;font:inherit;font-size:14px}
+.scribe .freitext::placeholder{color:var(--dunkler)}
 
-/* ---- Aktionen ---- */
-.scribe .aktionen { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
-.scribe .haupt { font-family: var(--schrift-display), sans-serif; border: 0; background: var(--gruen);
-  color: #fff; border-radius: 11px; padding: 12px 24px; font-size: 14.5px; font-weight: 600; cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 10px 24px -14px rgba(47, 107, 94, 0.7); }
-.scribe .haupt:hover:not(:disabled) { background: var(--gruen-tief); transform: translateY(-1px); }
-.scribe .haupt:disabled { background: #B9C9C2; cursor: not-allowed; box-shadow: none; }
-.scribe .neben { font-family: var(--schrift-display), sans-serif; border: 1.5px solid var(--gruen);
-  background: var(--karte); color: var(--gruen-tief); border-radius: 11px; padding: 10px 18px;
-  font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
-.scribe .neben:hover:not(:disabled) { background: var(--gruen-hauch); }
-.scribe .neben:disabled { border-color: var(--nebel); color: var(--nebel); cursor: not-allowed; }
-.scribe .hinweis-fehlt { color: var(--rot); font-size: 13px; font-weight: 600;
-  font-family: var(--schrift-mono), monospace; }
-.scribe .hinweis-ok { color: var(--gruen-tief); font-size: 13px; }
+/* ===== Aktionen ===== */
+.scribe .aktionen{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+.scribe .haupt{font-family:var(--display);font-weight:700;font-size:14.5px;color:var(--auf-primaer);
+  border:0;cursor:pointer;border-radius:14px;padding:13px 26px;
+  background:linear-gradient(135deg,var(--primaer),var(--primaer-tief));
+  box-shadow:0 0 30px -10px var(--primaer-glow);transition:transform .15s ease,box-shadow .15s ease}
+.scribe .haupt:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 44px -10px var(--primaer-glow)}
+.scribe .haupt:disabled{background:var(--dunkler);color:var(--grund);cursor:not-allowed;box-shadow:none}
+.scribe .neben{font-family:var(--display);font-weight:600;font-size:14px;cursor:pointer;border-radius:14px;
+  padding:12px 20px;border:1px solid var(--primaer);background:transparent;color:var(--primaer);
+  transition:all .15s ease}
+.scribe[data-thema="hell"] .neben{color:var(--primaer-tief)}
+.scribe .neben:hover:not(:disabled){background:var(--primaer-soft);transform:translateY(-1px)}
+.scribe .neben:disabled{border-color:var(--dunkler);color:var(--dunkler);cursor:not-allowed}
+.scribe .hinweis-fehlt{color:var(--rot);font-size:13px;font-weight:600;font-family:var(--mono)}
+.scribe .hinweis-ok{color:var(--primaer);font-size:13px}
 
-/* ---- Ausgänge: zwei Artefakte, eine Quelle ---- */
-.scribe .ausgaenge { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px;
-  opacity: 0.38; transition: opacity 0.3s ease; }
-.scribe .ausgaenge.live { opacity: 1; }
-@media (prefers-reduced-motion: no-preference) {
-  .scribe .ausgaenge.live > * { animation: auftauchen 0.4s ease both; }
-  .scribe .ausgaenge.live > *:nth-child(2) { animation-delay: 0.08s; }
-  .scribe .ausgaenge.live > *:nth-child(3) { animation-delay: 0.16s; }
-  @keyframes auftauchen { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* ===== Ausgänge ===== */
+.scribe .ausgaenge{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;
+  opacity:.38;transition:opacity .3s ease}
+.scribe .ausgaenge.live{opacity:1}
+@media(prefers-reduced-motion:no-preference){
+  .scribe .ausgaenge.live>*{animation:auftauchen .4s ease both}
+  .scribe .ausgaenge.live>*:nth-child(2){animation-delay:.08s}
+  .scribe .ausgaenge.live>*:nth-child(3){animation-delay:.16s}
+  @keyframes auftauchen{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 }
-@media (max-width: 880px) { .scribe .ausgaenge { grid-template-columns: 1fr; } }
-.scribe .ausgang { border-radius: 14px; padding: 16px 18px; }
-.scribe .ausgang .ohead { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-bottom: 10px; flex-wrap: wrap; }
-.scribe .ausgang .otitel { font-family: var(--schrift-display), sans-serif; font-size: 14px; font-weight: 600; }
-.scribe .marke { font-family: var(--schrift-mono), monospace; font-size: 10px; letter-spacing: 0.05em;
-  text-transform: uppercase; border-radius: 6px; padding: 3px 8px; }
-.scribe .ausgang.akte { background: #FFFDF8; border: 1px solid #E5DEC9; }
-.scribe .ausgang.akte .marke { background: #EFE8D3; color: #6E5F3C; }
-.scribe .aktemeta { font-family: var(--schrift-mono), monospace; font-size: 11px; color: #8A8268; margin-bottom: 8px; }
-.scribe .aktetext { font-size: 14.5px; line-height: 1.6; }
-.scribe .akteversion { margin-top: 12px; border-top: 1px dashed #DFD6BE; padding-top: 9px;
-  font-family: var(--schrift-mono), monospace; font-size: 10.5px; color: #8A8268; }
-.scribe .ausgang.geld { background: var(--karte); border: 1px solid var(--linie); }
-.scribe .ausgang.geld .marke { background: var(--bernstein-hauch); color: #8C5A1D; }
-.scribe .geldtabelle { font-family: var(--schrift-mono), monospace; font-size: 12px; }
-.scribe .geldtabelle table { width: 100%; border-collapse: collapse; }
-.scribe .geldtabelle td { padding: 7px 8px; border-bottom: 1px solid var(--linie); vertical-align: top; }
-.scribe .geldtabelle tr:last-child td { border-bottom: 0; }
-.scribe .geldtabelle .code { color: var(--gruen-tief); font-weight: 600; white-space: nowrap; }
-.scribe .geldtabelle .anzahl { color: var(--bernstein); font-weight: 600; white-space: nowrap; }
-.scribe .geldnotiz { margin-top: 10px; font-size: 11.5px; color: var(--gedeckt); }
-.scribe .geldnotiz b { color: var(--tinte); }
-.scribe .kopplung { grid-column: 1 / -1; background: var(--karte); border: 1px solid var(--linie);
-  border-left: 3px solid var(--gruen); border-radius: 12px; padding: 12px 16px; font-size: 13.5px;
-  display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.scribe .kopplung .kmarke { font-family: var(--schrift-mono), monospace; font-size: 10px;
-  letter-spacing: 0.05em; text-transform: uppercase; background: var(--gruen-hauch);
-  color: var(--gruen-tief); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
-.scribe .kopplung span { color: var(--gedeckt); }
-.scribe .kopplung b { color: var(--tinte); font-weight: 600; }
+@media(max-width:880px){.scribe .ausgaenge{grid-template-columns:1fr}}
+.scribe .ausgang{border-radius:18px;padding:18px 20px}
+.scribe .ausgang .ohead{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:11px;flex-wrap:wrap}
+.scribe .ausgang .otitel{font-family:var(--display);font-size:14.5px;font-weight:700}
+.scribe .marke{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  border-radius:7px;padding:4px 9px}
+.scribe .ausgang.akte{background:#FBF7EE;color:#23201A;
+  box-shadow:0 0 0 1px rgba(242,181,68,.25),0 0 50px -26px rgba(242,181,68,.4)}
+.scribe[data-thema="hell"] .ausgang.akte{background:rgba(255,253,247,.94);
+  box-shadow:0 0 0 1px rgba(229,222,201,.9),0 24px 60px -36px rgba(16,32,26,.4)}
+.scribe .ausgang.akte .marke{background:#EFE8D3;color:#6E5F3C}
+.scribe .aktemeta{font-family:var(--mono);font-size:11px;color:#8A8268;margin-bottom:8px}
+.scribe .aktetext{font-size:14.5px;line-height:1.6}
+.scribe .akteversion{margin-top:12px;border-top:1px dashed rgba(140,130,104,.45);padding-top:9px;
+  font-family:var(--mono);font-size:10.5px;color:#8A8268}
+.scribe .ausgang.geld .marke{background:var(--gold-soft);color:var(--gold-textton)}
+.scribe .geldtabelle{font-family:var(--mono);font-size:12px}
+.scribe .geldtabelle table{width:100%;border-collapse:collapse}
+.scribe .geldtabelle td{padding:8px;border-bottom:1px solid var(--kante);vertical-align:top}
+.scribe .geldtabelle tr:last-child td{border-bottom:0}
+.scribe .geldtabelle .code{color:var(--primaer);font-weight:600;white-space:nowrap}
+.scribe[data-thema="hell"] .geldtabelle .code{color:var(--primaer-tief)}
+.scribe .geldtabelle .anzahl{color:var(--gold);font-weight:700;white-space:nowrap}
+.scribe[data-thema="hell"] .geldtabelle .anzahl{color:var(--gold-textton)}
+.scribe .geldnotiz{margin-top:10px;font-size:11.5px;color:var(--gedeckt);font-family:var(--text)}
+.scribe .geldnotiz b{color:var(--schrift)}
+.scribe .kopplung{grid-column:1/-1;border-left:3px solid var(--primaer);border-radius:14px;
+  padding:13px 18px;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.scribe .kopplung .kmarke{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  background:var(--primaer-soft);color:var(--primaer);border-radius:7px;padding:4px 9px;white-space:nowrap}
+.scribe[data-thema="hell"] .kopplung .kmarke{color:var(--primaer-tief)}
+.scribe .kopplung span{color:var(--gedeckt)}
+.scribe .kopplung b{color:var(--schrift);font-weight:600}
 
-/* ---- Login ---- */
-.scribe .login-buehne { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-.scribe .login-karte { width: 100%; max-width: 400px; background: var(--karte);
-  border: 1px solid var(--linie); border-radius: 14px; padding: 32px 34px;
-  box-shadow: 0 24px 56px -32px rgba(22, 36, 31, 0.45); }
-.scribe .login-karte h1 { font-family: var(--schrift-display), sans-serif; font-size: 28px;
-  font-weight: 700; margin: 0 0 4px; }
-.scribe .login-karte h1 .anima { font-weight: 400; color: var(--gedeckt); }
-.scribe .login-karte .unterzeile { color: var(--gedeckt); font-size: 13.5px; margin: 0 0 22px; }
-.scribe .login-karte label { display: block; font-size: 12.5px; font-weight: 600; margin: 14px 0 5px; }
-.scribe .login-fehler { background: var(--rot-hauch); color: var(--rot); border-radius: 9px;
-  padding: 9px 12px; font-size: 13px; margin-top: 14px; }
-.scribe .login-karte .haupt { width: 100%; margin-top: 20px; }
+/* ===== Eintrags-Detail (Tagesliste-Klick) ===== */
+.scribe .deckel{position:fixed;inset:0;z-index:20;background:rgba(5,9,7,.55);
+  display:grid;place-items:center;padding:22px;backdrop-filter:blur(6px)}
+.scribe .detailkarte{width:100%;max-width:640px;max-height:84vh;overflow:auto;padding:20px 22px}
+.scribe .detailkarte .ohead{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:10px;flex-wrap:wrap}
+.scribe .detailkarte .otitel{font-family:var(--display);font-size:15px;font-weight:700}
+.scribe .detailtext{background:#FBF7EE;color:#23201A;border-radius:12px;padding:13px 15px;
+  font-size:14px;line-height:1.6;margin:10px 0}
+.scribe .detailmeta{font-family:var(--mono);font-size:11px;color:var(--gedeckt)}
+.scribe .schliessen{margin-top:14px}
+
+/* ===== Login ===== */
+.scribe .login-buehne{min-height:100vh;display:grid;place-items:center;padding:24px}
+.scribe .login-karte{width:100%;max-width:400px;padding:32px 34px}
+.scribe .login-karte h1{font-family:var(--display);font-size:28px;font-weight:700;margin:0 0 4px}
+.scribe .login-karte h1 .anima{font-weight:400;color:var(--gedeckt)}
+.scribe .login-karte .unterzeile{color:var(--gedeckt);font-size:13.5px;margin:0 0 22px}
+.scribe .login-karte label{display:block;font-size:12.5px;font-weight:600;margin:14px 0 5px}
+.scribe .login-fehler{background:var(--rot-soft);color:var(--rot);border-radius:10px;
+  padding:9px 12px;font-size:13px;margin-top:14px}
+.scribe .login-karte .haupt{width:100%;margin-top:20px}

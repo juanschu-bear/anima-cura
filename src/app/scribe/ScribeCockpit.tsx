@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { useThema } from "./ScribeShell";
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean };
@@ -36,6 +37,9 @@ type TagesEintrag = {
   behandlungsart: string | null;
   ivoris_push_status: string;
   bestaetigt_am: string | null;
+  text: string;
+  zaehne: string[];
+  positionen: { code: string; text: string; anzahl?: number }[];
   patients: { vorname: string; nachname: string } | null;
 };
 
@@ -61,6 +65,8 @@ const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
 
 export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const router = useRouter();
+  const { thema, wechseln } = useThema();
+  const [detail, setDetail] = useState<TagesEintrag | null>(null);
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
@@ -447,6 +453,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          <button className="thema-toggle" onClick={wechseln}>
+            {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
+          </button>
           <span className="nutzer">{nutzerName}</span>
           <button className="abmelden" onClick={abmelden}>Abmelden</button>
         </span>
@@ -475,7 +484,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
                 : "–";
               return (
-                <div className="wache" key={e.id}>
+                <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => setDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && setDetail(e)}>
                   <div className="zeit">{am}</div>
                   <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
                   <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
@@ -581,14 +590,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <div className="kartenfuss">
             {bestaetigt ? (
               <>
-                <span className="stempel">Bestätigt · v{bestaetigt.version} · {bestaetigt.am}</span>
                 {dirty ? (
-                  <span style={{ color: "var(--bernstein)", fontWeight: 600 }}>
+                  <span style={{ color: "var(--gold-textton)", fontWeight: 600 }}>
                     Geändert, wird erst mit neuer Version Teil der Akte
                   </span>
                 ) : (
                   <span>Änderungen nur als neue Version, Historie bleibt sichtbar (§ 630f BGB)</span>
                 )}
+                {!dirty && <span className="stempel">Bestätigt · v{bestaetigt.version} · {bestaetigt.am}</span>}
               </>
             ) : (
               <span>Entwurf. Wird mit Bestätigung Teil der Akte, Aufbewahrung 10 Jahre.</span>
@@ -769,6 +778,44 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             </div>
           )}
         </div>
+
+        {detail && (
+          <div className="deckel" onClick={() => setDetail(null)}>
+            <div className="detailkarte" onClick={(ev) => ev.stopPropagation()}>
+              <div className="ohead">
+                <span className="otitel">
+                  {detail.patients ? `${detail.patients.vorname} ${detail.patients.nachname}` : "Unbekannt"}
+                  {" · "}{ART_NAMEN[detail.behandlungsart ?? ""] ?? detail.behandlungsart}
+                </span>
+                <span className={`pille ${wachePille(detail).cls}`} style={{ position: "static" }}>{wachePille(detail).text}</span>
+              </div>
+              <div className="detailmeta">
+                {leistungsName(detail.termin_typ, detail.behandlungsart)} · Version {detail.version}
+                {detail.bestaetigt_am && ` · bestätigt ${new Date(detail.bestaetigt_am).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}`}
+                {detail.zaehne?.length > 0 && ` · Zähne: ${detail.zaehne.join(", ")}`}
+              </div>
+              <div className="detailtext">{detail.text}</div>
+              {(detail.positionen ?? []).length > 0 && (
+                <div className="geldtabelle">
+                  <table>
+                    <tbody>
+                      {detail.positionen.map((p, i) => (
+                        <tr key={i}>
+                          <td className="code">{p.code}{(p.anzahl ?? 1) > 1 && <span className="anzahl"> ×{p.anzahl}</span>}</td>
+                          <td>{p.text}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="detailmeta" style={{ marginTop: 10 }}>
+                Nur Ansicht. Änderungen laufen über den Eintrag selbst als neue Version.
+              </p>
+              <button className="neben schliessen" onClick={() => setDetail(null)}>Schließen</button>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );
