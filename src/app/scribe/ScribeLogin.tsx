@@ -8,6 +8,7 @@ export default function ScribeLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
+  const [pwSichtbar, setPwSichtbar] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
 
@@ -35,14 +36,19 @@ export default function ScribeLogin() {
         <input id="scribe-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
         <label htmlFor="scribe-passwort">Passwort</label>
-        <input
-          id="scribe-passwort"
-          type="password"
-          autoComplete="current-password"
-          value={passwort}
-          onChange={(e) => setPasswort(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && anmelden()}
-        />
+        <span className="pwfeld">
+          <input
+            id="scribe-passwort"
+            type={pwSichtbar ? "text" : "password"}
+            autoComplete="current-password"
+            value={passwort}
+            onChange={(e) => setPasswort(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && anmelden()}
+          />
+          <button type="button" className="pwauge" aria-label={pwSichtbar ? "Passwort verbergen" : "Passwort anzeigen"} onClick={() => setPwSichtbar((s) => !s)}>
+            {pwSichtbar ? "\u{1F648}" : "\u{1F441}"}
+          </button>
+        </span>
 
         {fehler && <div className="login-fehler">{fehler}</div>}
 

@@ -191,7 +191,27 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
   );
 }
 
-type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null };
+type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null; permissions?: { scribe_schreiben?: boolean } | null };
+
+function PwFeld({ wert, setzen, platzhalter, label, klein, onEnter }: { wert: string; setzen: (v: string) => void; platzhalter: string; label: string; klein?: boolean; onEnter?: () => void }) {
+  const [sichtbar, setSichtbar] = useState(false);
+  return (
+    <span className={klein ? "pwfeld klein" : "pwfeld"}>
+      <input
+        type={sichtbar ? "text" : "password"}
+        value={wert}
+        onChange={(e) => setzen(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
+        placeholder={platzhalter}
+        aria-label={label}
+        autoComplete="new-password"
+      />
+      <button type="button" className="pwauge" aria-label={sichtbar ? "Passwort verbergen" : "Passwort anzeigen"} onClick={() => setSichtbar((s) => !s)}>
+        {sichtbar ? "\u{1F648}" : "\u{1F441}"}
+      </button>
+    </span>
+  );
+}
 const ROLLEN_INFO: { wert: string; label: string; rechte: string }[] = [
   { wert: "admin", label: "Admin", rechte: "Alles: dokumentieren, ivoris, Team & Zugänge verwalten" },
   { wert: "verwaltung", label: "Verwaltung", rechte: "Dokumentieren und ivoris-Push, keine Team-Verwaltung" },
@@ -244,6 +264,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
   const [editId, setEditId] = useState<string | null>(null);
   const [editRolle, setEditRolle] = useState("verwaltung");
   const [editKuerzel, setEditKuerzel] = useState("");
+  const [editScribe, setEditScribe] = useState(false);
   const [resetId, setResetId] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState("");
   const [pushInfo, setPushInfo] = useState<string | null>(null);
@@ -672,7 +693,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
     const res = await fetch(`/api/team/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel }),
+      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel, scribe_schreiben: editScribe }),
     });
     const json = await res.json().catch(() => ({}));
     setTeamLaeuft(false);
@@ -1108,13 +1129,17 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
           )}
         </div>
 
+      </main>
+
         {pwOffen && (
           <div className="deckel" onClick={() => setPwOffen(false)}>
             <div className="detailkarte" style={{ maxWidth: 420 }} onClick={(ev) => ev.stopPropagation()}>
               <div className="ohead spalte"><span className="otitel gross">Passwort ändern</span></div>
               <p className="detailmeta" style={{ marginTop: 4 }}>Kein altes Passwort nötig, die Anmeldung ist der Nachweis.</p>
-              <input type="password" placeholder="Neues Passwort (mind. 8 Zeichen)" value={pw1} onChange={(e) => setPw1(e.target.value)} aria-label="Neues Passwort" />
-              <input type="password" placeholder="Neues Passwort bestätigen" value={pw2} onChange={(e) => setPw2(e.target.value)} aria-label="Neues Passwort bestätigen" style={{ marginTop: 8 }} />
+              <PwFeld wert={pw1} setzen={setPw1} platzhalter="Neues Passwort (mind. 8 Zeichen)" label="Neues Passwort" />
+              <div style={{ marginTop: 8 }}>
+                <PwFeld wert={pw2} setzen={setPw2} platzhalter="Neues Passwort bestätigen" label="Neues Passwort bestätigen" onEnter={eigenesPasswortSpeichern} />
+              </div>
               {pwHinweis && <p className={pwHinweis.ok ? "hinweis-ok" : "hinweis-fehlt"} style={{ marginTop: 10 }}>{pwHinweis.text}</p>}
               <div className="aktionen" style={{ marginTop: 14 }}>
                 <button className="haupt" onClick={eigenesPasswortSpeichern} disabled={pwLaeuft}>{pwLaeuft ? "Speichert ..." : "Speichern"}</button>
@@ -1129,33 +1154,44 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
             <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
               <div className="ohead spalte">
                 <span className="otitel gross">Team &amp; Zugänge</span>
-                <span className="o-unter">Konten · Rollen · Kürzel · Passwörter</span>
+              </div>
+              <div className="team-kopfzeile">
+                <span>Konto</span><span>K\u00fcrzel</span><span>Rolle</span><span>Passwort &amp; Rechte</span>
               </div>
               {team.map((m) => (
                 <div className="team-zeile" key={m.id}>
                   <div className="team-info">
-                    <div className="team-name">{m.display_name}{m.kuerzel && <span className="team-kuerzel"> · {m.kuerzel}</span>}</div>
+                    <div className="team-name">{m.display_name}</div>
                     <div className="team-mail">{m.email}</div>
                   </div>
-                  <span className={`pille rollen-${m.role}`} style={{ position: "static" }}>{m.role}</span>
+                  <span className="team-kuerzelzelle">{m.kuerzel ?? "\u2014"}</span>
+                  <span className="team-rolle">
+                    <span className={`pille rollen-${m.role}`} style={{ position: "static" }}>{m.role}</span>
+                    {m.permissions?.scribe_schreiben === true && m.role === "lesezugriff" && <span className="perm-tag plus">+ Scribe</span>}
+                    {m.permissions?.scribe_schreiben === false && m.role !== "lesezugriff" && <span className="perm-tag minus">ohne Scribe</span>}
+                  </span>
                   {editId === m.id ? (
                     <span className="team-edit">
                       <select value={editRolle} onChange={(e) => setEditRolle(e.target.value)} aria-label="Rolle">
                         {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
                       </select>
-                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="Kürzel" style={{ width: 70 }} aria-label="Kürzel" />
+                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="K\u00fcrzel" style={{ width: 70 }} aria-label="K\u00fcrzel" />
+                      <label className="perm-schalter">
+                        <input type="checkbox" checked={editScribe} onChange={(e) => setEditScribe(e.target.checked)} />
+                        Scribe: dokumentieren &amp; ivoris
+                      </label>
                       <button className="neben klein" disabled={teamLaeuft} onClick={() => teamSpeichern(m.id)}>OK</button>
                       <button className="neben klein" onClick={() => setEditId(null)}>Abbruch</button>
                     </span>
                   ) : resetId === m.id ? (
                     <span className="team-edit">
-                      <input type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="Neues Passwort" aria-label="Neues Passwort" />
+                      <PwFeld klein wert={resetPw} setzen={setResetPw} platzhalter="Neues Passwort" label="Neues Passwort" onEnter={() => teamPasswortSetzen(m.id)} />
                       <button className="neben klein" disabled={teamLaeuft} onClick={() => teamPasswortSetzen(m.id)}>OK</button>
                       <button className="neben klein" onClick={() => { setResetId(null); setResetPw(""); }}>Abbruch</button>
                     </span>
                   ) : (
                     <span className="team-edit">
-                      <button className="neben klein" onClick={() => { setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? ""); setResetId(null); }}>Bearbeiten</button>
+                      <button className="neben klein" onClick={() => { setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? ""); setEditScribe(m.permissions?.scribe_schreiben ?? ["admin", "verwaltung"].includes(m.role)); setResetId(null); }}>Bearbeiten</button>
                       <button className="neben klein" onClick={() => { setResetId(m.id); setResetPw(""); setEditId(null); }}>Passwort</button>
                     </span>
                   )}
@@ -1173,7 +1209,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
                   {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
                 </select>
                 <input value={neu.kuerzel} onChange={(e) => setNeu({ ...neu, kuerzel: e.target.value })} placeholder="Kürzel, z. B. ms" aria-label="Kürzel" />
-                <input type="password" value={neu.passwort} onChange={(e) => setNeu({ ...neu, passwort: e.target.value })} placeholder="Startpasswort (mind. 8 Zeichen)" aria-label="Startpasswort" />
+                <PwFeld wert={neu.passwort} setzen={(v) => setNeu({ ...neu, passwort: v })} platzhalter="Startpasswort (mind. 8 Zeichen)" label="Startpasswort" />
               </div>
               <p className="detailmeta" style={{ marginTop: 6 }}>{ROLLEN_INFO.find((r) => r.wert === neu.rolle)?.rechte}</p>
               {teamHinweis && <p className={teamHinweis.ok ? "hinweis-ok" : "hinweis-fehlt"} style={{ marginTop: 8 }}>{teamHinweis.text}</p>}
@@ -1282,7 +1318,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
             </div>
           </div>
         )}
-      </main>
+
     </>
   );
 }

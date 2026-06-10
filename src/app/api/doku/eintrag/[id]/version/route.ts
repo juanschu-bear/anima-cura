@@ -27,12 +27,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role, kuerzel")
+    .select("role, kuerzel, permissions")
     .eq("id", user.id)
     .single();
 
   const role = (profile?.role as string | undefined) ?? null;
-  if (!role || !["admin", "verwaltung"].includes(role)) {
+  const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
+  const scribeErlaubt = permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role));
+  if (!scribeErlaubt) {
     return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
   }
 

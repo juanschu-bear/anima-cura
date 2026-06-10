@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Nur für Admins" }, { status: 403 });
   }
 
-  let body: { name?: string; rolle?: string; kuerzel?: string | null };
+  let body: { name?: string; rolle?: string; kuerzel?: string | null; scribe_schreiben?: boolean };
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Ungueltiger JSON-Body" }, { status: 400 });
   }
@@ -38,9 +38,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (body.kuerzel !== undefined) {
     update.kuerzel = (body.kuerzel ?? "").trim().toLowerCase() || null;
   }
+  const service = createServerClient();
+  if (body.scribe_schreiben !== undefined) {
+    const { data: aktuell } = await service.from("user_profiles").select("permissions").eq("id", params.id).single();
+    update.permissions = {
+      ...((aktuell?.permissions as Record<string, unknown>) ?? {}),
+      scribe_schreiben: body.scribe_schreiben === true,
+    };
+  }
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nichts zu ändern." }, { status: 400 });
 
-  const service = createServerClient();
   const { data, error } = await service
     .from("user_profiles")
     .update(update)

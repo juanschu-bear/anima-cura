@@ -26,7 +26,7 @@ export async function GET() {
   const service = createServerClient();
   const { data, error } = await service
     .from("user_profiles")
-    .select("id, email, display_name, role, kuerzel")
+    .select("id, email, display_name, role, kuerzel, permissions")
     .is("patient_id", null)
     .order("display_name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

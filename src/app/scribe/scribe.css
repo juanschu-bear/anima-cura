@@ -289,7 +289,7 @@
 .scribe .kopplung b{color:var(--schrift);font-weight:600}
 
 /* ===== Eintrags-Detail (Tagesliste-Klick) ===== */
-.scribe .deckel{position:fixed;inset:0;z-index:20;background:rgba(5,9,7,.55);
+.scribe .deckel{position:fixed;inset:0;z-index:60;background:rgba(5,9,7,.55);
   display:grid;place-items:center;padding:22px;backdrop-filter:blur(6px)}
 .scribe .detailkarte{width:100%;max-width:640px;max-height:84vh;overflow:auto;padding:20px 22px}
 .scribe .detailkarte .ohead{display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -406,7 +406,32 @@
 .scribe .neben.verwerfen:hover{background:rgba(255,107,82,.12)}
 
 /* ===== Team & Zugänge + Passwort ===== */
-.scribe .team-zeile{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--kante);flex-wrap:wrap}
+.scribe .team-kopfzeile{display:grid;grid-template-columns:minmax(190px,1fr) 70px 140px minmax(230px,auto);
+  gap:12px;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gedeckt);padding:2px 0 9px;border-bottom:1px solid var(--kante)}
+.scribe .team-zeile{display:grid;grid-template-columns:minmax(190px,1fr) 70px 140px minmax(230px,auto);
+  align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--kante)}
+.scribe .team-kuerzelzelle{font-family:var(--mono);font-size:13px;font-weight:600}
+.scribe .team-rolle{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.scribe .perm-tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;border-radius:999px;padding:2px 8px}
+.scribe .perm-tag.plus{background:var(--primaer-soft);color:var(--primaer)}
+.scribe[data-thema="hell"] .perm-tag.plus{color:var(--primaer-tief)}
+.scribe .perm-tag.minus{background:rgba(255,255,255,.07);color:var(--gedeckt)}
+.scribe[data-thema="hell"] .perm-tag.minus{background:rgba(16,32,26,.07)}
+.scribe .perm-schalter{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--schrift);
+  white-space:nowrap;cursor:pointer}
+.scribe .perm-schalter input{accent-color:var(--primaer);width:15px;height:15px;cursor:pointer}
+.scribe .pwfeld{position:relative;display:block;width:100%}
+.scribe .pwfeld.klein{width:200px}
+.scribe .pwfeld input{padding-right:42px;width:100%}
+.scribe .pwauge{position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;
+  border:none;cursor:pointer;font-size:16px;line-height:1;padding:5px;border-radius:8px}
+.scribe .pwauge:hover{background:var(--primaer-soft)}
+@media(max-width:760px){
+  .scribe .team-kopfzeile{display:none}
+  .scribe .team-zeile{grid-template-columns:1fr;gap:8px}
+}
 .scribe .team-info{min-width:200px;flex:1}
 .scribe .team-name{font-family:var(--display);font-weight:700;font-size:14px}
 .scribe .team-kuerzel{font-family:var(--mono);font-weight:600;color:var(--gedeckt);font-size:12px}
