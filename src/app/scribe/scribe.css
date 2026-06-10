@@ -130,8 +130,7 @@
 .scribe .leer{color:var(--gedeckt);font-size:13.5px;font-style:italic}
 
 /* ===== Eingaben ===== */
-.scribe input[type="text"],.scribe input[type="email"],.scribe input[type="password"],
-.scribe input[type="number"],.scribe select{
+.scribe input:not([type="checkbox"]):not([type="radio"]),.scribe select{
   width:100%;border:1px solid var(--kante);border-radius:10px;background:var(--eingabe);
   color:var(--schrift);padding:9px 12px;font:inherit;font-size:14px;
   transition:border-color .15s ease,box-shadow .15s ease}
@@ -424,3 +423,19 @@
 .scribe .mail-feld input{flex:1}
 .scribe .mail-suffix{font-family:var(--mono);font-size:12px;color:var(--gedeckt);white-space:nowrap}
 @media(max-width:700px){.scribe .team-form{grid-template-columns:1fr}}
+
+/* ===== Kontrast-Fix: Overlays & Eingaben ===== */
+.scribe[data-thema="hell"] .detailkarte{background:#FFFEF9;border-color:rgba(16,32,26,.14);
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  box-shadow:0 30px 70px -30px rgba(10,20,16,.45)}
+.scribe[data-thema="hell"] .deckel{background:rgba(20,28,24,.45)}
+.scribe[data-thema="hell"] .detailkarte input:not([type="checkbox"]):not([type="radio"]),
+.scribe[data-thema="hell"] .detailkarte select{background:#FFFFFF;border-color:rgba(16,32,26,.22);color:#16241D}
+.scribe[data-thema="hell"] .detailkarte ::placeholder{color:#7A8B82}
+.scribe .detailkarte ::placeholder{color:var(--dunkler)}
+
+/* Overlay-Köpfe: Titel ist Titel, Unterzeile ist klar lesbar */
+.scribe .ohead.spalte{flex-direction:column;align-items:flex-start;gap:3px;margin-bottom:14px}
+.scribe .otitel.gross{font-size:21px;letter-spacing:-.01em}
+.scribe .o-unter{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--gedeckt)}

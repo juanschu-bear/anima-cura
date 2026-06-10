@@ -1111,7 +1111,7 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
         {pwOffen && (
           <div className="deckel" onClick={() => setPwOffen(false)}>
             <div className="detailkarte" style={{ maxWidth: 420 }} onClick={(ev) => ev.stopPropagation()}>
-              <div className="ohead"><span className="otitel" style={{ fontSize: 18 }}>Passwort ändern</span></div>
+              <div className="ohead spalte"><span className="otitel gross">Passwort ändern</span></div>
               <p className="detailmeta" style={{ marginTop: 4 }}>Kein altes Passwort nötig, die Anmeldung ist der Nachweis.</p>
               <input type="password" placeholder="Neues Passwort (mind. 8 Zeichen)" value={pw1} onChange={(e) => setPw1(e.target.value)} aria-label="Neues Passwort" />
               <input type="password" placeholder="Neues Passwort bestätigen" value={pw2} onChange={(e) => setPw2(e.target.value)} aria-label="Neues Passwort bestätigen" style={{ marginTop: 8 }} />
@@ -1127,9 +1127,9 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
         {teamOffen && (
           <div className="deckel" onClick={() => setTeamOffen(false)}>
             <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
-              <div className="ohead">
-                <span className="otitel" style={{ fontSize: 18 }}>Team &amp; Zugänge</span>
-                <span className="detailmeta">Konten, Rollen, Kürzel, Passwörter</span>
+              <div className="ohead spalte">
+                <span className="otitel gross">Team &amp; Zugänge</span>
+                <span className="o-unter">Konten · Rollen · Kürzel · Passwörter</span>
               </div>
               {team.map((m) => (
                 <div className="team-zeile" key={m.id}>
@@ -1188,9 +1188,9 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
         {spickOffen && (
           <div className="deckel" onClick={() => setSpickOffen(false)}>
             <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
-              <div className="ohead">
-                <span className="otitel" style={{ fontSize: 20 }}>Spickzettel</span>
-                <span className="detailmeta">Alles, was man fragen könnte</span>
+              <div className="ohead spalte">
+                <span className="otitel gross">Spickzettel</span>
+                <span className="o-unter">Alles, was man fragen könnte</span>
               </div>
               <input
                 type="text"
