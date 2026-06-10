@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { Landmark, RefreshCw, Save, Settings } from "lucide-react";
 import Link from "next/link";
-import { DEFAULT_AUTH_USERS } from "@/lib/auth";
 import { useBankConnections, useEinstellungen } from "@/hooks/useData";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import TeamVerwaltung from "@/components/auth/TeamVerwaltung";
 
 type JsonRecord = Record<string, any>;
 
@@ -297,52 +297,7 @@ export default function EinstellungenPage() {
         </div>
       </section>
 
-      <section className="stat-card space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="ac-section-title">{t("settings.userPerms", locale)}</h2>
-            <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-              {t("settings.authManagedUsers", locale)}
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: "var(--ac-surface-muted)" }}>
-                <th className="table-header text-left">{t("settings.user", locale)}</th>
-                <th className="table-header text-left">{t("settings.email", locale)}</th>
-                <th className="table-header text-left">{t("settings.role", locale)}</th>
-                <th className="table-header text-left">{t("settings.accessScope", locale)}</th>
-                <th className="table-header text-left">{t("settings.password", locale)}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DEFAULT_AUTH_USERS.map((defaultUser) => (
-                <tr key={defaultUser.email}>
-                  <td className="table-cell font-semibold">{defaultUser.fullName}</td>
-                  <td className="table-cell">{defaultUser.email}</td>
-                  <td className="table-cell">
-                    {defaultUser.role === "admin"
-                      ? t("settings.admin", locale)
-                      : defaultUser.role === "verwaltung"
-                      ? t("settings.office", locale)
-                      : t("settings.readOnly", locale)}
-                  </td>
-                  <td className="table-cell">
-                    {defaultUser.role === "admin"
-                      ? t("settings.accessAdmin", locale)
-                      : defaultUser.role === "verwaltung"
-                      ? t("settings.accessVerwaltung", locale)
-                      : t("settings.accessReadOnly", locale)}
-                  </td>
-                  <td className="table-cell">{t("settings.authManagedPassword", locale)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <TeamVerwaltung />
 
       <div>
         <button

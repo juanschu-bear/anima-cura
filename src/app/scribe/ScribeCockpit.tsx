@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useThema } from "./ScribeShell";
-import { MODULE, STUFEN, effektiveStufe, type Stufe } from "@/lib/permissions";
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean };
@@ -192,12 +191,10 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
   );
 }
 
-type TeamMitglied = { id: string; email: string; display_name: string; role: string; kuerzel: string | null; permissions?: { scribe_schreiben?: boolean; module?: Record<string, string> } | null };
-
-function PwFeld({ wert, setzen, platzhalter, label, klein, onEnter }: { wert: string; setzen: (v: string) => void; platzhalter: string; label: string; klein?: boolean; onEnter?: () => void }) {
+function PwFeld({ wert, setzen, platzhalter, label, onEnter }: { wert: string; setzen: (v: string) => void; platzhalter: string; label: string; onEnter?: () => void }) {
   const [sichtbar, setSichtbar] = useState(false);
   return (
-    <span className={klein ? "pwfeld klein" : "pwfeld"}>
+    <span className="pwfeld">
       <input
         type={sichtbar ? "text" : "password"}
         value={wert}
@@ -213,13 +210,8 @@ function PwFeld({ wert, setzen, platzhalter, label, klein, onEnter }: { wert: st
     </span>
   );
 }
-const ROLLEN_INFO: { wert: string; label: string; rechte: string }[] = [
-  { wert: "admin", label: "Admin", rechte: "Alles: dokumentieren, ivoris, Team & Zugänge verwalten" },
-  { wert: "verwaltung", label: "Verwaltung", rechte: "Dokumentieren und ivoris-Push, keine Team-Verwaltung" },
-  { wert: "lesezugriff", label: "Lesezugriff", rechte: "Nur ansehen, kein Bestätigen, kein ivoris" },
-];
 
-export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: string; rolle: string }) {
+export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const router = useRouter();
   const { thema, wechseln } = useThema();
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
@@ -256,19 +248,6 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
   const [pw2, setPw2] = useState("");
   const [pwLaeuft, setPwLaeuft] = useState(false);
   const [pwHinweis, setPwHinweis] = useState<{ ok: boolean; text: string } | null>(null);
-  const [teamOffen, setTeamOffen] = useState(false);
-  const [team, setTeam] = useState<TeamMitglied[]>([]);
-  const [mailDomain, setMailDomain] = useState("praxis-schubert.de");
-  const [teamHinweis, setTeamHinweis] = useState<{ ok: boolean; text: string } | null>(null);
-  const [teamLaeuft, setTeamLaeuft] = useState(false);
-  const [neu, setNeu] = useState({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRolle, setEditRolle] = useState("verwaltung");
-  const [editKuerzel, setEditKuerzel] = useState("");
-  const [editScribe, setEditScribe] = useState(false);
-  const [editModule, setEditModule] = useState<Record<string, Stufe>>({});
-  const [resetId, setResetId] = useState<string | null>(null);
-  const [resetPw, setResetPw] = useState("");
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -664,62 +643,6 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
     setPwHinweis({ ok: true, text: "Passwort geändert. Gilt ab der nächsten Anmeldung." });
   }
 
-  async function teamLaden() {
-    setTeamHinweis(null);
-    const res = await fetch("/api/team");
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Team konnte nicht geladen werden." }); return; }
-    setTeam(json.mitglieder ?? []);
-    if (json.mail_domain) setMailDomain(json.mail_domain);
-  }
-
-  async function teamAnlegen() {
-    setTeamHinweis(null);
-    setTeamLaeuft(true);
-    const res = await fetch("/api/team", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(neu),
-    });
-    const json = await res.json().catch(() => ({}));
-    setTeamLaeuft(false);
-    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Anlegen fehlgeschlagen." }); return; }
-    setNeu({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
-    setTeamHinweis({ ok: true, text: `${json.mitglied.email} angelegt.` });
-    await teamLaden();
-  }
-
-  async function teamSpeichern(id: string) {
-    setTeamHinweis(null);
-    setTeamLaeuft(true);
-    const res = await fetch(`/api/team/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rolle: editRolle, kuerzel: editKuerzel, scribe_schreiben: editScribe, module_stufen: editModule }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setTeamLaeuft(false);
-    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Speichern fehlgeschlagen." }); return; }
-    setEditId(null);
-    await teamLaden();
-  }
-
-  async function teamPasswortSetzen(id: string) {
-    setTeamHinweis(null);
-    if (resetPw.length < 8) { setTeamHinweis({ ok: false, text: "Passwort: mindestens 8 Zeichen." }); return; }
-    setTeamLaeuft(true);
-    const res = await fetch(`/api/team/${id}/passwort`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passwort: resetPw }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setTeamLaeuft(false);
-    if (!res.ok) { setTeamHinweis({ ok: false, text: json.error ?? "Passwort-Reset fehlgeschlagen." }); return; }
-    setResetId(null); setResetPw("");
-    setTeamHinweis({ ok: true, text: "Passwort gesetzt." });
-  }
-
   async function abmelden() {
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
@@ -790,9 +713,6 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
-          {rolle === "admin" && (
-            <button className="thema-toggle" onClick={() => { setTeamOffen(true); setTeamHinweis(null); teamLaden(); }}>Team</button>
-          )}
           <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>
           <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
           <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>
@@ -1146,105 +1066,6 @@ export default function ScribeCockpit({ nutzerName, rolle }: { nutzerName: strin
               <div className="aktionen" style={{ marginTop: 14 }}>
                 <button className="haupt" onClick={eigenesPasswortSpeichern} disabled={pwLaeuft}>{pwLaeuft ? "Speichert ..." : "Speichern"}</button>
                 <button className="neben" onClick={() => setPwOffen(false)}>Schließen</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {teamOffen && (
-          <div className="deckel" onClick={() => setTeamOffen(false)}>
-            <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
-              <div className="ohead spalte">
-                <span className="otitel gross">Team &amp; Zugänge</span>
-              </div>
-              <div className="team-kopfzeile">
-                <span>Konto</span><span>Kürzel</span><span>Rolle</span><span>Passwort &amp; Rechte</span>
-              </div>
-              {team.map((m) => (
-                <div className="team-zeile" key={m.id}>
-                  <div className="team-info">
-                    <div className="team-name">{m.display_name}</div>
-                    <div className="team-mail">{m.email}</div>
-                  </div>
-                  <span className="team-kuerzelzelle">{m.kuerzel ?? "\u2014"}</span>
-                  <span className="team-rolle">
-                    <span className={`pille rollen-${m.role}`} style={{ position: "static" }}>{m.role}</span>
-                    {m.permissions?.scribe_schreiben === true && m.role === "lesezugriff" && <span className="perm-tag plus">+ Scribe</span>}
-                    {m.permissions?.scribe_schreiben === false && m.role !== "lesezugriff" && <span className="perm-tag minus">ohne Scribe</span>}
-                  </span>
-                  {editId === m.id ? (
-                    <span className="team-edit">
-                      <select value={editRolle} onChange={(e) => setEditRolle(e.target.value)} aria-label="Rolle">
-                        {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
-                      </select>
-                      <input value={editKuerzel} onChange={(e) => setEditKuerzel(e.target.value)} placeholder="Kürzel" style={{ width: 70 }} aria-label="Kürzel" />
-                      <label className="perm-schalter">
-                        <input type="checkbox" checked={editScribe} onChange={(e) => setEditScribe(e.target.checked)} />
-                        Scribe: dokumentieren &amp; ivoris
-                      </label>
-                      <button className="neben klein" disabled={teamLaeuft} onClick={() => teamSpeichern(m.id)}>OK</button>
-                      <button className="neben klein" onClick={() => setEditId(null)}>Abbruch</button>
-                    </span>
-                  ) : resetId === m.id ? (
-                    <span className="team-edit">
-                      <PwFeld klein wert={resetPw} setzen={setResetPw} platzhalter="Neues Passwort" label="Neues Passwort" onEnter={() => teamPasswortSetzen(m.id)} />
-                      <button className="neben klein" disabled={teamLaeuft} onClick={() => teamPasswortSetzen(m.id)}>OK</button>
-                      <button className="neben klein" onClick={() => { setResetId(null); setResetPw(""); }}>Abbruch</button>
-                    </span>
-                  ) : (
-                    <span className="team-edit">
-                      <button className="neben klein" onClick={() => {
-                        setEditId(m.id); setEditRolle(m.role); setEditKuerzel(m.kuerzel ?? "");
-                        setEditScribe(m.permissions?.scribe_schreiben ?? ["admin", "verwaltung"].includes(m.role));
-                        const stufen: Record<string, Stufe> = {};
-                        for (const mod of MODULE) stufen[mod.schluessel] = effektiveStufe(m.role as never, m.permissions ?? null, mod.schluessel);
-                        setEditModule(stufen);
-                        setResetId(null);
-                      }}>Bearbeiten</button>
-                      <button className="neben klein" onClick={() => { setResetId(m.id); setResetPw(""); setEditId(null); }}>Passwort</button>
-                    </span>
-                  )}
-                </div>
-              ))}
-              {editId && (
-                <div className="team-matrix">
-                  <p className="team-matrix-titel">Anima-Cura-Rechte für {team.find((m) => m.id === editId)?.display_name ?? "Konto"}</p>
-                  <p className="team-matrix-hinweis">Stufe pro Modul, übersteuert die Rolle. Sichtbarkeit und Seitenzugriff gelten sofort, die Schreib-Sperren in den Modulen folgen schrittweise.</p>
-                  <div className="team-matrix-raster">
-                    {MODULE.map((mod) => (
-                      <label className="team-matrix-zelle" key={mod.schluessel}>
-                        <span>{mod.label}</span>
-                        <select
-                          value={editModule[mod.schluessel] ?? "keine"}
-                          onChange={(e) => setEditModule({ ...editModule, [mod.schluessel]: e.target.value as Stufe })}
-                          aria-label={`Stufe für ${mod.label}`}
-                        >
-                          {STUFEN.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="spick-bereich" style={{ marginTop: 24 }}>Neues Teammitglied</p>
-              <div className="team-form">
-                <input value={neu.name} onChange={(e) => setNeu({ ...neu, name: e.target.value })} placeholder="Name, z. B. Dr. Maria Schubert" aria-label="Name" />
-                <span className="mail-feld">
-                  <input value={neu.lokal} onChange={(e) => setNeu({ ...neu, lokal: e.target.value })} placeholder="vorname" aria-label="E-Mail vor dem @" />
-                  <span className="mail-suffix">@{mailDomain}</span>
-                </span>
-                <select value={neu.rolle} onChange={(e) => setNeu({ ...neu, rolle: e.target.value })} aria-label="Rolle">
-                  {ROLLEN_INFO.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
-                </select>
-                <input value={neu.kuerzel} onChange={(e) => setNeu({ ...neu, kuerzel: e.target.value })} placeholder="Kürzel, z. B. ms" aria-label="Kürzel" />
-                <PwFeld wert={neu.passwort} setzen={(v) => setNeu({ ...neu, passwort: v })} platzhalter="Startpasswort (mind. 8 Zeichen)" label="Startpasswort" />
-              </div>
-              <p className="detailmeta" style={{ marginTop: 6 }}>{ROLLEN_INFO.find((r) => r.wert === neu.rolle)?.rechte}</p>
-              {teamHinweis && <p className={teamHinweis.ok ? "hinweis-ok" : "hinweis-fehlt"} style={{ marginTop: 8 }}>{teamHinweis.text}</p>}
-              <div className="aktionen" style={{ marginTop: 12 }}>
-                <button className="haupt" disabled={teamLaeuft} onClick={teamAnlegen}>{teamLaeuft ? "Arbeitet ..." : "Anlegen"}</button>
-                <button className="neben" onClick={() => setTeamOffen(false)}>Schließen</button>
               </div>
             </div>
           </div>
