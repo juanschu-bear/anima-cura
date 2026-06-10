@@ -65,21 +65,24 @@ const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   removable: [],
 };
 
-/* Spickzettel: alles, was man fragen koennte. Durchsuchbar. */
-const SPICKZETTEL: { frage: string; antwort: string }[] = [
-  { frage: "Was macht Anima Scribe?", antwort: "Es legt den Karteieintrag fuer den laufenden Termin fertig vor. Sie bestaetigen, klicken Abweichungen an, fertig. Daraus entstehen zwei Dinge: der Verlaufstext fuer die Akte und die Abrechnungspositionen." },
-  { frage: "Was passiert beim Bestaetigen?", antwort: "Der Eintrag wird als Version 1 revisionssicher in Anima gespeichert. Er ist damit Teil der Akte (Aufbewahrung 10 Jahre), aber noch NICHT in ivoris." },
-  { frage: "Wann ist der Eintrag in ivoris?", antwort: "Erst nach Klick auf 'In ivoris-Akte schreiben'. Solange zeigt die Tagesliste 'noch nicht in ivoris'. Nachholen geht jederzeit: Patientenkarte in der Tagesliste anklicken, dort steht der Knopf." },
-  { frage: "Was bedeuten die Pillen in der Tagesliste?", antwort: "Rot pulsierend: handeln (Doku offen oder Push-Fehler). Bernstein: bestaetigt, aber noch nicht in ivoris. Gruen: in ivoris angekommen." },
-  { frage: "Ich habe etwas falsch eingetragen. Wie korrigiere ich?", antwort: "Einfach aendern. Der Knopf wird zu 'Als Version v2 bestaetigen', ein Aenderungsgrund ist Pflicht. Die alte Fassung bleibt sichtbar in der Historie, nichts wird geloescht. In ivoris erscheint die Korrektur als neuer Eintrag mit KORREKTUR-Vermerk." },
-  { frage: "Warum kann ich nichts loeschen?", antwort: "Patientenakten sind gesetzlich revisionssicher (Paragraf 630f BGB). Eintraege werden versioniert, nie geloescht. Das schuetzt die Praxis bei Pruefungen und Streitfaellen." },
-  { frage: "Was ist die Schnellwahl mit dem Plus, z. B. Erstberatung (Anfangsdiagnostik)?", antwort: "Eine Kombi: zwei Leistungen in einer Sitzung, ein Eintrag. Sie koennen auch selbst stapeln, einfach mehrere Leistungen anklicken." },
-  { frage: "Warum ist der Bestaetigen-Knopf gesperrt?", antwort: "Es fehlt etwas Pflichtiges. Daneben steht genau was, z. B. 'Gesperrt, fehlt: Befund, Patient'. Pflichtgruppen sind mit 'Pflicht' markiert." },
-  { frage: "Wie setze ich Zaehne?", antwort: "Im Zahnbogen oder im FDI-Raster anklicken, beides ist synchron. Gewaehlte Zaehne bekommen im Bogen ein goldenes Attachment aufgesetzt. Die Zahnliste landet automatisch im Text." },
-  { frage: "Warum sehe ich manche Leistungen bei diesem Patienten nicht?", antwort: "Altersregeln. Beispiel: IP-Prophylaxe ist Kassenleistung fuer 6- bis 17-Jaehrige und erscheint nur bei passendem Alter. Das Alter steht am Patienten." },
-  { frage: "Was bedeuten die zwei Karten unter Ausgaenge?", antwort: "Ein Eintrag, zwei Artefakte. Links der Verlaufstext fuer die ivoris-Akte (rechtsverbindlich). Rechts die nackten Positionen fuer KZV bzw. Privatliquidation, dort gehen keine Texte hin." },
-  { frage: "Hell oder dunkel?", antwort: "Oben rechts umschalten. Die Wahl merkt sich der Browser." },
-  { frage: "Sind das dieselben Zugangsdaten wie bei Anima Cura?", antwort: "Ja, ein Konto fuer beides. Abmelden hier beendet auch die Cura-Sitzung in diesem Browser." },
+/* Spickzettel: gegliedert nach Bereichen, durchsuchbar. */
+const SPICK_BEREICHE = ["Bedienung", "Patient & Termin", "Eintrag & Versionen", "ivoris & Abrechnung"] as const;
+const SPICKZETTEL: { bereich: (typeof SPICK_BEREICHE)[number]; frage: string; antwort: string }[] = [
+  { bereich: "Bedienung", frage: "Was macht Anima Scribe?", antwort: "Es legt den Karteieintrag für den laufenden Termin fertig vor. Sie bestätigen, klicken Abweichungen an, fertig. Daraus entstehen zwei Dinge: der Verlaufstext für die Akte und die Abrechnungspositionen." },
+  { bereich: "Bedienung", frage: "Warum ist der Bestätigen-Knopf gesperrt?", antwort: "Es fehlt etwas Pflichtiges. Daneben steht genau was, z. B. 'Gesperrt, fehlt: Befund, Patient'. Pflichtgruppen sind mit 'Pflicht' markiert." },
+  { bereich: "Bedienung", frage: "Hell oder dunkel?", antwort: "Oben rechts umschalten. Die Wahl merkt sich der Browser." },
+  { bereich: "Bedienung", frage: "Sind das dieselben Zugangsdaten wie bei Anima Cura?", antwort: "Ja, ein Konto für beides. Abmelden hier beendet auch die Cura-Sitzung in diesem Browser." },
+  { bereich: "Patient & Termin", frage: "Wie wähle ich den Patienten?", antwort: "Oben im Termin-Bereich suchen (mindestens zwei Zeichen). Das Alter steht direkt am Namen. Mit 'wechseln' geht es zum nächsten." },
+  { bereich: "Patient & Termin", frage: "Was ist die Schnellwahl mit dem Plus, z. B. Erstberatung (Anfangsdiagnostik)?", antwort: "Eine Kombi: zwei Leistungen in einer Sitzung, ein Eintrag. Sie können auch selbst stapeln, einfach mehrere Leistungen anklicken." },
+  { bereich: "Patient & Termin", frage: "Warum sehe ich manche Leistungen bei diesem Patienten nicht?", antwort: "Altersregeln. Beispiel: IP-Prophylaxe ist Kassenleistung für 6- bis 17-Jährige und erscheint nur bei passendem Alter." },
+  { bereich: "Patient & Termin", frage: "Wie setze ich Zähne?", antwort: "Im Zahnbogen oder im FDI-Raster anklicken, beides ist synchron. Gewählte Zähne bekommen im Bogen ein goldenes Attachment aufgesetzt, die Zahnliste landet automatisch im Text." },
+  { bereich: "Eintrag & Versionen", frage: "Was passiert beim Bestätigen?", antwort: "Der Eintrag wird als Version 1 revisionssicher in Anima gespeichert. Er ist damit Teil der Akte (Aufbewahrung 10 Jahre), aber noch NICHT in ivoris." },
+  { bereich: "Eintrag & Versionen", frage: "Ich habe etwas falsch eingetragen. Wie korrigiere ich?", antwort: "Einfach ändern. Der Knopf wird zu 'Als Version v2 bestätigen', ein Änderungsgrund ist Pflicht. Die alte Fassung bleibt sichtbar in der Historie, nichts wird gelöscht." },
+  { bereich: "Eintrag & Versionen", frage: "Warum kann ich nichts löschen?", antwort: "Patientenakten sind gesetzlich revisionssicher (§ 630f BGB). Einträge werden versioniert, nie gelöscht. Das schützt die Praxis bei Prüfungen und Streitfällen. Korrigieren ist ausdrücklich erlaubt, nur eben sichtbar." },
+  { bereich: "ivoris & Abrechnung", frage: "Wann ist der Eintrag in ivoris?", antwort: "Erst nach Klick auf 'In ivoris-Akte schreiben'. Solange zeigt die Tagesliste 'noch nicht in ivoris'. Nachholen geht jederzeit: Patientenkarte in der Tagesliste anklicken, dort steht der Knopf." },
+  { bereich: "ivoris & Abrechnung", frage: "Was bedeuten die Pillen in der Tagesliste?", antwort: "Rot pulsierend: handeln (Doku offen oder Push-Fehler). Bernstein: bestätigt, aber noch nicht in ivoris. Grün: in ivoris angekommen." },
+  { bereich: "ivoris & Abrechnung", frage: "Was bedeuten die zwei Karten unter Ausgänge?", antwort: "Ein Eintrag, zwei Artefakte. Links der Verlaufstext für die ivoris-Akte (rechtsverbindlich). Rechts die nackten Positionen für KZV bzw. Privatliquidation, dort gehen keine Texte hin." },
+  { bereich: "ivoris & Abrechnung", frage: "Was erscheint in ivoris bei einer Korrektur?", antwort: "ivoris kann nichts überschreiben. Eine Korrektur erscheint dort als neuer Eintrag mit dem Vermerk 'KORREKTUR (v2):' davor. So bleibt alles nachvollziehbar." },
 ];
 
 function berechneAlter(geburtsdatum: string | null): number | null {
@@ -106,7 +109,7 @@ function ZahnBogen({ zaehne, toggle }: { zaehne: number[]; toggle: (n: number) =
   const punkte = (fdi: number[], cy: number, unten: boolean) =>
     fdi.map((n, i) => {
       const t = (i + 0.5) / fdi.length;
-      const ang = Math.PI * (1 - t);
+      const ang = Math.PI * (1 - (0.05 + 0.9 * t));
       const x = 160 + 140 * Math.cos(ang);
       const y = cy + (unten ? 1 : -1) * 80 * Math.sin(ang);
       return { n, x, y };
@@ -114,6 +117,8 @@ function ZahnBogen({ zaehne, toggle }: { zaehne: number[]; toggle: (n: number) =
   const alle = [...punkte(FDI_OK, 97, false), ...punkte(FDI_UK, 115, true)];
   return (
     <svg className="zahnbogen" viewBox="0 0 320 212" aria-label="Zahnbogen, Klick setzt Zahn">
+      <text x={160} y={90} className="kieferlabel">OK · Oberkiefer</text>
+      <text x={160} y={130} className="kieferlabel">UK · Unterkiefer</text>
       {alle.map(({ n, x, y }) => {
         const aktiv = zaehne.includes(n);
         return (
@@ -143,6 +148,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [detailFehler, setDetailFehler] = useState<string | null>(null);
   const [spickOffen, setSpickOffen] = useState(false);
   const [spickSuche, setSpickSuche] = useState("");
+  const [spickBereich, setSpickBereich] = useState<string>("alle");
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
@@ -565,7 +571,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
-          <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickOffen(true); }}>Spickzettel</button>
+          <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>
           <button className="thema-toggle" onClick={wechseln}>
             {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
           </button>
@@ -844,9 +850,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         {/* ===== Ausgänge ===== */}
         <p className="abschnitt">Ausgänge · zwei getrennte Artefakte, eine Quelle</p>
         <div className={`ausgaenge${bestaetigt ? " live" : ""}`}>
+          <div className="ausgang-spalte">
           <div className="ausgang akte">
             <div className="ohead">
-              <span className="otitel">Verlaufsdokumentation → Akte (ivoris)<span className="ounter">Memory · das Gedächtnis der Behandlung</span></span>
+              <span className="otitel">Verlaufsdokumentation → Akte (ivoris)</span>
               <span className="marke">rechtsverbindlich · § 630f BGB</span>
             </div>
             {bestaetigt ? (
@@ -863,9 +870,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <span className="leer">Erscheint nach Bestätigung als Karteieintrag.</span>
             )}
           </div>
+          <span className="signatur">Memory · das Gedächtnis der Behandlung</span>
+          </div>
+          <div className="ausgang-spalte">
           <div className="ausgang geld">
             <div className="ohead">
-              <span className="otitel">{abrechnungTitel}<span className="ounter">Cash Cow · ohne Doku kein Geld</span></span>
+              <span className="otitel">{abrechnungTitel}</span>
               <span className="marke">nur Positionen · keine Texte</span>
             </div>
             <div className="geldtabelle">
@@ -885,6 +895,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             )}
             <p className="geldnotiz">Positionen sind Vorschläge aus der Vorlage, abrechnungsfachlich zu prüfen. Mit * markierte Zeilen besonders.</p>
           </div>
+          <span className="signatur">Cash Cow · ohne Doku kein Geld</span>
+          </div>
           {bestaetigt && animaKopplung && (
             <div className="kopplung">
               <span className="kmarke">→ Anima Cura</span>
@@ -895,9 +907,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
         {spickOffen && (
           <div className="deckel" onClick={() => setSpickOffen(false)}>
-            <div className="detailkarte" onClick={(ev) => ev.stopPropagation()}>
+            <div className="detailkarte" style={{ maxWidth: 760 }} onClick={(ev) => ev.stopPropagation()}>
               <div className="ohead">
-                <span className="otitel">Spickzettel</span>
+                <span className="otitel" style={{ fontSize: 20 }}>Spickzettel</span>
                 <span className="detailmeta">Alles, was man fragen könnte</span>
               </div>
               <input
@@ -907,19 +919,33 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 onChange={(e) => setSpickSuche(e.target.value)}
                 aria-label="Spickzettel durchsuchen"
               />
-              {SPICKZETTEL.filter((s) => {
+              <div className="wahlzeile" style={{ marginTop: 12 }}>
+                <button className="wahl" aria-pressed={spickBereich === "alle"} onClick={() => setSpickBereich("alle")}>Alles</button>
+                {SPICK_BEREICHE.map((b) => (
+                  <button key={b} className="wahl" aria-pressed={spickBereich === b} onClick={() => setSpickBereich(b)}>{b}</button>
+                ))}
+              </div>
+              {(() => {
                 const q = spickSuche.trim().toLowerCase();
-                return !q || s.frage.toLowerCase().includes(q) || s.antwort.toLowerCase().includes(q);
-              }).map((s) => (
-                <div className="spick-eintrag" key={s.frage}>
-                  <div className="spick-frage">{s.frage}</div>
-                  <div className="spick-antwort">{s.antwort}</div>
-                </div>
-              ))}
-              {SPICKZETTEL.every((s) => {
-                const q = spickSuche.trim().toLowerCase();
-                return q && !s.frage.toLowerCase().includes(q) && !s.antwort.toLowerCase().includes(q);
-              }) && <p className="leer" style={{ marginTop: 14 }}>Nichts gefunden. Anders formulieren, oder kurz Juan fragen.</p>}
+                const passt = (s: (typeof SPICKZETTEL)[number]) =>
+                  (!q || s.frage.toLowerCase().includes(q) || s.antwort.toLowerCase().includes(q)) &&
+                  (spickBereich === "alle" || s.bereich === spickBereich);
+                const sichtbar = SPICKZETTEL.filter(passt);
+                if (sichtbar.length === 0) {
+                  return <p className="leer" style={{ marginTop: 16 }}>Nichts gefunden. Anders formulieren, oder kurz Juan fragen.</p>;
+                }
+                return SPICK_BEREICHE.filter((b) => sichtbar.some((s) => s.bereich === b)).map((b) => (
+                  <div key={b}>
+                    <p className="spick-bereich">{b}</p>
+                    {sichtbar.filter((s) => s.bereich === b).map((s) => (
+                      <div className="spick-eintrag" key={s.frage}>
+                        <div className="spick-frage">{s.frage}</div>
+                        <div className="spick-antwort">{s.antwort}</div>
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
               <button className="neben schliessen" onClick={() => setSpickOffen(false)}>Schließen</button>
             </div>
           </div>

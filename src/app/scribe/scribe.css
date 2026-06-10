@@ -84,9 +84,12 @@
 .scribe .kopf .datum{color:var(--gedeckt);font-size:12.5px}
 .scribe .kopf .rechts{margin-left:auto;display:flex;align-items:center;gap:14px}
 .scribe .kopf .nutzer{color:var(--gedeckt);font-size:13px}
-.scribe .thema-toggle,.scribe .abmelden{border:0;background:none;color:var(--primaer);font:inherit;
-  font-size:13px;font-weight:600;cursor:pointer;padding:0}
-.scribe .thema-toggle:hover,.scribe .abmelden:hover{text-decoration:underline}
+.scribe .thema-toggle,.scribe .abmelden{font-family:var(--display);font-size:12.5px;font-weight:600;
+  cursor:pointer;color:var(--schrift);background:var(--flaeche-flach);
+  border:1px solid var(--kante-hover);border-radius:999px;padding:7px 15px;
+  transition:all .15s ease}
+.scribe .thema-toggle:hover,.scribe .abmelden:hover{border-color:var(--primaer);
+  background:var(--primaer-soft);transform:translateY(-1px)}
 
 /* ===== Held ===== */
 .scribe .held{max-width:1160px;margin:0 auto;padding:50px 26px 6px}
@@ -340,3 +343,23 @@
 .scribe .spick-eintrag{margin-top:16px}
 .scribe .spick-frage{font-family:var(--display);font-weight:700;font-size:14px}
 .scribe .spick-antwort{font-size:13.5px;color:var(--gedeckt);margin-top:3px;line-height:1.55}
+
+/* ===== Signaturen unter den Ausgangskarten ===== */
+.scribe .ausgang-spalte{display:flex;flex-direction:column;gap:9px}
+.scribe .ausgang-spalte .ausgang{flex:1}
+.scribe .signatur{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gedeckt);padding-left:6px}
+
+/* ===== Spickzettel-Bereiche ===== */
+.scribe .spick-bereich{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--primaer);margin:22px 0 4px;display:flex;align-items:center;gap:10px}
+.scribe[data-thema="hell"] .spick-bereich{color:var(--primaer-tief)}
+.scribe .spick-bereich::after{content:"";flex:1;height:1px;background:var(--kante)}
+.scribe .spick-frage{font-family:var(--display);font-weight:700;font-size:15px}
+
+/* ===== Zahnbogen: Kiefer-Beschriftung + Hell-Kontrast ===== */
+.scribe .kieferlabel{font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;
+  fill:var(--dunkler);text-anchor:middle;text-transform:uppercase;pointer-events:none}
+.scribe[data-thema="hell"] .zahnform{fill:#FFFFFF;stroke:#9DB3A8;stroke-width:1.2}
+.scribe[data-thema="hell"] .zahn-g:hover .zahnform{stroke:var(--primaer)}
+.scribe[data-thema="hell"] .zahnnr{fill:#3C4F46}
