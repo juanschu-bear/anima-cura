@@ -1,4 +1,4 @@
-# Anima Curo
+# Anima Cura
 
 **Automated rate management, bank reconciliation & dunning for medical practices – powered by AI.**
 
