@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role")
+    .select("role, kuerzel")
     .eq("id", user.id)
     .single();
 
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     version: neueVersion,
     status: "bestaetigt",
     bestaetigt_von: user.id,
+    bestaetigt_kuerzel: (profile?.kuerzel as string | null) ?? null,
     bestaetigt_am: new Date().toISOString(),
     // Inhalt hat sich geaendert: erneuter Push noetig (ivoris ist append-only,
     // dort entsteht ein zusaetzlicher Korrektur-Eintrag)

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role")
+    .select("role, kuerzel")
     .eq("id", user.id)
     .single();
 
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     status: bestaetigen ? "bestaetigt" : "entwurf",
     version: 1,
     bestaetigt_von: bestaetigen ? user.id : null,
+    bestaetigt_kuerzel: bestaetigen ? ((profile?.kuerzel as string | null) ?? null) : null,
     bestaetigt_am: bestaetigen ? new Date().toISOString() : null,
     ivoris_push_status: "ausstehend",
   };

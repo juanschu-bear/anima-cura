@@ -59,7 +59,8 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   // Korrektur-Kennzeichnung: ab Version 2 entsteht in ivoris ein zusaetzlicher Eintrag
   const zaehne = (eintrag.zaehne as string[]) ?? [];
   const prefix = (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
-  const text = `${prefix}${eintrag.text}`;
+  const kuerzel = (eintrag.bestaetigt_kuerzel as string | null) ?? null;
+  const text = `${prefix}${eintrag.text}${kuerzel ? ` ${kuerzel}` : ""}`;
 
   try {
     const result = await addIvorisKarteiEintrag({
