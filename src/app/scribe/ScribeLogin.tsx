@@ -28,19 +28,11 @@ export default function ScribeLogin() {
   return (
     <div className="login-buehne">
       <div className="login-karte">
-        <h1 style={{ fontFamily: "var(--schrift-display), serif" }}>
-          <span style={{ fontStyle: "normal", fontWeight: 400, color: "var(--graphit)" }}>Anima</span> Scribe
-        </h1>
-        <p className="unterzeile">Dokumentation am Stuhl. Bestaetigen statt nachtragen.</p>
+        <h1><span className="anima">Anima</span> Scribe</h1>
+        <p className="unterzeile">Behandlungscockpit. Termin vorbei, Doku fertig.</p>
 
         <label htmlFor="scribe-email">E-Mail</label>
-        <input
-          id="scribe-email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <input id="scribe-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
         <label htmlFor="scribe-passwort">Passwort</label>
         <input

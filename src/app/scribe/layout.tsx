@@ -1,21 +1,21 @@
 import type { ReactNode } from "react";
-import { Fraunces, Source_Sans_3, Spline_Sans_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./scribe.css";
 
-const fraunces = Fraunces({ subsets: ["latin"], weight: ["400", "600"], style: ["normal", "italic"], variable: "--schrift-display" });
-const sourceSans = Source_Sans_3({ subsets: ["latin"], weight: ["400", "600", "700"], variable: "--schrift-text" });
-const splineMono = Spline_Sans_Mono({ subsets: ["latin"], weight: ["400", "600"], variable: "--schrift-mono" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--schrift-display" });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--schrift-text" });
+const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--schrift-mono" });
 
-export const metadata = { title: "Anima Scribe" };
+export const metadata = { title: "Anima Scribe · Behandlungscockpit" };
 
-// Anima Scribe: eigenes Gesicht, gleicher Kern.
-// Auth wird in den Seiten geprueft (Login-Seite muss ohne Session erreichbar sein).
+// Anima Scribe: Familienmitglied der Anima-Reihe mit eigenem Charakter.
 export default function ScribeLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className={`scribe ${fraunces.variable} ${sourceSans.variable} ${splineMono.variable}`}
+      className={`scribe ${spaceGrotesk.variable} ${inter.variable} ${jetbrains.variable}`}
       style={{ fontFamily: "var(--schrift-text), system-ui, sans-serif" }}
     >
+      <div className="aurora" aria-hidden="true" />
       {children}
     </div>
   );
