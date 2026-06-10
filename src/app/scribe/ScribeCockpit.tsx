@@ -222,6 +222,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [sendet, setSendet] = useState(false);
   const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
+  const [demo, setDemo] = useState(false);
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -463,6 +464,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   async function neueVersion() {
     if (!bestaetigt || !aenderungsgrund.trim() || komposition.fehlt.length > 0) return;
+    if (demo) {
+      setBestaetigt({ ...bestaetigt, version: bestaetigt.version + 1, am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) });
+      setDirty(false);
+      setAenderungsgrund("");
+      setPushStatus("offen");
+      setPushInfo(null);
+      return;
+    }
     setSendet(true);
     setAktionsFehler(null);
     const res = await fetch(`/api/doku/eintrag/${bestaetigt.id}/version`, {
@@ -522,6 +531,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     }
     if (bestaetigt) return;
     if (!patient || module.length === 0 || komposition.fehlt.length > 0) return;
+    if (demo) {
+      setBestaetigt({ id: "demo", version: 1, am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) });
+      setDirty(false);
+      setAenderungsgrund("");
+      setPushStatus("offen");
+      setPushInfo(null);
+      return;
+    }
     setSendet(true);
     setAktionsFehler(null);
     const res = await fetch("/api/doku/eintrag", {
@@ -565,6 +582,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   async function ivorisPush() {
     if (!bestaetigt) return;
+    if (demo || bestaetigt.id === "demo") {
+      setPushStatus("gepusht");
+      setPushInfo("demo");
+      return;
+    }
     setPushStatus("laeuft");
     setPushInfo(null);
     const res = await fetch(`/api/doku/eintrag/${bestaetigt.id}/ivoris-push`, { method: "POST" });
@@ -601,6 +623,22 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setDetail(e);
   }
 
+  async function detailVerwerfen() {
+    if (!detail) return;
+    if (!window.confirm("Eintrag wirklich verwerfen? Er verschwindet aus der Tagesliste, bleibt aber in der Historie nachvollziehbar.")) return;
+    setDetailLaeuft(true);
+    setDetailFehler(null);
+    const res = await fetch(`/api/doku/eintrag/${detail.id}/verwerfen`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setDetailLaeuft(false);
+    if (!res.ok) {
+      setDetailFehler(json.error ?? "Verwerfen fehlgeschlagen.");
+      return;
+    }
+    setDetail(null);
+    await ladeHeute();
+  }
+
   async function detailPush() {
     if (!detail) return;
     setDetailLaeuft(true);
@@ -633,6 +671,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
           <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>
           <button className="thema-toggle" onClick={wechseln}>
             {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
@@ -641,6 +680,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <button className="abmelden" onClick={abmelden}>Abmelden</button>
         </span>
       </header>
+      {demo && <div className="demo-banner">Demo-Modus · es wird nichts gespeichert, kein Datenbank-Eintrag, kein ivoris</div>}
 
       <section className="held">
         <p className="augenbraue">Behandlungscockpit</p>
@@ -790,7 +830,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <div className="feld" style={{ marginTop: 14 }}>
             {brauchtZaehne && (
               <div className="gruppe">
-                <div className="gname">Zahnschema · klickbares Kieferbild</div>
+                <div className="kiefer-titel">Zahnschema · klickbares Kieferbild</div>
                 <p className="kiefer-hilfe">Zahn oder Zahl anklicken, beides geht, für die Attachment-Simulation. Das FDI-Raster darunter bleibt synchron.</p>
                 <KieferSchema zaehne={zaehne} seiten={seiten} toggle={toggleZahn} />
                 <div className="zahnschema">
@@ -905,7 +945,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           {komposition.fehlt.length > 0 && (
             <span className="hinweis-fehlt">Gesperrt, fehlt: {komposition.fehlt.join(", ")}</span>
           )}
-          {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">ivoris-Eintrag {pushInfo.slice(0, 8)}…</span>}
+          {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
           {pushStatus === "fehler" && pushInfo && <span className="hinweis-fehlt">{pushInfo}</span>}
           {aktionsFehler && <span className="hinweis-fehlt">{aktionsFehler}</span>}
         </div>
@@ -1055,6 +1095,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 )}
                 {detail.ivoris_push_status === "gepusht" && (
                   <span className="hinweis-ok">✓ In ivoris angekommen</span>
+                )}
+                {detail.ivoris_push_status !== "gepusht" && (
+                  <button className="neben verwerfen" disabled={detailLaeuft} onClick={detailVerwerfen}>Verwerfen</button>
                 )}
                 {detailFehler && <span className="hinweis-fehlt">{detailFehler}</span>}
                 <button className="neben" onClick={() => setDetail(null)}>Schließen</button>

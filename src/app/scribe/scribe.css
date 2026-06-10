@@ -393,3 +393,15 @@
   margin-left:auto;margin-right:auto;text-align:center}
 .scribe .kiefer-legende{justify-content:center}
 .scribe .kiefer-legende .l-ab::before{background:#C9C2B0}
+
+/* ===== Echter Titel, Demo-Modus, Verwerfen ===== */
+.scribe .kiefer-titel{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:-.01em;
+  text-align:center;margin:0 0 6px}
+.scribe .thema-toggle[data-an="true"]{border-color:var(--gold);color:var(--gold);
+  background:rgba(242,181,68,.13);box-shadow:0 0 16px -7px var(--gold)}
+.scribe .demo-banner{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:#231602;text-align:center;padding:8px 14px;border-radius:11px;
+  margin:14px 0 0;background:linear-gradient(135deg,var(--gold),#D89B22);
+  box-shadow:0 0 24px -8px var(--gold)}
+.scribe .neben.verwerfen{border-color:var(--rot);color:var(--rot)}
+.scribe .neben.verwerfen:hover{background:rgba(255,107,82,.12)}

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       "id, termin_datum, behandlungsart, termin_typ, status, version, text, zaehne, positionen, ivoris_push_status, ivoris_entry_id, bestaetigt_am, patient_id, patients ( id, vorname, nachname )"
     )
     .eq("termin_datum", datum)
+    .neq("status", "verworfen")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
