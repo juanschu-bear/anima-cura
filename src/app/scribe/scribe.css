@@ -19,41 +19,41 @@
   --grund:#0B0F0D; --schrift:#EAF2ED; --gedeckt:#93A69C; --dunkler:#5E6F66;
   --flaeche:linear-gradient(180deg,#161D19,#111613); --flaeche-flach:#131916;
   --kante:rgba(255,255,255,.08); --kante-hover:rgba(255,255,255,.16);
-  --primaer:#2BD9A4; --primaer-tief:#16A87B; --auf-primaer:#06231A;
-  --primaer-soft:rgba(43,217,164,.13); --primaer-glow:rgba(43,217,164,.85);
+  --primaer:#5EA2FF; --primaer-tief:#2E6FE6; --auf-primaer:#06172F;
+  --primaer-soft:rgba(94,162,255,.13); --primaer-glow:rgba(94,162,255,.85);
   --gold:#F2B544; --gold-soft:rgba(242,181,68,.14); --gold-textton:#F2B544; --auf-gold:#231602;
   --rot:#FF6B52; --rot-soft:rgba(255,107,82,.14);
   --eingabe:#101512; --schatten:0 30px 60px -40px rgba(0,0,0,.9);
   --lineatur:rgba(140,130,104,.35);
-  --glanz-glow:rgba(43,217,164,.45);
+  --glanz-glow:rgba(94,162,255,.5);
 }
 /* ===== Thema: Glas & Tiefe ===== */
 .scribe[data-thema="hell"]{
   --grund:#EDF3EF; --schrift:#10201A; --gedeckt:#4E6259; --dunkler:#8AA096;
   --flaeche:rgba(255,255,255,.58); --flaeche-flach:rgba(255,255,255,.7);
-  --kante:rgba(255,255,255,.85); --kante-hover:rgba(14,138,106,.5);
-  --primaer:#0E8A6A; --primaer-tief:#0A6B53; --auf-primaer:#FFFFFF;
-  --primaer-soft:rgba(14,138,106,.13); --primaer-glow:rgba(14,138,106,.7);
+  --kante:rgba(255,255,255,.85); --kante-hover:rgba(46,111,230,.5);
+  --primaer:#2E6FE6; --primaer-tief:#1E54C2; --auf-primaer:#FFFFFF;
+  --primaer-soft:rgba(46,111,230,.13); --primaer-glow:rgba(46,111,230,.7);
   --gold:#D99A2B; --gold-soft:rgba(217,154,43,.16); --gold-textton:#8C5A1D; --auf-gold:#FFFFFF;
   --rot:#D6543C; --rot-soft:rgba(214,84,60,.14);
   --eingabe:rgba(255,255,255,.8); --schatten:0 24px 60px -36px rgba(16,32,26,.45);
   --lineatur:rgba(140,160,150,.35);
-  --glanz-glow:rgba(14,138,106,.3);
+  --glanz-glow:rgba(46,111,230,.35);
 }
 
 /* ===== Aurora / Mesh ===== */
 .scribe .aurora{position:fixed;inset:-22%;z-index:0;pointer-events:none;transition:opacity .3s ease}
 .scribe[data-thema="dunkel"] .aurora{opacity:1;filter:blur(40px);
   background:
-    radial-gradient(34% 26% at 18% 6%, rgba(43,217,164,.22), transparent 70%),
+    radial-gradient(34% 26% at 18% 6%, rgba(94,162,255,.2), transparent 70%),
     radial-gradient(28% 24% at 86% 12%, rgba(242,181,68,.16), transparent 70%),
-    radial-gradient(38% 32% at 74% 92%, rgba(43,217,164,.14), transparent 72%);}
+    radial-gradient(38% 32% at 74% 92%, rgba(94,162,255,.13), transparent 72%);}
 .scribe[data-thema="hell"] .aurora{opacity:.9;filter:blur(54px) saturate(1.15);
   background:
-    radial-gradient(38% 30% at 16% 12%, rgba(14,138,106,.34), transparent 70%),
+    radial-gradient(38% 30% at 16% 12%, rgba(46,111,230,.28), transparent 70%),
     radial-gradient(30% 26% at 84% 8%, rgba(217,154,43,.30), transparent 70%),
     radial-gradient(36% 32% at 78% 86%, rgba(94,201,255,.22), transparent 72%),
-    radial-gradient(30% 26% at 8% 88%, rgba(14,138,106,.26), transparent 70%);}
+    radial-gradient(30% 26% at 8% 88%, rgba(46,111,230,.22), transparent 70%);}
 @media (prefers-reduced-motion:no-preference){
   .scribe .aurora{animation:aurora-drift 28s ease-in-out infinite alternate}
   @keyframes aurora-drift{from{transform:translate3d(-1.8%,-1%,0)}to{transform:translate3d(1.8%,2%,0)}}
@@ -316,7 +316,7 @@
 .scribe[data-thema="dunkel"] .feld{position:relative}
 .scribe[data-thema="dunkel"] .feld::before{content:"";position:absolute;inset:-1px;border-radius:inherit;
   padding:1px;pointer-events:none;
-  background:linear-gradient(135deg,rgba(43,217,164,.45),rgba(242,181,68,.28) 42%,transparent 72%);
+  background:linear-gradient(135deg,rgba(94,162,255,.45),rgba(242,181,68,.28) 42%,transparent 72%);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;mask-composite:exclude}
 
