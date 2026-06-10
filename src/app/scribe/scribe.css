@@ -1,0 +1,173 @@
+/* ============ Anima Scribe – Designsystem ============
+   Tinte auf Karteikarte. Porzellan, Ultramarin, Siegelrot.
+*/
+.scribe {
+  --porzellan: #EFF1ED;
+  --karte: #FFFFFF;
+  --tinte: #1E2126;
+  --graphit: #6A7280;
+  --nebel: #A8B0BC;
+  --linie: #DDE2DB;
+  --ultramarin: #2B49C3;
+  --ultramarin-tief: #1F3590;
+  --ultramarin-hauch: #E9EDFB;
+  --siegel: #C2492F;
+  --siegel-hauch: #FAEAE5;
+  --lineatur: #DCE3EE;
+  --rand: #D8654F;
+
+  background: var(--porzellan);
+  color: var(--tinte);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.scribe *, .scribe *::before, .scribe *::after { box-sizing: border-box; }
+
+/* ---- Kopfzeile ---- */
+.scribe .kopf {
+  display: flex; align-items: baseline; gap: 18px;
+  padding: 18px 28px 14px; border-bottom: 1px solid var(--linie);
+  background: var(--porzellan); flex-wrap: wrap;
+}
+.scribe .wortmarke { font-size: 24px; font-weight: 600; font-style: italic; letter-spacing: -0.01em; }
+.scribe .wortmarke .anima { font-style: normal; font-weight: 400; color: var(--graphit); }
+.scribe .kopf .datum { color: var(--graphit); font-size: 13.5px; }
+.scribe .kopf .nutzer { margin-left: auto; color: var(--graphit); font-size: 13px; }
+
+.scribe .buehne { max-width: 1180px; margin: 0 auto; padding: 26px 28px 100px;
+  display: grid; grid-template-columns: 330px 1fr; gap: 26px; align-items: start; }
+@media (max-width: 920px) { .scribe .buehne { grid-template-columns: 1fr; } }
+
+/* ---- Abschnitts-Etikett ---- */
+.scribe .etikett { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--graphit); font-weight: 600; margin: 0 0 10px; }
+
+/* ---- Linke Spalte ---- */
+.scribe .feld { background: var(--karte); border: 1px solid var(--linie); border-radius: 10px;
+  padding: 16px 18px; margin-bottom: 18px; }
+.scribe .feld + .scribe .feld { margin-top: 0; }
+
+.scribe input[type="text"], .scribe input[type="email"], .scribe input[type="password"],
+.scribe input[type="number"], .scribe select {
+  width: 100%; border: 1px solid var(--linie); border-radius: 8px; background: #FCFCFB;
+  color: var(--tinte); padding: 9px 12px; font: inherit; font-size: 14px;
+}
+.scribe input:focus, .scribe select:focus, .scribe button:focus-visible {
+  outline: 2px solid var(--ultramarin); outline-offset: 1px;
+}
+.scribe input[type="number"] { width: 76px; }
+
+.scribe .suchliste { margin: 8px 0 0; padding: 0; list-style: none; border: 1px solid var(--linie);
+  border-radius: 8px; overflow: hidden; }
+.scribe .suchliste li button { display: block; width: 100%; text-align: left; border: 0;
+  background: var(--karte); padding: 9px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+.scribe .suchliste li + li button { border-top: 1px solid var(--linie); }
+.scribe .suchliste li button:hover { background: var(--ultramarin-hauch); }
+.scribe .gewaehlt { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  background: var(--ultramarin-hauch); border-radius: 8px; font-weight: 600; font-size: 14px; }
+.scribe .gewaehlt button { margin-left: auto; border: 0; background: none; color: var(--ultramarin);
+  cursor: pointer; font-size: 13px; }
+
+.scribe .tagesliste { margin: 0; padding: 0; list-style: none; }
+.scribe .tagesliste li { display: flex; gap: 10px; align-items: baseline; padding: 9px 2px;
+  border-bottom: 1px dashed var(--linie); font-size: 13.5px; }
+.scribe .tagesliste li:last-child { border-bottom: 0; }
+.scribe .tagesliste .wer { font-weight: 600; }
+.scribe .tagesliste .was { color: var(--graphit); }
+.scribe .leer { color: var(--graphit); font-size: 13.5px; font-style: italic; }
+
+/* ---- Pillen & Marken ---- */
+.scribe .pille { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; border-radius: 999px;
+  padding: 2px 9px; white-space: nowrap; }
+.scribe .pille.blau { background: var(--ultramarin-hauch); color: var(--ultramarin-tief); }
+.scribe .pille.rot { background: var(--siegel-hauch); color: var(--siegel); }
+.scribe .pille.grau { background: #EDEFEA; color: var(--graphit); }
+
+/* ---- Wahl-Knöpfe ---- */
+.scribe .wahlzeile { display: flex; flex-wrap: wrap; gap: 7px; }
+.scribe .wahl { border: 1px solid var(--linie); background: var(--karte); color: var(--tinte);
+  border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.scribe .wahl:hover { border-color: var(--ultramarin); }
+.scribe .wahl[aria-pressed="true"] { background: var(--ultramarin); border-color: var(--ultramarin);
+  color: #fff; font-weight: 600; }
+
+/* ---- Zahnschema ---- */
+.scribe .zahnschema { display: grid; grid-template-columns: repeat(16, 23px); gap: 3px; }
+.scribe .zahn { font-size: 10px; padding: 5px 0; text-align: center; border: 1px solid var(--linie);
+  background: var(--karte); color: var(--graphit); border-radius: 4px; cursor: pointer; }
+.scribe .zahn:hover { border-color: var(--ultramarin); }
+.scribe .zahn[aria-pressed="true"] { background: var(--ultramarin); border-color: var(--ultramarin);
+  color: #fff; font-weight: 700; }
+.scribe .zahnluecke { grid-column: span 16; height: 3px; }
+@media (max-width: 560px) { .scribe .zahnschema { grid-template-columns: repeat(8, 23px); }
+  .scribe .zahnluecke { grid-column: span 8; } }
+
+/* ---- Die Karteikarte (Signatur) ---- */
+.scribe .karteikarte { position: relative; background: var(--karte); border: 1px solid var(--linie);
+  border-radius: 10px; padding: 18px 22px 22px 74px; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(30,33,38,0.04), 0 10px 24px -18px rgba(30,33,38,0.25); }
+.scribe .karteikarte::before { content: ""; position: absolute; left: 54px; top: 0; bottom: 0;
+  width: 1.5px; background: var(--rand); opacity: 0.55; }
+.scribe .karteikarte .schreibflaeche { background-image:
+  repeating-linear-gradient(transparent 0 31px, var(--lineatur) 31px 32px);
+  line-height: 32px; min-height: 96px; font-size: 15.5px; }
+.scribe .karteikarte .kartenkopf { font-size: 12px; color: var(--graphit); margin-bottom: 8px; }
+.scribe .seg-fix {}
+.scribe .seg-var { background: var(--ultramarin-hauch); border-radius: 3px; padding: 0 3px; }
+.scribe .seg-fehlt { background: var(--siegel-hauch); color: var(--siegel); border-radius: 3px;
+  padding: 0 7px; font-size: 13px; font-weight: 600; }
+.scribe .kartenfuss { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--linie);
+  font-size: 11.5px; color: var(--nebel); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+/* Stempel */
+.scribe .stempel { display: inline-block; transform: rotate(-7deg); border: 2px solid var(--ultramarin);
+  color: var(--ultramarin); border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.9; }
+
+/* ---- Aktionen ---- */
+.scribe .aktionen { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.scribe .haupt { border: 0; background: var(--ultramarin); color: #fff; border-radius: 9px;
+  padding: 11px 22px; font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+.scribe .haupt:hover { background: var(--ultramarin-tief); }
+.scribe .haupt:disabled { background: var(--nebel); cursor: not-allowed; }
+.scribe .neben { border: 1px solid var(--ultramarin); background: var(--karte); color: var(--ultramarin);
+  border-radius: 9px; padding: 10px 18px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.scribe .neben:disabled { border-color: var(--nebel); color: var(--nebel); cursor: not-allowed; }
+.scribe .hinweis-fehlt { color: var(--siegel); font-size: 13px; font-weight: 600; }
+.scribe .hinweis-ok { color: var(--ultramarin-tief); font-size: 13px; }
+
+/* ---- Positionen ---- */
+.scribe .positionen { background: var(--karte); border: 1px solid var(--linie); border-radius: 10px;
+  padding: 14px 18px; margin-top: 18px; }
+.scribe .positionen table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.scribe .positionen td { padding: 7px 6px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+.scribe .positionen tr:last-child td { border-bottom: 0; }
+.scribe .positionen .code { color: var(--ultramarin-tief); font-weight: 600; white-space: nowrap; }
+.scribe .positionen .anzahl { color: var(--siegel); font-weight: 600; }
+.scribe .positionen .fussnote { font-size: 11.5px; color: var(--graphit); margin: 10px 0 0; }
+
+/* ---- Gruppen im Composer ---- */
+.scribe .gruppe { margin-top: 14px; }
+.scribe .gruppe .gname { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--graphit); font-weight: 600; margin-bottom: 6px; }
+.scribe .gruppe .gname .pflicht { color: var(--siegel); }
+.scribe .freitext { width: 100%; border: 1px dashed var(--linie); border-radius: 8px; background: #FCFCFB;
+  padding: 9px 12px; font: inherit; font-size: 14px; margin-top: 6px; }
+
+/* ---- Login ---- */
+.scribe .login-buehne { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.scribe .login-karte { width: 100%; max-width: 400px; background: var(--karte);
+  border: 1px solid var(--linie); border-radius: 12px; padding: 32px 34px;
+  box-shadow: 0 16px 40px -24px rgba(30,33,38,0.3); }
+.scribe .login-karte h1 { font-size: 30px; font-weight: 600; font-style: italic; margin: 0 0 4px; }
+.scribe .login-karte .unterzeile { color: var(--graphit); font-size: 13.5px; margin: 0 0 22px; }
+.scribe .login-karte label { display: block; font-size: 12.5px; font-weight: 600; margin: 14px 0 5px; }
+.scribe .login-fehler { background: var(--siegel-hauch); color: var(--siegel); border-radius: 8px;
+  padding: 9px 12px; font-size: 13px; margin-top: 14px; }
+.scribe .login-karte .haupt { width: 100%; margin-top: 20px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .scribe .karteikarte, .scribe .feld { transition: box-shadow 0.2s ease; }
+}

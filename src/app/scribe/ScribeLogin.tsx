@@ -1,0 +1,63 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@/lib/db/supabase";
+
+export default function ScribeLogin() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [passwort, setPasswort] = useState("");
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [laedt, setLaedt] = useState(false);
+
+  async function anmelden() {
+    setFehler(null);
+    setLaedt(true);
+    const supabase = createBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password: passwort });
+    setLaedt(false);
+    if (error) {
+      setFehler("Anmeldung fehlgeschlagen. E-Mail und Passwort pruefen.");
+      return;
+    }
+    router.push("/scribe");
+    router.refresh();
+  }
+
+  return (
+    <div className="login-buehne">
+      <div className="login-karte">
+        <h1 style={{ fontFamily: "var(--schrift-display), serif" }}>
+          <span style={{ fontStyle: "normal", fontWeight: 400, color: "var(--graphit)" }}>Anima</span> Scribe
+        </h1>
+        <p className="unterzeile">Dokumentation am Stuhl. Bestaetigen statt nachtragen.</p>
+
+        <label htmlFor="scribe-email">E-Mail</label>
+        <input
+          id="scribe-email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <label htmlFor="scribe-passwort">Passwort</label>
+        <input
+          id="scribe-passwort"
+          type="password"
+          autoComplete="current-password"
+          value={passwort}
+          onChange={(e) => setPasswort(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && anmelden()}
+        />
+
+        {fehler && <div className="login-fehler">{fehler}</div>}
+
+        <button className="haupt" onClick={anmelden} disabled={laedt || !email || !passwort}>
+          {laedt ? "Anmelden ..." : "Anmelden"}
+        </button>
+      </div>
+    </div>
+  );
+}
