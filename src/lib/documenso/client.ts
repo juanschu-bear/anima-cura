@@ -121,8 +121,8 @@ function getConfig(): DocumensoConfig {
   return { baseUrl: normalizeBaseUrl(rawBase), apiKey };
 }
 
-function toUint8Array(pdf: Uint8Array | ArrayBuffer | Buffer): Uint8Array {
-  if (pdf instanceof Uint8Array) return pdf;
+function toUint8Array(pdf: Uint8Array | ArrayBuffer | Buffer): Uint8Array<ArrayBuffer> {
+  // Kopie in frischen ArrayBuffer (TS 5.7: Uint8Array<ArrayBufferLike> ist kein BlobPart)
   return new Uint8Array(pdf);
 }
 

@@ -137,6 +137,7 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
 
 interface Props {
   patientId: string;
+  modus?: "patient" | "praxis";
 }
 
 type StepName =
