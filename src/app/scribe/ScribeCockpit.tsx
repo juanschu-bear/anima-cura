@@ -103,40 +103,90 @@ function passtAlter(v: Vorlage, alter: number | null): boolean {
   return true;
 }
 
-/* Visueller Zahnbogen: OK oben, UK unten, Klick setzt den Zahn,
-   gewaehlte Zaehne bekommen ein animiert aufgesetztes Attachment (Gold-Raute). */
-function ZahnBogen({ zaehne, toggle }: { zaehne: number[]; toggle: (n: number) => void }) {
-  const punkte = (fdi: number[], cy: number, unten: boolean) =>
-    fdi.map((n, i) => {
-      const t = (i + 0.5) / fdi.length;
-      const ang = Math.PI * (1 - (0.05 + 0.9 * t));
-      const x = 160 + 140 * Math.cos(ang);
-      const y = cy + (unten ? 1 : -1) * 80 * Math.sin(ang);
-      return { n, x, y };
-    });
-  const alle = [...punkte(FDI_OK, 97, false), ...punkte(FDI_UK, 115, true)];
+/* Kieferschema: fotorealistisches Schaubild (public/scribe/zahnschema.jpg),
+   32 Zahn- und 32 Zahl-Hotspots, kalibriert. Klick-Zyklus: aussen -> innen -> ab. */
+type Seite = "aussen" | "innen";
+const ZAHN_POS: Record<number, [number, number]> = {
+  18:[772,780], 17:[784,663], 16:[810,560], 15:[853,458], 14:[903,382], 13:[982,300], 12:[1053,240], 11:[1133,212],
+  21:[1224,212], 22:[1303,240], 23:[1378,300], 24:[1443,382], 25:[1493,458], 26:[1532,560], 27:[1562,663], 28:[1572,780],
+  48:[772,1000], 47:[780,1112], 46:[838,1222], 45:[878,1316], 44:[903,1386], 43:[975,1418], 42:[1045,1444], 41:[1120,1448],
+  31:[1205,1448], 32:[1288,1444], 33:[1356,1418], 34:[1430,1386], 35:[1458,1316], 36:[1500,1222], 37:[1558,1112], 38:[1568,1000],
+};
+const LABEL_POS: Record<number, [number, number]> = {
+  11:[990,53], 21:[1297,53], 12:[855,133], 22:[1445,133], 13:[689,242], 23:[1623,242],
+  14:[570,331], 24:[1732,331], 15:[534,440], 25:[1768,440], 16:[499,550], 26:[1792,550],
+  17:[459,659], 27:[1812,659], 18:[426,772], 28:[1837,772],
+  48:[465,946], 38:[1792,946], 47:[485,1059], 37:[1772,1059], 46:[519,1168], 36:[1758,1168],
+  45:[564,1277], 35:[1729,1277], 44:[653,1380], 34:[1693,1380], 43:[808,1451], 33:[1525,1451],
+  42:[915,1574], 32:[1410,1574], 41:[1043,1643], 31:[1277,1643],
+};
+const BOGEN_INNEN: Record<"ok" | "uk", [number, number]> = { ok: [1168, 600], uk: [1168, 1130] };
+
+function zahnFormel(z: number) {
+  const d = z % 10;
+  if (d >= 6) return { rx: 38, ry: 44 };
+  if (d >= 4) return { rx: 32, ry: 36 };
+  if (d === 3) return { rx: 24, ry: 38 };
+  return { rx: 20, ry: 40 };
+}
+
+function seitenPunkt(z: number, seite: Seite): [number, number] {
+  const [x, y] = ZAHN_POS[z];
+  const ok = z < 30;
+  const c = ok ? BOGEN_INNEN.ok : BOGEN_INNEN.uk;
+  let dx = x - c[0], dy = y - c[1];
+  const l = Math.hypot(dx, dy) || 1;
+  dx /= l; dy /= l;
+  const f = zahnFormel(z);
+  let fx = ok ? 0.22 : 0.1, fy = ok ? 0.16 : 0.08;
+  if (seite === "innen") { fx = ok ? -0.34 : -0.3; fy = ok ? -0.28 : -0.24; }
+  return [x + dx * f.rx * fx, y + dy * f.ry * fy];
+}
+
+function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Record<number, Seite>; toggle: (n: number) => void }) {
   return (
-    <svg className="zahnbogen" viewBox="0 0 320 212" aria-label="Zahnbogen, Klick setzt Zahn">
-      <text x={160} y={90} className="kieferlabel">OK · Oberkiefer</text>
-      <text x={160} y={130} className="kieferlabel">UK · Unterkiefer</text>
-      {alle.map(({ n, x, y }) => {
-        const aktiv = zaehne.includes(n);
-        return (
-          <g key={n} className="zahn-g" onClick={() => toggle(n)}>
-            <title>{`Zahn ${n}`}</title>
-            <circle cx={x} cy={y} r={9.5} className={aktiv ? "zahnform aktiv" : "zahnform"} />
-            <text x={x} y={y + 2.6} className={aktiv ? "zahnnr aktiv" : "zahnnr"}>{n}</text>
-            {aktiv && (
-              <g transform={`translate(${x + 6.5} ${y - 7})`}>
-                <g className="attachment-anim">
-                  <rect x={-3.2} y={-3.2} width={6.4} height={6.4} transform="rotate(45)" className="attachment" />
-                </g>
-              </g>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <div className="kiefer-papier">
+      <svg className="kieferschema" viewBox="0 0 2336 1744" role="group" aria-label="Zahnschema: Klick wechselt außen, innen, abgewählt">
+        <image href="/scribe/zahnschema.jpg" width={2336} height={1744} />
+        {zaehne.map((z) => {
+          if (!ZAHN_POS[z]) return null;
+          const seite: Seite = seiten[z] ?? "aussen";
+          const innen = seite === "innen";
+          const f = zahnFormel(z);
+          const [x, y] = ZAHN_POS[z];
+          const [lx, ly] = LABEL_POS[z];
+          const [bx, by] = seitenPunkt(z, seite);
+          return (
+            <g key={`${z}-${seite}`} className="kiefer-mark">
+              <ellipse cx={x} cy={y} rx={f.rx} ry={f.ry} className={innen ? "ktint innen" : "ktint"} />
+              <rect x={lx - 62} y={ly - 38} width={124} height={76} rx={14} className={innen ? "klabel innen" : "klabel"} />
+              <rect x={bx - 13} y={by - 13} width={26} height={26} transform={`rotate(45 ${bx} ${by})`} className="kdiamant" />
+            </g>
+          );
+        })}
+        {(Object.entries(ZAHN_POS) as unknown as [string, [number, number]][]).map(([zs, [x, y]]) => {
+          const z = Number(zs);
+          const f = zahnFormel(z);
+          return (
+            <ellipse key={`h${z}`} cx={x} cy={y} rx={f.rx + 18} ry={f.ry + 18} className="khotspot" onClick={() => toggle(z)}>
+              <title>{`Zahn ${z}`}</title>
+            </ellipse>
+          );
+        })}
+        {(Object.entries(LABEL_POS) as unknown as [string, [number, number]][]).map(([zs, [x, y]]) => {
+          const z = Number(zs);
+          return (
+            <rect key={`l${z}`} x={x - 62} y={y - 38} width={124} height={76} rx={14} className="khotspot" onClick={() => toggle(z)}>
+              <title>{`Zahn ${z}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div className="kiefer-legende">
+        <span className="l-aussen">außen · bukkal</span>
+        <span className="l-innen">innen · palatinal (OK) / lingual (UK)</span>
+      </div>
+    </div>
   );
 }
 
@@ -162,6 +212,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   const [auswahl, setAuswahl] = useState<Record<string, Record<string, number[]>>>({});
   const [zaehne, setZaehne] = useState<number[]>([]);
+  const [seiten, setSeiten] = useState<Record<number, Seite>>({});
   const [schienenVon, setSchienenVon] = useState("9");
   const [schienenBis, setSchienenBis] = useState("11");
   const [bogen, setBogen] = useState(BOGEN[2]);
@@ -289,6 +340,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     const erste = vorlagen.filter((v) => v.behandlungsart === k).sort((a, b) => a.sort_index - b.sort_index)[0];
     setGewaehlt(erste ? [erste.termin_typ] : []);
     setZaehne([]);
+    setSeiten({});
     setAusnahme("");
     resetSitzung();
   }
@@ -330,7 +382,13 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   function toggleZahn(n: number) {
     bearbeitet();
-    setZaehne((alt) => (alt.includes(n) ? alt.filter((x) => x !== n) : [...alt, n].sort((a, b) => a - b)));
+    const s = seiten[n];
+    const neu = { ...seiten };
+    if (!s) neu[n] = "aussen";
+    else if (s === "aussen") neu[n] = "innen";
+    else delete neu[n];
+    setSeiten(neu);
+    setZaehne(Object.keys(neu).map(Number).sort((a, b) => a - b));
   }
 
   /* Text aus allen gestapelten Modulen zusammensetzen */
@@ -346,7 +404,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           fehlt.push("Zahnangabe (FDI)");
           out = out.replace(/\{zaehne\}/g, "⟨Zahn?⟩");
         } else {
-          out = out.replace(/\{zaehne\}/g, zaehne.join(", "));
+          out = out.replace(/\{zaehne\}/g, zaehne.map((z) => seiten[z] === "innen" ? `${z} (${z < 30 ? "palatinal" : "lingual"})` : String(z)).join(", "));
         }
       }
       if (out.includes("{von}") || out.includes("{bis}")) {
@@ -383,7 +441,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     let text = segs.map((s) => (s.art === "fehlt" ? "" : s.text)).join("");
     if (ausnahme.trim()) text += ` Ausnahme: ${ausnahme.trim()}`;
     return { segs, fehlt: Array.from(new Set(fehlt)), text: text.trim() };
-  }, [module, auswahl, zaehne, schienenVon, schienenBis, bogen, ausnahme, patient]);
+  }, [module, auswahl, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient]);
 
   /* Positionen über alle Module auflösen */
   const positionen = useMemo(() => {
@@ -416,6 +474,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schienen_von: schienenVon,
           schienen_bis: schienenBis,
           bogen,
+          zahn_seiten: seiten,
           leistungen: module.map((m) => m.name),
         },
         auswahl,
@@ -448,6 +507,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setPatient(null);
     setSuche("");
     setZaehne([]);
+    setSeiten({});
     setAusnahme("");
     const erste = artVorlagen[0];
     setGewaehlt(erste ? [erste.termin_typ] : []);
@@ -477,6 +537,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schienen_von: schienenVon,
           schienen_bis: schienenBis,
           bogen,
+          zahn_seiten: seiten,
           leistungen: module.map((m) => m.name),
         },
         auswahl,
@@ -729,14 +790,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {brauchtZaehne && (
               <div className="gruppe">
                 <div className="gname">Zahnschema (FDI)</div>
-                <ZahnBogen zaehne={zaehne} toggle={toggleZahn} />
+                <KieferSchema zaehne={zaehne} seiten={seiten} toggle={toggleZahn} />
                 <div className="zahnschema">
                   {FDI_OK.map((n) => (
-                    <button key={n} className="zahn" aria-pressed={zaehne.includes(n)} onClick={() => toggleZahn(n)}>{n}</button>
+                    <button key={n} className="zahn" aria-pressed={zaehne.includes(n)} data-seite={seiten[n]} onClick={() => toggleZahn(n)}>{n}</button>
                   ))}
                   <div className="zahnluecke" />
                   {FDI_UK.map((n) => (
-                    <button key={n} className="zahn" aria-pressed={zaehne.includes(n)} onClick={() => toggleZahn(n)}>{n}</button>
+                    <button key={n} className="zahn" aria-pressed={zaehne.includes(n)} data-seite={seiten[n]} onClick={() => toggleZahn(n)}>{n}</button>
                   ))}
                 </div>
               </div>
