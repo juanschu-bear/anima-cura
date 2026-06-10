@@ -643,7 +643,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
         <div className="feld" style={{ marginTop: 14 }}>
           {module.map((m) => (
-            <div key={m.id}>
+            <div key={m.id} className="modulblock">
               {Object.entries(m.struktur.groups).map(([g, grp]) => (
                 <div className="gruppe" key={`${m.termin_typ}:${g}`}>
                   <div className="gname">
