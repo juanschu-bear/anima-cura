@@ -587,3 +587,13 @@
   box-shadow:0 12px 30px -12px var(--primaer)}
 .scribe .pp-absenden:hover:not(:disabled){filter:brightness(1.06)}
 .scribe .pp-absenden:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+
+/* Praxis-Pass: eigene Termin-Art hinzufuegen */
+.scribe .pp-neu-knopf{width:100%;margin-top:6px;padding:12px;border:1.5px dashed var(--kante);border-radius:12px;
+  background:none;color:var(--gedeckt);font-family:var(--mono);font-size:13px;cursor:pointer;transition:border-color .15s,color .15s}
+.scribe .pp-neu-knopf:hover{border-color:var(--primaer);color:var(--primaer)}
+.scribe .pp-neu{margin-top:6px;padding:16px;border:1px solid var(--primaer);border-radius:12px;background:var(--flaeche)}
+.scribe .pp-neu-aktionen{display:flex;gap:10px;margin-top:10px}
+.scribe .pp-abbruch{font-family:var(--display);font-weight:600;font-size:14px;padding:9px 18px;border-radius:10px;
+  background:none;color:var(--gedeckt);border:1px solid var(--kante);cursor:pointer}
+.scribe .pp-abbruch:hover{border-color:var(--gedeckt)}
