@@ -506,3 +506,84 @@
   .scribe .listenkopf{flex-direction:column;align-items:flex-start}
   .scribe .listensuche{flex:1;min-width:0;width:100%}
 }
+
+/* ===================== Praxis-Pass ===================== */
+.scribe .pp-wrap{max-width:780px;margin:0 auto;padding:34px 22px 90px}
+.scribe .pp-kopf{margin-bottom:26px}
+.scribe .pp-marke{font-family:var(--mono);font-size:12px;letter-spacing:.24em;color:var(--primaer);margin-bottom:14px}
+.scribe .pp-kopf h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;margin:0 0 12px;color:var(--schrift)}
+.scribe .pp-lede{font-size:15.5px;color:var(--gedeckt);max-width:60ch;line-height:1.6}
+.scribe .pp-fortschritt{display:flex;align-items:center;gap:14px;margin-top:22px}
+.scribe .pp-balken{flex:1;height:8px;border-radius:999px;background:var(--kante);overflow:hidden}
+.scribe .pp-balken span{display:block;height:100%;background:linear-gradient(90deg,var(--primaer),var(--gold));border-radius:999px;transition:width .4s ease}
+.scribe .pp-zaehler{font-family:var(--mono);font-size:12.5px;color:var(--gedeckt);white-space:nowrap}
+
+.scribe .pp-hinweis{padding:12px 16px;border-radius:12px;font-size:14px;margin-bottom:16px}
+.scribe .pp-hinweis.ok{background:var(--primaer-soft);color:var(--primaer-tief);border:1px solid var(--primaer)}
+.scribe .pp-hinweis.fehler{background:var(--rot-soft);color:var(--rot);border:1px solid var(--rot)}
+.scribe .pp-laden{font-family:var(--mono);font-size:13px;color:var(--gedeckt);padding:30px 0}
+
+.scribe .pp-art{margin-bottom:30px}
+.scribe .pp-art h2{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;color:var(--primaer-tief);
+  margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--kante)}
+
+.scribe .pp-karte{border:1px solid var(--kante);border-radius:14px;background:var(--flaeche);margin-bottom:10px;overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.scribe .pp-karte.fertig{border-color:var(--primaer)}
+.scribe .pp-kartenkopf{width:100%;display:flex;align-items:center;gap:12px;padding:15px 18px;background:none;border:none;
+  cursor:pointer;text-align:left;font-family:var(--text);color:var(--schrift)}
+.scribe .pp-status-punkt{width:9px;height:9px;border-radius:50%;background:var(--kante);flex-shrink:0;transition:background .2s}
+.scribe .pp-karte.fertig .pp-status-punkt{background:var(--primaer)}
+.scribe .pp-kartentitel{font-weight:600;font-size:15px;flex:1}
+.scribe .pp-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+.scribe .pp-tag.gespeichert{background:var(--gold-soft);color:var(--gold)}
+.scribe .pp-tag.abgesendet{background:var(--primaer-soft);color:var(--primaer-tief)}
+.scribe .pp-chevron{color:var(--gedeckt);font-size:13px}
+
+.scribe .pp-koerper{padding:6px 18px 20px;border-top:1px solid var(--kante)}
+.scribe .pp-varhint{font-size:13px;color:var(--gedeckt);font-style:italic;margin:12px 0 4px}
+.scribe .pp-feldlabel{display:block;font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--primaer-tief);margin:18px 0 4px}
+.scribe .pp-feldhint{font-size:13px;color:var(--gedeckt);margin:0 0 8px;line-height:1.5}
+.scribe .pp-textarea,.scribe .pp-input{width:100%;font-family:var(--text);font-size:14.5px;color:var(--schrift);
+  background:var(--grund);border:1px solid var(--kante);border-radius:10px;padding:10px 12px;resize:vertical}
+.scribe .pp-textarea:focus,.scribe .pp-input:focus{outline:none;border-color:var(--primaer)}
+.scribe .pp-input{margin-top:8px}
+
+.scribe .pp-istand{background:var(--grund);border:1px solid var(--kante);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.scribe .pp-gruppe{padding:8px 0;border-bottom:1px dashed var(--kante)}
+.scribe .pp-gruppe:last-child{border-bottom:none}
+.scribe .pp-gruppe-kopf{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.scribe .pp-gruppe-label{font-weight:600;font-size:13.5px}
+.scribe .pp-pflicht{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:6px}
+.scribe .pp-pflicht.ja{background:rgba(217,142,43,.14);color:var(--gold)}
+.scribe .pp-pflicht.nein{background:var(--kante);color:var(--gedeckt)}
+.scribe .pp-gruppe-typ{font-family:var(--mono);font-size:10.5px;color:var(--gedeckt)}
+.scribe .pp-optliste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.scribe .pp-optliste li{font-size:13px;color:var(--gedeckt);padding-left:14px;position:relative}
+.scribe .pp-optliste li::before{content:"•";position:absolute;left:2px;color:var(--primaer)}
+.scribe .pp-optliste li.pp-leer{font-style:italic}
+
+.scribe .pp-schritte{display:flex;flex-direction:column;gap:8px}
+.scribe .pp-schritt{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.scribe .pp-schritt-label{font-size:14px}
+.scribe .pp-segwahl{display:inline-flex;border:1px solid var(--kante);border-radius:9px;overflow:hidden}
+.scribe .pp-seg{font-family:var(--mono);font-size:12px;padding:6px 12px;background:var(--grund);color:var(--gedeckt);border:none;cursor:pointer;
+  border-left:1px solid var(--kante)}
+.scribe .pp-seg:first-child{border-left:none}
+.scribe .pp-seg.an{background:var(--primaer);color:#fff}
+.scribe .pp-zweispalt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:560px){.scribe .pp-zweispalt{grid-template-columns:1fr}}
+
+.scribe .pp-aktionen{margin-top:18px}
+.scribe .pp-speichern{font-family:var(--display);font-weight:600;font-size:14px;padding:9px 18px;border-radius:10px;
+  background:var(--flaeche);color:var(--primaer-tief);border:1px solid var(--primaer);cursor:pointer}
+.scribe .pp-speichern:hover:not(:disabled){background:var(--primaer-soft)}
+.scribe .pp-speichern:disabled{opacity:.5;cursor:not-allowed}
+
+.scribe .pp-fuss{margin-top:30px;padding:24px;border:1px solid var(--kante);border-radius:14px;background:var(--flaeche);text-align:center}
+.scribe .pp-fuss p{font-size:14px;color:var(--gedeckt);margin:0 0 16px;max-width:54ch;margin-inline:auto}
+.scribe .pp-absenden{font-family:var(--display);font-weight:700;font-size:16px;padding:13px 30px;border-radius:12px;
+  background:linear-gradient(135deg,var(--primaer),var(--primaer-tief));color:#fff;border:none;cursor:pointer;
+  box-shadow:0 12px 30px -12px var(--primaer)}
+.scribe .pp-absenden:hover:not(:disabled){filter:brightness(1.06)}
+.scribe .pp-absenden:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
