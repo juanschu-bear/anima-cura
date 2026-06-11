@@ -511,8 +511,11 @@
 .scribe .pp-wrap{max-width:780px;margin:0 auto;padding:34px 22px 90px}
 .scribe .pp-kopf{margin-bottom:26px}
 .scribe .pp-marke{font-family:var(--mono);font-size:12px;letter-spacing:.24em;color:var(--primaer);margin-bottom:14px}
-.scribe .pp-kopf h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;margin:0 0 12px;color:var(--schrift)}
+.scribe .pp-eyebrow{font-family:var(--mono);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--primaer);margin-bottom:14px}
+.scribe .pp-kopf h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4.6vw,46px);line-height:1.06;letter-spacing:-.025em;margin:0 0 18px;color:var(--schrift);max-width:18ch}
 .scribe .pp-lede{font-size:15.5px;color:var(--gedeckt);max-width:60ch;line-height:1.6}
+.scribe .pp-deal{font-family:var(--display);font-size:18px;font-weight:500;color:var(--schrift);max-width:54ch;line-height:1.45;margin:0 0 14px}
+.scribe .pp-deal + .pp-lede{margin-top:0}
 .scribe .pp-fortschritt{display:flex;align-items:center;gap:14px;margin-top:22px}
 .scribe .pp-balken{flex:1;height:8px;border-radius:999px;background:var(--kante);overflow:hidden}
 .scribe .pp-balken span{display:block;height:100%;background:linear-gradient(90deg,var(--primaer),var(--gold));border-radius:999px;transition:width .4s ease}

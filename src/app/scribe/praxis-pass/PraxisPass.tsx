@@ -29,7 +29,7 @@ type Antwort = {
 };
 
 const ART_NAME: Record<string, string> = {
-  aligner: "Aligner (Clear Aligner)",
+  aligner: "Aligner",
   multiband: "Multiband (feste Spange)",
   removable: "Removable (herausnehmbar)",
 };
@@ -173,15 +173,15 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   return (
     <main className="pp-wrap">
       <header className="pp-kopf">
-        <h1>Anima Scribe ist fertig. Jetzt bekommt es euren Ton.</h1>
-        <p className="pp-lede">
-          Scribe ist gebaut, aber noch neutral. Damit es bei jedem Termin so schreibt, wie ihr es schreiben würdet,
-          braucht es einmal euer Wissen. Unten seht ihr pro Termin-Art, was Scribe schon vorschlägt. Ihr streicht,
-          korrigiert und ergänzt, bis es klingt wie ihr.
+        <div className="pp-eyebrow">Anima Scribe ist fertig</div>
+        <h1>Jetzt bekommt es euren Ton.</h1>
+        <p className="pp-deal">
+          Investiert jetzt einmal rund 30 Minuten. Dafür schreibt sich eure Doku ab dem nächsten Termin in Sekunden,
+          in eurem Ton.
         </p>
         <p className="pp-lede">
-          Das ist einmalig. Einmal sauber gemacht, schreibt sich die Doku danach bei jedem Patienten in Sekunden,
-          in eurem Ton. Plant etwa eine halbe Stunde ein, ihr könnt jederzeit speichern und später weitermachen.
+          Scribe ist gebaut, aber noch neutral. Unten seht ihr pro Termin-Art, was Scribe schon vorschlägt. Ihr
+          streicht, korrigiert und ergänzt, bis es klingt wie ihr. Ihr könnt jederzeit speichern und später weitermachen.
         </p>
         <div className="pp-fortschritt">
           <div className="pp-balken"><span style={{ width: gesamt ? `${(erledigt / gesamt) * 100}%` : "0%" }} /></div>
