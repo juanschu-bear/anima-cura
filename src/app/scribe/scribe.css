@@ -597,3 +597,16 @@
 .scribe .pp-abbruch{font-family:var(--display);font-weight:600;font-size:14px;padding:9px 18px;border-radius:10px;
   background:none;color:var(--gedeckt);border:1px solid var(--kante);cursor:pointer}
 .scribe .pp-abbruch:hover{border-color:var(--gedeckt)}
+
+/* Praxis-Pass: Optionen als bearbeitbare Chips mit Enter-Eingabe */
+.scribe .pp-chipbox{display:flex;flex-wrap:wrap;gap:7px;align-items:center;background:var(--grund);
+  border:1px solid var(--kante);border-radius:10px;padding:9px 10px;margin-top:4px}
+.scribe .pp-chip{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;background:var(--primaer-soft);
+  color:var(--primaer-tief);border:1px solid var(--primaer);border-radius:8px;padding:4px 6px 4px 10px}
+.scribe .pp-chip-x{border:none;background:none;color:var(--primaer-tief);font-size:16px;line-height:1;cursor:pointer;
+  padding:0 2px;opacity:.7}
+.scribe .pp-chip-x:hover{opacity:1;color:var(--rot)}
+.scribe .pp-chip-leer{font-size:13px;color:var(--gedeckt);font-style:italic}
+.scribe .pp-chip-input{flex:1;min-width:160px;border:none;background:none;font-family:var(--text);font-size:14px;
+  color:var(--schrift);padding:5px 4px}
+.scribe .pp-chip-input:focus{outline:none}

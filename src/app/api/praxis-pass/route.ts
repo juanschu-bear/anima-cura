@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     eigener_name: body.eigener_name ?? null,
     verlaufstext: body.verlaufstext ?? null,
     optionen_text: body.optionen_text ?? null,
+    optionen_final: body.optionen_final ?? {},
     zusatzschritte: body.zusatzschritte ?? {},
     kig_text: body.kig_text ?? null,
     bema_text: body.bema_text ?? null,

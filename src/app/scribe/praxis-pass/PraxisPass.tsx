@@ -19,6 +19,7 @@ type Antwort = {
   termin_typ: string;
   verlaufstext?: string | null;
   optionen_text?: string | null;
+  optionen_final?: Record<string, string[]> | null;
   zusatzschritte?: Record<string, string> | null;
   kig_text?: string | null;
   bema_text?: string | null;
@@ -49,6 +50,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   const [eigene, setEigene] = useState<Vorlage[]>([]);
   const [neuArt, setNeuArt] = useState<string | null>(null); // welche Behandlungsart gerade ein Eingabefeld zeigt
   const [neuName, setNeuName] = useState("");
+  const [optEntwurf, setOptEntwurf] = useState<Record<string, string>>({}); // key: gid::gruppe -> aktueller Eingabetext
 
   const apiUrl = useCallback((pfad: string) => (token ? `${pfad}${pfad.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : pfad), [token]);
   const apiHeaders = useCallback((): HeadersInit => (token ? { "Content-Type": "application/json", "x-praxis-pass-token": token } : { "Content-Type": "application/json" }), [token]);
@@ -105,6 +107,29 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       ...alt,
       [k]: { ...(alt[k] ?? { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ }), behandlungsart: v.behandlungsart, termin_typ: v.termin_typ, ...patch },
     }));
+  }
+
+  // Aktuelle Optionsliste einer Gruppe: gespeicherte Bearbeitung, sonst die Vorlage-Platzhalter als Start.
+  function optListe(v: Vorlage, gk: string, vorgabe: string[]): string[] {
+    const a = feld(schluessel(v.behandlungsart, v.termin_typ));
+    const f = a.optionen_final ?? {};
+    return f[gk] ?? vorgabe;
+  }
+  function setOptListe(v: Vorlage, gk: string, neu: string[]) {
+    const a = feld(schluessel(v.behandlungsart, v.termin_typ));
+    setFeld(v, { optionen_final: { ...(a.optionen_final ?? {}), [gk]: neu } });
+  }
+  function optHinzu(v: Vorlage, gk: string, vorgabe: string[]) {
+    const ek = `${schluessel(v.behandlungsart, v.termin_typ)}::${gk}`;
+    const text = (optEntwurf[ek] ?? "").trim();
+    if (!text) return;
+    const aktuell = optListe(v, gk, vorgabe);
+    setOptListe(v, gk, [...aktuell, text]);
+    setOptEntwurf((alt) => ({ ...alt, [ek]: "" }));
+  }
+  function optWeg(v: Vorlage, gk: string, vorgabe: string[], idx: number) {
+    const aktuell = optListe(v, gk, vorgabe);
+    setOptListe(v, gk, aktuell.filter((_, i) => i !== idx));
   }
 
   async function speichern(v: Vorlage) {
@@ -193,41 +218,60 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
                     )}
 
                     <label className="pp-feldlabel">1. Verlaufstext, wie er in der Akte stehen soll</label>
-                    <p className="pp-feldhint">Der Satz, den du selbst diktieren würdest. Frei schreiben, wir gießen ihn in die Vorlage.</p>
+                    <p className="pp-feldhint">Schreib den Text, der nach so einem Termin in der Patientenakte stehen soll. Das Beispiel im Feld kannst du überschreiben.</p>
                     <textarea className="pp-textarea" rows={3} value={a.verlaufstext ?? ""}
                       onChange={(e) => setFeld(v, { verlaufstext: e.target.value })}
                       placeholder="z. B. Routinekontrolle, Sitz und Tracking unauffällig, nächste Schienen ausgegeben." />
 
                     {v.eigen ? (
                       <>
-                        <label className="pp-feldlabel">2. Welche Auswahl-Optionen gehören dazu?</label>
-                        <p className="pp-feldhint">Diese Termin-Art ist neu, es gibt noch keine Vorlage. Schreib die Befunde oder Auswahlpunkte, die wir daraus bauen sollen.</p>
-                        <textarea className="pp-textarea" rows={3} value={a.optionen_text ?? ""}
-                          onChange={(e) => setFeld(v, { optionen_text: e.target.value })}
-                          placeholder="z. B. Befund A, Befund B, Maßnahme C ..." />
+                        <label className="pp-feldlabel">2. Welche Auswahl-Punkte gehören dazu?</label>
+                        <p className="pp-feldhint">Diese Termin-Art ist neu. Tippe jeden Befund oder Auswahlpunkt ein und drücke Enter. Jeder Punkt erscheint als Eintrag.</p>
+                        {(() => {
+                          const gk = "punkte";
+                          const liste = optListe(v, gk, []);
+                          const ek = `${k}::${gk}`;
+                          return (
+                            <div className="pp-chipbox">
+                              {liste.map((opt, i) => (
+                                <span className="pp-chip" key={i}>{opt}<button type="button" className="pp-chip-x" onClick={() => optWeg(v, gk, [], i)} aria-label="entfernen">×</button></span>
+                              ))}
+                              <input className="pp-chip-input" value={optEntwurf[ek] ?? ""}
+                                onChange={(e) => setOptEntwurf((alt) => ({ ...alt, [ek]: e.target.value }))}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); optHinzu(v, gk, []); } }}
+                                placeholder="Punkt eintippen, Enter" />
+                            </div>
+                          );
+                        })()}
                       </>
                     ) : (
                       <>
-                        <label className="pp-feldlabel">2. Das legt Scribe aktuell vor</label>
-                        <p className="pp-feldhint">Platzhalter aus dem Aufbau. Was fehlt oder anders ist, einfach unten ergänzen.</p>
-                        <div className="pp-istand">
-                          {Object.entries(groups).map(([gk, g]) => (
+                        <label className="pp-feldlabel">2. Die Auswahl-Optionen prüfen</label>
+                        <p className="pp-feldhint">Diese Punkte legt Scribe aktuell vor (Platzhalter). Streiche mit dem × was nicht stimmt, und tippe eigene Punkte ein, Enter fügt sie hinzu.</p>
+                        {Object.entries(groups).map(([gk, g]) => {
+                          const vorgabe = (g.opts ?? []).map((o) => o.t);
+                          const liste = optListe(v, gk, vorgabe);
+                          const ek = `${k}::${gk}`;
+                          return (
                             <div className="pp-gruppe" key={gk}>
                               <div className="pp-gruppe-kopf">
                                 <span className="pp-gruppe-label">{g.label}</span>
                                 <span className={`pp-pflicht ${g.req ? "ja" : "nein"}`}>{g.req ? "Pflicht" : "optional"}</span>
                                 <span className="pp-gruppe-typ">{g.type === "multi" ? "Mehrfach" : "Einfach"}</span>
                               </div>
-                              <ul className="pp-optliste">
-                                {(g.opts ?? []).map((o, i) => <li key={i}>{o.t}</li>)}
-                                {(g.opts ?? []).length === 0 && <li className="pp-leer">keine Optionen hinterlegt</li>}
-                              </ul>
+                              <div className="pp-chipbox">
+                                {liste.map((opt, i) => (
+                                  <span className="pp-chip" key={i}>{opt}<button type="button" className="pp-chip-x" onClick={() => optWeg(v, gk, vorgabe, i)} aria-label="entfernen">×</button></span>
+                                ))}
+                                {liste.length === 0 && <span className="pp-chip-leer">noch keine Punkte</span>}
+                                <input className="pp-chip-input" value={optEntwurf[ek] ?? ""}
+                                  onChange={(e) => setOptEntwurf((alt) => ({ ...alt, [ek]: e.target.value }))}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); optHinzu(v, gk, vorgabe); } }}
+                                  placeholder="Punkt eintippen, Enter" />
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <textarea className="pp-textarea" rows={2} value={a.optionen_text ?? ""}
-                          onChange={(e) => setFeld(v, { optionen_text: e.target.value })}
-                          placeholder="Ergänzungen oder Korrekturen zu den Optionen oben." />
+                          );
+                        })}
                       </>
                     )}
 
@@ -263,7 +307,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
                     )}
 
                     <label className="pp-feldlabel">{kigRelevant ? "5." : "4."} Abrechnung (für Frau Rüger)</label>
-                    {v.struktur?.kontext && <p className="pp-feldhint">Aktuell hinterlegt: {v.struktur.kontext}</p>}
+                    <p className="pp-feldhint">{v.struktur?.kontext ? `Bisher notiert: ${v.struktur.kontext}. Bitte die echten Positionen eintragen.` : "Hier bitte die passenden Abrechnungspositionen eintragen."}</p>
                     <div className="pp-zweispalt">
                       <input className="pp-input" value={a.bema_text ?? ""} onChange={(e) => setFeld(v, { bema_text: e.target.value })} placeholder="BEMA-Positionen" />
                       <input className="pp-input" value={a.goz_text ?? ""} onChange={(e) => setFeld(v, { goz_text: e.target.value })} placeholder="GOZ-Positionen" />
