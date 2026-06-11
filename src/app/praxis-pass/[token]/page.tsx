@@ -8,7 +8,14 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], 
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--schrift-mono" });
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Anima Scribe · Praxis-Pass" };
+const titel = "Anima Scribe";
+const beschreibung = "Jetzt bekommt Scribe euren Ton. Einmal ausfüllen, danach schreibt sich die Doku selbst.";
+export const metadata = {
+  title: titel,
+  description: beschreibung,
+  openGraph: { title: titel, description: beschreibung, type: "website" },
+  twitter: { card: "summary", title: titel, description: beschreibung },
+};
 
 // Oeffentlicher, tokengeschuetzter Zugang. Kein Login. Nur wer den Link hat, kommt rein.
 export default function PraxisPassTokenPage({ params }: { params: { token: string } }) {
