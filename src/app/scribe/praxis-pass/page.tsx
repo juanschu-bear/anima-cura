@@ -7,5 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function PraxisPassPage() {
   const user = await getAuthenticatedAppUser();
   if (!user) redirect("/scribe/login");
-  return <PraxisPass nutzerName={user.fullName ?? user.email ?? "Praxis"} />;
+  return (
+    <div className="pp-host">
+      <PraxisPass nutzerName={user.fullName ?? user.email ?? "Praxis"} />
+    </div>
+  );
 }

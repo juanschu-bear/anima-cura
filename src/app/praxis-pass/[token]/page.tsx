@@ -16,8 +16,8 @@ export default function PraxisPassTokenPage({ params }: { params: { token: strin
   if (!erlaubt || params.token !== erlaubt) notFound();
 
   return (
-    <div className={`scribe ${spaceGrotesk.variable} ${inter.variable} ${jetbrains.variable}`} data-thema="hell"
-         style={{ fontFamily: "var(--schrift-text), system-ui, sans-serif", minHeight: "100vh" }}>
+    <div className={`scribe pp-host ${spaceGrotesk.variable} ${inter.variable} ${jetbrains.variable}`}
+         style={{ fontFamily: "var(--schrift-text), system-ui, sans-serif" }}>
       <PraxisPass nutzerName="Praxis" token={params.token} />
     </div>
   );

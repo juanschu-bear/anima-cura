@@ -610,3 +610,23 @@
 .scribe .pp-chip-input{flex:1;min-width:160px;border:none;background:none;font-family:var(--text);font-size:14px;
   color:var(--schrift);padding:5px 4px}
 .scribe .pp-chip-input:focus{outline:none}
+
+/* ===== Praxis-Pass: eigenes Anima-Farbkleid (creme/gruen/amber), unabhaengig vom Scribe-Theme ===== */
+.pp-host{
+  --grund:#FFFDF7; --flaeche:#FFFFFF; --schrift:#18271F; --gedeckt:#5C6B62;
+  --kante:#E3DCC9; --kante-hover:#2E6B4B;
+  --primaer:#2E6B4B; --primaer-tief:#1E4A33; --primaer-soft:#E7F0EA;
+  --gold:#C8881E; --gold-soft:#F6E8C8; --gold-textton:#8C5A1D;
+  --rot:#C0392B; --rot-soft:#F8E5E2;
+  background:#FAF6EC; min-height:100vh;
+}
+@media (prefers-color-scheme: dark){
+  .pp-host{
+    --grund:#15271D; --flaeche:#1C3126; --schrift:#EAF3EC; --gedeckt:#9EB2A6;
+    --kante:rgba(255,255,255,.14); --kante-hover:#76BE95;
+    --primaer:#76BE95; --primaer-tief:#BBD8C4; --primaer-soft:rgba(118,190,149,.16);
+    --gold:#E8AD48; --gold-soft:rgba(232,173,72,.18); --gold-textton:#E8AD48;
+    --rot:#E8897F; --rot-soft:rgba(220,90,80,.18);
+    background:#13211A;
+  }
+}
