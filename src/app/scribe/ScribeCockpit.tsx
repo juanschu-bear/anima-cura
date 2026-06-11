@@ -191,6 +191,16 @@ function KieferSchema({ zaehne, seiten, toggle }: { zaehne: number[]; seiten: Re
   );
 }
 
+function verschiebeTag(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + delta);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 function PwFeld({ wert, setzen, platzhalter, label, onEnter }: { wert: string; setzen: (v: string) => void; platzhalter: string; label: string; onEnter?: () => void }) {
   const [sichtbar, setSichtbar] = useState(false);
   return (
@@ -223,6 +233,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
+  const [listenDatum, setListenDatum] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [listenSuche, setListenSuche] = useState("");
 
   const [suche, setSuche] = useState("");
   const [treffer, setTreffer] = useState<PatientTreffer[]>([]);
@@ -254,12 +266,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [aenderungsgrund, setAenderungsgrund] = useState("");
 
   const ladeHeute = useCallback(async () => {
-    const res = await fetch("/api/doku/heute");
+    const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
     if (res.ok) {
       const json = await res.json();
       setHeute(json.eintraege ?? []);
     }
-  }, []);
+  }, [listenDatum]);
 
   useEffect(() => {
     (async () => {
@@ -372,16 +384,29 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     resetSitzung();
   }
 
+  // Phase eines Termintyps bestimmen (fuer die Kombi-Regel)
+  function phaseVon(slug: string): string | null {
+    const p = PHASEN.find((ph) => ph.slugs.includes(slug));
+    return p ? p.name : null;
+  }
+
   function leistungToggle(slug: string) {
     bearbeitet();
     setGewaehlt((alt) => {
+      // bereits aktiv: abwaehlen, aber mindestens eine bleibt
       if (alt.includes(slug)) {
         const rest = alt.filter((s) => s !== slug);
-        return rest.length > 0 ? rest : alt; // mindestens eine Leistung bleibt
+        return rest.length > 0 ? rest : alt;
       }
-      // Reihenfolge wie im Katalog
       const reihenfolge = artVorlagen.map((v) => v.termin_typ);
-      return reihenfolge.filter((s) => alt.includes(s) || s === slug);
+      const neuePhase = phaseVon(slug);
+      const aktuellePhase = alt.length > 0 ? phaseVon(alt[0]) : null;
+      // Gleiche Phase: dazunehmen (echte Kombi, z. B. Bogenkontrolle + IP).
+      // Andere Phase: ersetzen (eine Diagnostik wird nicht zur Verlaufskontrolle).
+      if (aktuellePhase && neuePhase === aktuellePhase) {
+        return reihenfolge.filter((s) => alt.includes(s) || s === slug);
+      }
+      return [slug];
     });
   }
 
@@ -737,31 +762,73 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
       <main className="buehne">
         {/* ===== Doku-Wache ===== */}
-        <p className="abschnitt">Heute · Tagescockpit mit Doku-Wache</p>
-        {heute.length === 0 ? (
-          <div className="feld"><span className="leer">Noch kein Eintrag heute. Der erste dauert zwanzig Sekunden.</span></div>
-        ) : (
-          <div className="raster">
-            {heute.map((e) => {
-              const p = wachePille(e);
-              const am = e.bestaetigt_am
-                ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-                : "–";
-              return (
-                <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => oeffneDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && oeffneDetail(e)}>
-                  <div className="zeit">{am}</div>
-                  <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
-                  <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
-                  <span className={`pille ${p.cls}`}>{p.text}</span>
-                </div>
-              );
-            })}
+        <div className="listenkopf">
+          <p className="abschnitt" style={{ margin: 0 }}>Tagescockpit · Doku-Wache</p>
+          <div className="listensteuer">
+            <button className="tagpfeil" aria-label="Tag zurück" onClick={() => setListenDatum((d) => verschiebeTag(d, -1))}>‹</button>
+            <input className="tagwahl" type="date" value={listenDatum} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setListenDatum(e.target.value || listenDatum)} aria-label="Datum wählen" />
+            <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= new Date().toISOString().slice(0, 10)} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
+            {listenDatum !== new Date().toISOString().slice(0, 10) && (
+              <button className="heutbtn" onClick={() => setListenDatum(new Date().toISOString().slice(0, 10))}>Heute</button>
+            )}
+            <input className="listensuche" type="text" placeholder="Patient filtern" value={listenSuche} onChange={(e) => setListenSuche(e.target.value)} aria-label="Tagesliste nach Patient filtern" />
           </div>
-        )}
+        </div>
+
+        {(() => {
+          const term = listenSuche.trim().toLowerCase();
+          const gefiltert = term
+            ? heute.filter((e) => e.patients && `${e.patients.vorname} ${e.patients.nachname}`.toLowerCase().includes(term))
+            : heute;
+          const offeneListe = gefiltert.filter((e) => e.status === "entwurf" || e.ivoris_push_status === "fehler");
+          const erledigt = gefiltert.filter((e) => !(e.status === "entwurf" || e.ivoris_push_status === "fehler"));
+          const tagIstHeute = listenDatum === new Date().toISOString().slice(0, 10);
+
+          const Karte = (e: TagesEintrag) => {
+            const p = wachePille(e);
+            const am = e.bestaetigt_am
+              ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+              : "·";
+            return (
+              <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => oeffneDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && oeffneDetail(e)}>
+                <div className="zeit">{am}</div>
+                <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
+                <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
+                <span className={`pille ${p.cls}`}>{p.text}</span>
+              </div>
+            );
+          };
+
+          if (gefiltert.length === 0) {
+            return (
+              <div className="feld"><span className="leer">
+                {term ? "Kein Treffer für diesen Filter." : tagIstHeute ? "Noch kein Eintrag heute. Der erste dauert zwanzig Sekunden." : "An diesem Tag gibt es keine Einträge."}
+              </span></div>
+            );
+          }
+
+          return (
+            <>
+              {offeneListe.length > 0 && (
+                <div className="listengruppe">
+                  <p className="gruppenlabel offen">Offen · {offeneListe.length}</p>
+                  <div className="raster">{offeneListe.map(Karte)}</div>
+                </div>
+              )}
+              {erledigt.length > 0 && (
+                <div className="listengruppe">
+                  <p className="gruppenlabel erledigt">Erledigt · {erledigt.length}</p>
+                  <div className="raster">{erledigt.map(Karte)}</div>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
         <p className="wachenotiz">
           Die Doku-Wache schlägt an, sobald ein Eintrag offen bleibt oder ein Push scheitert:
           <b> rot pulsierend heißt handeln</b>.
-          {offen > 0 ? ` Aktuell offen: ${offen}.` : " Aktuell ist alles abgeräumt."}
+          {offen > 0 ? ` Heute offen: ${offen}.` : " Heute ist alles abgeräumt."}
         </p>
 
         {/* ===== Patient & Termin ===== */}
