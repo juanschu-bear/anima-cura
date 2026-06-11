@@ -173,12 +173,15 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   return (
     <main className="pp-wrap">
       <header className="pp-kopf">
-        <div className="pp-marke">ANIMA SCRIBE</div>
-        <h1>Praxis-Pass: euer Fachinhalt</h1>
+        <h1>Anima Scribe ist fertig. Jetzt bekommt es euren Ton.</h1>
         <p className="pp-lede">
-          Das hier ist schon gebaut. Pro Termin-Art seht ihr, was Anima Scribe aktuell vorlegt.
-          Ergänzt euren echten Verlaufstext, prüft die Optionen und sendet am Ende alles ab.
-          Einmalig, danach legt Scribe eure eigenen Texte vor.
+          Scribe ist gebaut, aber noch neutral. Damit es bei jedem Termin so schreibt, wie ihr es schreiben würdet,
+          braucht es einmal euer Wissen. Unten seht ihr pro Termin-Art, was Scribe schon vorschlägt. Ihr streicht,
+          korrigiert und ergänzt, bis es klingt wie ihr.
+        </p>
+        <p className="pp-lede">
+          Das ist einmalig. Einmal sauber gemacht, schreibt sich die Doku danach bei jedem Patienten in Sekunden,
+          in eurem Ton. Plant etwa eine halbe Stunde ein, ihr könnt jederzeit speichern und später weitermachen.
         </p>
         <div className="pp-fortschritt">
           <div className="pp-balken"><span style={{ width: gesamt ? `${(erledigt / gesamt) * 100}%` : "0%" }} /></div>
@@ -217,8 +220,8 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
                       <p className="pp-varhint">Dieses Formular fragt zusätzlich ab: {vars.map((x) => VAR_NAME[x] ?? x).join(", ")}.</p>
                     )}
 
-                    <label className="pp-feldlabel">1. Verlaufstext, wie er in der Akte stehen soll</label>
-                    <p className="pp-feldhint">Schreib den Text, der nach so einem Termin in der Patientenakte stehen soll. Das Beispiel im Feld kannst du überschreiben.</p>
+                    <label className="pp-feldlabel">1. So soll der Eintrag in der Patientenakte aussehen</label>
+                    <p className="pp-feldhint">Der Text, den ihr nach so einem Termin in die Karte schreiben würdet. Das Beispiel im Feld könnt ihr überschreiben.</p>
                     <textarea className="pp-textarea" rows={3} value={a.verlaufstext ?? ""}
                       onChange={(e) => setFeld(v, { verlaufstext: e.target.value })}
                       placeholder="z. B. Routinekontrolle, Sitz und Tracking unauffällig, nächste Schienen ausgegeben." />
