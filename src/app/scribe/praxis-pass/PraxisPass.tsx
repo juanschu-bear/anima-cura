@@ -25,6 +25,7 @@ type Antwort = {
   bema_text?: string | null;
   goz_text?: string | null;
   abrechnung_anm?: string | null;
+  position?: number | null;
   status?: string;
 };
 
@@ -52,6 +53,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   const [neuName, setNeuName] = useState("");
   const [optEntwurf, setOptEntwurf] = useState<Record<string, string>>({}); // key: gid::gruppe -> aktueller Eingabetext
   const [fehlerVorlagen, setFehlerVorlagen] = useState<Record<string, { verlauf?: boolean; gruppen?: string[] }>>({});
+  const [reihenfolge, setReihenfolge] = useState<Record<string, number>>({}); // key -> position
 
   const apiUrl = useCallback((pfad: string) => (token ? `${pfad}${pfad.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : pfad), [token]);
   const apiHeaders = useCallback((): HeadersInit => (token ? { "Content-Type": "application/json", "x-praxis-pass-token": token } : { "Content-Type": "application/json" }), [token]);
@@ -66,8 +68,11 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       setVorlagen(jv.vorlagen ?? []);
       const map: Record<string, Antwort> = {};
       const eigeneAusDb: Vorlage[] = [];
+      const ord: Record<string, number> = {};
       (ja.antworten ?? []).forEach((a: Antwort & { eigener_name?: string | null }) => {
-        map[schluessel(a.behandlungsart, a.termin_typ)] = a;
+        const kk = schluessel(a.behandlungsart, a.termin_typ);
+        map[kk] = a;
+        if (a.position != null) ord[kk] = a.position;
         if (a.eigener_name) {
           eigeneAusDb.push({ id: `eigen-${a.behandlungsart}-${a.termin_typ}`, behandlungsart: a.behandlungsart as Vorlage["behandlungsart"],
             termin_typ: a.termin_typ, name: a.eigener_name, sort_index: 999, struktur: {}, eigen: true });
@@ -75,6 +80,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       });
       setEigene(eigeneAusDb);
       setAntworten(map);
+      setReihenfolge(ord);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : "Fehler beim Laden.");
     } finally { setLadend(false); }
@@ -83,14 +89,41 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
 
   const sortiert = useMemo(() => {
     const grp: Record<string, Vorlage[]> = { aligner: [], multiband: [], removable: [] };
-    [...vorlagen].sort((a, b) => a.sort_index - b.sort_index).forEach((v) => grp[v.behandlungsart]?.push(v));
-    eigene.forEach((v) => grp[v.behandlungsart]?.push(v));
+    const posVon = (v: Vorlage) => {
+      const k = schluessel(v.behandlungsart, v.termin_typ);
+      if (reihenfolge[k] != null) return reihenfolge[k];
+      return v.eigen ? 1000 + v.sort_index : v.sort_index;
+    };
+    [...vorlagen, ...eigene].forEach((v) => grp[v.behandlungsart]?.push(v));
+    for (const art of Object.keys(grp)) grp[art].sort((a, b) => posVon(a) - posVon(b));
     return grp;
-  }, [vorlagen, eigene]);
+  }, [vorlagen, eigene, reihenfolge]);
 
   function istErledigt(k: string) {
     const a = antworten[k];
     return !!a && (((a.verlaufstext ?? "").trim().length > 0) || a.status === "gespeichert" || a.status === "abgesendet");
+  }
+
+  // Eine Termin-Art innerhalb ihrer Behandlungsart nach oben/unten schieben und die Reihenfolge sichern.
+  async function verschieben(art: string, k: string, dir: -1 | 1) {
+    const liste = (sortiert[art] ?? []).slice();
+    const idx = liste.findIndex((v) => schluessel(v.behandlungsart, v.termin_typ) === k);
+    const ziel = idx + dir;
+    if (idx < 0 || ziel < 0 || ziel >= liste.length) return;
+    [liste[idx], liste[ziel]] = [liste[ziel], liste[idx]];
+    const neu: Record<string, number> = { ...reihenfolge };
+    liste.forEach((v, i) => { neu[schluessel(v.behandlungsart, v.termin_typ)] = i; });
+    setReihenfolge(neu);
+    await fetch(apiUrl("/api/praxis-pass"), {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({
+        reihenfolge: {
+          behandlungsart: art,
+          ordnung: liste.map((v) => ({ termin_typ: v.termin_typ, eigener_name: v.eigen ? v.name : null })),
+        },
+      }),
+    }).catch(() => {});
   }
 
   const erledigt = useMemo(
@@ -245,7 +278,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       {!ladend && ART_REIHE.map((art) => (
         <section className="pp-art" key={art}>
           <h2>{ART_NAME[art]}</h2>
-          {sortiert[art]?.map((v) => {
+          {sortiert[art]?.map((v, idx) => {
             const k = schluessel(v.behandlungsart, v.termin_typ);
             const a = feld(k);
             const groups = v.struktur?.groups ?? {};
@@ -253,15 +286,22 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
             const kigRelevant = art === "multiband" && ["erstuntersuchung", "diagnostik"].includes(v.termin_typ);
             const zs = a.zusatzschritte ?? {};
             const auf = offen === k;
+            const anzahl = sortiert[art]?.length ?? 0;
             return (
               <article className={`pp-karte ${istErledigt(k) ? "fertig" : ""}${fehlerVorlagen[k] ? " fehlt" : ""}`} key={v.id}>
-                <button className="pp-kartenkopf" onClick={() => setOffen(auf ? null : k)} aria-expanded={auf}>
-                  <span className="pp-status-punkt" aria-hidden="true" />
-                  <span className="pp-kartentitel">{v.name}</span>
-                  {a.status === "abgesendet" && <span className="pp-tag abgesendet">abgesendet</span>}
-                  {a.status === "gespeichert" && <span className="pp-tag gespeichert">gespeichert</span>}
-                  <span className="pp-chevron">{auf ? "▾" : "▸"}</span>
-                </button>
+                <div className="pp-kartenzeile">
+                  <span className="pp-sortpfeile">
+                    <button className="pp-sortpfeil" onClick={() => verschieben(art, k, -1)} disabled={idx === 0} aria-label="nach oben verschieben">▲</button>
+                    <button className="pp-sortpfeil" onClick={() => verschieben(art, k, 1)} disabled={idx === anzahl - 1} aria-label="nach unten verschieben">▼</button>
+                  </span>
+                  <button className="pp-kartenkopf" onClick={() => setOffen(auf ? null : k)} aria-expanded={auf}>
+                    <span className="pp-status-punkt" aria-hidden="true" />
+                    <span className="pp-kartentitel">{v.name}</span>
+                    {a.status === "abgesendet" && <span className="pp-tag abgesendet">abgesendet</span>}
+                    {a.status === "gespeichert" && <span className="pp-tag gespeichert">gespeichert</span>}
+                    <span className="pp-chevron">{auf ? "▾" : "▸"}</span>
+                  </button>
+                </div>
 
                 {auf && (
                   <div className="pp-koerper">

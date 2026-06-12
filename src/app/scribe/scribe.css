@@ -568,6 +568,14 @@
 .scribe .pp-karte.fertig{border-color:var(--primaer)}
 .scribe .pp-kartenkopf{width:100%;display:flex;align-items:center;gap:12px;padding:15px 18px;background:none;border:none;
   cursor:pointer;text-align:left;font-family:var(--text);color:var(--schrift)}
+.scribe .pp-kartenzeile{display:flex;align-items:stretch}
+.scribe .pp-kartenzeile .pp-kartenkopf{flex:1;min-width:0}
+.scribe .pp-sortpfeile{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 4px 0 10px;flex-shrink:0}
+.scribe .pp-sortpfeil{width:26px;height:20px;border-radius:7px;border:1px solid var(--kante);background:var(--grund);
+  color:var(--gedeckt);font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:border-color .15s,color .15s,background .15s}
+.scribe .pp-sortpfeil:hover:not(:disabled){border-color:var(--primaer);color:var(--primaer);background:var(--primaer-soft)}
+.scribe .pp-sortpfeil:disabled{opacity:.3;cursor:not-allowed}
 .scribe .pp-status-punkt{width:9px;height:9px;border-radius:50%;background:var(--kante);flex-shrink:0;transition:background .2s}
 .scribe .pp-karte.fertig .pp-status-punkt{background:var(--primaer)}
 .scribe .pp-kartentitel{font-weight:600;font-size:15px;flex:1}

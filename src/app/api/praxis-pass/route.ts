@@ -41,6 +41,34 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Ungueltiger Body" }, { status: 400 });
 
+  // Reihenfolge einer Behandlungsart sichern (Termin-Arten verschoben).
+  if (body.reihenfolge && Array.isArray(body.reihenfolge.ordnung)) {
+    const art = String(body.reihenfolge.behandlungsart ?? "");
+    const ordnung: { termin_typ: string; eigener_name?: string | null }[] = body.reihenfolge.ordnung;
+    for (let i = 0; i < ordnung.length; i++) {
+      const tt = String(ordnung[i].termin_typ ?? "");
+      if (!art || !tt) continue;
+      const { data: vorhanden } = await supabase
+        .from("praxis_pass")
+        .select("id")
+        .eq("behandlungsart", art)
+        .eq("termin_typ", tt)
+        .maybeSingle();
+      if (vorhanden) {
+        await supabase.from("praxis_pass").update({ position: i }).eq("behandlungsart", art).eq("termin_typ", tt);
+      } else {
+        await supabase.from("praxis_pass").insert({
+          behandlungsart: art,
+          termin_typ: tt,
+          eigener_name: ordnung[i].eigener_name ?? null,
+          position: i,
+          status: "offen",
+        });
+      }
+    }
+    return NextResponse.json({ ok: true, reihenfolge: true });
+  }
+
   if (body.absenden === true) {
     // Praxispass-Inhalte in die produktiven Cockpit-Vorlagen (doku_vorlagen) uebernehmen.
     const { data: paesse, error: ladeErr } = await supabase.from("praxis_pass").select("*");
@@ -76,7 +104,7 @@ export async function POST(request: NextRequest) {
         struktur.quelle = "praxis";
         const { error: upErr } = await supabase
           .from("doku_vorlagen")
-          .update({ struktur })
+          .update(p.position != null ? { struktur, sort_index: p.position } : { struktur })
           .eq("behandlungsart", p.behandlungsart)
           .eq("termin_typ", p.termin_typ);
         if (upErr) return NextResponse.json({ error: `Vorlage ${p.behandlungsart}/${p.termin_typ}: ${upErr.message}` }, { status: 500 });
@@ -105,7 +133,7 @@ export async function POST(request: NextRequest) {
           behandlungsart: p.behandlungsart,
           termin_typ: p.termin_typ,
           name: p.eigener_name,
-          sort_index: 900,
+          sort_index: p.position ?? 900,
           aktiv: true,
           struktur,
           positionen: [],
