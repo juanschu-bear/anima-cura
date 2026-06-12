@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { pruefeEmail } from "@/lib/validation/feldpruefung";
 
 export default function PatientLoginForm() {
   const router = useRouter();
@@ -23,6 +24,8 @@ export default function PatientLoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailFehlt, setEmailFehlt] = useState(false);
+  const [passwortFehlt, setPasswortFehlt] = useState(false);
 
   // ---- Animated "plexus" network background (canvas, client-only) ----
   useEffect(() => {
@@ -106,6 +109,18 @@ export default function PatientLoginForm() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const eMail = email.trim();
+    let eFehler = false;
+    let eGrund = "";
+    if (!eMail) { eFehler = true; }
+    else { const r = pruefeEmail(eMail); if (!r.ok) { eFehler = true; eGrund = r.grund; } }
+    const pFehler = !password;
+    setEmailFehlt(eFehler);
+    setPasswortFehlt(pFehler);
+    if (eFehler || pFehler) {
+      setError(eFehler && pFehler ? "Bitte E-Mail und Passwort ausfüllen." : eFehler ? (eGrund || "Bitte E-Mail eingeben.") : "Bitte Passwort eingeben.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -145,7 +160,7 @@ export default function PatientLoginForm() {
     router.refresh();
   }
 
-  // Entrance container/children — staggered, spring-based, reduced-motion aware.
+  // Entrance container/children - staggered, spring-based, reduced-motion aware.
   const container: Variants = {
     hidden: {},
     show: {
@@ -165,13 +180,13 @@ export default function PatientLoginForm() {
 
   return (
     <div className="acl-root">
-      {/* Ambient futuristic background — purely decorative, hidden from SR */}
+      {/* Ambient futuristic background - purely decorative, hidden from SR */}
       <div className="acl-bg" aria-hidden="true">
         <div className="acl-aurora acl-aurora-1" />
         <div className="acl-aurora acl-aurora-2" />
         <canvas ref={canvasRef} className="acl-plexus" />
         <div className="acl-vignette" />
-        {/* Large brand logo watermark filling the left half — background texture only */}
+        {/* Large brand logo watermark filling the left half - background texture only */}
         <div className="acl-watermark">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon-512-transparent.png" alt="" className="acl-watermark-img" />
@@ -184,10 +199,10 @@ export default function PatientLoginForm() {
         initial="hidden"
         animate="show"
       >
-        {/* LEFT — empty (logo watermark lives in the background) */}
+        {/* LEFT - empty (logo watermark lives in the background) */}
         <div className="acl-spacer" aria-hidden="true" />
 
-        {/* RIGHT — login */}
+        {/* RIGHT - login */}
         <motion.div className="acl-login" variants={item}>
           <div className="acl-card">
             <div className="acl-card-sheen" aria-hidden="true" />
@@ -240,9 +255,9 @@ export default function PatientLoginForm() {
                     autoComplete="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); if (emailFehlt) setEmailFehlt(false); }}
                     placeholder="deine@email.de"
-                    className="acl-input"
+                    className={"acl-input" + (emailFehlt ? " acl-input--fehlt" : "")}
                   />
                 </div>
               </div>
@@ -261,9 +276,9 @@ export default function PatientLoginForm() {
                     autoComplete="current-password"
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); if (passwortFehlt) setPasswortFehlt(false); }}
                     placeholder="••••••••"
-                    className="acl-input acl-input--pw"
+                    className={"acl-input acl-input--pw" + (passwortFehlt ? " acl-input--fehlt" : "")}
                   />
                   <button
                     type="button"
@@ -329,7 +344,7 @@ export default function PatientLoginForm() {
         /* ---------- Ambient background ---------- */
         .acl-bg { position: absolute; inset: 0; z-index: -1; }
 
-        /* Large brand logo watermark filling the LEFT half of the screen —
+        /* Large brand logo watermark filling the LEFT half of the screen -
            pure background texture: very low opacity, low z-index, non-interactive. */
         .acl-watermark {
           position: absolute;
@@ -513,6 +528,11 @@ export default function PatientLoginForm() {
           box-shadow: 0 0 0 3px rgba(34,197,94,0.45), 0 12px 34px -8px rgba(34,197,94,0.65);
         }
         .acl-submit:disabled { opacity: 0.75; cursor: wait; }
+        .acl-input--fehlt, .acl-input--fehlt:hover, .acl-input--fehlt:focus {
+          border-color: rgba(248,113,113,0.85);
+          box-shadow: 0 0 0 3px rgba(248,113,113,0.18), 0 0 20px -4px rgba(248,113,113,0.5);
+          background: rgba(8,10,16,0.82);
+        }
         .acl-submit-shine {
           position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
           background: linear-gradient(110deg, transparent, rgba(255,255,255,0.35), transparent);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { pruefeEmail } from "@/lib/validation/feldpruefung";
 
 export default function ScribeLogin() {
   const router = useRouter();
@@ -15,11 +16,18 @@ export default function ScribeLogin() {
   const [passwortFehlt, setPasswortFehlt] = useState(false);
 
   async function anmelden() {
-    const eFehlt = !email.trim();
+    const eMail = email.trim();
+    let eFehlt = false;
+    let eGrund = "";
+    if (!eMail) { eFehlt = true; }
+    else { const r = pruefeEmail(eMail); if (!r.ok) { eFehlt = true; eGrund = r.grund; } }
     const pFehlt = !passwort.trim();
     setEmailFehlt(eFehlt);
     setPasswortFehlt(pFehlt);
-    if (eFehlt || pFehlt) return;
+    if (eFehlt || pFehlt) {
+      setFehler(eGrund || null);
+      return;
+    }
     setFehler(null);
     setLaedt(true);
     const supabase = createBrowserClient();
