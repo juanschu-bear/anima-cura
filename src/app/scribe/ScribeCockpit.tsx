@@ -735,7 +735,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   return (
     <>
       <header className="kopf">
-        <span className="wortmarke"><span className="anima">Anima</span> Scribe</span>
+        <span className="wortmarke">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="kopf-logo" src="/scribe-brand/icon-512.png" alt="" />
+          <span className="anima">Anima</span> Scribe
+        </span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
           <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>

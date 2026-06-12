@@ -28,17 +28,26 @@ export default function ScribeLogin() {
 
   return (
     <div className="login-buehne">
-      <div className="login-karte">
-        <h1><span className="anima">Anima</span> Scribe</h1>
-        <p className="unterzeile">Behandlungscockpit. Termin vorbei, Doku fertig.</p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="login-bg-glow" aria-hidden="true" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="login-bg-icon" src="/scribe-brand/icon-512.png" alt="" aria-hidden="true" />
+      <div className="login-bg-wort" aria-hidden="true">Anima Scribe</div>
+
+      <div className="login-mitte">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="login-hero-icon" src="/scribe-brand/icon-512.png" alt="Anima Scribe" />
+        <div className="login-cockpit">Behandlungscockpit</div>
+        <p className="login-claim">Termin vorbei, Doku fertig.</p>
 
         <label htmlFor="scribe-email">E-Mail</label>
-        <input id="scribe-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input id="scribe-email" className="login-feld" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
         <label htmlFor="scribe-passwort">Passwort</label>
         <span className="pwfeld">
           <input
             id="scribe-passwort"
+            className="login-feld"
             type={pwSichtbar ? "text" : "password"}
             autoComplete="current-password"
             value={passwort}
