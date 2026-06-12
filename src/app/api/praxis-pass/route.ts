@@ -69,6 +69,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, reihenfolge: true });
   }
 
+  // Eigene Termin-Art umbenennen.
+  if (body.umbenennen && body.umbenennen.termin_typ) {
+    const { behandlungsart, termin_typ, name } = body.umbenennen;
+    if (behandlungsart && termin_typ) {
+      const { data: vorhanden } = await supabase
+        .from("praxis_pass")
+        .select("id")
+        .eq("behandlungsart", behandlungsart)
+        .eq("termin_typ", termin_typ)
+        .maybeSingle();
+      if (vorhanden) {
+        await supabase.from("praxis_pass").update({ eigener_name: name ?? null }).eq("behandlungsart", behandlungsart).eq("termin_typ", termin_typ);
+      } else {
+        await supabase.from("praxis_pass").insert({ behandlungsart, termin_typ, eigener_name: name ?? null, status: "offen" });
+      }
+    }
+    return NextResponse.json({ ok: true, umbenannt: true });
+  }
+
+  // Eigene Termin-Art loeschen (praxis_pass und, falls schon uebernommen, die Cockpit-Vorlage).
+  if (body.loeschen && body.loeschen.termin_typ) {
+    const art = String(body.loeschen.behandlungsart ?? "");
+    const tt = String(body.loeschen.termin_typ ?? "");
+    if (art && tt) {
+      await supabase.from("praxis_pass").delete().eq("behandlungsart", art).eq("termin_typ", tt);
+      if (tt.startsWith("eigen-")) {
+        await supabase.from("doku_vorlagen").delete().eq("behandlungsart", art).eq("termin_typ", tt);
+      }
+    }
+    return NextResponse.json({ ok: true, geloescht: true });
+  }
+
   if (body.absenden === true) {
     // Praxispass-Inhalte in die produktiven Cockpit-Vorlagen (doku_vorlagen) uebernehmen.
     const { data: paesse, error: ladeErr } = await supabase.from("praxis_pass").select("*");

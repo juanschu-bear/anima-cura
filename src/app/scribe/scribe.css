@@ -576,6 +576,9 @@
   transition:border-color .15s,color .15s,background .15s}
 .scribe .pp-sortpfeil:hover:not(:disabled){border-color:var(--primaer);color:var(--primaer);background:var(--primaer-soft)}
 .scribe .pp-sortpfeil:disabled{opacity:.3;cursor:not-allowed}
+.scribe .pp-loeschen{flex-shrink:0;width:38px;border:none;background:none;color:var(--gedeckt);font-size:22px;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s}
+.scribe .pp-loeschen:hover{color:var(--rot)}
 .scribe .pp-status-punkt{width:9px;height:9px;border-radius:50%;background:var(--kante);flex-shrink:0;transition:background .2s}
 .scribe .pp-karte.fertig .pp-status-punkt{background:var(--primaer)}
 .scribe .pp-kartentitel{font-weight:600;font-size:15px;flex:1}

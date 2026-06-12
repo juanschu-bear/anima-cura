@@ -209,6 +209,35 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
     setNeuName(""); setNeuArt(null); setOffen(schluessel(v.behandlungsart, v.termin_typ));
   }
 
+  // Eigene Termin-Art umbenennen: lokal sofort, beim Verlassen des Feldes gesichert.
+  function umbenennen(v: Vorlage, name: string) {
+    setEigene((alt) => alt.map((e) => (e.id === v.id ? { ...e, name } : e)));
+  }
+  async function nameSichern(v: Vorlage) {
+    if (!v.eigen) return;
+    await fetch(apiUrl("/api/praxis-pass"), {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ umbenennen: { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ, name: v.name } }),
+    }).catch(() => {});
+  }
+
+  // Eigene Termin-Art loeschen: lokal entfernen und serverseitig (praxis_pass + ggf. Cockpit-Vorlage).
+  async function loeschenEigene(v: Vorlage) {
+    if (!v.eigen) return;
+    if (typeof window !== "undefined" && !window.confirm(`Termin-Art „${v.name}“ wirklich löschen?`)) return;
+    const k = schluessel(v.behandlungsart, v.termin_typ);
+    setEigene((alt) => alt.filter((e) => e.id !== v.id));
+    setAntworten((alt) => { const n = { ...alt }; delete n[k]; return n; });
+    setReihenfolge((alt) => { const n = { ...alt }; delete n[k]; return n; });
+    if (offen === k) setOffen(null);
+    await fetch(apiUrl("/api/praxis-pass"), {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ loeschen: { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ } }),
+    }).catch(() => {});
+  }
+
   async function allesAbsenden() {
     const alle = [...vorlagen, ...eigene];
     const maengel: Record<string, { verlauf?: boolean; gruppen?: string[] }> = {};
@@ -301,10 +330,19 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
                     {a.status === "gespeichert" && <span className="pp-tag gespeichert">gespeichert</span>}
                     <span className="pp-chevron">{auf ? "▾" : "▸"}</span>
                   </button>
+                  {v.eigen && (
+                    <button className="pp-loeschen" onClick={() => loeschenEigene(v)} aria-label={`Termin-Art ${v.name} löschen`} title="Termin-Art löschen">×</button>
+                  )}
                 </div>
 
                 {auf && (
                   <div className="pp-koerper">
+                    {v.eigen && (
+                      <>
+                        <label className="pp-feldlabel">Name dieser Termin-Art</label>
+                        <input className="pp-input" value={v.name} onChange={(e) => umbenennen(v, e.target.value)} onBlur={() => nameSichern(v)} placeholder="z. B. Aligner-Besprechung" />
+                      </>
+                    )}
                     {vars.length > 0 && (
                       <p className="pp-varhint">Dieses Formular fragt zusätzlich ab: {vars.map((x) => VAR_NAME[x] ?? x).join(", ")}.</p>
                     )}
