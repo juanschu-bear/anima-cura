@@ -304,7 +304,7 @@
 /* ===== Login ===== */
 /* ===== Login: Vollseiten-Buehne, fest dunkel, Logo im Hintergrund ===== */
 .scribe .login-buehne{position:relative;min-height:100vh;overflow:hidden;
-  display:grid;place-items:center;padding:48px 24px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0 24px 80px;
   background:radial-gradient(120% 70% at 50% -5%, #122a3a 0%, #0c1512 42%, #07100d 100%)}
 .scribe .login-bg-glow{position:absolute;z-index:0;width:1100px;height:1100px;top:-200px;left:50%;
   transform:translateX(-50%);pointer-events:none;
@@ -314,7 +314,8 @@
 .scribe .login-bg-wort{position:absolute;z-index:0;left:50%;bottom:-2.5vw;transform:translateX(-50%);
   font-family:var(--display);font-weight:700;font-size:min(230px,23vw);letter-spacing:-.04em;
   white-space:nowrap;color:rgba(180,205,255,.05);line-height:1;pointer-events:none}
-.scribe .login-mitte{position:relative;z-index:2;width:100%;max-width:362px;text-align:center}
+.scribe .login-mitte{position:relative;z-index:2;width:100%;max-width:360px;text-align:center;
+  margin-top:clamp(56px,9vh,118px)}
 .scribe .login-hero-icon{width:124px;height:124px;display:block;margin:0 auto 20px;
   filter:drop-shadow(0 14px 38px rgba(46,111,230,.55))}
 .scribe .login-cockpit{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.2em;
@@ -323,7 +324,8 @@
 .scribe .login-mitte label{display:block;text-align:left;font-size:11px;color:#93a69c;
   font-weight:500;margin:14px 0 6px;letter-spacing:.02em}
 .scribe .login-feld{width:100%;height:46px;border-radius:13px;border:1px solid rgba(255,255,255,.06);
-  background:rgba(5,8,7,.66);color:#eaf2ed;padding:0 14px;font-size:14px;font-family:var(--text);
+  background:rgba(5,8,7,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:#eaf2ed;padding:0 14px;font-size:14px;font-family:var(--text);
   outline:none;transition:border-color .2s ease}
 .scribe .login-feld:focus{border-color:var(--primaer)}
 .scribe .login-mitte .pwfeld input{padding-right:42px}
@@ -331,6 +333,7 @@
   padding:9px 12px;font-size:13px;margin-top:14px;text-align:left}
 .scribe .login-mitte .haupt{width:100%;margin-top:22px;height:50px;border-radius:14px}
 .scribe .login-mitte .haupt:not(:disabled){background:linear-gradient(180deg,#5ea2ff,#2e6fe6);color:#fff;box-shadow:0 12px 30px rgba(46,111,230,.4)}
+.scribe .login-mitte .haupt:disabled{background:rgba(255,255,255,.07);color:#5b6c63;box-shadow:none}
 
 /* ===== Leuchtkanten (Obsidian, wie Mockup B) ===== */
 .scribe[data-thema="dunkel"] .feld{position:relative}
