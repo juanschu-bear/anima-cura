@@ -42,9 +42,82 @@ export async function POST(request: NextRequest) {
   if (!body) return NextResponse.json({ error: "Ungueltiger Body" }, { status: 400 });
 
   if (body.absenden === true) {
+    // Praxispass-Inhalte in die produktiven Cockpit-Vorlagen (doku_vorlagen) uebernehmen.
+    const { data: paesse, error: ladeErr } = await supabase.from("praxis_pass").select("*");
+    if (ladeErr) return NextResponse.json({ error: ladeErr.message }, { status: 500 });
+
+    let uebernommen = 0;
+    let neu = 0;
+    for (const p of paesse ?? []) {
+      const final = (p.optionen_final ?? {}) as Record<string, string[]>;
+      const abrechnung = [p.kig_text, p.bema_text, p.goz_text, p.abrechnung_anm]
+        .filter((t) => t && String(t).trim())
+        .join(" · ");
+
+      const { data: vorlage } = await supabase
+        .from("doku_vorlagen")
+        .select("struktur")
+        .eq("behandlungsart", p.behandlungsart)
+        .eq("termin_typ", p.termin_typ)
+        .maybeSingle();
+
+      if (vorlage) {
+        // Bestehende Vorlage: bearbeitete Options-Gruppen ersetzen, Beispieltext + Abrechnung als Referenz mitfuehren.
+        const struktur = { ...((vorlage.struktur ?? {}) as Record<string, unknown>) };
+        const groups = { ...((struktur.groups ?? {}) as Record<string, Record<string, unknown>>) };
+        for (const [gk, liste] of Object.entries(final)) {
+          if (groups[gk] && Array.isArray(liste)) {
+            groups[gk] = { ...groups[gk], opts: liste.map((t, i) => (i === 0 ? { t, on: true } : { t })) };
+          }
+        }
+        struktur.groups = groups;
+        if (p.verlaufstext && String(p.verlaufstext).trim()) struktur.praxis_muster = p.verlaufstext;
+        if (abrechnung) struktur.praxis_abrechnung = abrechnung;
+        struktur.quelle = "praxis";
+        const { error: upErr } = await supabase
+          .from("doku_vorlagen")
+          .update({ struktur })
+          .eq("behandlungsart", p.behandlungsart)
+          .eq("termin_typ", p.termin_typ);
+        if (upErr) return NextResponse.json({ error: `Vorlage ${p.behandlungsart}/${p.termin_typ}: ${upErr.message}` }, { status: 500 });
+        uebernommen++;
+      } else if (p.eigener_name && String(p.eigener_name).trim()) {
+        // Neu angelegte eigene Termin-Art: als neue Vorlage erzeugen.
+        const groups: Record<string, unknown> = {};
+        const template: unknown[] = [];
+        for (const [gk, liste] of Object.entries(final)) {
+          groups[gk] = { label: gk.charAt(0).toUpperCase() + gk.slice(1), req: false, type: "multi", opts: (Array.isArray(liste) ? liste : []).map((t) => ({ t })) };
+          template.push({ g: gk });
+        }
+        const struktur = {
+          template,
+          groups,
+          vars: [],
+          kontext: "",
+          abrechnung_titel: "Abrechnung",
+          abrechnung_hinweis: "",
+          anima_kopplung: "",
+          praxis_muster: p.verlaufstext ?? "",
+          praxis_abrechnung: abrechnung,
+          quelle: "praxis",
+        };
+        const { error: insErr } = await supabase.from("doku_vorlagen").insert({
+          behandlungsart: p.behandlungsart,
+          termin_typ: p.termin_typ,
+          name: p.eigener_name,
+          sort_index: 900,
+          aktiv: true,
+          struktur,
+          positionen: [],
+        });
+        if (insErr) return NextResponse.json({ error: `Neue Vorlage ${p.eigener_name}: ${insErr.message}` }, { status: 500 });
+        neu++;
+      }
+    }
+
     const { error } = await supabase.from("praxis_pass").update({ status: "abgesendet" }).neq("status", "abgesendet");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, abgesendet: true });
+    return NextResponse.json({ ok: true, abgesendet: true, uebernommen, neu });
   }
 
   if (!body.behandlungsart || !body.termin_typ) {
