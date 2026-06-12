@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("doku_eintraege")
     .select(
-      "id, termin_datum, behandlungsart, termin_typ, status, version, text, zaehne, positionen, ivoris_push_status, ivoris_entry_id, bestaetigt_am, patient_id, patients ( id, vorname, nachname )"
+      "id, termin_datum, behandlungsart, termin_typ, status, version, text, zaehne, positionen, ivoris_push_status, ivoris_entry_id, bestaetigt_am, patient_id, vorlage_id, auswahl, variablen, ausnahme_freitext, patients ( id, vorname, nachname, geburtsdatum )"
     )
     .eq("termin_datum", datum)
     .neq("status", "verworfen")

@@ -42,7 +42,12 @@ type TagesEintrag = {
   text: string;
   zaehne: string[];
   positionen: { code: string; text: string; anzahl?: number }[];
-  patients: { vorname: string; nachname: string } | null;
+  patient_id: string;
+  vorlage_id: string | null;
+  auswahl: Record<string, Record<string, number[]>> | null;
+  variablen: Record<string, unknown> | null;
+  ausnahme_freitext: string | null;
+  patients: { id?: string; vorname: string; nachname: string; geburtsdatum?: string | null } | null;
 };
 
 const ART_NAMEN: Record<string, string> = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" };
@@ -252,6 +257,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [ausnahme, setAusnahme] = useState("");
 
   const [sendet, setSendet] = useState(false);
+  const [speichert, setSpeichert] = useState(false);
+  const [entwurfId, setEntwurfId] = useState<string | null>(null);
+  const [zwischenInfo, setZwischenInfo] = useState<string | null>(null);
   const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
   const [demo, setDemo] = useState(false);
@@ -352,6 +360,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setPushStatus("offen");
     setPushInfo(null);
     setAktionsFehler(null);
+    setEntwurfId(null);
+    setZwischenInfo(null);
   }
 
   /* Defaults je gewähltem Modul setzen */
@@ -612,6 +622,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         positionen,
         ausnahme_freitext: ausnahme.trim() || null,
         bestaetigen: true,
+        entwurf_id: entwurfId,
       }),
     });
     setSendet(false);
@@ -626,8 +637,89 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       version: json.eintrag.version,
       am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
     });
+    setEntwurfId(null);
+    setZwischenInfo(null);
     setPushStatus("offen");
     await ladeHeute();
+  }
+
+  // Zwischenspeichern: aktuellen Stand als Entwurf sichern, ohne Pflichtpruefung, ohne ivoris.
+  // Mehrfaches Speichern aktualisiert denselben Entwurf (entwurfId).
+  async function zwischenspeichern() {
+    if (!patient || module.length === 0) {
+      setAktionsFehler("Zum Zwischenspeichern bitte zuerst Patient und Leistung waehlen.");
+      return;
+    }
+    if (demo) {
+      setZwischenInfo(new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
+      setAktionsFehler(null);
+      return;
+    }
+    setSpeichert(true);
+    setAktionsFehler(null);
+    const res = await fetch("/api/doku/eintrag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patient_id: patient.id,
+        vorlage_id: module[0].id,
+        behandlungsart: art,
+        termin_typ: module.map((m) => m.termin_typ).join("+"),
+        text: komposition.text,
+        zaehne: zaehne.map(String),
+        variablen: {
+          schienen_von: schienenVon,
+          schienen_bis: schienenBis,
+          bogen,
+          zahn_seiten: seiten,
+          leistungen: module.map((m) => m.name),
+        },
+        auswahl,
+        positionen,
+        ausnahme_freitext: ausnahme.trim() || null,
+        bestaetigen: false,
+        entwurf_id: entwurfId,
+      }),
+    });
+    setSpeichert(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setAktionsFehler(json.error ?? "Zwischenspeichern fehlgeschlagen.");
+      return;
+    }
+    const json = await res.json();
+    setEntwurfId(json.eintrag.id);
+    setZwischenInfo(new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
+    await ladeHeute();
+  }
+
+  // Einen gespeicherten Entwurf aus der Tagesliste zurueck in die Eingabemaske laden.
+  function entwurfLaden(e: TagesEintrag) {
+    if (e.status !== "entwurf") return;
+    const alter = e.patients?.geburtsdatum ? berechneAlter(e.patients.geburtsdatum) : null;
+    setPatient({ id: e.patient_id, name: e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt", alter });
+    setSuche("");
+    setTreffer([]);
+    if (e.behandlungsart) setArt(e.behandlungsart);
+    setGewaehlt(e.termin_typ ? e.termin_typ.split("+") : []);
+    setAuswahl(e.auswahl ?? {});
+    setZaehne((e.zaehne ?? []).map(Number).filter((n) => !Number.isNaN(n)));
+    const v = (e.variablen ?? {}) as Record<string, unknown>;
+    if (typeof v.schienen_von === "string") setSchienenVon(v.schienen_von);
+    if (typeof v.schienen_bis === "string") setSchienenBis(v.schienen_bis);
+    if (typeof v.bogen === "string") setBogen(v.bogen);
+    if (v.zahn_seiten && typeof v.zahn_seiten === "object") setSeiten(v.zahn_seiten as Record<number, Seite>);
+    setAusnahme(e.ausnahme_freitext ?? "");
+    setEntwurfId(e.id);
+    setBestaetigt(null);
+    setDirty(false);
+    setAenderungsgrund("");
+    setPushStatus("offen");
+    setPushInfo(null);
+    setAktionsFehler(null);
+    setZwischenInfo(null);
+    setDetail(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function ivorisPush() {
@@ -796,7 +888,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
               : "·";
             return (
-              <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => oeffneDetail(e)} onKeyDown={(ev) => ev.key === "Enter" && oeffneDetail(e)}>
+              <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))} onKeyDown={(ev) => ev.key === "Enter" && (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))}>
                 <div className="zeit">{am}</div>
                 <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
                 <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
@@ -1044,6 +1136,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   : "Eingetragen ✓"
                 : "Bestätigen & eintragen"}
           </button>
+          {!bestaetigt && (
+            <button className="neben" onClick={zwischenspeichern} disabled={speichert || sendet}>
+              {speichert ? "Speichert ..." : "Zwischenspeichern"}
+            </button>
+          )}
           {bestaetigt && !dirty && (
             <button className="neben" onClick={ivorisPush} disabled={pushStatus === "laeuft" || pushStatus === "gepusht"}>
               {pushStatus === "laeuft"
@@ -1061,6 +1158,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           {komposition.fehlt.length > 0 && (
             <span className="hinweis-fehlt">Gesperrt, fehlt: {komposition.fehlt.join(", ")}</span>
           )}
+          {entwurfId && !bestaetigt && !zwischenInfo && <span className="hinweis-ok">Gespeicherter Entwurf, wird beim Bestätigen final in die Akte eingetragen.</span>}
+          {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
           {pushStatus === "fehler" && pushInfo && <span className="hinweis-fehlt">{pushInfo}</span>}
           {aktionsFehler && <span className="hinweis-fehlt">{aktionsFehler}</span>}
