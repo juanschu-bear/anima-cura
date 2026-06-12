@@ -11,8 +11,15 @@ export default function ScribeLogin() {
   const [pwSichtbar, setPwSichtbar] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
+  const [emailFehlt, setEmailFehlt] = useState(false);
+  const [passwortFehlt, setPasswortFehlt] = useState(false);
 
   async function anmelden() {
+    const eFehlt = !email.trim();
+    const pFehlt = !passwort.trim();
+    setEmailFehlt(eFehlt);
+    setPasswortFehlt(pFehlt);
+    if (eFehlt || pFehlt) return;
     setFehler(null);
     setLaedt(true);
     const supabase = createBrowserClient();
@@ -41,17 +48,17 @@ export default function ScribeLogin() {
         <p className="login-claim">Termin vorbei, Doku fertig.</p>
 
         <label htmlFor="scribe-email">E-Mail</label>
-        <input id="scribe-email" className="login-feld" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input id="scribe-email" className={`login-feld${emailFehlt ? " fehlt" : ""}`} type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); if (emailFehlt) setEmailFehlt(false); }} />
 
         <label htmlFor="scribe-passwort">Passwort</label>
         <span className="pwfeld">
           <input
             id="scribe-passwort"
-            className="login-feld"
+            className={`login-feld${passwortFehlt ? " fehlt" : ""}`}
             type={pwSichtbar ? "text" : "password"}
             autoComplete="current-password"
             value={passwort}
-            onChange={(e) => setPasswort(e.target.value)}
+            onChange={(e) => { setPasswort(e.target.value); if (passwortFehlt) setPasswortFehlt(false); }}
             onKeyDown={(e) => e.key === "Enter" && anmelden()}
           />
           <button type="button" className="pwauge" aria-label={pwSichtbar ? "Passwort verbergen" : "Passwort anzeigen"} onClick={() => setPwSichtbar((s) => !s)}>
@@ -61,7 +68,7 @@ export default function ScribeLogin() {
 
         {fehler && <div className="login-fehler">{fehler}</div>}
 
-        <button className="haupt" onClick={anmelden} disabled={laedt || !email || !passwort}>
+        <button className="haupt" onClick={anmelden} disabled={laedt}>
           {laedt ? "Anmelden ..." : "Anmelden"}
         </button>
       </div>
