@@ -769,12 +769,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         <div className="listenkopf">
           <p className="abschnitt" style={{ margin: 0 }}>Tagescockpit · Doku-Wache</p>
           <div className="listensteuer">
-            <button className="tagpfeil" aria-label="Tag zurück" onClick={() => setListenDatum((d) => verschiebeTag(d, -1))}>‹</button>
-            <input className="tagwahl" type="date" value={listenDatum} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setListenDatum(e.target.value || listenDatum)} aria-label="Datum wählen" />
-            <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= new Date().toISOString().slice(0, 10)} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
-            {listenDatum !== new Date().toISOString().slice(0, 10) && (
-              <button className="heutbtn" onClick={() => setListenDatum(new Date().toISOString().slice(0, 10))}>Heute</button>
-            )}
+            <div className="datumnav">
+              <button className="tagpfeil" aria-label="Tag zurück" onClick={() => setListenDatum((d) => verschiebeTag(d, -1))}>‹</button>
+              <input className="tagwahl" type="date" value={listenDatum} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setListenDatum(e.target.value || listenDatum)} aria-label="Datum wählen" />
+              <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= new Date().toISOString().slice(0, 10)} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
+              {listenDatum !== new Date().toISOString().slice(0, 10) && (
+                <button className="heutbtn" onClick={() => setListenDatum(new Date().toISOString().slice(0, 10))}>Heute</button>
+              )}
+            </div>
             <input className="listensuche" type="text" placeholder="Patient filtern" value={listenSuche} onChange={(e) => setListenSuche(e.target.value)} aria-label="Tagesliste nach Patient filtern" />
           </div>
         </div>
@@ -806,7 +808,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           if (gefiltert.length === 0) {
             return (
               <div className="feld"><span className="leer">
-                {term ? "Kein Treffer für diesen Filter." : tagIstHeute ? "Noch kein Eintrag heute. Der erste dauert zwanzig Sekunden." : "An diesem Tag gibt es keine Einträge."}
+                {term ? "Kein Treffer für diesen Filter." : tagIstHeute ? "Noch kein Eintrag heute." : "An diesem Tag gibt es keine Einträge."}
               </span></div>
             );
           }
@@ -963,7 +965,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 <div className="gname">Schienen-Nr.</div>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--schrift-mono), monospace", fontSize: 13 }}>
                   Nr. <input type="number" min={1} value={schienenVon} onChange={(e) => { bearbeitet(); setSchienenVon(e.target.value); }} aria-label="Schiene von" />
-                  – <input type="number" min={1} value={schienenBis} onChange={(e) => { bearbeitet(); setSchienenBis(e.target.value); }} aria-label="Schiene bis" />
+                  bis <input type="number" min={1} value={schienenBis} onChange={(e) => { bearbeitet(); setSchienenBis(e.target.value); }} aria-label="Schiene bis" />
                 </span>
               </div>
             )}

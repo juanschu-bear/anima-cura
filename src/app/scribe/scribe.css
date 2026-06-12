@@ -499,10 +499,11 @@
 .scribe .team-matrix-zelle select{width:118px;padding:6px 10px;font-size:12.5px}
 
 /* ===== Tagesliste: Datum, Suche, Gruppen ===== */
-.scribe .listenkopf{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:30px 0 14px}
-.scribe .listensteuer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scribe .listenkopf{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin:30px 0 14px}
+.scribe .listensteuer{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.scribe .datumnav{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex-shrink:0}
 .scribe .tagpfeil{
-  width:34px;height:34px;border-radius:10px;border:1px solid var(--kante);
+  width:34px;height:34px;border-radius:10px;border:1px solid var(--kante);flex-shrink:0;
   background:var(--flaeche);color:var(--schrift);font-size:18px;line-height:1;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:border-color .15s,background .15s}
 .scribe .tagpfeil:hover:not(:disabled){border-color:var(--primaer);color:var(--primaer)}
@@ -516,7 +517,7 @@
   background:var(--primaer-soft);color:var(--primaer);cursor:pointer}
 .scribe[data-thema="hell"] .heutbtn{color:var(--primaer-tief)}
 .scribe .listensuche{
-  font-size:13px;padding:8px 12px;border-radius:10px;min-width:150px;
+  font-size:13px;padding:8px 12px;border-radius:10px;flex:1;min-width:150px;
   border:1px solid var(--kante);background:var(--flaeche);color:var(--schrift)}
 .scribe .listengruppe{margin-bottom:14px}
 .scribe .gruppenlabel{
@@ -527,9 +528,10 @@
 .scribe .gruppenlabel.offen::before{background:var(--rot);box-shadow:0 0 0 0 var(--rot);animation:puls 1.3s ease-in-out infinite}
 .scribe .gruppenlabel.erledigt{color:var(--gedeckt)}
 .scribe .gruppenlabel.erledigt::before{background:var(--gedeckt)}
-@media(max-width:620px){
-  .scribe .listenkopf{flex-direction:column;align-items:flex-start}
-  .scribe .listensuche{flex:1;min-width:0;width:100%}
+@media(max-width:560px){
+  .scribe .datumnav{width:100%}
+  .scribe .tagwahl{flex:1}
+  .scribe .listensuche{flex:1 1 100%;min-width:0;width:100%}
 }
 
 /* ===================== Praxis-Pass ===================== */
