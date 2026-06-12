@@ -83,7 +83,7 @@
 .scribe .kopf-logo{width:30px;height:30px;flex-shrink:0}
 .scribe .wortmarke .anima{font-weight:400;color:var(--gedeckt)}
 .scribe .kopf .datum{color:var(--gedeckt);font-size:12.5px}
-.scribe .kopf .rechts{margin-left:auto;display:flex;align-items:center;gap:14px}
+.scribe .kopf .rechts{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .scribe .kopf .nutzer{color:var(--gedeckt);font-size:13px}
 .scribe .thema-toggle,.scribe .abmelden{font-family:var(--display);font-size:12.5px;font-weight:600;
   cursor:pointer;color:var(--schrift);background:var(--flaeche-flach);
@@ -91,6 +91,12 @@
   transition:all .15s ease}
 .scribe .thema-toggle:hover,.scribe .abmelden:hover{border-color:var(--primaer);
   background:var(--primaer-soft);transform:translateY(-1px)}
+@media(max-width:920px){
+  .scribe .kopf{border-radius:22px;padding:14px 16px;gap:8px 12px}
+  .scribe .kopf .datum{width:100%}
+  .scribe .kopf .rechts{margin-left:0;width:100%;gap:8px}
+  .scribe .kopf .nutzer{width:100%;order:9;margin-top:2px}
+}
 
 /* ===== Held ===== */
 .scribe .held{max-width:1160px;margin:0 auto;padding:50px 26px 6px}
