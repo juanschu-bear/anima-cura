@@ -15,6 +15,7 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
     --primary:#0f8a72; --primary-bright:#23b08f; --primary-lighter:#5fd0a8; --primary-soft:rgba(15,138,114,0.10);
     --green:#3fab73;
     --gold:#c2922f; --gold-bright:#e6b347; --gold-ink:#3a2c08;
+    --fehlt:#e5484d; --fehlt-ring:rgba(229,72,77,0.13); --fehlt-glow:rgba(229,72,77,0.16); --fehlt-bg:rgba(229,72,77,0.07); --fehlt-line:rgba(229,72,77,0.25); --fehlt-ink:#b5363a;
     --shadow:0 26px 60px -34px rgba(40,55,50,0.4);}
 .aab[data-theme="dark"]{color-scheme:dark;
     --bg:#0f1614; --bg-tint-1:rgba(47,182,163,0.13); --bg-tint-2:rgba(95,208,168,0.08);
@@ -26,6 +27,7 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
     --primary:#2fb6a3; --primary-bright:#49d0bb; --primary-lighter:#6fe0c6; --primary-soft:rgba(47,182,163,0.14);
     --green:#54b07d;
     --gold:#cda23f; --gold-bright:#ecc463; --gold-ink:#2a2008;
+    --fehlt:#ff6b6b; --fehlt-ring:rgba(255,107,107,0.16); --fehlt-glow:rgba(255,107,107,0.18); --fehlt-bg:rgba(255,107,107,0.10); --fehlt-line:rgba(255,107,107,0.3); --fehlt-ink:#ff9a9a;
     --shadow:0 26px 60px -30px rgba(0,0,0,0.8);}
 .aab{--radius:16px;--maxw:760px;}
 .aab *{box-sizing:border-box;}
@@ -133,7 +135,13 @@ const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
 .aab .btn.primary{background:linear-gradient(150deg,var(--gold-bright),var(--gold));border:none;color:var(--gold-ink);box-shadow:0 12px 30px -10px var(--gold);}
 .aab .btn.primary:hover{filter:brightness(1.05);}
 .aab .btn:disabled{opacity:.35;cursor:not-allowed;}
-.aab .plabel{font-size:12.5px;color:var(--muted);}`;
+.aab .plabel{font-size:12.5px;color:var(--muted);}
+.aab input.fehlt, .aab select.fehlt, .aab textarea.fehlt{border-color:var(--fehlt);box-shadow:0 0 0 3px var(--fehlt-ring),0 0 16px var(--fehlt-glow);}
+.aab .yn.fehlt, .aab .pills.fehlt{padding:8px;border-radius:13px;border:1.5px solid var(--fehlt);box-shadow:0 0 16px var(--fehlt-glow);}
+.aab .consent.fehlt{border-color:var(--fehlt);box-shadow:0 0 0 1px var(--fehlt-ring),0 0 16px var(--fehlt-glow);}
+.aab .sigpad.fehlt{border-color:var(--fehlt);box-shadow:0 0 16px var(--fehlt-glow);}
+.aab .fehlt-hinweis{display:flex;align-items:center;gap:9px;background:var(--fehlt-bg);border:1px solid var(--fehlt-line);color:var(--fehlt-ink);border-radius:11px;padding:11px 14px;font-size:13px;font-weight:500;margin-bottom:18px;}
+.aab .fehlt-hinweis .pkt{width:9px;height:9px;border-radius:50%;background:var(--fehlt);flex:none;box-shadow:0 0 9px var(--fehlt-glow);}`;
 
 interface Props {
   patientId: string;
@@ -203,7 +211,7 @@ const CONSENTS: ConsentDef[] = [
   { key: "ew_anima", label: "Ich stimme zu, dass meine Daten in der Anima Cura Plattform gespeichert und verarbeitet werden, damit ich Unterlagen, Termine und Rechnungen dort einsehen kann, und dass ich über die Plattform für Folgetermine kontaktiert werden darf.", pflicht: false },
 ];
 
-const SignaturePad = forwardRef<HTMLCanvasElement>(function SignaturePad(_props, ref) {
+const SignaturePad = forwardRef<HTMLCanvasElement, { fehlt?: boolean; onSign?: () => void }>(function SignaturePad({ fehlt, onSign }, ref) {
   const innerRef = useRef<HTMLCanvasElement | null>(null);
   useImperativeHandle(ref, () => innerRef.current as HTMLCanvasElement, []);
   const drawing = useRef(false);
@@ -233,6 +241,7 @@ const SignaturePad = forwardRef<HTMLCanvasElement>(function SignaturePad(_props,
   const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
     drawing.current = true;
     last.current = point(e);
+    onSign?.();
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
   };
 
@@ -265,7 +274,7 @@ const SignaturePad = forwardRef<HTMLCanvasElement>(function SignaturePad(_props,
     <>
       <canvas
         ref={innerRef}
-        className="sigpad"
+        className={"sigpad" + (fehlt ? " fehlt" : "")}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={end}
@@ -284,12 +293,44 @@ export function AnamneseForm({ patientId }: Props) {
   const [data, setData] = useState<Record<string, unknown>>({});
   const [stepName, setStepName] = useState<StepName>("versicherung");
   const [done, setDone] = useState(false);
+  const [fehlen, setFehlen] = useState<string[]>([]);
 
   const sig1 = useRef<HTMLCanvasElement | null>(null);
   const sig2 = useRef<HTMLCanvasElement | null>(null);
 
-  const set = (key: string, value: unknown) => setData((d) => ({ ...d, [key]: value }));
+  const set = (key: string, value: unknown) => {
+    setData((d) => ({ ...d, [key]: value }));
+    setFehlen((f) => (f.includes(key) ? f.filter((k) => k !== key) : f));
+  };
   const txt = (key: string) => (data[key] as string) ?? "";
+
+  const PFLICHT: Record<StepName, string[]> = {
+    versicherung: ["versicherungsart", "krankenkasse"],
+    patient: ["patient_vorname", "patient_nachname", "patient_geburtsdatum", "patient_geschlecht", "patient_telefon", "patient_strasse", "patient_hausnummer", "patient_plz", "patient_wohnort", "patient_email", "patient_mobil"],
+    versicherter: ["vp_vorname", "vp_nachname", "vp_telefon"],
+    behandlung: ["besuchsgrund"],
+    gesundheit: [...MEDS.map((m) => m.key), "g_zaehneputzen"],
+    einwilligungen: ["ew_roentgen"],
+    abschluss: ["abschluss_datum", "abschluss_ort", "unterschrift_sig1"],
+  };
+
+  const sigLeer = (c: HTMLCanvasElement | null): boolean => {
+    if (!c) return true;
+    const blank = document.createElement("canvas");
+    blank.width = c.width;
+    blank.height = c.height;
+    return c.toDataURL() === blank.toDataURL();
+  };
+
+  const istLeer = (key: string): boolean => {
+    if (key === "unterschrift_sig1") return sigLeer(sig1.current);
+    const v = data[key];
+    if (v === undefined || v === null || v === false) return true;
+    return typeof v === "string" && v.trim() === "";
+  };
+
+  const pruefeSchritt = (): string[] => (PFLICHT[stepName] ?? []).filter(istLeer);
+  const ff = (key: string) => (fehlen.includes(key) ? " fehlt" : "");
 
   const isMinor = (() => {
     const v = data.patient_geburtsdatum as string | undefined;
@@ -329,6 +370,13 @@ export function AnamneseForm({ patientId }: Props) {
   };
 
   const goNext = () => {
+    const fehlend = pruefeSchritt();
+    if (fehlend.length > 0) {
+      setFehlen(fehlend);
+      scrollTop();
+      return;
+    }
+    setFehlen([]);
     if (pos >= total - 1) { submit(); return; }
     setStepName(visibleSteps[pos + 1]);
     scrollTop();
@@ -343,7 +391,7 @@ export function AnamneseForm({ patientId }: Props) {
   const renderYesNo = (name: string) => {
     const v = data[name];
     return (
-      <div className="yn">
+      <div className={"yn" + ff(name)}>
         <button type="button" className={v === "ja" ? "on" : ""} onClick={() => set(name, "ja")}>Ja</button>
         <button type="button" className={v === "nein" ? "on" : ""} onClick={() => set(name, "nein")}>Nein</button>
       </div>
@@ -353,7 +401,7 @@ export function AnamneseForm({ patientId }: Props) {
   const renderPills = (name: string, options: string[]) => {
     const v = data[name];
     return (
-      <div className="pills">
+      <div className={"pills" + ff(name)}>
         {options.map((o) => (
           <button key={o} type="button" className={v === o ? "on" : ""} onClick={() => set(name, o)}>{o}</button>
         ))}
@@ -364,7 +412,7 @@ export function AnamneseForm({ patientId }: Props) {
   const renderConsent = (c: ConsentDef) => {
     const on = Boolean(data[c.key]);
     return (
-      <div key={c.key} className={"consent" + (on ? " on" : "")} onClick={() => set(c.key, !on)}>
+      <div key={c.key} className={"consent" + (on ? " on" : "") + ff(c.key)} onClick={() => set(c.key, !on)}>
         <div className="box">
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
@@ -394,7 +442,7 @@ export function AnamneseForm({ patientId }: Props) {
               {renderPills("versicherungsart", ["Gesetzlich versichert", "Privat versichert", "Beihilfe", "Selbstzahler"])}
             </div>
             <div className="grid">
-              <div className="field"><label>Krankenkasse <span className="req">*</span></label><input type="text" placeholder="z. B. AOK, TK …" value={txt("krankenkasse")} onChange={(e) => set("krankenkasse", e.target.value)} /></div>
+              <div className="field"><label>Krankenkasse <span className="req">*</span></label><input type="text" placeholder="z. B. AOK, TK …" className={ff("krankenkasse").trim()} value={txt("krankenkasse")} onChange={(e) => set("krankenkasse", e.target.value)} /></div>
               <div className="field"><label>Zusatzversicherung? <span className="opt">freiwillig</span></label>{renderYesNo("zusatzversicherung")}</div>
             </div>
             {data.zusatzversicherung === "ja" && (
@@ -408,17 +456,17 @@ export function AnamneseForm({ patientId }: Props) {
             <h2>Angaben zum Patienten</h2>
             <p className="sub">Wer wird bei uns behandelt?</p>
             <div className="grid">
-              <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" value={txt("patient_vorname")} onChange={(e) => set("patient_vorname", e.target.value)} /></div>
-              <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" value={txt("patient_nachname")} onChange={(e) => set("patient_nachname", e.target.value)} /></div>
-              <div className="field col-2"><label>Geburtsdatum <span className="req">*</span></label><input type="date" value={txt("patient_geburtsdatum")} onChange={(e) => set("patient_geburtsdatum", e.target.value)} /><span className="hint">Daraus richten wir den Bogen automatisch passend für Sie ein.</span></div>
-              <div className="field"><label>Geschlecht <span className="req">*</span></label><select value={txt("patient_geschlecht")} onChange={(e) => set("patient_geschlecht", e.target.value)}><option value="">Bitte wählen</option><option>Männlich</option><option>Weiblich</option><option>Divers</option></select></div>
-              <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" value={txt("patient_telefon")} onChange={(e) => set("patient_telefon", e.target.value)} /></div>
-              <div className="field"><label>Straße <span className="req">*</span></label><input type="text" value={txt("patient_strasse")} onChange={(e) => set("patient_strasse", e.target.value)} /></div>
-              <div className="field"><label>Hausnummer <span className="req">*</span></label><input type="text" value={txt("patient_hausnummer")} onChange={(e) => set("patient_hausnummer", e.target.value)} /></div>
-              <div className="field"><label>PLZ <span className="req">*</span></label><input type="text" inputMode="numeric" value={txt("patient_plz")} onChange={(e) => set("patient_plz", e.target.value)} /></div>
-              <div className="field"><label>Wohnort <span className="req">*</span></label><input type="text" value={txt("patient_wohnort")} onChange={(e) => set("patient_wohnort", e.target.value)} /></div>
-              <div className="field col-2"><label>E-Mail-Adresse <span className="req">*</span></label><input type="email" value={txt("patient_email")} onChange={(e) => set("patient_email", e.target.value)} /><span className="hint">Für Terminerinnerungen und Ihre Unterlagen.</span></div>
-              <div className="field"><label>Mobilnummer <span className="req">*</span></label><input type="tel" value={txt("patient_mobil")} onChange={(e) => set("patient_mobil", e.target.value)} /></div>
+              <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("patient_vorname").trim()} value={txt("patient_vorname")} onChange={(e) => set("patient_vorname", e.target.value)} /></div>
+              <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("patient_nachname").trim()} value={txt("patient_nachname")} onChange={(e) => set("patient_nachname", e.target.value)} /></div>
+              <div className="field col-2"><label>Geburtsdatum <span className="req">*</span></label><input type="date" className={ff("patient_geburtsdatum").trim()} value={txt("patient_geburtsdatum")} onChange={(e) => set("patient_geburtsdatum", e.target.value)} /><span className="hint">Daraus richten wir den Bogen automatisch passend für Sie ein.</span></div>
+              <div className="field"><label>Geschlecht <span className="req">*</span></label><select className={ff("patient_geschlecht").trim()} value={txt("patient_geschlecht")} onChange={(e) => set("patient_geschlecht", e.target.value)}><option value="">Bitte wählen</option><option>Männlich</option><option>Weiblich</option><option>Divers</option></select></div>
+              <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("patient_telefon").trim()} value={txt("patient_telefon")} onChange={(e) => set("patient_telefon", e.target.value)} /></div>
+              <div className="field"><label>Straße <span className="req">*</span></label><input type="text" className={ff("patient_strasse").trim()} value={txt("patient_strasse")} onChange={(e) => set("patient_strasse", e.target.value)} /></div>
+              <div className="field"><label>Hausnummer <span className="req">*</span></label><input type="text" className={ff("patient_hausnummer").trim()} value={txt("patient_hausnummer")} onChange={(e) => set("patient_hausnummer", e.target.value)} /></div>
+              <div className="field"><label>PLZ <span className="req">*</span></label><input type="text" inputMode="numeric" className={ff("patient_plz").trim()} value={txt("patient_plz")} onChange={(e) => set("patient_plz", e.target.value)} /></div>
+              <div className="field"><label>Wohnort <span className="req">*</span></label><input type="text" className={ff("patient_wohnort").trim()} value={txt("patient_wohnort")} onChange={(e) => set("patient_wohnort", e.target.value)} /></div>
+              <div className="field col-2"><label>E-Mail-Adresse <span className="req">*</span></label><input type="email" className={ff("patient_email").trim()} value={txt("patient_email")} onChange={(e) => set("patient_email", e.target.value)} /><span className="hint">Für Terminerinnerungen und Ihre Unterlagen.</span></div>
+              <div className="field"><label>Mobilnummer <span className="req">*</span></label><input type="tel" className={ff("patient_mobil").trim()} value={txt("patient_mobil")} onChange={(e) => set("patient_mobil", e.target.value)} /></div>
               <div className="field"><label>Beruf</label><input type="text" value={txt("patient_beruf")} onChange={(e) => set("patient_beruf", e.target.value)} /></div>
             </div>
           </section>
@@ -433,10 +481,10 @@ export function AnamneseForm({ patientId }: Props) {
               <span>Dieser Schritt erscheint nur, weil der Patient laut Geburtsdatum unter 18 ist. Bei Volljährigen entfällt er.</span>
             </div>
             <div className="grid">
-              <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" value={txt("vp_vorname")} onChange={(e) => set("vp_vorname", e.target.value)} /></div>
-              <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" value={txt("vp_nachname")} onChange={(e) => set("vp_nachname", e.target.value)} /></div>
+              <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("vp_vorname").trim()} value={txt("vp_vorname")} onChange={(e) => set("vp_vorname", e.target.value)} /></div>
+              <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("vp_nachname").trim()} value={txt("vp_nachname")} onChange={(e) => set("vp_nachname", e.target.value)} /></div>
               <div className="field"><label>Geburtsdatum</label><input type="date" value={txt("vp_geburtsdatum")} onChange={(e) => set("vp_geburtsdatum", e.target.value)} /></div>
-              <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" value={txt("vp_telefon")} onChange={(e) => set("vp_telefon", e.target.value)} /></div>
+              <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("vp_telefon").trim()} value={txt("vp_telefon")} onChange={(e) => set("vp_telefon", e.target.value)} /></div>
               <div className="field"><label>Straße</label><input type="text" value={txt("vp_strasse")} onChange={(e) => set("vp_strasse", e.target.value)} /></div>
               <div className="field"><label>Hausnummer</label><input type="text" value={txt("vp_hausnummer")} onChange={(e) => set("vp_hausnummer", e.target.value)} /></div>
               <div className="field"><label>PLZ</label><input type="text" value={txt("vp_plz")} onChange={(e) => set("vp_plz", e.target.value)} /></div>
@@ -459,7 +507,7 @@ export function AnamneseForm({ patientId }: Props) {
           <section className="step active">
             <h2>Grund Ihres Besuchs</h2>
             <p className="sub">Erzählen Sie uns kurz, worum es geht, und welche Ärzte mitbehandeln.</p>
-            <div className="field col-2"><label>Grund Ihres Besuchs <span className="req">*</span></label><textarea placeholder="Was führt Sie zu uns?" value={txt("besuchsgrund")} onChange={(e) => set("besuchsgrund", e.target.value)} /></div>
+            <div className="field col-2"><label>Grund Ihres Besuchs <span className="req">*</span></label><textarea placeholder="Was führt Sie zu uns?" className={ff("besuchsgrund").trim()} value={txt("besuchsgrund")} onChange={(e) => set("besuchsgrund", e.target.value)} /></div>
             <div className="field col-2"><label>Behandelnder / überweisender Zahnarzt <span className="opt">freiwillig</span></label><textarea placeholder="Name und Adresse" value={txt("zahnarzt")} onChange={(e) => set("zahnarzt", e.target.value)} /></div>
             <div className="field col-2"><label>Hausarzt <span className="opt">freiwillig</span></label><textarea placeholder="Name und Adresse" value={txt("hausarzt")} onChange={(e) => set("hausarzt", e.target.value)} /></div>
           </section>
@@ -512,10 +560,10 @@ export function AnamneseForm({ patientId }: Props) {
             <p className="sub">Fast geschafft. Noch zwei Kleinigkeiten und Ihre Unterschrift.</p>
             <div className="field col-2"><label>Wie sind Sie auf uns aufmerksam geworden? <span className="opt">freiwillig</span></label>{renderPills("aufmerksam_geworden", ["Google-Suche", "Empfehlung", "Überweisung Zahnarzt", "Social Media", "Sonstiges"])}</div>
             <div className="grid">
-              <div className="field"><label>Datum <span className="req">*</span></label><input type="date" value={txt("abschluss_datum")} onChange={(e) => set("abschluss_datum", e.target.value)} /></div>
-              <div className="field"><label>Ort <span className="req">*</span></label><input type="text" value={txt("abschluss_ort")} onChange={(e) => set("abschluss_ort", e.target.value)} /></div>
+              <div className="field"><label>Datum <span className="req">*</span></label><input type="date" className={ff("abschluss_datum").trim()} value={txt("abschluss_datum")} onChange={(e) => set("abschluss_datum", e.target.value)} /></div>
+              <div className="field"><label>Ort <span className="req">*</span></label><input type="text" className={ff("abschluss_ort").trim()} value={txt("abschluss_ort")} onChange={(e) => set("abschluss_ort", e.target.value)} /></div>
             </div>
-            <div className="field col-2"><label>Unterschrift des/der Versicherten <span className="req">*</span></label><SignaturePad ref={sig1} /></div>
+            <div className="field col-2"><label>Unterschrift des/der Versicherten <span className="req">*</span></label><SignaturePad ref={sig1} fehlt={fehlen.includes("unterschrift_sig1")} onSign={() => setFehlen((f) => f.filter((k) => k !== "unterschrift_sig1"))} /></div>
             {data.vp2_vorhanden === "ja" && (
               <div className="field col-2"><label>Unterschrift des weiteren Erziehungsberechtigten</label><SignaturePad ref={sig2} /></div>
             )}
@@ -567,7 +615,12 @@ export function AnamneseForm({ patientId }: Props) {
               <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
             </div>
           ) : (
-            renderStep()
+            <>
+              {fehlen.length > 0 && (
+                <div className="fehlt-hinweis"><span className="pkt" />Bitte die rot markierten Pflichtangaben noch ausfüllen.</div>
+              )}
+              {renderStep()}
+            </>
           )}
         </div>
       </div>
