@@ -7,7 +7,19 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--schrift-text" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--schrift-mono" });
 
-export const metadata = { title: "Anima Scribe · Behandlungscockpit" };
+export const metadata = {
+  title: "Anima Scribe · Behandlungscockpit",
+  manifest: "/scribe-manifest.json",
+  icons: {
+    icon: [
+      { url: "/scribe-brand/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/scribe-brand/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/scribe-brand/apple-touch-icon.png",
+    shortcut: "/scribe-brand/favicon.ico",
+  },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Anima Scribe" },
+};
 
 export default function ScribeLayout({ children }: { children: ReactNode }) {
   return (

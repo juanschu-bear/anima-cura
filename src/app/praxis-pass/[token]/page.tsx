@@ -13,6 +13,12 @@ const beschreibung = "Jetzt bekommt Scribe euren Ton. Einmal ausfüllen, danach 
 export const metadata = {
   title: titel,
   description: beschreibung,
+  manifest: "/scribe-manifest.json",
+  icons: {
+    icon: "/scribe-brand/favicon-32x32.png",
+    apple: "/scribe-brand/apple-touch-icon.png",
+    shortcut: "/scribe-brand/favicon.ico",
+  },
   openGraph: { title: titel, description: beschreibung, type: "website" },
   twitter: { card: "summary", title: titel, description: beschreibung },
 };

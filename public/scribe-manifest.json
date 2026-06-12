@@ -1,0 +1,14 @@
+{
+  "name": "Anima Scribe",
+  "short_name": "Anima Scribe",
+  "description": "Chairside-Dokumentation in Sekunden.",
+  "start_url": "/scribe",
+  "display": "standalone",
+  "background_color": "#0E1726",
+  "theme_color": "#2E6FE6",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/scribe-brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/scribe-brand/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
