@@ -51,6 +51,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   const [neuArt, setNeuArt] = useState<string | null>(null); // welche Behandlungsart gerade ein Eingabefeld zeigt
   const [neuName, setNeuName] = useState("");
   const [optEntwurf, setOptEntwurf] = useState<Record<string, string>>({}); // key: gid::gruppe -> aktueller Eingabetext
+  const [fehlerVorlagen, setFehlerVorlagen] = useState<Record<string, { verlauf?: boolean; gruppen?: string[] }>>({});
 
   const apiUrl = useCallback((pfad: string) => (token ? `${pfad}${pfad.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : pfad), [token]);
   const apiHeaders = useCallback((): HeadersInit => (token ? { "Content-Type": "application/json", "x-praxis-pass-token": token } : { "Content-Type": "application/json" }), [token]);
@@ -107,6 +108,23 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       ...alt,
       [k]: { ...(alt[k] ?? { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ }), behandlungsart: v.behandlungsart, termin_typ: v.termin_typ, ...patch },
     }));
+    setFehlerVorlagen((f) => {
+      if (!(k in f)) return f;
+      const n = { ...f };
+      delete n[k];
+      return n;
+    });
+  }
+
+  // Eine Vorlage gilt als angefangen, wenn die Praxis darin etwas eingetragen hat.
+  function istBeruehrt(k: string) {
+    const a = antworten[k];
+    if (!a) return false;
+    if ((a.verlaufstext ?? "").trim()) return true;
+    if (a.optionen_final && Object.values(a.optionen_final).some((l) => Array.isArray(l) && l.length > 0)) return true;
+    if (a.zusatzschritte && Object.values(a.zusatzschritte).some((w) => w && String(w).trim() && w !== "nein")) return true;
+    if ((a.kig_text ?? "").trim() || (a.bema_text ?? "").trim() || (a.goz_text ?? "").trim() || (a.abrechnung_anm ?? "").trim()) return true;
+    return a.status === "gespeichert" || a.status === "abgesendet";
   }
 
   // Aktuelle Optionsliste einer Gruppe: gespeicherte Bearbeitung, sonst die Vorlage-Platzhalter als Start.
@@ -159,6 +177,37 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   }
 
   async function allesAbsenden() {
+    const alle = [...vorlagen, ...eigene];
+    const maengel: Record<string, { verlauf?: boolean; gruppen?: string[] }> = {};
+    let beruehrte = 0;
+    for (const v of alle) {
+      const k = schluessel(v.behandlungsart, v.termin_typ);
+      if (!istBeruehrt(k)) continue;
+      beruehrte++;
+      const a = feld(k);
+      const m: { verlauf?: boolean; gruppen?: string[] } = {};
+      if (!(a.verlaufstext ?? "").trim()) m.verlauf = true;
+      const leer: string[] = [];
+      for (const [gk, g] of Object.entries(v.struktur?.groups ?? {})) {
+        if (g.req) {
+          const vorgabe = (g.opts ?? []).map((o) => o.t);
+          if (optListe(v, gk, vorgabe).length === 0) leer.push(gk);
+        }
+      }
+      if (leer.length) m.gruppen = leer;
+      if (m.verlauf || m.gruppen) maengel[k] = m;
+    }
+    if (beruehrte === 0) {
+      setHinweis({ ok: false, text: "Es ist noch nichts ausgefüllt, das abgesendet werden könnte." });
+      return;
+    }
+    if (Object.keys(maengel).length > 0) {
+      setFehlerVorlagen(maengel);
+      setOffen(Object.keys(maengel)[0]);
+      setHinweis({ ok: false, text: "Bitte die rot markierten Pflichtangaben ergänzen, dann erneut absenden." });
+      return;
+    }
+    setFehlerVorlagen({});
     setAbsendet(true); setHinweis(null);
     const res = await fetch(apiUrl("/api/praxis-pass"), {
       method: "POST", headers: apiHeaders(), body: JSON.stringify({ absenden: true }),
@@ -205,7 +254,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
             const zs = a.zusatzschritte ?? {};
             const auf = offen === k;
             return (
-              <article className={`pp-karte ${istErledigt(k) ? "fertig" : ""}`} key={v.id}>
+              <article className={`pp-karte ${istErledigt(k) ? "fertig" : ""}${fehlerVorlagen[k] ? " fehlt" : ""}`} key={v.id}>
                 <button className="pp-kartenkopf" onClick={() => setOffen(auf ? null : k)} aria-expanded={auf}>
                   <span className="pp-status-punkt" aria-hidden="true" />
                   <span className="pp-kartentitel">{v.name}</span>
@@ -222,7 +271,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
 
                     <label className="pp-feldlabel">1. So soll der Eintrag in der Patientenakte aussehen</label>
                     <p className="pp-feldhint">Der Text, den ihr nach so einem Termin in die Karte schreiben würdet. Das Beispiel im Feld könnt ihr überschreiben.</p>
-                    <textarea className="pp-textarea" rows={3} value={a.verlaufstext ?? ""}
+                    <textarea className={"pp-textarea" + (fehlerVorlagen[k]?.verlauf ? " fehlt" : "")} rows={3} value={a.verlaufstext ?? ""}
                       onChange={(e) => setFeld(v, { verlaufstext: e.target.value })}
                       placeholder="z. B. Routinekontrolle, Sitz und Tracking unauffällig, nächste Schienen ausgegeben." />
 
@@ -262,7 +311,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
                                 <span className={`pp-pflicht ${g.req ? "ja" : "nein"}`}>{g.req ? "Pflicht" : "optional"}</span>
                                 <span className="pp-gruppe-typ">{g.type === "multi" ? "Mehrfach" : "Einfach"}</span>
                               </div>
-                              <div className="pp-chipbox">
+                              <div className={"pp-chipbox" + (fehlerVorlagen[k]?.gruppen?.includes(gk) ? " fehlt" : "")}>
                                 {liste.map((opt, i) => (
                                   <span className="pp-chip" key={i}>{opt}<button type="button" className="pp-chip-x" onClick={() => optWeg(v, gk, vorgabe, i)} aria-label="entfernen">×</button></span>
                                 ))}
@@ -349,7 +398,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       {!ladend && (
         <footer className="pp-fuss">
           <p>Wenn alles passt, sende den gesamten Praxis-Pass ab. Du kannst vorher jede Art einzeln speichern und später weitermachen.</p>
-          <button className="pp-absenden" disabled={absendet || erledigt === 0} onClick={allesAbsenden}>
+          <button className="pp-absenden" disabled={absendet} onClick={allesAbsenden}>
             {absendet ? "Sende …" : "Praxis-Pass absenden"}
           </button>
         </footer>
