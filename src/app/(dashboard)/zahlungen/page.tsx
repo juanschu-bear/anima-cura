@@ -66,18 +66,21 @@ export default function ZahlungenPage() {
     };
   }, [stats]);
 
+  // Aktionen laufen ueber die Server-Route (Service-Role), damit RLS die Schreibzugriffe nicht blockiert.
+  async function aktionSenden(payload: Record<string, unknown>) {
+    const res = await fetch("/api/zahlungen/aktion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, json };
+  }
+
   async function handleManualMatch(txId: string, patientId: string) {
     const selectedPatient = patienten.find((p) => p.id === patientId);
-    const supabase = createBrowserClient();
-    const { error } = await supabase
-      .from("transaktionen")
-      .update({ matching_status: "manuell", matched_patient_id: patientId, matching_score: 100 })
-      .eq("id", txId);
-    if (error) {
-      setSyncHint(t("payments.manualMatchedLocal", locale));
-    } else {
-      setSyncHint(t("payments.manualMatched", locale));
-    }
+    const { ok } = await aktionSenden({ aktion: "zuordnen", txId, patientId });
+    setSyncHint(t(ok ? "payments.manualMatched" : "payments.manualMatchedLocal", locale));
     setClientTx((prev) =>
       prev.map((tx) =>
         tx.id === txId
@@ -99,13 +102,8 @@ export default function ZahlungenPage() {
   }
 
   async function handleIgnore(txId: string) {
-    const supabase = createBrowserClient();
-    const { error } = await supabase.from("transaktionen").update({ matching_status: "ignoriert" }).eq("id", txId);
-    if (error) {
-      setSyncHint(t("payments.ignoredMarkedLocal", locale));
-    } else {
-      setSyncHint(t("payments.ignoredMarked", locale));
-    }
+    const { ok } = await aktionSenden({ aktion: "ignorieren", txId });
+    setSyncHint(t(ok ? "payments.ignoredMarked" : "payments.ignoredMarkedLocal", locale));
     setClientTx((prev) => prev.map((tx) => (tx.id === txId ? { ...tx, matching_status: "ignoriert" } : tx)));
     refetch();
     refetchStats();
@@ -113,29 +111,47 @@ export default function ZahlungenPage() {
 
   async function handleConfirmSuggestion(tx: any) {
     if (!tx?.matched_patient_id) return;
-    const supabase = createBrowserClient();
-    const { error } = await supabase
-      .from("transaktionen")
-      .update({ matching_status: "auto", matching_score: Math.max(Number(tx.matching_score || 0), 90) })
-      .eq("id", tx.id);
-    if (error) {
-      setSyncHint(t("payments.suggestionConfirmedLocal", locale));
-    } else {
-      setSyncHint(t("payments.suggestionConfirmed", locale));
-    }
+    const { ok } = await aktionSenden({ aktion: "bestaetigen", txId: tx.id });
+    setSyncHint(t(ok ? "payments.suggestionConfirmed" : "payments.suggestionConfirmedLocal", locale));
     setClientTx((prev) =>
       prev.map((row) =>
         row.id === tx.id
-          ? {
-              ...row,
-              matching_status: "auto",
-              matching_score: Math.max(Number(row.matching_score || 0), 90),
-            }
+          ? { ...row, matching_status: "auto", matching_score: Math.max(Number(row.matching_score || 0), 90) }
           : row
       )
     );
     refetch();
     refetchStats();
+  }
+
+  // Stapel: alle sicheren Vorschlaege ab Schwelle auf einmal bestaetigen.
+  const [stapelMin, setStapelMin] = useState(80);
+  const [stapelVorschau, setStapelVorschau] = useState<number | null>(null);
+  const [stapelLaeuft, setStapelLaeuft] = useState(false);
+
+  useEffect(() => {
+    let aktiv = true;
+    aktionSenden({ aktion: "stapel_vorschau", minScore: stapelMin }).then(({ ok, json }) => {
+      if (aktiv && ok) setStapelVorschau(json.anzahl ?? 0);
+    });
+    return () => { aktiv = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stapelMin, stats.vorschlag]);
+
+  async function handleStapelBestaetigen() {
+    if (!stapelVorschau || stapelLaeuft) return;
+    if (typeof window !== "undefined" && !window.confirm(`${stapelVorschau} sichere Vorschläge (Score ab ${stapelMin}) bestätigen?`)) return;
+    setStapelLaeuft(true);
+    const { ok, json } = await aktionSenden({ aktion: "stapel_bestaetigen", minScore: stapelMin });
+    setStapelLaeuft(false);
+    if (ok) {
+      setSyncHint(`${json.anzahl ?? 0} Vorschläge bestätigt.`);
+      setStapelVorschau(0);
+      refetch();
+      refetchStats();
+    } else {
+      setSyncHint(json.error ?? "Stapel-Bestätigung fehlgeschlagen.");
+    }
   }
 
   // Dialog mit vorbefuellter Suche: Nachname aus dem Absender raten.
@@ -306,6 +322,30 @@ export default function ZahlungenPage() {
         <MetricCard label={t("payments.needsReview", locale)} value={metrics.vorschlag.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} amber theme={theme} />
         <MetricCard label={t("payments.unclearCard", locale)} value={metrics.unklar.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} sub={t("payments.allTime", locale)} theme={theme} />
       </div>
+
+      {metrics.vorschlag > 0 && (
+        <div className="rounded-2xl border p-4" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--ac-text)" }}>Sichere Vorschläge stapelweise bestätigen</p>
+              <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
+                {stapelVorschau === null
+                  ? "Wird geprüft …"
+                  : `${stapelVorschau.toLocaleString("de-DE")} Vorschläge ab Score ${stapelMin} werden zugeordnet.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs" style={{ color: "var(--ac-text-mute)" }}>Score ab</span>
+              {[90, 80, 70].map((s) => (
+                <button key={s} onClick={() => setStapelMin(s)} className={`ac-chip ${stapelMin === s ? "ac-chip-active" : ""}`}>{s}</button>
+              ))}
+              <button className="btn-primary" disabled={!stapelVorschau || stapelLaeuft} onClick={handleStapelBestaetigen}>
+                {stapelLaeuft ? "Bestätige …" : `${(stapelVorschau ?? 0).toLocaleString("de-DE")} bestätigen`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative max-w-md">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
