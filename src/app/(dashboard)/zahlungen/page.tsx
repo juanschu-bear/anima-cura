@@ -286,6 +286,14 @@ export default function ZahlungenPage() {
     return t("payments.reason.amountMatches", locale, { expected: expected.toLocaleString(dl) });
   }
 
+  // Verstaendliches Vertrauens-Wort zum Score, damit die Praxis nicht nur eine nackte Zahl sieht.
+  function vertrauenLabel(score: number) {
+    if (score >= 90) return locale === "en" ? "Very sure" : "Sehr sicher";
+    if (score >= 80) return locale === "en" ? "Sure" : "Sicher";
+    if (score >= 70) return locale === "en" ? "Likely" : "Wahrscheinlich";
+    return locale === "en" ? "Uncertain" : "Unsicher";
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -331,13 +339,12 @@ export default function ZahlungenPage() {
               <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
                 {stapelVorschau === null
                   ? "Wird geprüft …"
-                  : `${stapelVorschau.toLocaleString("de-DE")} Vorschläge ab Score ${stapelMin} werden zugeordnet.`}
+                  : `${stapelVorschau.toLocaleString("de-DE")} Treffer ab Stufe „${vertrauenLabel(stapelMin)}“ werden zugeordnet.`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs" style={{ color: "var(--ac-text-mute)" }}>Score ab</span>
               {[90, 80, 70].map((s) => (
-                <button key={s} onClick={() => setStapelMin(s)} className={`ac-chip ${stapelMin === s ? "ac-chip-active" : ""}`}>{s}</button>
+                <button key={s} onClick={() => setStapelMin(s)} className={`ac-chip ${stapelMin === s ? "ac-chip-active" : ""}`}>{vertrauenLabel(s)} · {s}</button>
               ))}
               <button className="btn-primary" disabled={!stapelVorschau || stapelLaeuft} onClick={handleStapelBestaetigen}>
                 {stapelLaeuft ? "Bestätige …" : `${(stapelVorschau ?? 0).toLocaleString("de-DE")} bestätigen`}
@@ -412,38 +419,28 @@ export default function ZahlungenPage() {
         </div>
       </div>
 
-      <div
-        className="rounded-lg border px-4 py-3 text-sm"
-        style={{
-          borderColor: "var(--ac-border)",
-          background: "var(--ac-surface)",
-          color: "var(--ac-text-soft)",
-        }}
-      >
-        <p className="mb-1 font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.statusExplained", locale)}</p>
-        <p>
-          <span className="font-semibold">{t("payments.status.automatic", locale)}:</span> {t("payments.status.automaticDesc", locale)}
-          {" · "}
-          <span className="font-semibold">{t("payments.status.deviation", locale)}:</span> {t("payments.status.deviationDesc", locale)}
-          {" · "}
-          <span className="font-semibold">{t("payments.filter.manual", locale)}:</span> {t("payments.status.manualDesc", locale)}
-          {" · "}
-          <span className="font-semibold">{t("payments.status.unclear", locale)}:</span> {t("payments.status.unclearDesc", locale)}
-          {" · "}
-          <span className="font-semibold">{t("payments.filter.ignored", locale)}:</span> {t("payments.status.ignoredDesc", locale)}
-        </p>
-      </div>
-      <div
-        className="rounded-lg border px-4 py-3 text-xs"
-        style={{
-          borderColor: "var(--ac-border)",
-          background: "var(--ac-surface)",
-          color: "var(--ac-text-mute)",
-        }}
-      >
-        <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.actions", locale)}</span>{" "}
-        {t("payments.actionsDesc", locale)}
-      </div>
+      <details className="rounded-lg border" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)" }}>
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>
+          {locale === "en" ? "How it works" : "Wie funktioniert das?"}
+        </summary>
+        <div className="border-t px-4 py-3 text-sm" style={{ borderColor: "var(--ac-border)", color: "var(--ac-text-soft)" }}>
+          <p className="mb-2">
+            <span className="font-semibold">{t("payments.status.automatic", locale)}:</span> {t("payments.status.automaticDesc", locale)}
+            {" · "}
+            <span className="font-semibold">{t("payments.status.deviation", locale)}:</span> {t("payments.status.deviationDesc", locale)}
+            {" · "}
+            <span className="font-semibold">{t("payments.filter.manual", locale)}:</span> {t("payments.status.manualDesc", locale)}
+            {" · "}
+            <span className="font-semibold">{t("payments.status.unclear", locale)}:</span> {t("payments.status.unclearDesc", locale)}
+            {" · "}
+            <span className="font-semibold">{t("payments.filter.ignored", locale)}:</span> {t("payments.status.ignoredDesc", locale)}
+          </p>
+          <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
+            <span className="font-semibold" style={{ color: "var(--ac-text)" }}>{t("payments.actions", locale)}</span>{" "}
+            {t("payments.actionsDesc", locale)}
+          </p>
+        </div>
+      </details>
 
       <div
         className="overflow-hidden rounded-[16px] border"
@@ -536,9 +533,10 @@ export default function ZahlungenPage() {
                     >
                       <StatusBadge status={tx.matching_status} />
                     </button>
-                    {tx.matching_status === "abweichung" && reasonText(tx) && (
+                    {tx.matching_status === "abweichung" && (
                       <span className="text-[11px] font-semibold" style={{ color: theme === "dark" ? "#f0bf7e" : "#a16b15" }}>
-                        {reasonText(tx)}
+                        {vertrauenLabel(Number(tx.matching_score || 0))} · Score {Math.round(Number(tx.matching_score || 0))}
+                        {reasonText(tx) ? ` · ${reasonText(tx)}` : ""}
                       </span>
                     )}
                   </div>
