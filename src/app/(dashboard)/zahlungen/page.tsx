@@ -14,11 +14,12 @@ export default function ZahlungenPage() {
   const { locale, theme } = useAppStore();
 
   const [statusFilter, setStatusFilter] = useState("alle");
+  const [kasseFilter, setKasseFilter] = useState("alle"); // alle | gesetzlich (BEMA) | privat (GOZ)
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const [suche, setSuche] = useState("");
   const [sucheAktiv, setSucheAktiv] = useState("");
-  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, page, pageSize, suche: sucheAktiv });
+  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, kasse: kasseFilter, page, pageSize, suche: sucheAktiv });
 
   // Suche entprellen: erst 350ms nach dem letzten Tastendruck abfragen.
   useEffect(() => {
@@ -387,6 +388,22 @@ export default function ZahlungenPage() {
             </button>
           ))}
         </div>
+        <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Abrechnungsart</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "alle", label: "Alle" },
+            { key: "gesetzlich", label: "Kasse (BEMA)" },
+            { key: "privat", label: "Privat (GOZ)" },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setKasseFilter(f.key); setPage(1); }}
+              className={`ac-chip ${kasseFilter === f.key ? "ac-chip-active" : ""}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
         <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zahlungsweg</p>
         <div className="flex flex-wrap gap-2">
           {[
@@ -543,17 +560,25 @@ export default function ZahlungenPage() {
                 </td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
                   {tx.patients && tx.matched_patient_id ? (
-                    <button
-                      type="button"
-                      className="font-medium hover:text-[#392fb8]"
-                      style={{ color: theme === "dark" ? "#b8b4ff" : "#4b42d6" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/patienten/${tx.matched_patient_id}`);
-                      }}
-                    >
-                      {tx.patients.nachname}, {tx.patients.vorname}
-                    </button>
+                    <span className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="font-medium hover:text-[#392fb8]"
+                        style={{ color: theme === "dark" ? "#b8b4ff" : "#4b42d6" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/patienten/${tx.matched_patient_id}`);
+                        }}
+                      >
+                        {tx.patients.nachname}, {tx.patients.vorname}
+                      </button>
+                      {tx.patients.kasse === "gesetzlich" && (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: theme === "dark" ? "#1e3a5f" : "#dbeafe", color: theme === "dark" ? "#93c5fd" : "#1d4ed8" }}>BEMA</span>
+                      )}
+                      {tx.patients.kasse === "privat" && (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: theme === "dark" ? "#1f3d2f" : "#dcfce7", color: theme === "dark" ? "#86efac" : "#15803d" }}>GOZ</span>
+                      )}
+                    </span>
                   ) : "—"}
                 </td>
                 <td className="table-cell py-3">

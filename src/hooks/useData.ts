@@ -101,6 +101,7 @@ export function usePatient(id: string) {
 // ─── Transaktionen ──────────────────────────────────────────
 export function useTransaktionen(filters?: {
   status?: string;
+  kasse?: string;
   from?: string;
   to?: string;
   page?: number;
@@ -116,14 +117,22 @@ export function useTransaktionen(filters?: {
     const pageSize = filters?.pageSize ?? 100;
     const page = filters?.page ?? 1;
     const fromIdx = (page - 1) * pageSize;
+    const kasse = filters?.kasse;
+    // Bei BEMA/GOZ-Filter inner join auf den zugeordneten Patienten, sonst normaler Join.
+    const sel = kasse && kasse !== "alle"
+      ? "*, patients:matched_patient_id!inner(vorname, nachname, kasse)"
+      : "*, patients:matched_patient_id(vorname, nachname, kasse)";
     let query = supabase
       .from("transaktionen")
-      .select("*, patients:matched_patient_id(vorname, nachname)", { count: "exact" })
+      .select(sel, { count: "exact" })
       .order("datum", { ascending: false })
       .range(fromIdx, fromIdx + pageSize - 1);
 
     if (filters?.status && filters.status !== "alle") {
       query = query.eq("matching_status", filters.status);
+    }
+    if (kasse && kasse !== "alle") {
+      query = query.eq("patients.kasse", kasse);
     }
     if (filters?.from) query = query.gte("datum", filters.from);
     if (filters?.to) query = query.lte("datum", filters.to);
@@ -149,7 +158,7 @@ export function useTransaktionen(filters?: {
     setTransaktionen(data || []);
     setTotalCount(count ?? 0);
     setLoading(false);
-  }, [filters?.status, filters?.from, filters?.to, filters?.page, filters?.pageSize, filters?.suche]);
+  }, [filters?.status, filters?.kasse, filters?.from, filters?.to, filters?.page, filters?.pageSize, filters?.suche]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
