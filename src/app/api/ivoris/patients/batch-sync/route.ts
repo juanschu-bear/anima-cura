@@ -2,158 +2,164 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // Vercel Pro
+export const maxDuration = 60;
 
-const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
-const PAGES_PER_BATCH = 100; // All pages in one go - 93 pages × ~2s = ~200s, fits in 300s maxDuration
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function fetchIvorisPage(page: number) {
-  const app = process.env.IVORIS_APP!;
-  const appVersion = process.env.IVORIS_APP_VERSION!;
-  const apiKey = process.env.IVORIS_API_KEY!;
-  const linkname = process.env.IVORIS_LINKNAME!;
-  const username = process.env.IVORIS_USERNAME!;
-  const password = process.env.IVORIS_PASSWORD!;
-  const baseUrl = `${DEFAULT_RELAY_HOST}/relay/${linkname}/webservice/api`;
-  const basic = Buffer.from(`${username}:${password}`).toString("base64");
+type SubmitBody = {
+  patientId?: string | null;
+  answers?: Record<string, unknown>;
+  schema?: { meds?: unknown; consents?: unknown } | null;
+};
 
-  const url = `${baseUrl}/Patient/v1/AllPatients?app=${encodeURIComponent(app)}&app_version=${encodeURIComponent(appVersion)}&api_key=${encodeURIComponent(apiKey)}&page=${page}`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Basic ${basic}`, Accept: "application/json" },
-    cache: "no-store",
-  });
-
-  if (!res.ok) throw new Error(`IVORIS page ${page}: HTTP ${res.status}`);
-  return await res.json();
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
-function mapGender(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const v = raw.toLowerCase();
-  if (["m", "male", "mann", "männlich"].includes(v)) return "m";
-  if (["w", "f", "female", "frau", "weiblich"].includes(v)) return "w";
-  if (["d", "divers", "diverse"].includes(v)) return "d";
-  return null;
-}
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as SubmitBody;
+    const answers = body.answers;
 
-function mapInsurance(raw: string | null | undefined): string {
-  if (!raw) return "privat";
-  const v = raw.toLowerCase();
-  if (v.includes("statutory") || v.includes("gesetz") || v.includes("gkv")) return "gesetzlich";
-  return "privat";
-}
+    if (!answers || typeof answers !== "object") {
+      return NextResponse.json(
+        { ok: false, error: "answers fehlt oder ist ungültig" },
+        { status: 400 }
+      );
+    }
 
-function normalizePatient(raw: any) {
-  const ivorisId = raw.Id;
-  if (!ivorisId) return null;
+    const supabase = createServerClient();
 
-  const treatment = raw.Treatment && typeof raw.Treatment === "object" ? raw.Treatment : null;
-  const currentInsurance = raw.CurrentInsurance && typeof raw.CurrentInsurance === "object" ? raw.CurrentInsurance : null;
-  const address = raw.Address && typeof raw.Address === "object" ? raw.Address : null;
+    const patientId =
+      typeof body.patientId === "string" && UUID_RE.test(body.patientId)
+        ? body.patientId
+        : null;
 
-  return {
-    ivoris_id: ivorisId,
-    vorname: raw.Firstname || "",
-    nachname: raw.Lastname || "",
-    geburtsdatum: raw.Birthday ? new Date(raw.Birthday).toISOString().slice(0, 10) : null,
-    geschlecht: mapGender(raw.Gender),
-    kasse: mapInsurance(raw.HealthInsurance),
-    versichertennummer: currentInsurance?.InsuranceNumber || null,
-    behandlung: treatment?.OrthodontistStage || "Unbekannt",
-    behandlung_start: null as string | null,
-    telefon: raw.Phone || raw.Mobile || null,
-    email: raw.Email || null,
-    strasse: address?.Street || null,
-    plz: address?.Zip || null,
-    ort: address?.City || null,
-    land: address?.Country || "DE",
-  };
-}
+    const vorname = asString(answers["patient_vorname"]);
+    const nachname = asString(answers["patient_nachname"]);
+    const email = asString(answers["patient_email"]);
+    const geburtsdatum = asString(answers["patient_geburtsdatum"]);
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const startPage = parseInt(searchParams.get("startPage") || "0", 10);
-  const appUrl = process.env.EXT_PUBLIC_APP_URL || "https://anima-cura.vercel.app";
+    // 1) Einreichung speichern
+    const { data: sub, error: insertError } = await supabase
+      .from("anamnese_submissions")
+      .insert({
+        patient_id: patientId,
+        vorname,
+        nachname,
+        email,
+        geburtsdatum,
+        answers,
+        status: "offen",
+      })
+      .select("id")
+      .single();
 
-  const db = createServerClient();
-  let totalFetched = 0;
-  let totalUpdated = 0;
-  let totalInserted = 0;
-  let totalSkipped = 0;
-  let reachedEnd = false;
-  const errors: string[] = [];
+    if (insertError || !sub) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Speichern fehlgeschlagen: ${insertError?.message ?? "unbekannt"}`,
+        },
+        { status: 500 }
+      );
+    }
 
-  for (let page = startPage; page < startPage + PAGES_PER_BATCH; page++) {
-    let patients: any[];
+    const submissionId = sub.id as string;
+
+    // 2) PDF beim PDF-Dienst rendern lassen
+    const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
+    const pdfKey = process.env.ANIMASIGN_PDF_KEY;
+
+    if (!pdfBaseUrl || !pdfKey) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          status: "fehler",
+          fehler_text: "ANIMASIGN_PDF_URL oder ANIMASIGN_PDF_KEY fehlt",
+        })
+        .eq("id", submissionId);
+      return NextResponse.json(
+        { ok: false, id: submissionId, error: "PDF-Dienst nicht konfiguriert" },
+        { status: 500 }
+      );
+    }
+
+    const dateipart = nachname
+      ? nachname.replace(/[^\p{L}\p{N}_-]/gu, "_")
+      : submissionId;
+
+    let pdfBuffer: Buffer;
     try {
-      patients = await fetchIvorisPage(page);
-    } catch (e) {
-      errors.push(String(e));
-      continue;
-    }
+      const pdfResponse = await fetch(`${pdfBaseUrl}/render`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": pdfKey,
+        },
+        body: JSON.stringify({
+          answers,
+          schema: body.schema ?? null,
+          filename: `Anamnesebogen_${dateipart}.pdf`,
+        }),
+      });
 
-    if (!Array.isArray(patients) || patients.length === 0) {
-      reachedEnd = true;
-      break;
-    }
-
-    totalFetched += patients.length;
-
-    for (const raw of patients) {
-      const normalized = normalizePatient(raw);
-      if (!normalized) { totalSkipped++; continue; }
-
-      // Check if patient exists
-      const { data: existing } = await db
-        .from("patients")
-        .select("id")
-        .eq("ivoris_id", normalized.ivoris_id)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        // Update
-        const { ivoris_id, ...updateFields } = normalized;
-        const { error } = await db
-          .from("patients")
-          .update(updateFields)
-          .eq("ivoris_id", ivoris_id);
-
-        if (error) {
-          errors.push(`Update ${ivoris_id}: ${error.message}`);
-          totalSkipped++;
-        } else {
-          totalUpdated++;
-        }
-      } else {
-        // Insert
-        const { error } = await db.from("patients").insert(normalized);
-        if (error) {
-          errors.push(`Insert ${normalized.ivoris_id}: ${error.message}`);
-          totalSkipped++;
-        } else {
-          totalInserted++;
-        }
+      if (!pdfResponse.ok) {
+        throw new Error(`PDF-Dienst antwortete mit ${pdfResponse.status}`);
       }
+
+      pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+    } catch (pdfError) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({ status: "fehler", fehler_text: `PDF: ${String(pdfError)}` })
+        .eq("id", submissionId);
+      return NextResponse.json(
+        {
+          ok: false,
+          id: submissionId,
+          error: `PDF-Erzeugung fehlgeschlagen: ${String(pdfError)}`,
+        },
+        { status: 502 }
+      );
     }
 
-    // Throttle between pages
-    await new Promise((r) => setTimeout(r, 300));
+    // 3) PDF im Supabase-Storage ablegen
+    const pdfPath = `${submissionId}/Anamnesebogen.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from("anamnese-dokumente")
+      .upload(pdfPath, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          status: "fehler",
+          fehler_text: `Storage: ${uploadError.message}`,
+        })
+        .eq("id", submissionId);
+      return NextResponse.json(
+        {
+          ok: false,
+          id: submissionId,
+          error: `Speichern des PDF fehlgeschlagen: ${uploadError.message}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    // 4) Einreichung aktualisieren
+    await supabase
+      .from("anamnese_submissions")
+      .update({ signed_pdf_path: pdfPath, status: "signatur_ausstehend" })
+      .eq("id", submissionId);
+
+    return NextResponse.json({ ok: true, id: submissionId, pdf_path: pdfPath });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }
-
-  const nextPage = reachedEnd ? null : startPage + PAGES_PER_BATCH;
-
-  // Done - no chaining needed, all pages processed in one go
-
-  return NextResponse.json({
-    ok: true,
-    batch: { startPage, pagesProcessed: Math.min(PAGES_PER_BATCH, (reachedEnd ? 93 : startPage + PAGES_PER_BATCH) - startPage) },
-    results: { fetched: totalFetched, updated: totalUpdated, inserted: totalInserted, skipped: totalSkipped },
-    errors: errors.slice(0, 20),
-    done: reachedEnd,
-    nextPage,
-    message: reachedEnd
-      ? `Sync abgeschlossen! ${totalFetched} Patienten verarbeitet.`
-      : `Batch ${startPage}-${startPage + PAGES_PER_BATCH - 1} fertig. Nächster Batch startet automatisch (Seite ${nextPage}).`,
-  });
 }
