@@ -2,164 +2,136 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // Vercel Pro
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
+const PAGES_PER_BATCH = 100; // alle Seiten in einem Durchlauf
 
-type SubmitBody = {
-  patientId?: string | null;
-  answers?: Record<string, unknown>;
-  schema?: { meds?: unknown; consents?: unknown } | null;
-};
+async function fetchIvorisPage(page: number) {
+  const app = process.env.IVORIS_APP!;
+  const appVersion = process.env.IVORIS_APP_VERSION!;
+  const apiKey = process.env.IVORIS_API_KEY!;
+  const linkname = process.env.IVORIS_LINKNAME!;
+  const username = process.env.IVORIS_USERNAME!;
+  const password = process.env.IVORIS_PASSWORD!;
+  const baseUrl = `${DEFAULT_RELAY_HOST}/relay/${linkname}/webservice/api`;
+  const basic = Buffer.from(`${username}:${password}`).toString("base64");
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() !== "" ? value : null;
+  const url = `${baseUrl}/Patient/v1/AllPatients?app=${encodeURIComponent(app)}&app_version=${encodeURIComponent(appVersion)}&api_key=${encodeURIComponent(apiKey)}&page=${page}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Basic ${basic}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error(`IVORIS page ${page}: HTTP ${res.status}`);
+  return await res.json();
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as SubmitBody;
-    const answers = body.answers;
+function mapGender(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase();
+  if (["m", "male", "mann", "maennlich", "männlich"].includes(v)) return "m";
+  if (["w", "f", "female", "frau", "weiblich"].includes(v)) return "w";
+  if (["d", "divers", "diverse"].includes(v)) return "d";
+  return null;
+}
 
-    if (!answers || typeof answers !== "object") {
-      return NextResponse.json(
-        { ok: false, error: "answers fehlt oder ist ungültig" },
-        { status: 400 }
-      );
-    }
+function mapInsurance(raw: string | null | undefined): string {
+  if (!raw) return "privat";
+  const v = raw.toLowerCase();
+  if (v.includes("statutory") || v.includes("gesetz") || v.includes("gkv")) return "gesetzlich";
+  return "privat";
+}
 
-    const supabase = createServerClient();
+function normalizePatient(raw: any) {
+  const ivorisId = raw.Id;
+  if (!ivorisId) return null;
 
-    const patientId =
-      typeof body.patientId === "string" && UUID_RE.test(body.patientId)
-        ? body.patientId
-        : null;
+  const treatment = raw.Treatment && typeof raw.Treatment === "object" ? raw.Treatment : null;
+  const currentInsurance = raw.CurrentInsurance && typeof raw.CurrentInsurance === "object" ? raw.CurrentInsurance : null;
+  const address = raw.Address && typeof raw.Address === "object" ? raw.Address : null;
 
-    const vorname = asString(answers["patient_vorname"]);
-    const nachname = asString(answers["patient_nachname"]);
-    const email = asString(answers["patient_email"]);
-    const geburtsdatum = asString(answers["patient_geburtsdatum"]);
+  return {
+    ivoris_id: ivorisId,
+    vorname: raw.Firstname || "",
+    nachname: raw.Lastname || "",
+    geburtsdatum: raw.Birthday ? new Date(raw.Birthday).toISOString().slice(0, 10) : null,
+    geschlecht: mapGender(raw.Gender),
+    kasse: mapInsurance(raw.HealthInsurance),
+    versichertennummer: currentInsurance?.InsuranceNumber || null,
+    behandlung: treatment?.OrthodontistStage || "Unbekannt",
+    behandlung_start: null as string | null,
+    telefon: raw.Phone || raw.Mobile || null,
+    email: raw.Email || null,
+    strasse: address?.Street || null,
+    plz: address?.Zip || null,
+    ort: address?.City || null,
+    land: address?.Country || "DE",
+  };
+}
 
-    // 1) Einreichung speichern
-    const { data: sub, error: insertError } = await supabase
-      .from("anamnese_submissions")
-      .insert({
-        patient_id: patientId,
-        vorname,
-        nachname,
-        email,
-        geburtsdatum,
-        answers,
-        status: "offen",
-      })
-      .select("id")
-      .single();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const startPage = parseInt(searchParams.get("startPage") || "0", 10);
 
-    if (insertError || !sub) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Speichern fehlgeschlagen: ${insertError?.message ?? "unbekannt"}`,
-        },
-        { status: 500 }
-      );
-    }
+  const db = createServerClient();
+  let totalFetched = 0;
+  let totalUpserted = 0;
+  let totalSkipped = 0;
+  let reachedEnd = false;
+  const errors: string[] = [];
 
-    const submissionId = sub.id as string;
-
-    // 2) PDF beim PDF-Dienst rendern lassen
-    const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
-    const pdfKey = process.env.ANIMASIGN_PDF_KEY;
-
-    if (!pdfBaseUrl || !pdfKey) {
-      await supabase
-        .from("anamnese_submissions")
-        .update({
-          status: "fehler",
-          fehler_text: "ANIMASIGN_PDF_URL oder ANIMASIGN_PDF_KEY fehlt",
-        })
-        .eq("id", submissionId);
-      return NextResponse.json(
-        { ok: false, id: submissionId, error: "PDF-Dienst nicht konfiguriert" },
-        { status: 500 }
-      );
-    }
-
-    const dateipart = nachname
-      ? nachname.replace(/[^\p{L}\p{N}_-]/gu, "_")
-      : submissionId;
-
-    let pdfBuffer: Buffer;
+  for (let page = startPage; page < startPage + PAGES_PER_BATCH; page++) {
+    let patients: any[];
     try {
-      const pdfResponse = await fetch(`${pdfBaseUrl}/render`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": pdfKey,
-        },
-        body: JSON.stringify({
-          answers,
-          schema: body.schema ?? null,
-          filename: `Anamnesebogen_${dateipart}.pdf`,
-        }),
-      });
-
-      if (!pdfResponse.ok) {
-        throw new Error(`PDF-Dienst antwortete mit ${pdfResponse.status}`);
-      }
-
-      pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
-    } catch (pdfError) {
-      await supabase
-        .from("anamnese_submissions")
-        .update({ status: "fehler", fehler_text: `PDF: ${String(pdfError)}` })
-        .eq("id", submissionId);
-      return NextResponse.json(
-        {
-          ok: false,
-          id: submissionId,
-          error: `PDF-Erzeugung fehlgeschlagen: ${String(pdfError)}`,
-        },
-        { status: 502 }
-      );
+      patients = await fetchIvorisPage(page);
+    } catch (e) {
+      errors.push(String(e));
+      continue;
     }
 
-    // 3) PDF im Supabase-Storage ablegen
-    const pdfPath = `${submissionId}/Anamnesebogen.pdf`;
-    const { error: uploadError } = await supabase.storage
-      .from("anamnese-dokumente")
-      .upload(pdfPath, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      await supabase
-        .from("anamnese_submissions")
-        .update({
-          status: "fehler",
-          fehler_text: `Storage: ${uploadError.message}`,
-        })
-        .eq("id", submissionId);
-      return NextResponse.json(
-        {
-          ok: false,
-          id: submissionId,
-          error: `Speichern des PDF fehlgeschlagen: ${uploadError.message}`,
-        },
-        { status: 500 }
-      );
+    if (!Array.isArray(patients) || patients.length === 0) {
+      reachedEnd = true;
+      break;
     }
 
-    // 4) Einreichung aktualisieren
-    await supabase
-      .from("anamnese_submissions")
-      .update({ signed_pdf_path: pdfPath, status: "signatur_ausstehend" })
-      .eq("id", submissionId);
+    totalFetched += patients.length;
 
-    return NextResponse.json({ ok: true, id: submissionId, pdf_path: pdfPath });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+    const rows: NonNullable<ReturnType<typeof normalizePatient>>[] = [];
+    for (const raw of patients) {
+      const normalized = normalizePatient(raw);
+      if (!normalized) { totalSkipped++; continue; }
+      rows.push(normalized);
+    }
+
+    if (rows.length === 0) continue;
+
+    const { error } = await db
+      .from("patients")
+      .upsert(rows, { onConflict: "ivoris_id" });
+
+    if (error) {
+      errors.push(`Upsert Seite ${page}: ${error.message}`);
+      totalSkipped += rows.length;
+    } else {
+      totalUpserted += rows.length;
+    }
+
+    await new Promise((r) => setTimeout(r, 150));
   }
+
+  const nextPage = reachedEnd ? null : startPage + PAGES_PER_BATCH;
+
+  return NextResponse.json({
+    ok: true,
+    batch: { startPage },
+    results: { fetched: totalFetched, upserted: totalUpserted, skipped: totalSkipped },
+    errors: errors.slice(0, 20),
+    done: reachedEnd,
+    nextPage,
+    message: reachedEnd
+      ? `Sync abgeschlossen. ${totalFetched} Patienten verarbeitet, ${totalUpserted} geschrieben.`
+      : `Batch ab Seite ${startPage} fertig.`,
+  });
 }
