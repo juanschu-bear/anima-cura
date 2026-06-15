@@ -151,11 +151,11 @@ interface Props {
 }
 
 type StepName =
-  | "versicherung" | "patient" | "versicherter"
+  | "versicherung" | "patient" | "versicherter" | "zahler"
   | "behandlung" | "gesundheit" | "einwilligungen" | "abschluss";
 
 const STEPS: StepName[] = [
-  "versicherung", "patient", "versicherter",
+  "versicherung", "patient", "versicherter", "zahler",
   "behandlung", "gesundheit", "einwilligungen", "abschluss",
 ];
 
@@ -163,6 +163,7 @@ const STEP_TITLES: Record<StepName, string> = {
   versicherung: "Versicherung",
   patient: "Patient",
   versicherter: "Versicherter",
+  zahler: "Zahler",
   behandlung: "Behandlung",
   gesundheit: "Gesundheit",
   einwilligungen: "Einwilligungen",
@@ -317,6 +318,7 @@ export function AnamneseForm({ patientId }: Props) {
     versicherung: ["versicherungsart", "krankenkasse"],
     patient: ["patient_vorname", "patient_nachname", "patient_geburtsdatum", "patient_geschlecht", "patient_telefon", "patient_strasse", "patient_hausnummer", "patient_plz", "patient_wohnort", "patient_email", "patient_mobil"],
     versicherter: ["vp_vorname", "vp_nachname", "vp_telefon"],
+    zahler: ["ist_selbstzahler", "ist_vn"],
     behandlung: ["besuchsgrund"],
     gesundheit: [...MEDS.map((m) => m.key), "g_zaehneputzen"],
     einwilligungen: ["ew_roentgen"],
@@ -343,13 +345,19 @@ export function AnamneseForm({ patientId }: Props) {
     patient_nachname: pruefeName,
     vp_vorname: pruefeName,
     vp_nachname: pruefeName,
+    zahler_vorname: pruefeName,
+    zahler_nachname: pruefeName,
+    vn_vorname: pruefeName,
+    vn_nachname: pruefeName,
     patient_email: pruefeEmail,
     patient_telefon: pruefeTelefon,
     patient_mobil: pruefeTelefon,
     vp_telefon: pruefeTelefon,
+    zahler_telefon: pruefeTelefon,
     patient_plz: pruefePlz,
     patient_hausnummer: pruefeHausnummer,
     patient_geburtsdatum: (v) => pruefeDatum(v, { geburt: true }),
+    zahler_geburtsdatum: (v) => pruefeDatum(v, { geburt: true }),
     abschluss_datum: (v) => pruefeDatum(v),
     krankenkasse: (v) => pruefeText(v, 2),
     patient_strasse: (v) => pruefeText(v, 2),
@@ -359,9 +367,18 @@ export function AnamneseForm({ patientId }: Props) {
   };
 
   const pruefeSchritt = (): { keys: string[]; gruende: Record<string, string> } => {
+    const requiredKeys = [...(PFLICHT[stepName] ?? [])];
+    if (stepName === "zahler") {
+      if (data.ist_selbstzahler === "nein") {
+        requiredKeys.push("zahler_vorname", "zahler_nachname", "zahler_telefon");
+      }
+      if (data.ist_vn === "nein") {
+        requiredKeys.push("vn_vorname", "vn_nachname");
+      }
+    }
     const keys: string[] = [];
     const g: Record<string, string> = {};
-    for (const key of PFLICHT[stepName] ?? []) {
+    for (const key of requiredKeys) {
       if (istLeer(key)) { keys.push(key); continue; }
       const pf = PRUEFUNG[key];
       if (pf) {
@@ -542,6 +559,41 @@ export function AnamneseForm({ patientId }: Props) {
                 <div className="field"><label>Telefonnummer</label><input type="tel" value={txt("vp2_telefon")} onChange={(e) => set("vp2_telefon", e.target.value)} /></div>
                 <div className="field"><label>E-Mail-Adresse</label><input type="email" value={txt("vp2_email")} onChange={(e) => set("vp2_email", e.target.value)} /></div>
               </div></div>
+            )}
+          </section>
+        );
+      case "zahler":
+        return (
+          <section className="step active">
+            <h2>Zahler & Versicherungsnehmer</h2>
+            <p className="sub">Bitte teilen Sie uns mit, ob Sie selbst der Zahler und der Versicherungsnehmer sind. Falls nicht, ergänzen Sie bitte die entsprechenden Angaben.</p>
+            <div className="field col-2">
+              <label>Sind Sie selbst der Zahler? <span className="req">*</span></label>
+              {renderYesNo("ist_selbstzahler")}
+            </div>
+            {data.ist_selbstzahler === "nein" && (
+              <div className="followup show">
+                <div className="grid">
+                  <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("zahler_vorname").trim()} value={txt("zahler_vorname")} onChange={(e) => set("zahler_vorname", e.target.value)} />{gruende["zahler_vorname"] ? <span className="fehlt-grund">{gruende["zahler_vorname"]}</span> : null}</div>
+                  <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("zahler_nachname").trim()} value={txt("zahler_nachname")} onChange={(e) => set("zahler_nachname", e.target.value)} />{gruende["zahler_nachname"] ? <span className="fehlt-grund">{gruende["zahler_nachname"]}</span> : null}</div>
+                  <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("zahler_telefon").trim()} value={txt("zahler_telefon")} onChange={(e) => set("zahler_telefon", e.target.value)} />{gruende["zahler_telefon"] ? <span className="fehlt-grund">{gruende["zahler_telefon"]}</span> : null}</div>
+                  <div className="field"><label>Geburtsdatum <span className="opt">freiwillig</span></label><input type="date" value={txt("zahler_geburtsdatum")} onChange={(e) => set("zahler_geburtsdatum", e.target.value)} /></div>
+                  <div className="field col-2"><label>Verhältnis zum Patienten <span className="opt">freiwillig</span></label><input type="text" value={txt("zahler_verhaeltnis")} onChange={(e) => set("zahler_verhaeltnis", e.target.value)} /></div>
+                </div>
+              </div>
+            )}
+            <div className="field col-2" style={{ marginTop: 6 }}>
+              <label>Sind Sie selbst der Versicherungsnehmer? <span className="req">*</span></label>
+              {renderYesNo("ist_vn")}
+            </div>
+            {data.ist_vn === "nein" && (
+              <div className="followup show">
+                <div className="grid">
+                  <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("vn_vorname").trim()} value={txt("vn_vorname")} onChange={(e) => set("vn_vorname", e.target.value)} />{gruende["vn_vorname"] ? <span className="fehlt-grund">{gruende["vn_vorname"]}</span> : null}</div>
+                  <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("vn_nachname").trim()} value={txt("vn_nachname")} onChange={(e) => set("vn_nachname", e.target.value)} />{gruende["vn_nachname"] ? <span className="fehlt-grund">{gruende["vn_nachname"]}</span> : null}</div>
+                  <div className="field col-2"><label>Verhältnis zum Patienten <span className="opt">freiwillig</span></label><input type="text" value={txt("vn_verhaeltnis")} onChange={(e) => set("vn_verhaeltnis", e.target.value)} /></div>
+                </div>
+              </div>
             )}
           </section>
         );
