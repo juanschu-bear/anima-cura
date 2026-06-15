@@ -52,7 +52,7 @@ Create these three users in Supabase Auth during setup:
 | Email | Password | Role | Name |
 |-------|----------|------|------|
 | maria@praxis-schubert.de | ms13sr06?! | admin | Dr. Maria Schubert |
-| sabine@praxis-schubert.de | sabine2026! | verwaltung | Sabine |
+| sabine@praxis-schubert.de | ms13sr06?! | verwaltung | Sabine |
 | empfang@praxis-schubert.de | empfang2026! | lesezugriff | Empfang |
 
 ### 7. Important Notes

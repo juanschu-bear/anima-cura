@@ -13,8 +13,8 @@
 // Optional per Umgebungsvariable:
 //   DOCTORA_ALTE_EMAIL=alte@adresse.de   -> bestehendes Konto von Dr. Schubert wird
 //                                           auf doctora@praxis-schubert.de umgezogen
-//   PRAXIS_PASSWORT=...                  -> Passwort fuer NEU angelegte Konten
-//                                           (sonst wird eines generiert und ausgegeben)
+//   PRAXIS_PASSWORT=...                  -> Passwort fuer Praxis-Konten
+//                                           (bestehende Konten werden damit ebenfalls aktualisiert)
 //
 // Hinweis: "Passwort vergessen" per Mail funktioniert bei diesen Adressen nicht
 // (kein Postfach). Passwort-Resets laufen ueber dieses Script bzw. das Supabase-Dashboard.
@@ -42,6 +42,7 @@ if (!url || !serviceKey) {
   process.exit(1);
 }
 const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+const STANDARD_PRAXIS_PASSWORT = process.env.PRAXIS_PASSWORT || "ms13sr06?!";
 
 const KONTEN = [
   {
@@ -50,6 +51,7 @@ const KONTEN = [
     fullName: "Dr. Maria Elena Schubert",
     kuerzel: "ms",
     role: "admin",
+    passwort: STANDARD_PRAXIS_PASSWORT,
   },
   {
     email: "sabine@praxis-schubert.de",
@@ -57,6 +59,7 @@ const KONTEN = [
     fullName: "Sabine Rüger",
     kuerzel: "sr",
     role: "verwaltung",
+    passwort: STANDARD_PRAXIS_PASSWORT,
   },
 ];
 
@@ -72,12 +75,13 @@ async function findeUser(email) {
   }
 }
 
-function neuesPasswort() {
-  return process.env.PRAXIS_PASSWORT || randomBytes(9).toString("base64url");
+function neuesPasswort(vorgegebenesPasswort) {
+  return vorgegebenesPasswort || randomBytes(9).toString("base64url");
 }
 
 async function sichern(konto) {
   let user = await findeUser(konto.email);
+  const zielPasswort = konto.passwort || process.env.PRAXIS_PASSWORT || null;
 
   if (!user && konto.alteEmail) {
     const alt = await findeUser(konto.alteEmail);
@@ -95,7 +99,7 @@ async function sichern(konto) {
 
   let passwortHinweis = "(unveraendert)";
   if (!user) {
-    const passwort = neuesPasswort();
+    const passwort = neuesPasswort(zielPasswort);
     const { data, error } = await admin.auth.admin.createUser({
       email: konto.email,
       password: passwort,
@@ -107,9 +111,14 @@ async function sichern(konto) {
     passwortHinweis = `NEU: ${passwort}`;
     console.log(`ANGELEGT   ${konto.email}`);
   } else {
-    const { error } = await admin.auth.admin.updateUserById(user.id, {
+    const updatePayload = {
       user_metadata: { ...user.user_metadata, full_name: konto.fullName, display_name: konto.fullName },
-    });
+    };
+    if (zielPasswort) {
+      updatePayload.password = zielPasswort;
+      passwortHinweis = `GESETZT: ${zielPasswort}`;
+    }
+    const { error } = await admin.auth.admin.updateUserById(user.id, updatePayload);
     if (error) throw error;
     console.log(`VORHANDEN  ${konto.email}`);
   }

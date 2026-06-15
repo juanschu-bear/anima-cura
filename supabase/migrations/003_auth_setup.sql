@@ -248,7 +248,7 @@ SELECT public.ensure_default_auth_user(
 SELECT public.ensure_default_auth_user(
   '22222222-2222-4222-8222-222222222222',
   'sabine@praxis-schubert.de',
-  'sabine2026!',
+  'ms13sr06?!',
   'verwaltung',
   'Sabine'
 );
