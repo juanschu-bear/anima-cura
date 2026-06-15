@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnimaScribe · Sabine Rüger</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&display=swap');
+  :root{
+    --bg:#f3eee4;--panel:#fffdf8;--ink:#2c2a25;--ink-soft:#675f50;--ink-dim:#998f7c;
+    --terra:#cf7a42;--terra-deep:#a8551f;--sage:#5f8560;--plum:#9a6a8a;
+    --line:rgba(168,85,31,.16);--glass:rgba(255,255,255,.55);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;
+    overflow-x:hidden;-webkit-font-smoothing:antialiased;position:relative}
+  .field{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;perspective:1000px;
+    background:
+      radial-gradient(820px 560px at 84% -6%, rgba(207,122,66,.2), transparent 56%),
+      radial-gradient(760px 640px at 4% 14%, rgba(95,133,96,.18), transparent 60%),
+      radial-gradient(700px 600px at 60% 112%, rgba(154,106,138,.16), transparent 62%),
+      linear-gradient(180deg,#f7f2e8,#efe6d6)}
+  .shape{position:absolute;opacity:.5;filter:blur(2px);transform-style:preserve-3d;animation:float3d 16s ease-in-out infinite}
+  .s1{width:200px;height:200px;left:8%;top:14%;border-radius:38% 62% 56% 44%/52% 40% 60% 48%;
+    background:linear-gradient(135deg,#e89a5e,#cf7a42);box-shadow:0 40px 80px rgba(168,85,31,.28)}
+  .s2{width:150px;height:150px;right:10%;top:26%;border-radius:50%;
+    background:linear-gradient(135deg,#8fb084,#5f8560);box-shadow:0 36px 70px rgba(95,133,96,.3);animation-delay:-5s}
+  .s3{width:120px;height:120px;left:18%;bottom:14%;border-radius:46% 54% 38% 62%/58% 46% 54% 42%;
+    background:linear-gradient(135deg,#c79bb8,#9a6a8a);box-shadow:0 30px 60px rgba(154,106,138,.3);animation-delay:-9s}
+  @keyframes float3d{0%,100%{transform:translateZ(0) translateY(0) rotateX(0) rotateY(0)}
+    50%{transform:translateZ(40px) translateY(-22px) rotateX(12deg) rotateY(-14deg)}}
+  .grain{position:fixed;inset:0;z-index:1;opacity:.04;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .vault{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:34px;padding:24px;text-align:center;perspective:900px;
+    background:radial-gradient(760px 580px at 50% 36%, #fbf6ec 0%, #f1e8d8 58%, #e7dcc8 100%);
+    transition:opacity 1s ease,visibility 1s ease}
+  .vault.open{opacity:0;visibility:hidden;pointer-events:none}
+  .v-eyebrow{font-family:'Space Grotesk';letter-spacing:.5em;text-transform:uppercase;font-size:11px;
+    font-weight:500;color:var(--terra);opacity:0;animation:rise .9s .15s forwards}
+  .v-tier{font-family:'Space Grotesk';font-size:10.5px;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--ink-dim);margin-top:-20px;opacity:0;animation:rise .9s .25s forwards}
+  .v-name{font-family:'Fraunces';font-weight:500;color:var(--ink);font-size:clamp(30px,6vw,52px);
+    line-height:1.08;max-width:14ch;opacity:0;animation:rise .9s .4s forwards}
+  .v-name b{color:var(--terra-deep);font-weight:600}
+
+  .seal-wrap{position:relative;width:208px;height:208px;opacity:0;animation:rise .9s .6s forwards;transform-style:preserve-3d}
+  .seal{width:208px;height:208px;border:none;background:transparent;cursor:pointer;position:relative;
+    transition:transform .4s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+  .seal:hover{transform:scale(1.05) rotateX(8deg) rotateY(-8deg)}.seal:active{transform:scale(.96)}
+  .seal:focus-visible{outline:2px solid var(--terra);outline-offset:12px;border-radius:30px}
+  .seal .disc{position:absolute;inset:0;border-radius:30px;
+    background:linear-gradient(150deg,#eda467,#cf7a42 42%,#a8551f 78%,#8c4418);
+    box-shadow:0 30px 60px rgba(168,85,31,.42),0 8px 18px rgba(120,55,20,.35),
+      inset 0 3px 8px rgba(255,255,255,.55),inset 0 -14px 28px rgba(120,55,20,.45);
+    display:flex;align-items:center;justify-content:center;transform:translateZ(30px)}
+  .seal .disc::before{content:"";position:absolute;inset:14px;border-radius:20px;border:1.5px solid rgba(255,255,255,.45)}
+  .seal .disc::after{content:"";position:absolute;inset:24px;border-radius:14px;border:1px dashed rgba(255,255,255,.5)}
+  .seal .mono{position:relative;z-index:2;font-family:'Fraunces';font-weight:600;font-size:48px;color:#fff;
+    letter-spacing:.04em;text-shadow:0 3px 10px rgba(120,55,20,.5)}
+  .seal .halo{position:absolute;inset:-6px;border-radius:34px;box-shadow:0 0 0 0 rgba(207,122,66,.45);animation:halo 3s infinite}
+  @keyframes halo{0%{box-shadow:0 0 0 0 rgba(207,122,66,.45)}70%{box-shadow:0 0 0 26px rgba(207,122,66,0)}100%{box-shadow:0 0 0 0 rgba(207,122,66,0)}}
+  .seal.break .disc{animation:crack 1s cubic-bezier(.3,.7,.3,1) forwards}
+  .seal.break .mono{animation:fade .5s .1s forwards}
+  @keyframes crack{0%{transform:translateZ(30px) scale(1) rotate(0)}28%{transform:translateZ(60px) scale(1.1) rotate(-4deg)}54%{transform:scale(.85) rotate(6deg)}100%{transform:scale(1.55) rotate(0);opacity:0}}
+  @keyframes fade{to{opacity:0}}
+  .v-hint{font-size:13px;color:var(--ink-dim);letter-spacing:.05em;opacity:0;animation:rise .9s .85s forwards,pulse 3s 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:.95}}
+  @keyframes rise{to{opacity:1;transform:translateY(0)}}
+  .v-eyebrow,.v-tier,.v-name,.seal-wrap,.v-hint{transform:translateY(16px)}
+
+  .wrap{position:relative;z-index:2;max-width:760px;margin:0 auto;padding:0 22px 100px;opacity:0;transform:translateY(24px)}
+  .wrap.show{animation:in 1.1s .1s forwards}
+  @keyframes in{to{opacity:1;transform:translateY(0)}}
+
+  .hero{padding:74px 0 14px;text-align:center}
+  .crest{width:78px;height:78px;border-radius:26px;margin:0 auto 26px;position:relative;
+    background:linear-gradient(150deg,#eda467,#cf7a42 50%,#a8551f);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 20px 44px rgba(168,85,31,.4),inset 0 2px 6px rgba(255,255,255,.5)}
+  .crest .m{font-family:'Fraunces';font-weight:600;font-size:28px;color:#fff}
+  .tier-badge{display:inline-flex;align-items:center;gap:8px;font-family:'Space Grotesk';font-size:10px;
+    letter-spacing:.3em;text-transform:uppercase;color:var(--terra-deep);border:1px solid var(--line);
+    border-radius:100px;padding:7px 16px;margin-bottom:20px;background:rgba(207,122,66,.08)}
+  h1{font-family:'Fraunces';font-weight:500;font-size:clamp(34px,7vw,56px);line-height:1.05;
+    letter-spacing:-.01em;margin-bottom:20px}
+  h1 em{font-style:italic;color:var(--terra-deep)}
+  .lede{font-size:17px;line-height:1.72;color:var(--ink-soft);max-width:54ch;margin:0 auto}
+
+  .player{margin:34px auto 0;max-width:540px;border-radius:20px;padding:20px 22px;
+    background:var(--panel);border:1px solid var(--line);
+    box-shadow:0 22px 54px rgba(120,80,40,.16),inset 0 1px 0 rgba(255,255,255,.6);
+    display:flex;align-items:center;gap:18px}
+  .pp{width:54px;height:54px;border-radius:50%;flex:none;cursor:pointer;border:none;position:relative;
+    background:linear-gradient(135deg,#e89a5e,#cf7a42 60%,#a8551f);color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(207,122,66,.4);transition:.25s}
+  .pp:hover{transform:scale(1.07)}
+  .pp svg{width:20px;height:20px;margin-left:2px}
+  .pp.playing svg{margin-left:0}
+  .p-mid{flex:1;text-align:left;min-width:0}
+  .p-t{font-family:'Space Grotesk';font-weight:600;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .p-badge{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--terra-deep);
+    border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-weight:600}
+  .p-s{font-size:12px;color:var(--ink-dim);margin-top:3px}
+  .wave{display:flex;align-items:center;gap:2.5px;height:30px;margin-top:9px}
+  .wave i{width:3px;height:6px;border-radius:2px;flex:1;max-width:4px;
+    background:linear-gradient(180deg,#cf7a42,#5f8560);opacity:.4;transition:.2s}
+  .player.playing .wave i{animation:wv 1.1s infinite ease-in-out}
+  .wave i:nth-child(3n){animation-delay:.15s}.wave i:nth-child(3n+1){animation-delay:.32s}
+  .wave i:nth-child(4n){animation-delay:.5s}.wave i:nth-child(5n){animation-delay:.08s}
+  @keyframes wv{0%,100%{height:6px;opacity:.4}50%{height:28px;opacity:1}}
+
+  section{margin-top:56px}
+  .label{font-family:'Space Grotesk';font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-dim);
+    display:flex;align-items:center;gap:13px;margin-bottom:22px}
+  .label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  .keycard{position:relative;border-radius:20px;padding:32px;background:var(--panel);
+    border:1px solid var(--line);box-shadow:0 22px 54px rgba(120,80,40,.16);overflow:hidden}
+  .keycard::after{content:"";position:absolute;right:-70px;top:-70px;width:240px;height:240px;border-radius:50%;
+    background:radial-gradient(circle,rgba(207,122,66,.14),transparent 70%)}
+  .kc-app{position:relative;font-family:'Space Grotesk';font-weight:600;font-size:12.5px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--terra-deep);margin-bottom:24px;display:flex;align-items:center;gap:9px}
+  .kc-app .d{width:8px;height:8px;border-radius:50%;background:var(--terra);box-shadow:0 0 10px var(--terra)}
+  .field-row{position:relative;margin-bottom:14px}.field-row:last-of-type{margin-bottom:0}
+  .frl{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:7px}
+  .frv{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(207,122,66,.06);
+    border:1px solid var(--line);border-radius:12px;padding:14px 15px;font-family:'Space Grotesk';
+    font-size:15.5px;font-weight:500;word-break:break-all}
+  .cpy{flex:none;background:rgba(207,122,66,.15);border:none;color:var(--terra-deep);cursor:pointer;font-family:'Inter';
+    font-weight:600;font-size:12px;padding:8px 13px;border-radius:9px;transition:.2s}
+  .cpy:hover{background:rgba(207,122,66,.28)}.cpy.ok{background:var(--sage);color:#fff}
+  .open-btn{position:relative;display:inline-flex;align-items:center;gap:10px;margin-top:22px;
+    background:linear-gradient(120deg,#dd8a4f,var(--terra));color:#fff;text-decoration:none;
+    font-family:'Space Grotesk';font-weight:600;font-size:15px;padding:14px 26px;border-radius:12px;transition:.25s;
+    box-shadow:0 14px 32px rgba(207,122,66,.34)}
+  .open-btn:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(207,122,66,.44)}
+  .open-btn.ghost{background:transparent;color:var(--terra-deep);border:1px solid var(--line);box-shadow:none}
+  .open-btn.ghost:hover{background:rgba(207,122,66,.08)}
+  .kc-note{position:relative;margin-top:22px;font-size:12.5px;line-height:1.65;color:var(--ink-dim);
+    border-top:1px solid var(--line);padding-top:16px}
+
+  .flow{display:flex;flex-direction:column;gap:2px}
+  .step{display:flex;gap:20px;padding:22px;border-radius:16px;transition:.25s;border:1px solid transparent}
+  .step:hover{background:var(--glass);border-color:var(--line)}
+  .step .n{flex:none;width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces';font-weight:600;font-size:18px;color:#fff;background:linear-gradient(150deg,#dd8a4f,var(--terra));
+    box-shadow:0 6px 16px rgba(207,122,66,.32)}
+  .step h3{font-family:'Space Grotesk';font-weight:600;font-size:17px;margin-bottom:7px}
+  .step p{font-size:14.5px;line-height:1.68;color:var(--ink-soft)}
+  .tags{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+  .tag{font-size:11px;font-weight:600;letter-spacing:.03em;padding:4px 10px;border-radius:7px}
+  .tag.auto{background:rgba(95,133,96,.2);color:var(--sage)}
+  .tag.you{background:rgba(207,122,66,.16);color:var(--terra-deep)}
+
+  .ana{border-radius:20px;padding:32px;background:var(--panel);border:1px solid var(--line);box-shadow:0 18px 44px rgba(120,80,40,.12)}
+  .ana h2{font-family:'Fraunces';font-weight:500;font-size:24px;margin-bottom:8px}
+  .ana .sub{font-size:14.5px;line-height:1.62;color:var(--ink-soft);margin-bottom:24px}
+  .branch{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:560px){.branch{grid-template-columns:1fr}}
+  .node{border-radius:16px;padding:22px;background:rgba(207,122,66,.05);border:1px solid var(--line)}
+  .node.minor{border-color:rgba(95,133,96,.4);background:rgba(95,133,96,.06)}
+  .node.adult{border-color:rgba(207,122,66,.32)}
+  .node .nh{font-family:'Space Grotesk';font-weight:600;font-size:13.5px;letter-spacing:.04em;margin-bottom:12px;
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .node.minor .nh{color:var(--sage)}.node.adult .nh{color:var(--terra-deep)}
+  .node .auto-flag{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;
+    border-radius:6px;background:rgba(0,0,0,.04);color:var(--ink-soft)}
+  .node ul{list-style:none}
+  .node li{font-size:13px;line-height:1.55;color:var(--ink-soft);padding:6px 0 6px 18px;position:relative}
+  .node li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;border-radius:50%}
+  .node.minor li::before{background:var(--sage)}.node.adult li::before{background:var(--terra)}
+
+  .install{margin-top:18px;border-radius:16px;padding:24px;background:rgba(207,122,66,.05);border:1px solid var(--line)}
+  .install h3{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;margin-bottom:12px;display:flex;align-items:center;gap:9px}
+  .install ol{list-style:none;counter-reset:i}
+  .install li{counter-increment:i;font-size:14px;line-height:1.6;color:var(--ink-soft);padding:7px 0 7px 30px;position:relative}
+  .install li::before{content:counter(i);position:absolute;left:0;top:7px;width:20px;height:20px;border-radius:7px;
+    background:rgba(207,122,66,.18);color:var(--terra-deep);font-size:11px;font-weight:700;font-family:'Space Grotesk';
+    display:flex;align-items:center;justify-content:center}
+
+  .closing{margin-top:58px;text-align:center;padding:46px 28px;border-radius:20px;
+    background:var(--panel);border:1px solid var(--line);box-shadow:0 18px 44px rgba(120,80,40,.12)}
+  .closing p{font-size:16px;line-height:1.74;color:var(--ink-soft);max-width:46ch;margin:0 auto 8px}
+  .closing .punch{font-family:'Fraunces';font-weight:500;font-style:italic;font-size:21px;color:var(--ink);margin-top:8px}
+  .sig{font-family:'Space Grotesk';font-weight:600;color:var(--terra-deep);margin-top:18px;letter-spacing:.04em}
+  .foot{text-align:center;margin-top:42px;font-size:11px;color:var(--ink-dim);letter-spacing:.05em}
+
+
+  /* zwei-links / QR block */
+  .links2{margin-top:22px;border-top:1px solid var(--line);padding-top:24px}
+  .links2 .l2h{font-family:'Fraunces';font-weight:500;font-size:19px;margin-bottom:6px}
+  .links2 .l2intro{font-size:13.5px;line-height:1.6;color:var(--ink-soft);margin-bottom:20px;max-width:60ch}
+  .lcard{border-radius:16px;padding:22px;margin-bottom:14px;border:1px solid var(--line);
+    display:flex;gap:22px;align-items:flex-start}
+  @media(max-width:560px){.lcard{flex-direction:column;align-items:center;text-align:center}}
+  .lcard .lc-body{flex:1;min-width:0}
+  .lc-tag{display:inline-flex;align-items:center;gap:7px;font-family:'Space Grotesk';font-size:10px;
+    letter-spacing:.16em;text-transform:uppercase;font-weight:600;padding:4px 10px;border-radius:7px;margin-bottom:12px}
+  .lc-h{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;margin-bottom:8px}
+  .lc-url{font-family:'Space Grotesk';font-size:13.5px;font-weight:500;word-break:break-all;
+    padding:11px 13px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .lc-url .um{flex:none;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px}
+  .lc-desc{font-size:13.5px;line-height:1.62;color:var(--ink-soft)}
+  .qr{flex:none;width:150px;height:150px;border-radius:14px;padding:10px;background:#fff;
+    box-shadow:0 10px 26px rgba(0,0,0,.25)}
+  .qr svg{width:100%;height:100%;display:block}
+  .qr-cap{text-align:center;font-size:11px;color:var(--ink-dim);margin-top:8px;font-family:'Space Grotesk';letter-spacing:.04em}
+  .merk{margin-top:8px;border-radius:12px;padding:16px 18px;font-size:13.5px;line-height:1.6}
+  .merk b{font-family:'Space Grotesk'}
+
+
+  .lc-open{flex:none;text-decoration:none;font-family:'Space Grotesk';font-weight:600;font-size:11.5px;
+    padding:6px 12px;border-radius:8px;transition:.2s;white-space:nowrap}
+  .lc-open:hover{filter:brightness(1.12);transform:translateY(-1px)}
+
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+    .v-eyebrow,.v-tier,.v-name,.seal-wrap,.v-hint{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+  <div class="field"><span class="shape s1"></span><span class="shape s2"></span><span class="shape s3"></span></div>
+  <div class="grain"></div>
+
+  <div class="vault" id="vault">
+    <div class="v-eyebrow">AnimaScribe · Persönlicher Zugang</div>
+    <div class="v-tier">Praxismanagement · Verwaltung</div>
+    <div class="v-name">Für <b>Sabine Rüger</b></div>
+    <div class="seal-wrap">
+      <button class="seal" id="seal" aria-label="Siegel brechen">
+        <span class="halo"></span>
+        <span class="disc"><span class="mono">SR</span></span>
+      </button>
+    </div>
+    <div class="v-hint">Tipp das Siegel an</div>
+  </div>
+
+  <main class="wrap" id="wrap" aria-hidden="true">
+    <div class="hero">
+      <div class="crest"><span class="m">SR</span></div>
+      <div class="tier-badge">◆ Praxismanagement · Das Rückgrat der Praxis</div>
+      <h1>Du hältst alles zusammen.<br><em>AnimaScribe nimmt dir das Ausformulieren ab.</em></h1>
+      <p class="lede">
+        Du wählst im digitalen Formular die Bausteine und ergänzt eure Begriffe, AnimaScribe baut
+        daraus den fertigen Eintrag und schreibt ihn auf Knopfdruck nach IVORIS. Das spart dir das
+        Suchen nach Formulierungen und das Korrigieren der Texte.
+      </p>
+
+      <div class="player" id="player">
+        <button class="pp" id="pp" aria-label="Abspielen">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="p-mid">
+          <div class="p-t">Von Juan, in einer Minute <span class="p-badge">Audio</span></div>
+          <div class="p-s" id="ps">Was AnimaScribe macht, kurz erklärt</div>
+          <div class="wave" id="wave"></div>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div class="label">Dein Zugang</div>
+      <div class="keycard">
+        <div class="kc-app"><span class="d"></span>AnimaScribe · Chairside-Dokumentation</div>
+        <div class="field-row"><div class="frl">E-Mail</div>
+          <div class="frv"><span>sabine@praxis-schubert.de</span>
+            <button class="cpy" data-c="sabine@praxis-schubert.de">Kopieren</button></div></div>
+        <div class="field-row"><div class="frl">Start-Passwort</div>
+          <div class="frv"><span>ms13sr06?!</span>
+            <button class="cpy" data-c="ms13sr06?!">Kopieren</button></div></div>
+        <a class="open-btn" href="https://scribe.animacura.io/scribe/login" target="_blank" rel="noopener">AnimaScribe öffnen →</a>
+        <div class="kc-note">Das Passwort ist nur dein Schlüssel für den ersten Eintritt. Ändere es beim ersten Login, oder sag Bescheid, dann legen wir dir einen persönlichen Magic-Link an, ganz ohne Passwort.</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">So läuft AnimaScribe</div>
+      <div class="flow">
+        <div class="step"><div class="n">1</div><div>
+          <h3>Euer digitales Formular, eure Begriffe</h3>
+          <p>Du arbeitest in dem digitalen Baustein-Formular, das ihr euch am Freitag selbst gebaut habt. Antippen, auswählen, eure eigenen Begriffe ergänzen. Kein Suchen nach Formulierungen mehr.</p>
+          <div class="tags"><span class="tag you">Du wählst</span></div></div></div>
+        <div class="step"><div class="n">2</div><div>
+          <h3>Bestätigen, AnimaScribe setzt den Text</h3>
+          <p>Wenn du bestätigst, fügt AnimaScribe die Bausteine zu einem sauberen, vollständigen Karteitext zusammen. Du musst nicht ausformulieren.</p>
+          <div class="tags"><span class="tag auto">AnimaScribe schreibt</span></div></div></div>
+        <div class="step"><div class="n">3</div><div>
+          <h3>Auf Knopfdruck nach IVORIS</h3>
+          <p>Der fertige Eintrag geht mit einem Knopfdruck direkt in die IVORIS-Karteikarte. Nichts wird ohne dein Ja geschrieben, und bestätigte Einträge bleiben stehen.</p>
+          <div class="tags"><span class="tag auto">AnimaScribe überträgt</span><span class="tag you">Du gibst frei</span></div></div></div>
+        <div class="step"><div class="n">4</div><div>
+          <h3>KZV-Positionen gleich daneben</h3>
+          <p>Direkt neben dem Text stehen die passenden Abrechnungspositionen für die KZV. Du liest sie ab und überträgst sie, ohne zu suchen.</p>
+          <div class="tags"><span class="tag auto">AnimaScribe schlägt vor</span><span class="tag you">Du überträgst</span></div></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">AnimaSign · Der Anamnesebogen</div>
+      <div class="ana">
+        <h2>Erkennt selbst, wer vor ihm sitzt</h2>
+        <p class="sub">Offen über einen Link erreichbar, kein Login. AnimaSign merkt am Alter, ob ein Kind oder ein Erwachsener ausfüllt, und passt sich an. Probier es einmal selbst aus, einmal als Minderjährige, einmal als Erwachsene.</p>
+        <div class="branch">
+          <div class="node minor"><div class="nh">● Minderjährig <span class="auto-flag">Eltern-Screen</span></div>
+            <ul><li>Beim Ausfüllen der Kontaktdaten öffnet sich ein weiterer Screen</li>
+            <li>Der oder die Erziehungsberechtigte trägt sich dort ein</li>
+            <li>Wichtig: Versicherungsnehmer und Zahler, wer die Finanzierung übernimmt, und unterschreibt später</li></ul></div>
+          <div class="node adult"><div class="nh">● Volljährig <span class="auto-flag">Kein Extra-Screen</span></div>
+            <ul><li>Erkennt AnimaSign die Volljährigkeit, bleibt der Eltern-Screen aus</li>
+            <li>Direkter, kurzer Weg durch die eigene Vorgeschichte</li>
+            <li>Allgemeingesundheit, Medikation, Allergien</li></ul></div>
+        </div>
+        <a class="open-btn ghost" id="anaLink" href="https://anmeldung.animacura.io/patient/anamnese" target="_blank" rel="noopener" style="margin-top:22px">AnimaSign öffnen →</a>
+        <div class="install">
+          <h3>📱 Als App auf Tablet oder Handy legen</h3>
+          <ol>
+            <li>Den AnimaSign-Link im Browser öffnen, auf dem Tablet oder Handy am Empfang.</li>
+            <li>Im Browser-Menü auf „Zum Home-Bildschirm“ tippen, bei Safari über das Teilen-Symbol, bei Chrome über die drei Punkte.</li>
+            <li>Bestätigen, und das Icon liegt wie eine echte App auf dem Bildschirm.</li>
+            <li>Ab dann ein Tipp, und der Bogen ist offen für den nächsten Patienten.</li>
+          </ol>
+        </div>
+
+        <div class="links2">
+          <div class="l2h">Anamnesebogen, zwei Links, ein Zweck</div>
+          <div class="l2intro">Für das Testing in der Praxis gibt es den Anamnesebogen unter zwei Links. Beide führen zum selben Bogen, sie unterscheiden sich nur darin, was am Ende passiert, nachdem der Bogen abgeschickt wurde.</div>
+
+          <div class="lcard">
+            <div class="lc-body">
+              <span class="lc-tag" style="background:rgba(207,122,66,.16);color:#a8551f">● Link 1 · Patientenhandy</span>
+              <div class="lc-h">Für den Patienten am eigenen Handy</div>
+              <div class="lc-url" style="background:rgba(207,122,66,.07)"><span>anmeldung.animacura.io/patient/anamnese</span><a class="lc-open" style="background:rgba(207,122,66,.16);color:#a8551f" href="https://anmeldung.animacura.io/patient/anamnese" target="_blank" rel="noopener">Öffnen →</a></div>
+              <div class="lc-desc">Diesen Link bekommt der Patient als QR-Code und füllt den Bogen auf seinem eigenen Handy aus. Nach dem Absenden erscheint der Hinweis, dass der Bogen eingegangen ist und die Seite geschlossen werden kann. Der Patient ist damit fertig.</div>
+            </div>
+            <div>
+              <div class="qr"><svg viewBox="0 0 328 328" width="328" height="328" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect width="328" height="328" fill="#ffffff"/><g fill="#3a2418"><rect x="32" y="32" width="8" height="8"/><rect x="40" y="32" width="8" height="8"/><rect x="48" y="32" width="8" height="8"/><rect x="56" y="32" width="8" height="8"/><rect x="64" y="32" width="8" height="8"/><rect x="72" y="32" width="8" height="8"/><rect x="80" y="32" width="8" height="8"/><rect x="112" y="32" width="8" height="8"/><rect x="128" y="32" width="8" height="8"/><rect x="160" y="32" width="8" height="8"/><rect x="176" y="32" width="8" height="8"/><rect x="184" y="32" width="8" height="8"/><rect x="192" y="32" width="8" height="8"/><rect x="200" y="32" width="8" height="8"/><rect x="216" y="32" width="8" height="8"/><rect x="240" y="32" width="8" height="8"/><rect x="248" y="32" width="8" height="8"/><rect x="256" y="32" width="8" height="8"/><rect x="264" y="32" width="8" height="8"/><rect x="272" y="32" width="8" height="8"/><rect x="280" y="32" width="8" height="8"/><rect x="288" y="32" width="8" height="8"/><rect x="32" y="40" width="8" height="8"/><rect x="80" y="40" width="8" height="8"/><rect x="112" y="40" width="8" height="8"/><rect x="128" y="40" width="8" height="8"/><rect x="152" y="40" width="8" height="8"/><rect x="160" y="40" width="8" height="8"/><rect x="176" y="40" width="8" height="8"/><rect x="192" y="40" width="8" height="8"/><rect x="200" y="40" width="8" height="8"/><rect x="208" y="40" width="8" height="8"/><rect x="224" y="40" width="8" height="8"/><rect x="240" y="40" width="8" height="8"/><rect x="288" y="40" width="8" height="8"/><rect x="32" y="48" width="8" height="8"/><rect x="48" y="48" width="8" height="8"/><rect x="56" y="48" width="8" height="8"/><rect x="64" y="48" width="8" height="8"/><rect x="80" y="48" width="8" height="8"/><rect x="96" y="48" width="8" height="8"/><rect x="104" y="48" width="8" height="8"/><rect x="112" y="48" width="8" height="8"/><rect x="144" y="48" width="8" height="8"/><rect x="152" y="48" width="8" height="8"/><rect x="200" y="48" width="8" height="8"/><rect x="208" y="48" width="8" height="8"/><rect x="240" y="48" width="8" height="8"/><rect x="256" y="48" width="8" height="8"/><rect x="264" y="48" width="8" height="8"/><rect x="272" y="48" width="8" height="8"/><rect x="288" y="48" width="8" height="8"/><rect x="32" y="56" width="8" height="8"/><rect x="48" y="56" width="8" height="8"/><rect x="56" y="56" width="8" height="8"/><rect x="64" y="56" width="8" height="8"/><rect x="80" y="56" width="8" height="8"/><rect x="96" y="56" width="8" height="8"/><rect x="176" y="56" width="8" height="8"/><rect x="184" y="56" width="8" height="8"/><rect x="208" y="56" width="8" height="8"/><rect x="216" y="56" width="8" height="8"/><rect x="224" y="56" width="8" height="8"/><rect x="240" y="56" width="8" height="8"/><rect x="256" y="56" width="8" height="8"/><rect x="264" y="56" width="8" height="8"/><rect x="272" y="56" width="8" height="8"/><rect x="288" y="56" width="8" height="8"/><rect x="32" y="64" width="8" height="8"/><rect x="48" y="64" width="8" height="8"/><rect x="56" y="64" width="8" height="8"/><rect x="64" y="64" width="8" height="8"/><rect x="80" y="64" width="8" height="8"/><rect x="96" y="64" width="8" height="8"/><rect x="128" y="64" width="8" height="8"/><rect x="136" y="64" width="8" height="8"/><rect x="144" y="64" width="8" height="8"/><rect x="152" y="64" width="8" height="8"/><rect x="160" y="64" width="8" height="8"/><rect x="168" y="64" width="8" height="8"/><rect x="192" y="64" width="8" height="8"/><rect x="200" y="64" width="8" height="8"/><rect x="208" y="64" width="8" height="8"/><rect x="216" y="64" width="8" height="8"/><rect x="240" y="64" width="8" height="8"/><rect x="256" y="64" width="8" height="8"/><rect x="264" y="64" width="8" height="8"/><rect x="272" y="64" width="8" height="8"/><rect x="288" y="64" width="8" height="8"/><rect x="32" y="72" width="8" height="8"/><rect x="80" y="72" width="8" height="8"/><rect x="96" y="72" width="8" height="8"/><rect x="104" y="72" width="8" height="8"/><rect x="112" y="72" width="8" height="8"/><rect x="120" y="72" width="8" height="8"/><rect x="128" y="72" width="8" height="8"/><rect x="136" y="72" width="8" height="8"/><rect x="144" y="72" width="8" height="8"/><rect x="184" y="72" width="8" height="8"/><rect x="200" y="72" width="8" height="8"/><rect x="208" y="72" width="8" height="8"/><rect x="224" y="72" width="8" height="8"/><rect x="240" y="72" width="8" height="8"/><rect x="288" y="72" width="8" height="8"/><rect x="32" y="80" width="8" height="8"/><rect x="40" y="80" width="8" height="8"/><rect x="48" y="80" width="8" height="8"/><rect x="56" y="80" width="8" height="8"/><rect x="64" y="80" width="8" height="8"/><rect x="72" y="80" width="8" height="8"/><rect x="80" y="80" width="8" height="8"/><rect x="96" y="80" width="8" height="8"/><rect x="112" y="80" width="8" height="8"/><rect x="128" y="80" width="8" height="8"/><rect x="144" y="80" width="8" height="8"/><rect x="160" y="80" width="8" height="8"/><rect x="176" y="80" width="8" height="8"/><rect x="192" y="80" width="8" height="8"/><rect x="208" y="80" width="8" height="8"/><rect x="224" y="80" width="8" height="8"/><rect x="240" y="80" width="8" height="8"/><rect x="248" y="80" width="8" height="8"/><rect x="256" y="80" width="8" height="8"/><rect x="264" y="80" width="8" height="8"/><rect x="272" y="80" width="8" height="8"/><rect x="280" y="80" width="8" height="8"/><rect x="288" y="80" width="8" height="8"/><rect x="96" y="88" width="8" height="8"/><rect x="104" y="88" width="8" height="8"/><rect x="112" y="88" width="8" height="8"/><rect x="128" y="88" width="8" height="8"/><rect x="144" y="88" width="8" height="8"/><rect x="160" y="88" width="8" height="8"/><rect x="184" y="88" width="8" height="8"/><rect x="192" y="88" width="8" height="8"/><rect x="200" y="88" width="8" height="8"/><rect x="216" y="88" width="8" height="8"/><rect x="32" y="96" width="8" height="8"/><rect x="48" y="96" width="8" height="8"/><rect x="56" y="96" width="8" height="8"/><rect x="64" y="96" width="8" height="8"/><rect x="72" y="96" width="8" height="8"/><rect x="80" y="96" width="8" height="8"/><rect x="104" y="96" width="8" height="8"/><rect x="112" y="96" width="8" height="8"/><rect x="128" y="96" width="8" height="8"/><rect x="136" y="96" width="8" height="8"/><rect x="168" y="96" width="8" height="8"/><rect x="184" y="96" width="8" height="8"/><rect x="208" y="96" width="8" height="8"/><rect x="216" y="96" width="8" height="8"/><rect x="224" y="96" width="8" height="8"/><rect x="240" y="96" width="8" height="8"/><rect x="248" y="96" width="8" height="8"/><rect x="256" y="96" width="8" height="8"/><rect x="264" y="96" width="8" height="8"/><rect x="272" y="96" width="8" height="8"/><rect x="40" y="104" width="8" height="8"/><rect x="48" y="104" width="8" height="8"/><rect x="56" y="104" width="8" height="8"/><rect x="72" y="104" width="8" height="8"/><rect x="120" y="104" width="8" height="8"/><rect x="136" y="104" width="8" height="8"/><rect x="160" y="104" width="8" height="8"/><rect x="168" y="104" width="8" height="8"/><rect x="176" y="104" width="8" height="8"/><rect x="184" y="104" width="8" height="8"/><rect x="192" y="104" width="8" height="8"/><rect x="200" y="104" width="8" height="8"/><rect x="208" y="104" width="8" height="8"/><rect x="216" y="104" width="8" height="8"/><rect x="240" y="104" width="8" height="8"/><rect x="248" y="104" width="8" height="8"/><rect x="264" y="104" width="8" height="8"/><rect x="272" y="104" width="8" height="8"/><rect x="280" y="104" width="8" height="8"/><rect x="288" y="104" width="8" height="8"/><rect x="32" y="112" width="8" height="8"/><rect x="48" y="112" width="8" height="8"/><rect x="56" y="112" width="8" height="8"/><rect x="80" y="112" width="8" height="8"/><rect x="88" y="112" width="8" height="8"/><rect x="96" y="112" width="8" height="8"/><rect x="104" y="112" width="8" height="8"/><rect x="128" y="112" width="8" height="8"/><rect x="136" y="112" width="8" height="8"/><rect x="144" y="112" width="8" height="8"/><rect x="152" y="112" width="8" height="8"/><rect x="168" y="112" width="8" height="8"/><rect x="232" y="112" width="8" height="8"/><rect x="240" y="112" width="8" height="8"/><rect x="256" y="112" width="8" height="8"/><rect x="272" y="112" width="8" height="8"/><rect x="280" y="112" width="8" height="8"/><rect x="40" y="120" width="8" height="8"/><rect x="48" y="120" width="8" height="8"/><rect x="88" y="120" width="8" height="8"/><rect x="112" y="120" width="8" height="8"/><rect x="136" y="120" width="8" height="8"/><rect x="160" y="120" width="8" height="8"/><rect x="168" y="120" width="8" height="8"/><rect x="176" y="120" width="8" height="8"/><rect x="184" y="120" width="8" height="8"/><rect x="192" y="120" width="8" height="8"/><rect x="200" y="120" width="8" height="8"/><rect x="208" y="120" width="8" height="8"/><rect x="232" y="120" width="8" height="8"/><rect x="240" y="120" width="8" height="8"/><rect x="256" y="120" width="8" height="8"/><rect x="264" y="120" width="8" height="8"/><rect x="272" y="120" width="8" height="8"/><rect x="280" y="120" width="8" height="8"/><rect x="48" y="128" width="8" height="8"/><rect x="64" y="128" width="8" height="8"/><rect x="80" y="128" width="8" height="8"/><rect x="96" y="128" width="8" height="8"/><rect x="104" y="128" width="8" height="8"/><rect x="120" y="128" width="8" height="8"/><rect x="144" y="128" width="8" height="8"/><rect x="160" y="128" width="8" height="8"/><rect x="184" y="128" width="8" height="8"/><rect x="192" y="128" width="8" height="8"/><rect x="208" y="128" width="8" height="8"/><rect x="224" y="128" width="8" height="8"/><rect x="232" y="128" width="8" height="8"/><rect x="248" y="128" width="8" height="8"/><rect x="256" y="128" width="8" height="8"/><rect x="264" y="128" width="8" height="8"/><rect x="40" y="136" width="8" height="8"/><rect x="48" y="136" width="8" height="8"/><rect x="64" y="136" width="8" height="8"/><rect x="72" y="136" width="8" height="8"/><rect x="88" y="136" width="8" height="8"/><rect x="104" y="136" width="8" height="8"/><rect x="128" y="136" width="8" height="8"/><rect x="152" y="136" width="8" height="8"/><rect x="176" y="136" width="8" height="8"/><rect x="200" y="136" width="8" height="8"/><rect x="216" y="136" width="8" height="8"/><rect x="240" y="136" width="8" height="8"/><rect x="248" y="136" width="8" height="8"/><rect x="264" y="136" width="8" height="8"/><rect x="272" y="136" width="8" height="8"/><rect x="280" y="136" width="8" height="8"/><rect x="288" y="136" width="8" height="8"/><rect x="32" y="144" width="8" height="8"/><rect x="80" y="144" width="8" height="8"/><rect x="88" y="144" width="8" height="8"/><rect x="112" y="144" width="8" height="8"/><rect x="120" y="144" width="8" height="8"/><rect x="152" y="144" width="8" height="8"/><rect x="160" y="144" width="8" height="8"/><rect x="176" y="144" width="8" height="8"/><rect x="192" y="144" width="8" height="8"/><rect x="200" y="144" width="8" height="8"/><rect x="208" y="144" width="8" height="8"/><rect x="232" y="144" width="8" height="8"/><rect x="240" y="144" width="8" height="8"/><rect x="248" y="144" width="8" height="8"/><rect x="272" y="144" width="8" height="8"/><rect x="280" y="144" width="8" height="8"/><rect x="72" y="152" width="8" height="8"/><rect x="96" y="152" width="8" height="8"/><rect x="104" y="152" width="8" height="8"/><rect x="112" y="152" width="8" height="8"/><rect x="128" y="152" width="8" height="8"/><rect x="144" y="152" width="8" height="8"/><rect x="152" y="152" width="8" height="8"/><rect x="200" y="152" width="8" height="8"/><rect x="208" y="152" width="8" height="8"/><rect x="232" y="152" width="8" height="8"/><rect x="240" y="152" width="8" height="8"/><rect x="264" y="152" width="8" height="8"/><rect x="272" y="152" width="8" height="8"/><rect x="40" y="160" width="8" height="8"/><rect x="80" y="160" width="8" height="8"/><rect x="112" y="160" width="8" height="8"/><rect x="120" y="160" width="8" height="8"/><rect x="128" y="160" width="8" height="8"/><rect x="152" y="160" width="8" height="8"/><rect x="168" y="160" width="8" height="8"/><rect x="208" y="160" width="8" height="8"/><rect x="216" y="160" width="8" height="8"/><rect x="224" y="160" width="8" height="8"/><rect x="232" y="160" width="8" height="8"/><rect x="248" y="160" width="8" height="8"/><rect x="256" y="160" width="8" height="8"/><rect x="288" y="160" width="8" height="8"/><rect x="56" y="168" width="8" height="8"/><rect x="88" y="168" width="8" height="8"/><rect x="96" y="168" width="8" height="8"/><rect x="104" y="168" width="8" height="8"/><rect x="144" y="168" width="8" height="8"/><rect x="176" y="168" width="8" height="8"/><rect x="184" y="168" width="8" height="8"/><rect x="192" y="168" width="8" height="8"/><rect x="200" y="168" width="8" height="8"/><rect x="216" y="168" width="8" height="8"/><rect x="240" y="168" width="8" height="8"/><rect x="248" y="168" width="8" height="8"/><rect x="264" y="168" width="8" height="8"/><rect x="272" y="168" width="8" height="8"/><rect x="288" y="168" width="8" height="8"/><rect x="32" y="176" width="8" height="8"/><rect x="40" y="176" width="8" height="8"/><rect x="48" y="176" width="8" height="8"/><rect x="64" y="176" width="8" height="8"/><rect x="80" y="176" width="8" height="8"/><rect x="96" y="176" width="8" height="8"/><rect x="104" y="176" width="8" height="8"/><rect x="128" y="176" width="8" height="8"/><rect x="144" y="176" width="8" height="8"/><rect x="152" y="176" width="8" height="8"/><rect x="160" y="176" width="8" height="8"/><rect x="176" y="176" width="8" height="8"/><rect x="192" y="176" width="8" height="8"/><rect x="200" y="176" width="8" height="8"/><rect x="208" y="176" width="8" height="8"/><rect x="248" y="176" width="8" height="8"/><rect x="256" y="176" width="8" height="8"/><rect x="272" y="176" width="8" height="8"/><rect x="280" y="176" width="8" height="8"/><rect x="48" y="184" width="8" height="8"/><rect x="64" y="184" width="8" height="8"/><rect x="72" y="184" width="8" height="8"/><rect x="104" y="184" width="8" height="8"/><rect x="120" y="184" width="8" height="8"/><rect x="128" y="184" width="8" height="8"/><rect x="152" y="184" width="8" height="8"/><rect x="200" y="184" width="8" height="8"/><rect x="208" y="184" width="8" height="8"/><rect x="232" y="184" width="8" height="8"/><rect x="248" y="184" width="8" height="8"/><rect x="256" y="184" width="8" height="8"/><rect x="264" y="184" width="8" height="8"/><rect x="272" y="184" width="8" height="8"/><rect x="48" y="192" width="8" height="8"/><rect x="56" y="192" width="8" height="8"/><rect x="72" y="192" width="8" height="8"/><rect x="80" y="192" width="8" height="8"/><rect x="88" y="192" width="8" height="8"/><rect x="96" y="192" width="8" height="8"/><rect x="104" y="192" width="8" height="8"/><rect x="112" y="192" width="8" height="8"/><rect x="128" y="192" width="8" height="8"/><rect x="136" y="192" width="8" height="8"/><rect x="144" y="192" width="8" height="8"/><rect x="152" y="192" width="8" height="8"/><rect x="176" y="192" width="8" height="8"/><rect x="200" y="192" width="8" height="8"/><rect x="216" y="192" width="8" height="8"/><rect x="224" y="192" width="8" height="8"/><rect x="232" y="192" width="8" height="8"/><rect x="256" y="192" width="8" height="8"/><rect x="264" y="192" width="8" height="8"/><rect x="32" y="200" width="8" height="8"/><rect x="40" y="200" width="8" height="8"/><rect x="56" y="200" width="8" height="8"/><rect x="64" y="200" width="8" height="8"/><rect x="88" y="200" width="8" height="8"/><rect x="104" y="200" width="8" height="8"/><rect x="112" y="200" width="8" height="8"/><rect x="128" y="200" width="8" height="8"/><rect x="152" y="200" width="8" height="8"/><rect x="160" y="200" width="8" height="8"/><rect x="192" y="200" width="8" height="8"/><rect x="216" y="200" width="8" height="8"/><rect x="240" y="200" width="8" height="8"/><rect x="288" y="200" width="8" height="8"/><rect x="32" y="208" width="8" height="8"/><rect x="56" y="208" width="8" height="8"/><rect x="64" y="208" width="8" height="8"/><rect x="80" y="208" width="8" height="8"/><rect x="88" y="208" width="8" height="8"/><rect x="96" y="208" width="8" height="8"/><rect x="104" y="208" width="8" height="8"/><rect x="136" y="208" width="8" height="8"/><rect x="144" y="208" width="8" height="8"/><rect x="168" y="208" width="8" height="8"/><rect x="176" y="208" width="8" height="8"/><rect x="184" y="208" width="8" height="8"/><rect x="208" y="208" width="8" height="8"/><rect x="248" y="208" width="8" height="8"/><rect x="256" y="208" width="8" height="8"/><rect x="264" y="208" width="8" height="8"/><rect x="272" y="208" width="8" height="8"/><rect x="280" y="208" width="8" height="8"/><rect x="32" y="216" width="8" height="8"/><rect x="48" y="216" width="8" height="8"/><rect x="64" y="216" width="8" height="8"/><rect x="104" y="216" width="8" height="8"/><rect x="128" y="216" width="8" height="8"/><rect x="136" y="216" width="8" height="8"/><rect x="144" y="216" width="8" height="8"/><rect x="160" y="216" width="8" height="8"/><rect x="184" y="216" width="8" height="8"/><rect x="192" y="216" width="8" height="8"/><rect x="200" y="216" width="8" height="8"/><rect x="224" y="216" width="8" height="8"/><rect x="232" y="216" width="8" height="8"/><rect x="256" y="216" width="8" height="8"/><rect x="264" y="216" width="8" height="8"/><rect x="272" y="216" width="8" height="8"/><rect x="280" y="216" width="8" height="8"/><rect x="288" y="216" width="8" height="8"/><rect x="32" y="224" width="8" height="8"/><rect x="56" y="224" width="8" height="8"/><rect x="64" y="224" width="8" height="8"/><rect x="72" y="224" width="8" height="8"/><rect x="80" y="224" width="8" height="8"/><rect x="104" y="224" width="8" height="8"/><rect x="120" y="224" width="8" height="8"/><rect x="128" y="224" width="8" height="8"/><rect x="168" y="224" width="8" height="8"/><rect x="184" y="224" width="8" height="8"/><rect x="208" y="224" width="8" height="8"/><rect x="224" y="224" width="8" height="8"/><rect x="232" y="224" width="8" height="8"/><rect x="240" y="224" width="8" height="8"/><rect x="248" y="224" width="8" height="8"/><rect x="256" y="224" width="8" height="8"/><rect x="280" y="224" width="8" height="8"/><rect x="288" y="224" width="8" height="8"/><rect x="96" y="232" width="8" height="8"/><rect x="120" y="232" width="8" height="8"/><rect x="136" y="232" width="8" height="8"/><rect x="144" y="232" width="8" height="8"/><rect x="160" y="232" width="8" height="8"/><rect x="168" y="232" width="8" height="8"/><rect x="184" y="232" width="8" height="8"/><rect x="192" y="232" width="8" height="8"/><rect x="224" y="232" width="8" height="8"/><rect x="256" y="232" width="8" height="8"/><rect x="272" y="232" width="8" height="8"/><rect x="280" y="232" width="8" height="8"/><rect x="288" y="232" width="8" height="8"/><rect x="32" y="240" width="8" height="8"/><rect x="40" y="240" width="8" height="8"/><rect x="48" y="240" width="8" height="8"/><rect x="56" y="240" width="8" height="8"/><rect x="64" y="240" width="8" height="8"/><rect x="72" y="240" width="8" height="8"/><rect x="80" y="240" width="8" height="8"/><rect x="104" y="240" width="8" height="8"/><rect x="112" y="240" width="8" height="8"/><rect x="152" y="240" width="8" height="8"/><rect x="168" y="240" width="8" height="8"/><rect x="208" y="240" width="8" height="8"/><rect x="216" y="240" width="8" height="8"/><rect x="224" y="240" width="8" height="8"/><rect x="240" y="240" width="8" height="8"/><rect x="256" y="240" width="8" height="8"/><rect x="272" y="240" width="8" height="8"/><rect x="280" y="240" width="8" height="8"/><rect x="32" y="248" width="8" height="8"/><rect x="80" y="248" width="8" height="8"/><rect x="96" y="248" width="8" height="8"/><rect x="112" y="248" width="8" height="8"/><rect x="120" y="248" width="8" height="8"/><rect x="128" y="248" width="8" height="8"/><rect x="144" y="248" width="8" height="8"/><rect x="168" y="248" width="8" height="8"/><rect x="176" y="248" width="8" height="8"/><rect x="184" y="248" width="8" height="8"/><rect x="192" y="248" width="8" height="8"/><rect x="216" y="248" width="8" height="8"/><rect x="224" y="248" width="8" height="8"/><rect x="256" y="248" width="8" height="8"/><rect x="264" y="248" width="8" height="8"/><rect x="272" y="248" width="8" height="8"/><rect x="280" y="248" width="8" height="8"/><rect x="288" y="248" width="8" height="8"/><rect x="32" y="256" width="8" height="8"/><rect x="48" y="256" width="8" height="8"/><rect x="56" y="256" width="8" height="8"/><rect x="64" y="256" width="8" height="8"/><rect x="80" y="256" width="8" height="8"/><rect x="96" y="256" width="8" height="8"/><rect x="120" y="256" width="8" height="8"/><rect x="144" y="256" width="8" height="8"/><rect x="152" y="256" width="8" height="8"/><rect x="160" y="256" width="8" height="8"/><rect x="184" y="256" width="8" height="8"/><rect x="192" y="256" width="8" height="8"/><rect x="200" y="256" width="8" height="8"/><rect x="208" y="256" width="8" height="8"/><rect x="224" y="256" width="8" height="8"/><rect x="232" y="256" width="8" height="8"/><rect x="240" y="256" width="8" height="8"/><rect x="248" y="256" width="8" height="8"/><rect x="256" y="256" width="8" height="8"/><rect x="264" y="256" width="8" height="8"/><rect x="280" y="256" width="8" height="8"/><rect x="288" y="256" width="8" height="8"/><rect x="32" y="264" width="8" height="8"/><rect x="48" y="264" width="8" height="8"/><rect x="56" y="264" width="8" height="8"/><rect x="64" y="264" width="8" height="8"/><rect x="80" y="264" width="8" height="8"/><rect x="96" y="264" width="8" height="8"/><rect x="104" y="264" width="8" height="8"/><rect x="120" y="264" width="8" height="8"/><rect x="128" y="264" width="8" height="8"/><rect x="136" y="264" width="8" height="8"/><rect x="144" y="264" width="8" height="8"/><rect x="152" y="264" width="8" height="8"/><rect x="176" y="264" width="8" height="8"/><rect x="200" y="264" width="8" height="8"/><rect x="232" y="264" width="8" height="8"/><rect x="256" y="264" width="8" height="8"/><rect x="264" y="264" width="8" height="8"/><rect x="272" y="264" width="8" height="8"/><rect x="288" y="264" width="8" height="8"/><rect x="32" y="272" width="8" height="8"/><rect x="48" y="272" width="8" height="8"/><rect x="56" y="272" width="8" height="8"/><rect x="64" y="272" width="8" height="8"/><rect x="80" y="272" width="8" height="8"/><rect x="96" y="272" width="8" height="8"/><rect x="112" y="272" width="8" height="8"/><rect x="120" y="272" width="8" height="8"/><rect x="128" y="272" width="8" height="8"/><rect x="136" y="272" width="8" height="8"/><rect x="152" y="272" width="8" height="8"/><rect x="160" y="272" width="8" height="8"/><rect x="192" y="272" width="8" height="8"/><rect x="208" y="272" width="8" height="8"/><rect x="216" y="272" width="8" height="8"/><rect x="240" y="272" width="8" height="8"/><rect x="248" y="272" width="8" height="8"/><rect x="264" y="272" width="8" height="8"/><rect x="272" y="272" width="8" height="8"/><rect x="32" y="280" width="8" height="8"/><rect x="80" y="280" width="8" height="8"/><rect x="120" y="280" width="8" height="8"/><rect x="128" y="280" width="8" height="8"/><rect x="136" y="280" width="8" height="8"/><rect x="144" y="280" width="8" height="8"/><rect x="152" y="280" width="8" height="8"/><rect x="200" y="280" width="8" height="8"/><rect x="208" y="280" width="8" height="8"/><rect x="232" y="280" width="8" height="8"/><rect x="240" y="280" width="8" height="8"/><rect x="256" y="280" width="8" height="8"/><rect x="264" y="280" width="8" height="8"/><rect x="272" y="280" width="8" height="8"/><rect x="32" y="288" width="8" height="8"/><rect x="40" y="288" width="8" height="8"/><rect x="48" y="288" width="8" height="8"/><rect x="56" y="288" width="8" height="8"/><rect x="64" y="288" width="8" height="8"/><rect x="72" y="288" width="8" height="8"/><rect x="80" y="288" width="8" height="8"/><rect x="96" y="288" width="8" height="8"/><rect x="104" y="288" width="8" height="8"/><rect x="112" y="288" width="8" height="8"/><rect x="120" y="288" width="8" height="8"/><rect x="128" y="288" width="8" height="8"/><rect x="136" y="288" width="8" height="8"/><rect x="152" y="288" width="8" height="8"/><rect x="160" y="288" width="8" height="8"/><rect x="168" y="288" width="8" height="8"/><rect x="216" y="288" width="8" height="8"/><rect x="224" y="288" width="8" height="8"/><rect x="240" y="288" width="8" height="8"/><rect x="248" y="288" width="8" height="8"/><rect x="280" y="288" width="8" height="8"/></g></svg></div>
+              <div class="qr-cap">Scannen zum Testen</div>
+            </div>
+          </div>
+
+          <div class="lcard">
+            <div class="lc-body">
+              <span class="lc-tag" style="background:rgba(95,133,96,.18);color:#5f8560">● Link 2 · Praxis-Tablet</span>
+              <div class="lc-h">Für das Praxis-Tablet am Empfang</div>
+              <div class="lc-url" style="background:rgba(207,122,66,.07)"><span>anmeldung.animacura.io/patient/anamnese?modus=praxis</span><span class="um" style="background:rgba(95,133,96,.2);color:#5f8560">?modus=praxis</span><a class="lc-open" style="background:rgba(95,133,96,.2);color:#5f8560" href="https://anmeldung.animacura.io/patient/anamnese?modus=praxis" target="_blank" rel="noopener">Öffnen →</a></div>
+              <div class="lc-desc">Dieser Link wird auf dem Praxis-Tablet verwendet. Er ist identisch mit Link 1, hat aber am Ende den Zusatz <b>?modus=praxis</b>. Dadurch erscheint nach dem Absenden nicht „Seite schließen“, sondern die Möglichkeit, direkt den nächsten Patienten zu starten, ohne sich neu anzumelden. So kann die Helferin am Empfang einen Bogen nach dem anderen aufnehmen.</div>
+            </div>
+          </div>
+
+          <div class="merk" style="background:rgba(207,122,66,.08)">
+            <b>Kurz gemerkt:</b> Ohne Zusatz gleich Patientenmodus am Handy. Mit <b>?modus=praxis</b> gleich Tablet-Modus am Empfang.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="closing">
+      <p>Probier heute ruhig alles aus. Drück auf alles, bau einen Eintrag, schick dir selbst den Bogen. Nichts kann kaputtgehen.</p>
+      <p>Und alles, was dir im Ablauf auffällt, will ich hören, das baust du quasi mit. Ab Dienstag läuft das echt.</p>
+      <div class="punch">Du hältst den Laden zusammen. AnimaScribe macht ihn dir leichter.</div>
+      <div class="sig">Juan</div>
+    </div>
+    <div class="foot">Vertraulich · nur für Sabine Rüger · Praxis Schubert, Leipzig</div>
+  </main>
+
+<script>
+  const vault=document.getElementById('vault'),seal=document.getElementById('seal'),wrap=document.getElementById('wrap');
+  seal.addEventListener('click',()=>{seal.classList.add('break');
+    setTimeout(()=>{vault.classList.add('open');wrap.classList.add('show');wrap.setAttribute('aria-hidden','false');},760);});
+  document.querySelectorAll('.cpy').forEach(b=>b.addEventListener('click',()=>{
+    navigator.clipboard.writeText(b.dataset.c).then(()=>{const t=b.textContent;b.textContent='Kopiert';b.classList.add('ok');
+      setTimeout(()=>{b.textContent=t;b.classList.remove('ok')},1500);});}));
+
+  const wave=document.getElementById('wave');
+  for(let i=0;i<46;i++){wave.appendChild(document.createElement('i'));}
+
+  const AUDIO_SRC = "sabine.mp3";
+  const player=document.getElementById('player'),pp=document.getElementById('pp'),ps=document.getElementById('ps');
+  const playIco='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  const pauseIco='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  let audio=new Audio(AUDIO_SRC),playing=false;
+  audio.onended=stop;audio.onpause=()=>{if(!audio.ended)stop();};
+  pp.addEventListener('click',()=>{if(playing){audio.pause();stop();}else{const pr=audio.play();start();if(pr&&pr.catch){pr.catch(err=>{stop();ps.textContent='Audio konnte nicht starten. Liegt die MP3 im selben Ordner?';console.error('audio play failed',err);});}}});
+  function start(){playing=true;player.classList.add('playing');pp.classList.add('playing');pp.innerHTML=pauseIco;ps.textContent='Spielt …';}
+  function stop(){playing=false;player.classList.remove('playing');pp.classList.remove('playing');pp.innerHTML=playIco;ps.textContent='Was AnimaScribe macht, kurz erklärt';}
+
+  // AnimaSign-Buttons sind echte Links direkt im HTML.
+</script>
+</body>
+</html>
