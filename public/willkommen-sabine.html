@@ -278,7 +278,7 @@
     <div class="v-tier">Praxismanagement · Verwaltung</div>
     <div class="v-name">Für <b>Sabine Rüger</b></div>
     <div class="seal-wrap">
-      <button class="seal" id="seal" aria-label="Siegel brechen">
+      <button class="seal" id="seal" type="button" aria-label="Siegel brechen">
         <span class="halo"></span>
         <span class="disc"><span class="mono">SR</span></span>
       </button>
@@ -307,11 +307,11 @@
         </div>
         <div class="player-controls">
           <div class="speed-group" role="group" aria-label="Wiedergabegeschwindigkeit">
-            <button class="speed-btn active" data-speed="1">1x</button>
-            <button class="speed-btn" data-speed="1.25">1.25x</button>
-            <button class="speed-btn" data-speed="1.5">1.5x</button>
+            <button class="speed-btn active" type="button" data-speed="1">1x</button>
+            <button class="speed-btn" type="button" data-speed="1.25">1.25x</button>
+            <button class="speed-btn" type="button" data-speed="1.5">1.5x</button>
           </div>
-          <button class="listen-btn" id="pp" aria-label="Abspielen">
+          <button class="listen-btn" id="pp" type="button" aria-label="Abspielen">
             <span class="icon" id="ppIcon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
             <span id="ppLabel">Listen</span>
           </button>
@@ -340,10 +340,10 @@
         <div class="kc-app"><span class="d"></span>AnimaScribe · Chairside-Dokumentation</div>
         <div class="field-row"><div class="frl">E-Mail</div>
           <div class="frv"><span>sabine@praxis-schubert.de</span>
-            <button class="cpy" data-c="sabine@praxis-schubert.de">Kopieren</button></div></div>
+            <button class="cpy" type="button" data-c="sabine@praxis-schubert.de">Kopieren</button></div></div>
         <div class="field-row"><div class="frl">Start-Passwort</div>
           <div class="frv"><span>ms13sr06?!</span>
-            <button class="cpy" data-c="ms13sr06?!">Kopieren</button></div></div>
+            <button class="cpy" type="button" data-c="ms13sr06?!">Kopieren</button></div></div>
         <a class="open-btn" href="https://scribe.animacura.io/scribe/login" target="_blank" rel="noopener">AnimaScribe öffnen →</a>
         <div class="kc-note">Das Passwort ist nur dein Schlüssel für den ersten Eintritt. Ändere es beim ersten Login, oder sag Bescheid, dann legen wir dir einen persönlichen Magic-Link an, ganz ohne Passwort.</div>
       </div>
@@ -441,8 +441,22 @@
 
 <script>
   const vault=document.getElementById('vault'),seal=document.getElementById('seal'),wrap=document.getElementById('wrap');
-  seal.addEventListener('click',()=>{seal.classList.add('break');
-    setTimeout(()=>{vault.classList.add('open');wrap.classList.add('show');wrap.setAttribute('aria-hidden','false');},760);});
+  const openStateKey=`welcome-open:${location.pathname}`;
+  function rememberOpenState(){
+    try{sessionStorage.setItem(openStateKey,'1');}catch(_err){}
+  }
+  function isOpenRemembered(){
+    try{return sessionStorage.getItem(openStateKey)==='1';}catch(_err){return false;}
+  }
+  function openExperience(skipBreak=false){
+    if(skipBreak) seal.classList.add('break');
+    vault.classList.add('open');
+    wrap.classList.add('show');
+    wrap.setAttribute('aria-hidden','false');
+  }
+  if(isOpenRemembered()) openExperience(true);
+  seal.addEventListener('click',(event)=>{event.preventDefault();rememberOpenState();seal.classList.add('break');
+    setTimeout(()=>{openExperience();},760);});
   document.querySelectorAll('.cpy').forEach(b=>b.addEventListener('click',()=>{
     navigator.clipboard.writeText(b.dataset.c).then(()=>{const t=b.textContent;b.textContent='Kopiert';b.classList.add('ok');
       setTimeout(()=>{b.textContent=t;b.classList.remove('ok')},1500);});}));
