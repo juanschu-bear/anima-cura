@@ -71,7 +71,7 @@
   .v-eyebrow,.v-tier,.v-name,.seal-wrap,.v-hint{transform:translateY(16px)}
 
   .wrap{position:relative;z-index:2;max-width:760px;margin:0 auto;padding:0 22px 100px;opacity:0;transform:translateY(24px)}
-  .wrap.show{animation:in 1.1s .1s forwards}
+  .wrap.show{opacity:1;transform:translateY(0);animation:in 1.1s .1s forwards}
   @keyframes in{to{opacity:1;transform:translateY(0)}}
 
   .hero{padding:74px 0 14px;text-align:center}
@@ -217,7 +217,7 @@
   .lc-open:hover{filter:brightness(1.12);transform:translateY(-1px)}
 
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
-    .v-eyebrow,.v-tier,.v-name,.seal-wrap,.v-hint{opacity:1;transform:none}}
+    .v-eyebrow,.v-tier,.v-name,.seal-wrap,.v-hint,.wrap,.wrap.show{opacity:1;transform:none}}
 </style>
 </head>
 <body>
