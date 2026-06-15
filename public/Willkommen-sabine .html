@@ -267,8 +267,8 @@
           <div class="frv"><span>sabine@praxis-schubert.de</span>
             <button class="cpy" data-c="sabine@praxis-schubert.de">Kopieren</button></div></div>
         <div class="field-row"><div class="frl">Start-Passwort</div>
-          <div class="frv"><span>ms13sr06?!</span>
-            <button class="cpy" data-c="ms13sr06?!">Kopieren</button></div></div>
+          <div class="frv"><span>sabine2026!</span>
+            <button class="cpy" data-c="sabine2026!">Kopieren</button></div></div>
         <a class="open-btn" href="https://scribe.animacura.io/scribe/login" target="_blank" rel="noopener">AnimaScribe öffnen →</a>
         <div class="kc-note">Das Passwort ist nur dein Schlüssel für den ersten Eintritt. Ändere es beim ersten Login, oder sag Bescheid, dann legen wir dir einen persönlichen Magic-Link an, ganz ohne Passwort.</div>
       </div>
@@ -368,9 +368,41 @@
   const vault=document.getElementById('vault'),seal=document.getElementById('seal'),wrap=document.getElementById('wrap');
   seal.addEventListener('click',()=>{seal.classList.add('break');
     setTimeout(()=>{vault.classList.add('open');wrap.classList.add('show');wrap.setAttribute('aria-hidden','false');},760);});
-  document.querySelectorAll('.cpy').forEach(b=>b.addEventListener('click',()=>{
-    navigator.clipboard.writeText(b.dataset.c).then(()=>{const t=b.textContent;b.textContent='Kopiert';b.classList.add('ok');
-      setTimeout(()=>{b.textContent=t;b.classList.remove('ok')},1500);});}));
+  async function copyText(text,button){
+    const originalLabel=button.textContent;
+    const flash=(label,ok=true)=>{
+      button.textContent=label;
+      button.classList.toggle('ok',ok);
+      setTimeout(()=>{button.textContent=originalLabel;button.classList.remove('ok');},1800);
+    };
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+        flash('Kopiert');
+        return;
+      }
+    }catch(_err){}
+    try{
+      const helper=document.createElement('textarea');
+      helper.value=text;
+      helper.setAttribute('readonly','');
+      helper.style.position='fixed';
+      helper.style.opacity='0';
+      helper.style.pointerEvents='none';
+      document.body.appendChild(helper);
+      helper.focus();
+      helper.select();
+      helper.setSelectionRange(0,helper.value.length);
+      const copied=document.execCommand('copy');
+      document.body.removeChild(helper);
+      if(copied){flash('Kopiert');return;}
+    }catch(_err){}
+    flash('Bitte manuell',false);
+  }
+  document.querySelectorAll('.cpy').forEach(b=>b.addEventListener('click',(event)=>{
+    event.preventDefault();
+    copyText(b.dataset.c||'',b);
+  }));
 
   const wave=document.getElementById('wave');
   for(let i=0;i<46;i++){wave.appendChild(document.createElement('i'));}
