@@ -129,13 +129,13 @@
   .time-readout{display:flex;align-items:baseline;gap:8px;font-family:'Inter',sans-serif;font-size:15px;font-weight:600;color:var(--ink)}
   .time-readout .slash,.time-readout .duration{font-size:13px;color:var(--ink-soft)}
   .status-readout{font-family:'Space Grotesk';font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft)}
-  .wave-shell{position:relative;margin-top:10px;border-radius:999px;padding:12px 14px;background:rgba(17,19,32,.74);
+  .wave-shell{position:relative;display:inline-flex;align-items:center;width:auto;max-width:100%;margin-top:10px;border-radius:999px;padding:10px 14px;background:rgba(17,19,32,.74);
     border:1.4px solid rgba(255,255,255,.72);overflow:hidden;cursor:pointer}
-  .wave-progress{position:absolute;left:14px;right:14px;top:50%;height:12px;transform:translateY(-50%) scaleX(0);transform-origin:left center;border-radius:999px;
+  .wave-progress{position:absolute;left:10px;right:10px;top:10px;bottom:10px;transform:scaleX(0);transform-origin:left center;border-radius:999px;
     background:linear-gradient(90deg, rgba(246,217,142,.95), rgba(227,184,90,.55));filter:blur(.15px);
     box-shadow:0 0 18px rgba(227,184,90,.35);pointer-events:none}
-  .wave{position:relative;display:flex;align-items:flex-end;gap:6px;height:32px}
-  .wave i{width:100%;max-width:18px;flex:1;border-radius:999px;background:linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.12));
+  .wave{position:relative;display:flex;align-items:flex-end;gap:6px;height:32px;width:220px}
+  .wave i{width:12px;flex:none;border-radius:999px;background:linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.12));
     opacity:.88;transition:height .2s ease, transform .2s ease, background .2s ease}
   .wave i.played{background:linear-gradient(180deg, rgba(246,217,142,.9), rgba(227,184,90,.4))}
   .player.playing .wave i.active{animation:wv 1.12s infinite ease-in-out}
@@ -156,9 +156,9 @@
   }
   @media(max-width:560px){
     .listen-mode{font-size:11px;letter-spacing:.28em}
-    .wave-shell{padding:10px 12px}
-    .wave{gap:5px;height:28px}
-    .wave i{max-width:14px}
+    .wave-shell{padding:8px 10px}
+    .wave{gap:5px;height:28px;width:176px}
+    .wave i{width:10px}
     .player-meta{align-items:flex-start}
     .time-readout{font-size:14px}
   }
@@ -471,7 +471,7 @@
     currentTimeEl.textContent=formatTime(current);
     durationEl.textContent=formatTime(duration);
     const progress=duration?Math.min(current/duration,1):0;
-    waveProgress.style.transform=`translateY(-50%) scaleX(${progress.toFixed(4)})`;
+    waveProgress.style.transform=`scaleX(${progress.toFixed(4)})`;
     [...wave.children].forEach((bar,index,all)=>{
       const threshold=(index+1)/all.length;
       bar.classList.toggle('played',progress>=threshold-.02);
