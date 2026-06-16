@@ -162,13 +162,11 @@
 /* ===== Stufen, Phasen, Kontext ===== */
 .scribe .stufe{display:block;font-size:12.5px;font-weight:700;margin:16px 0 8px}
 .scribe .stufe:first-child{margin-top:0}
-.scribe .phase{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;
-  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--schrift);margin:15px 0 9px;border:1px solid var(--kante);
-  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
-  box-shadow:0 0 0 1px rgba(255,255,255,.02) inset}
-.scribe[data-thema="dunkel"] .phase{color:#C6D4CD;text-shadow:0 0 14px rgba(198,212,205,.12)}
-.scribe[data-thema="hell"] .phase{color:#32443C;background:rgba(255,255,255,.82);border-color:rgba(16,32,26,.12)}
+.scribe .phase{display:block;padding:0;
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--schrift);margin:15px 0 9px}
+.scribe[data-thema="dunkel"] .phase{color:#BFCFC7;text-shadow:0 0 14px rgba(198,212,205,.10)}
+.scribe[data-thema="hell"] .phase{color:#33453D}
 .scribe .kontext{margin-top:15px;font-size:12.5px;color:var(--gedeckt);
   border-top:1px dashed var(--kante);padding-top:12px}
 .scribe .kontext b{color:var(--schrift)}
