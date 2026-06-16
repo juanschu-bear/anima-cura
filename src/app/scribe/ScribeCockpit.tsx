@@ -63,6 +63,10 @@ const PHASEN: { name: string; slugs: string[] }[] = [
   { name: "Abschluss & Retention", slugs: ["abschluss", "entbaenderung", "retention"] },
 ];
 
+function istBekannterPhasenSlug(slug: string): boolean {
+  return PHASEN.some((phase) => phase.slugs.includes(slug));
+}
+
 /* Häufige Kombis: eine Sitzung, mehrere Leistungen (Praxis-Begriffe) */
 const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   aligner: [{ label: "Erstberatung (Anfangsdiagnostik)", slugs: ["beratung", "diagnostik"] }],
@@ -329,6 +333,19 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     () => artVorlagen.filter((v) => passtAlter(v, patient?.alter ?? null)),
     [artVorlagen, patient]
   );
+  const leistungsSektionen = useMemo(() => {
+    const sektionen = PHASEN
+      .map((phase) => ({
+        name: phase.name,
+        vorlagen: sichtbareVorlagen.filter((v) => phase.slugs.includes(v.termin_typ)),
+      }))
+      .filter((phase) => phase.vorlagen.length > 0);
+    const eigeneVorlagen = sichtbareVorlagen.filter((v) => !istBekannterPhasenSlug(v.termin_typ));
+    if (eigeneVorlagen.length > 0) {
+      sektionen.push({ name: "Praxis-eigene Leistungen", vorlagen: eigeneVorlagen });
+    }
+    return sektionen;
+  }, [sichtbareVorlagen]);
   /* Wenn ein Patient gewaehlt wird, fliegen altersfremde Leistungen aus der Auswahl */
   useEffect(() => {
     setGewaehlt((alt) => {
@@ -981,14 +998,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               ))}
             </div>
           )}
-          {PHASEN.map((phase) => {
-            const inPhase = sichtbareVorlagen.filter((v) => phase.slugs.includes(v.termin_typ));
-            if (inPhase.length === 0) return null;
+          {leistungsSektionen.map((phase) => {
             return (
               <div key={phase.name}>
                 <p className="phase">{phase.name}</p>
                 <div className="wahlzeile">
-                  {inPhase.map((v) => (
+                  {phase.vorlagen.map((v) => (
                     <button key={v.id} className="wahl" aria-pressed={gewaehlt.includes(v.termin_typ)} onClick={() => leistungToggle(v.termin_typ)}>
                       {v.name}
                     </button>
