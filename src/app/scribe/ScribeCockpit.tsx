@@ -14,6 +14,7 @@ type Struktur = {
   groups: Record<string, Gruppe>;
   vars: string[];
   kontext?: string;
+  praxis_muster?: string;
   alter_min?: number;
   alter_max?: number;
   abrechnung_titel?: string;
@@ -69,6 +70,16 @@ function istBekannterPhasenSlug(slug: string): boolean {
 
 function phasenNameVonSlug(slug: string): string | null {
   return PHASEN.find((phase) => phase.slugs.includes(slug))?.name ?? null;
+}
+
+function istEigeneTerminart(v: Vorlage): boolean {
+  return v.termin_typ.startsWith("eigen-");
+}
+
+function anzeigeName(v: Vorlage): string {
+  const muster = v.struktur?.praxis_muster?.trim();
+  if (istEigeneTerminart(v) && muster) return muster;
+  return v.name;
 }
 
 /* Häufige Kombis: eine Sitzung, mehrere Leistungen (Praxis-Begriffe) */
@@ -338,11 +349,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     [artVorlagen, patient]
   );
   const phasenZuordnung = useMemo(() => {
-    const bekannt = artVorlagen.map((v) => phasenNameVonSlug(v.termin_typ));
+    const bekannt = artVorlagen.map((v) => (istEigeneTerminart(v) ? "Eigene Terminarten" : phasenNameVonSlug(v.termin_typ)));
     const zuordnung: Record<string, string> = {};
     artVorlagen.forEach((v, idx) => {
       let phase = bekannt[idx];
-      if (!phase && !istBekannterPhasenSlug(v.termin_typ)) {
+      if (!phase && !istBekannterPhasenSlug(v.termin_typ) && !istEigeneTerminart(v)) {
         for (let i = idx - 1; i >= 0 && !phase; i--) phase = bekannt[i];
         for (let i = idx + 1; i < artVorlagen.length && !phase; i++) phase = bekannt[i];
       }
@@ -520,7 +531,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         const sel = auswahl[m.termin_typ]?.[seg.g] ?? [];
         if (sel.length === 0) {
           if (grp?.req) {
-            const label = module.length > 1 ? `${grp.label} (${m.name})` : grp.label;
+            const label = module.length > 1 ? `${grp.label} (${anzeigeName(m)})` : grp.label;
             fehlt.push(label);
             segs.push({ art: "fehlt", text: `[ ${label} fehlt ]` });
           }
@@ -578,7 +589,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
-          leistungen: module.map((m) => m.name),
+          leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
         positionen,
@@ -649,7 +660,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
-          leistungen: module.map((m) => m.name),
+          leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
         positionen,
@@ -705,7 +716,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
-          leistungen: module.map((m) => m.name),
+          leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
         positionen,
@@ -805,7 +816,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     const proArt = vorlagen.filter((v) => v.behandlungsart === artKey);
     return terminTyp
       .split("+")
-      .map((slug) => proArt.find((v) => v.termin_typ === slug)?.name ?? slug)
+      .map((slug) => {
+        const v = proArt.find((eintrag) => eintrag.termin_typ === slug);
+        return v ? anzeigeName(v) : slug;
+      })
       .join(" + ");
   }
 
@@ -1021,7 +1035,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 <div className="wahlzeile">
                   {phase.vorlagen.map((v) => (
                     <button key={v.id} className="wahl" aria-pressed={gewaehlt.includes(v.termin_typ)} onClick={() => leistungToggle(v.termin_typ)}>
-                      {v.name}
+                      {anzeigeName(v)}
                     </button>
                   ))}
                 </div>
@@ -1037,7 +1051,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
         <div className="karteikarte">
           <div className="kartenkopf">
-            {patient ? patient.name : "Kein Patient gewählt"} · {ART_NAMEN[art]} · {module.map((m) => m.name).join(" + ") || "Keine Leistung gewählt"}
+            {patient ? patient.name : "Kein Patient gewählt"} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ") || "Keine Leistung gewählt"}
           </div>
           <div className="schreibflaeche">
             {komposition.segs.map((s, i) => (
@@ -1109,7 +1123,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               {Object.entries(m.struktur.groups).map(([g, grp]) => (
                 <div className="gruppe" key={`${m.termin_typ}:${g}`}>
                   <div className="gname">
-                    {module.length > 1 && <span className="modul">{m.name} · </span>}
+                    {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
                     {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
                   </div>
                   <div className="wahlzeile">
@@ -1208,7 +1222,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {bestaetigt ? (
               <>
                 <div className="aktemeta">
-                  {new Date().toLocaleDateString("de-DE")} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {ART_NAMEN[art]} · {module.map((m) => m.name).join(" + ")}
+                  {new Date().toLocaleDateString("de-DE")} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ")}
                 </div>
                 <div className="aktetext">{komposition.text}</div>
                 <div className="akteversion">
