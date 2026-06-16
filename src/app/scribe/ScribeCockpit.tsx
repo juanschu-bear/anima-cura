@@ -67,6 +67,10 @@ function istBekannterPhasenSlug(slug: string): boolean {
   return PHASEN.some((phase) => phase.slugs.includes(slug));
 }
 
+function phasenNameVonSlug(slug: string): string | null {
+  return PHASEN.find((phase) => phase.slugs.includes(slug))?.name ?? null;
+}
+
 /* Häufige Kombis: eine Sitzung, mehrere Leistungen (Praxis-Begriffe) */
 const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   aligner: [{ label: "Erstberatung (Anfangsdiagnostik)", slugs: ["beratung", "diagnostik"] }],
@@ -333,19 +337,32 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     () => artVorlagen.filter((v) => passtAlter(v, patient?.alter ?? null)),
     [artVorlagen, patient]
   );
+  const phasenZuordnung = useMemo(() => {
+    const bekannt = artVorlagen.map((v) => phasenNameVonSlug(v.termin_typ));
+    const zuordnung: Record<string, string> = {};
+    artVorlagen.forEach((v, idx) => {
+      let phase = bekannt[idx];
+      if (!phase && !istBekannterPhasenSlug(v.termin_typ)) {
+        for (let i = idx - 1; i >= 0 && !phase; i--) phase = bekannt[i];
+        for (let i = idx + 1; i < artVorlagen.length && !phase; i++) phase = bekannt[i];
+      }
+      zuordnung[v.termin_typ] = phase ?? "Weitere Leistungen";
+    });
+    return zuordnung;
+  }, [artVorlagen]);
   const leistungsSektionen = useMemo(() => {
-    const sektionen = PHASEN
-      .map((phase) => ({
-        name: phase.name,
-        vorlagen: sichtbareVorlagen.filter((v) => phase.slugs.includes(v.termin_typ)),
-      }))
-      .filter((phase) => phase.vorlagen.length > 0);
-    const eigeneVorlagen = sichtbareVorlagen.filter((v) => !istBekannterPhasenSlug(v.termin_typ));
-    if (eigeneVorlagen.length > 0) {
-      sektionen.push({ name: "Praxis-eigene Leistungen", vorlagen: eigeneVorlagen });
-    }
+    const sektionen: { name: string; vorlagen: Vorlage[] }[] = [];
+    sichtbareVorlagen.forEach((v) => {
+      const name = phasenZuordnung[v.termin_typ] ?? "Weitere Leistungen";
+      const letzte = sektionen[sektionen.length - 1];
+      if (letzte?.name === name) {
+        letzte.vorlagen.push(v);
+      } else {
+        sektionen.push({ name, vorlagen: [v] });
+      }
+    });
     return sektionen;
-  }, [sichtbareVorlagen]);
+  }, [sichtbareVorlagen, phasenZuordnung]);
   /* Wenn ein Patient gewaehlt wird, fliegen altersfremde Leistungen aus der Auswahl */
   useEffect(() => {
     setGewaehlt((alt) => {
@@ -413,8 +430,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   // Phase eines Termintyps bestimmen (fuer die Kombi-Regel)
   function phaseVon(slug: string): string | null {
-    const p = PHASEN.find((ph) => ph.slugs.includes(slug));
-    return p ? p.name : null;
+    return phasenZuordnung[slug] ?? null;
   }
 
   function leistungToggle(slug: string) {

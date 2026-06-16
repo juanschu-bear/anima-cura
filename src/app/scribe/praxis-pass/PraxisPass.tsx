@@ -65,7 +65,9 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       const jv = await rv.json(); const ja = await ra.json();
       if (!rv.ok) throw new Error(jv.error ?? "Vorlagen konnten nicht geladen werden.");
       if (!ra.ok) throw new Error(ja.error ?? "Antworten konnten nicht geladen werden.");
-      setVorlagen(jv.vorlagen ?? []);
+      const vorlagenAusDb: Vorlage[] = jv.vorlagen ?? [];
+      setVorlagen(vorlagenAusDb);
+      const bekannteVorlagen = new Set(vorlagenAusDb.map((v) => schluessel(v.behandlungsart, v.termin_typ)));
       const map: Record<string, Antwort> = {};
       const eigeneAusDb: Vorlage[] = [];
       const ord: Record<string, number> = {};
@@ -73,7 +75,7 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
         const kk = schluessel(a.behandlungsart, a.termin_typ);
         map[kk] = a;
         if (a.position != null) ord[kk] = a.position;
-        if (a.eigener_name) {
+        if (a.eigener_name && !bekannteVorlagen.has(kk)) {
           eigeneAusDb.push({ id: `eigen-${a.behandlungsart}-${a.termin_typ}`, behandlungsart: a.behandlungsart as Vorlage["behandlungsart"],
             termin_typ: a.termin_typ, name: a.eigener_name, sort_index: 999, struktur: {}, eigen: true });
         }
