@@ -349,7 +349,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     [artVorlagen, patient]
   );
   const phasenZuordnung = useMemo(() => {
-    const bekannt = artVorlagen.map((v) => (istEigeneTerminart(v) ? "Eigene Terminarten" : phasenNameVonSlug(v.termin_typ)));
+    const bekannt = artVorlagen.map((v) => (istEigeneTerminart(v) ? (v.name.trim() || "Eigene Terminarten") : phasenNameVonSlug(v.termin_typ)));
     const zuordnung: Record<string, string> = {};
     artVorlagen.forEach((v, idx) => {
       let phase = bekannt[idx];
@@ -1181,11 +1181,6 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   : "Eingetragen ✓"
                 : "Bestätigen & eintragen"}
           </button>
-          {!bestaetigt && (
-            <button className="neben" onClick={zwischenspeichern} disabled={speichert || sendet}>
-              {speichert ? "Speichert ..." : "Zwischenspeichern"}
-            </button>
-          )}
           {bestaetigt && !dirty && (
             <button className="neben" onClick={ivorisPush} disabled={pushStatus === "laeuft" || pushStatus === "gepusht"}>
               {pushStatus === "laeuft"
