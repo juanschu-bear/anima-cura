@@ -76,6 +76,12 @@ function istEigeneTerminart(v: Vorlage): boolean {
   return v.termin_typ.startsWith("eigen-");
 }
 
+function sektionsNameVonVorlage(v: Vorlage): string | null {
+  if (istEigeneTerminart(v)) return v.name.trim() || "Eigene Terminart";
+  if (v.termin_typ === "start" || v.termin_typ === "eingliederung") return "Behandlungsbeginn";
+  return phasenNameVonSlug(v.termin_typ);
+}
+
 function anzeigeName(v: Vorlage): string {
   const muster = v.struktur?.praxis_muster?.trim();
   if (istEigeneTerminart(v) && muster) return muster;
@@ -349,7 +355,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     [artVorlagen, patient]
   );
   const phasenZuordnung = useMemo(() => {
-    const bekannt = artVorlagen.map((v) => (istEigeneTerminart(v) ? (v.name.trim() || "Eigene Terminarten") : phasenNameVonSlug(v.termin_typ)));
+    const bekannt = artVorlagen.map((v) => sektionsNameVonVorlage(v));
     const zuordnung: Record<string, string> = {};
     artVorlagen.forEach((v, idx) => {
       let phase = bekannt[idx];
