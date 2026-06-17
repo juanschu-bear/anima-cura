@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useThema } from "./ScribeShell";
@@ -272,6 +272,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   const [art, setArt] = useState<string>("aligner");
   const [gewaehlt, setGewaehlt] = useState<string[]>([]); // termin_typ-Slugs, stapelbar
+  const [terminOffen, setTerminOffen] = useState(false); // Klapp-Menue der Terminarten
+  const terminRef = useRef<HTMLDivElement>(null);
 
   const [auswahl, setAuswahl] = useState<Record<string, Record<string, number[]>>>({});
   const [zaehne, setZaehne] = useState<number[]>([]);
@@ -445,6 +447,19 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sichtbareVorlagen.map((v) => v.id).join(",")]);
+
+  /* Klapp-Menue der Terminarten schliesst bei Klick ausserhalb */
+  useEffect(() => {
+    if (!terminOffen) return;
+    function beiKlickAussen(e: MouseEvent) {
+      if (terminRef.current && !terminRef.current.contains(e.target as Node)) {
+        setTerminOffen(false);
+      }
+    }
+    document.addEventListener("mousedown", beiKlickAussen);
+    return () => document.removeEventListener("mousedown", beiKlickAussen);
+  }, [terminOffen]);
+
   const kontext = artVorlagen[0]?.struktur.kontext ?? "";
   const abrechnungTitel = artVorlagen[0]?.struktur.abrechnung_titel ?? "Abrechnung";
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
@@ -1168,20 +1183,62 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               ))}
             </div>
           )}
-          {leistungsSektionen.map((phase) => {
-            return (
-              <div key={phase.name}>
-                <p className="phase">{phase.name}</p>
-                <div className="wahlzeile">
-                  {phase.vorlagen.map((v) => (
-                    <button key={v.id} className="wahl" aria-pressed={gewaehlt.includes(v.termin_typ)} onClick={() => leistungToggle(v.termin_typ)}>
-                      {anzeigeName(v)}
-                    </button>
-                  ))}
-                </div>
+          <div className="terminwahl" ref={terminRef}>
+            <button
+              type="button"
+              className="terminwahl-trigger"
+              aria-expanded={terminOffen}
+              onClick={() => setTerminOffen((o) => !o)}
+            >
+              <span>Terminart wählen{module.length > 1 ? ` · ${module.length} gewählt` : ""}</span>
+              <span className="terminwahl-pfeil" aria-hidden>{terminOffen ? "▴" : "▾"}</span>
+            </button>
+            {terminOffen && (
+              <div className="terminwahl-menu" role="listbox" aria-multiselectable="true">
+                {leistungsSektionen.length === 0 && (
+                  <p className="terminwahl-leer">Keine passende Terminart</p>
+                )}
+                {leistungsSektionen.map((phase) => (
+                  <div key={phase.name} className="terminwahl-gruppe">
+                    <p className="terminwahl-phase">{phase.name}</p>
+                    {phase.vorlagen.map((v) => {
+                      const aktiv = gewaehlt.includes(v.termin_typ);
+                      return (
+                        <button
+                          type="button"
+                          key={v.id}
+                          className={`terminwahl-zeile${aktiv ? " aktiv" : ""}`}
+                          role="option"
+                          aria-selected={aktiv}
+                          onClick={() => leistungToggle(v.termin_typ)}
+                        >
+                          <span className="terminwahl-haken" aria-hidden>{aktiv ? "✓" : ""}</span>
+                          <span>{anzeigeName(v)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            );
-          })}
+            )}
+            {module.length > 0 && (
+              <div className="terminwahl-chips">
+                {module.map((v) => (
+                  <span key={v.id} className="terminwahl-chip">
+                    {anzeigeName(v)}
+                    <button
+                      type="button"
+                      className="terminwahl-chip-x"
+                      aria-label={`${anzeigeName(v)} entfernen`}
+                      onClick={() => leistungToggle(v.termin_typ)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           {kontext && <div className="kontext"><b>{ART_NAMEN[art]}:</b> {kontext}</div>}
         </div>
 

@@ -162,6 +162,33 @@
 /* ===== Stufen, Phasen, Kontext ===== */
 .scribe .stufe{display:block;font-size:12.5px;font-weight:700;margin:16px 0 8px}
 .scribe .stufe:first-child{margin-top:0}
+
+/* Terminart-Klappmenue: kompakt, mehrfach waehlbar, Auswahl als Chips sichtbar */
+.scribe .terminwahl{position:relative;margin-bottom:6px}
+.scribe .terminwahl-trigger{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;
+  padding:11px 14px;border:1px solid var(--kante);border-radius:12px;background:var(--flaeche-flach);
+  color:var(--schrift);font-size:14px;font-weight:600;cursor:pointer;transition:border-color .15s ease}
+.scribe .terminwahl-trigger:hover{border-color:var(--kante-hover)}
+.scribe .terminwahl-trigger[aria-expanded="true"]{border-color:var(--primaer)}
+.scribe .terminwahl-pfeil{color:var(--gedeckt);font-size:12px}
+.scribe .terminwahl-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;max-height:340px;
+  overflow-y:auto;padding:6px;border:1px solid var(--kante);border-radius:12px;background:var(--flaeche);
+  box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.scribe .terminwahl-phase{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gedeckt);margin:8px 8px 4px;font-weight:600}
+.scribe .terminwahl-zeile{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 10px;
+  border:0;border-radius:9px;background:transparent;color:var(--schrift);font-size:14px;cursor:pointer;
+  transition:background .12s ease}
+.scribe .terminwahl-zeile:hover{background:var(--flaeche-flach)}
+.scribe .terminwahl-zeile.aktiv{background:var(--primaer-soft);color:var(--primaer);font-weight:600}
+.scribe .terminwahl-haken{display:inline-flex;justify-content:center;width:14px;color:var(--primaer);font-weight:700}
+.scribe .terminwahl-leer{padding:10px;color:var(--gedeckt);font-size:13px}
+.scribe .terminwahl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.scribe .terminwahl-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;border-radius:999px;
+  background:var(--primaer-soft);color:var(--primaer);font-size:13px;font-weight:600}
+.scribe .terminwahl-chip-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+  border:0;border-radius:999px;background:transparent;color:var(--primaer);font-size:15px;line-height:1;cursor:pointer}
+.scribe .terminwahl-chip-x:hover{background:var(--primaer);color:var(--auf-primaer)}
 .scribe .phase{display:block;padding:0;
   font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
   color:var(--schrift);margin:15px 0 9px}
