@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/patients",
+      "schedule": "0 4,7,10,13,16 * * *"
     }
   ]
 }
