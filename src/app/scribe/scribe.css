@@ -227,8 +227,8 @@
 /* ===== Gruppen ===== */
 .scribe .gruppe{margin-top:20px}
 .scribe .gruppe:first-child{margin-top:0}
-.scribe .gname{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--gedeckt);font-weight:600;margin-bottom:9px;line-height:1.6}
+.scribe .gname{font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--schrift);font-weight:700;margin-bottom:11px;line-height:1.6}
 .scribe .gname .pflicht{color:var(--rot)}
 .scribe .gname .modul{color:var(--primaer)}
 .scribe .modulblock + .modulblock{margin-top:22px;padding-top:18px;border-top:1px dashed var(--kante)}
@@ -686,12 +686,26 @@
 .scribe .pp-lede + .pp-lede{margin-top:12px}
 
 /* --- Self-service: practice-added option texts (Weg B) --- */
-.wahl.plus { border-style: dashed; opacity: .85; }
-.wahl.plus:hover { opacity: 1; }
+.scribe .wahl.plus{border-style:solid;border-color:var(--primaer);background:var(--primaer-soft);
+  color:var(--primaer);opacity:1;font-weight:600;font-size:13.5px;padding:9px 17px}
+.scribe .wahl.plus:hover{background:var(--primaer);color:var(--auf-primaer);border-color:transparent;
+  transform:translateY(-1px)}
 .eigen-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .eigen-hinweis { font-size: 12px; color: var(--gedeckt); margin: 0; }
 .eigen-aktionen { display: flex; gap: 8px; }
 
 /* "keine Angabe"-Button (Pflichtgruppe ohne passende Option) */
-.wahl.keine { border-style: dotted; font-style: italic; opacity: .8; }
-.wahl.keine[aria-pressed="true"] { opacity: 1; outline: 1px solid currentColor; }
+.scribe .wahl.keine{border-style:dashed;border-color:var(--kante-hover);background:transparent;
+  color:var(--gedeckt);font-style:italic;opacity:1}
+.scribe .wahl.keine:hover{border-color:var(--gedeckt);color:var(--schrift);transform:translateY(-1px)}
+.scribe .wahl.keine[aria-pressed="true"]{border-style:solid;border-color:var(--gedeckt);
+  background:var(--flaeche-flach);color:var(--schrift);font-style:normal;font-weight:600;
+  box-shadow:0 0 0 1px var(--gedeckt)}
+
+/* Patient fehlt -> ivoris-Sync direkt aus der Suche */
+.scribe .sync-zeile{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.scribe .wahl.sync{border-style:solid;border-color:var(--primaer);background:var(--primaer-soft);color:var(--primaer)}
+.scribe .wahl.sync:hover{background:var(--primaer);color:var(--auf-primaer);border-color:transparent;transform:translateY(-1px)}
+.scribe .wahl.sync:disabled{opacity:.6;cursor:default;transform:none}
+.scribe .wahl.sync:disabled:hover{background:var(--primaer-soft);color:var(--primaer);border-color:var(--primaer)}
+.scribe .sync-info{font-family:var(--mono);font-size:12px;color:var(--gedeckt)}

@@ -307,6 +307,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [aenderungsgrund, setAenderungsgrund] = useState("");
+  const [syncLaeuft, setSyncLaeuft] = useState(false);
+  const [syncInfo, setSyncInfo] = useState<string | null>(null);
 
   const ladeHeute = useCallback(async () => {
     const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
@@ -347,6 +349,49 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     }, 250);
     return () => clearTimeout(t);
   }, [suche, patient]);
+
+  // Manueller ivoris-Sync direkt aus der Suche: holt fehlende Patienten sofort.
+  // ivoris bietet keinen "geaendert seit"-Endpoint, daher voller Pull ueber batch-sync,
+  // der serverseitig batchweise laeuft und per nextPage fortgesetzt wird.
+  async function patientenSynchronisieren() {
+    if (syncLaeuft) return;
+    setSyncLaeuft(true);
+    setSyncInfo("ivoris wird synchronisiert…");
+    try {
+      let startPage = 0;
+      let fetched = 0;
+      let upserted = 0;
+      // Safety cap: stop after 50 batches even if the route never reports done.
+      for (let i = 0; i < 50; i++) {
+        const res = await fetch(`/api/ivoris/patients/batch-sync?startPage=${startPage}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        fetched += json.results?.fetched ?? 0;
+        upserted += json.results?.upserted ?? 0;
+        if (json.done || json.nextPage === null || json.nextPage === undefined) break;
+        startPage = json.nextPage;
+      }
+      setSyncInfo(`Fertig. ${fetched} Patienten geprüft, ${upserted} aktualisiert.`);
+      // Aktuelle Suche erneut ausfuehren, damit ein frisch gezogener Patient sofort erscheint.
+      if (suche.trim().length >= 2 && !patient) {
+        const r = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
+        if (r.ok) {
+          const j = await r.json();
+          setTreffer(
+            (j.results ?? []).map((x: { id: string; name: string; geburtsdatum?: string | null }) => ({
+              id: x.id,
+              name: x.name,
+              alter: berechneAlter(x.geburtsdatum ?? null),
+            }))
+          );
+        }
+      }
+    } catch (e) {
+      setSyncInfo(`Sync fehlgeschlagen: ${String(e)}`);
+    } finally {
+      setSyncLaeuft(false);
+    }
+  }
 
   const artVorlagen = useMemo(
     () => vorlagen.filter((v) => v.behandlungsart === art).sort((a, b) => a.sort_index - b.sort_index),
@@ -1092,6 +1137,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   ))}
                 </ul>
               )}
+              <div className="sync-zeile">
+                <button type="button" className="wahl sync" disabled={syncLaeuft} onClick={patientenSynchronisieren}>
+                  {syncLaeuft ? "Synchronisiert…" : "↻ Patient fehlt? Mit ivoris synchronisieren"}
+                </button>
+                {syncInfo && <span className="sync-info">{syncInfo}</span>}
+              </div>
             </>
           )}
 
