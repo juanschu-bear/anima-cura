@@ -179,3 +179,28 @@ export async function fetchIvorisPatientsPage(page = 0) {
   }
   return payload;
 }
+
+// Fetch a single patient by ivoris UUID. Documented as GET /Patient/v1/Patient?id={uuid}.
+// The detail object often carries more fields than the AllPatients list entry.
+export async function fetchIvorisPatientById(id: string) {
+  const creds = getIvorisCredentials();
+  const baseUrl = buildBaseUrl(creds.linkname);
+  const mandantIndex = process.env.IVORIS_MANDANT_INDEX;
+  const url = new URL(`${baseUrl}/Patient/v1/Patient`);
+  withAuthParams(url, creds);
+  url.searchParams.set("id", id);
+  if (mandantIndex) {
+    url.searchParams.set("mandantIndex", mandantIndex);
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(creds),
+    cache: "no-store",
+  });
+  const payload = await parseBestEffortResponse(response);
+  if (!response.ok) {
+    throw new Error(`IVORIS GetPatient ${id} fehlgeschlagen (${response.status}): ${formatPayload(payload)}`);
+  }
+  return payload;
+}
