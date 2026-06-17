@@ -281,6 +281,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [bogen, setBogen] = useState(BOGEN[2]);
   const [ausnahme, setAusnahme] = useState("");
 
+  // --- Self-service: practice-added option texts (Weg B) ---
+  const [optOffen, setOptOffen] = useState<string | null>(null); // key `${termin_typ}:${gruppe}` of the open editor
+  const [optText, setOptText] = useState("");
+  const [optSpeichert, setOptSpeichert] = useState(false);
+
   const [sendet, setSendet] = useState(false);
   const [speichert, setSpeichert] = useState(false);
   const [entwurfId, setEntwurfId] = useState<string | null>(null);
@@ -394,6 +399,43 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const abrechnungTitel = artVorlagen[0]?.struktur.abrechnung_titel ?? "Abrechnung";
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
   const animaKopplung = artVorlagen[0]?.struktur.anima_kopplung ?? "";
+
+  // Reload templates so freshly added practice options appear as chips.
+  // Does NOT touch the current selection.
+  const ladeVorlagen = useCallback(async () => {
+    const res = await fetch("/api/doku/vorlagen");
+    if (!res.ok) return;
+    const json = await res.json();
+    setVorlagen(json.vorlagen ?? []);
+  }, []);
+
+  async function eigenenTextSpeichern(m: Vorlage, g: string) {
+    const text = optText.trim();
+    if (!text || optSpeichert) return;
+    setOptSpeichert(true);
+    try {
+      const res = await fetch("/api/doku/optionen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          behandlungsart: m.behandlungsart,
+          termin_typ: m.termin_typ,
+          gruppe: g,
+          text,
+        }),
+      });
+      if (res.ok) {
+        await ladeVorlagen(); // re-merge -> new chip shows up in this group
+        setOptOffen(null);
+        setOptText("");
+      } else {
+        const j = await res.json().catch(() => null);
+        alert(j?.error ?? "Speichern fehlgeschlagen.");
+      }
+    } finally {
+      setOptSpeichert(false);
+    }
+  }
 
   function bearbeitet() {
     setAktionsFehler(null);
@@ -1144,6 +1186,45 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                       </button>
                     ))}
                   </div>
+                  {(() => {
+                    const key = `${m.termin_typ}:${g}`;
+                    if (optOffen !== key) {
+                      return (
+                        <button className="wahl plus" onClick={() => { setOptOffen(key); setOptText(""); }}>
+                          + Eigener Text
+                        </button>
+                      );
+                    }
+                    return (
+                      <div className="eigen-editor">
+                        <input
+                          className="freitext"
+                          type="text"
+                          placeholder="Eigener Textbaustein"
+                          value={optText}
+                          autoFocus
+                          maxLength={400}
+                          onChange={(e) => setOptText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") eigenenTextSpeichern(m, g); }}
+                        />
+                        <p className="eigen-hinweis">
+                          Bitte Rechtschreibung und Textbaustein prüfen. Der Text wird genau so gespeichert.
+                        </p>
+                        <div className="eigen-aktionen">
+                          <button
+                            className="wahl bernstein"
+                            disabled={optSpeichert || !optText.trim()}
+                            onClick={() => eigenenTextSpeichern(m, g)}
+                          >
+                            {optSpeichert ? "Speichert…" : "Speichern"}
+                          </button>
+                          <button className="wahl" onClick={() => { setOptOffen(null); setOptText(""); }}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

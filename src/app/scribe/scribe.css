@@ -684,3 +684,10 @@
 }
 
 .scribe .pp-lede + .pp-lede{margin-top:12px}
+
+/* --- Self-service: practice-added option texts (Weg B) --- */
+.wahl.plus { border-style: dashed; opacity: .85; }
+.wahl.plus:hover { opacity: 1; }
+.eigen-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.eigen-hinweis { font-size: 12px; color: var(--gedeckt); margin: 0; }
+.eigen-aktionen { display: flex; gap: 8px; }
