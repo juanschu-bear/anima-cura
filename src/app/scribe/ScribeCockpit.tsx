@@ -286,6 +286,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [optText, setOptText] = useState("");
   const [optSpeichert, setOptSpeichert] = useState(false);
 
+  // --- Required-field changes: keine Angabe marker + current aligner number ---
+  const [leer, setLeer] = useState<Record<string, boolean>>({}); // key `${termin_typ}:${gruppe}` marked "keine Angabe"
+  const [schieneAktuell, setSchieneAktuell] = useState("");
+  const [schieneNotiz, setSchieneNotiz] = useState("");
+
   const [sendet, setSendet] = useState(false);
   const [speichert, setSpeichert] = useState(false);
   const [entwurfId, setEntwurfId] = useState<string | null>(null);
@@ -455,6 +460,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setAktionsFehler(null);
     setEntwurfId(null);
     setZwischenInfo(null);
+    setLeer({});
+    setSchieneAktuell("");
+    setSchieneNotiz("");
   }
 
   /* Defaults je gewähltem Modul setzen */
@@ -522,16 +530,28 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     const m = vorlageVon(slug);
     if (!m) return;
     bearbeitet();
-    const grp = m.struktur.groups[g];
+    setLeer((l) => ({ ...l, [`${slug}:${g}`]: false })); // selecting an option clears "keine Angabe"
     setAuswahl((alt) => {
       const modul = alt[slug] ?? {};
       const akt = modul[g] ?? [];
-      const neu =
-        grp.type === "single"
-          ? akt.includes(i) ? [] : [i]
-          : akt.includes(i) ? akt.filter((x) => x !== i) : [...akt, i].sort((a, b) => a - b);
+      // Multi-select for every group now (required fields included).
+      const neu = akt.includes(i) ? akt.filter((x) => x !== i) : [...akt, i].sort((a, b) => a - b);
       return { ...alt, [slug]: { ...modul, [g]: neu } };
     });
+  }
+
+  // "keine Angabe": mark a required group as intentionally empty. No text, no block.
+  function toggleKeineAngabe(slug: string, g: string) {
+    bearbeitet();
+    const key = `${slug}:${g}`;
+    const wirdLeer = !leer[key];
+    setLeer((l) => ({ ...l, [key]: wirdLeer }));
+    if (wirdLeer) {
+      setAuswahl((alt) => {
+        const modul = alt[slug] ?? {};
+        return { ...alt, [slug]: { ...modul, [g]: [] } };
+      });
+    }
   }
 
   function toggleZahn(n: number) {
@@ -554,15 +574,13 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     const fuellen = (t: string): string => {
       let out = t;
       if (out.includes("{zaehne}")) {
-        if (zaehne.length === 0) {
-          fehlt.push("Zahnangabe (FDI)");
-          out = out.replace(/\{zaehne\}/g, "⟨Zahn?⟩");
-        } else {
-          out = out.replace(/\{zaehne\}/g, zaehne.map((z) => seiten[z] === "innen" ? `${z} (${z < 30 ? "palatinal" : "lingual"})` : String(z)).join(", "));
-        }
+        // Teeth are never required: render empty when none selected.
+        out = out.replace(/\{zaehne\}/g, zaehne.length === 0
+          ? ""
+          : zaehne.map((z) => seiten[z] === "innen" ? `${z} (${z < 30 ? "palatinal" : "lingual"})` : String(z)).join(", "));
       }
       if (out.includes("{von}") || out.includes("{bis}")) {
-        if (!schienenVon || !schienenBis) fehlt.push("Schienen-Nr.");
+        // "Ausgegeben von/bis" is optional now and never blocks.
         out = out.replace("{von}", schienenVon || "?").replace("{bis}", schienenBis || "?");
       }
       if (out.includes("{bogen}")) out = out.replace("{bogen}", bogen);
@@ -577,13 +595,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         }
         const grp = m.struktur.groups[seg.g];
         const sel = auswahl[m.termin_typ]?.[seg.g] ?? [];
+        const istLeer = leer[`${m.termin_typ}:${seg.g}`] === true;
         if (sel.length === 0) {
-          if (grp?.req) {
+          if (grp?.req && !istLeer) {
             const label = module.length > 1 ? `${grp.label} (${anzeigeName(m)})` : grp.label;
             fehlt.push(label);
             segs.push({ art: "fehlt", text: `[ ${label} fehlt ]` });
           }
-          return;
+          return; // "keine Angabe" -> nothing rendered, no block
         }
         sel.forEach((i) => segs.push({ art: "var", text: fuellen(grp.opts[i].t) + " " }));
       });
@@ -592,10 +611,24 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     if (!patient) fehlt.push("Patient");
     if (module.length === 0) fehlt.push("Leistung");
 
+    // Current aligner number is the required field for aligner controls (vars includes "schienen").
+    const brauchtSchienenLocal = module.some((m) => m.struktur.vars.includes("schienen"));
+    let schieneText = "";
+    if (brauchtSchienenLocal) {
+      if (!schieneAktuell.trim()) {
+        fehlt.push("Aktuelle Schiene");
+      } else {
+        schieneText = ` Aktuell getragene Schiene: Nr. ${schieneAktuell.trim()}.`;
+        if (schieneNotiz.trim()) schieneText += ` ${schieneNotiz.trim()}`;
+      }
+    }
+
     let text = segs.map((s) => (s.art === "fehlt" ? "" : s.text)).join("");
+    text += schieneText;
     if (ausnahme.trim()) text += ` Ausnahme: ${ausnahme.trim()}`;
-    return { segs, fehlt: Array.from(new Set(fehlt)), text: text.trim() };
-  }, [module, auswahl, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient]);
+    text = text.replace(/\s{2,}/g, " ").trim();
+    return { segs, fehlt: Array.from(new Set(fehlt)), text };
+  }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz]);
 
   /* Positionen über alle Module auflösen */
   const positionen = useMemo(() => {
@@ -634,6 +667,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         zaehne: zaehne.map(String),
         variablen: {
           schienen_von: schienenVon,
+          schiene_aktuell: schieneAktuell,
+          schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
@@ -705,6 +740,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         zaehne: zaehne.map(String),
         variablen: {
           schienen_von: schienenVon,
+          schiene_aktuell: schieneAktuell,
+          schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
@@ -761,6 +798,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         zaehne: zaehne.map(String),
         variablen: {
           schienen_von: schienenVon,
+          schiene_aktuell: schieneAktuell,
+          schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
           zahn_seiten: seiten,
@@ -799,6 +838,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     const v = (e.variablen ?? {}) as Record<string, unknown>;
     if (typeof v.schienen_von === "string") setSchienenVon(v.schienen_von);
     if (typeof v.schienen_bis === "string") setSchienenBis(v.schienen_bis);
+    if (typeof v.schiene_aktuell === "string") setSchieneAktuell(v.schiene_aktuell);
+    if (typeof v.schiene_notiz === "string") setSchieneNotiz(v.schiene_notiz);
     if (typeof v.bogen === "string") setBogen(v.bogen);
     if (v.zahn_seiten && typeof v.zahn_seiten === "object") setSeiten(v.zahn_seiten as Record<number, Seite>);
     setAusnahme(e.ausnahme_freitext ?? "");
@@ -1147,10 +1188,22 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             )}
             {brauchtSchienen && (
               <div className="gruppe">
-                <div className="gname">Schienen-Nr.</div>
+                <div className="gname">Aktuell getragene Schiene <span className="pflicht">· Pflicht</span></div>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--schrift-mono), monospace", fontSize: 13 }}>
-                  Nr. <input type="number" min={1} value={schienenVon} onChange={(e) => { bearbeitet(); setSchienenVon(e.target.value); }} aria-label="Schiene von" />
-                  bis <input type="number" min={1} value={schienenBis} onChange={(e) => { bearbeitet(); setSchienenBis(e.target.value); }} aria-label="Schiene bis" />
+                  Nr. <input type="number" min={1} value={schieneAktuell} onChange={(e) => { bearbeitet(); setSchieneAktuell(e.target.value); }} aria-label="Aktuell getragene Schiene Nr." />
+                </span>
+                <input
+                  className="freitext"
+                  type="text"
+                  placeholder="Notiz zur Schiene (optional)"
+                  value={schieneNotiz}
+                  onChange={(e) => { bearbeitet(); setSchieneNotiz(e.target.value); }}
+                  style={{ marginTop: 6 }}
+                />
+                <div className="gname" style={{ marginTop: 10 }}>Ausgegeben (optional)</div>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--schrift-mono), monospace", fontSize: 13 }}>
+                  Nr. <input type="number" min={1} value={schienenVon} onChange={(e) => { bearbeitet(); setSchienenVon(e.target.value); }} aria-label="Ausgegeben von" />
+                  bis <input type="number" min={1} value={schienenBis} onChange={(e) => { bearbeitet(); setSchienenBis(e.target.value); }} aria-label="Ausgegeben bis" />
                 </span>
               </div>
             )}
@@ -1185,6 +1238,15 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                         {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
                       </button>
                     ))}
+                    {grp.req && (
+                      <button
+                        className="wahl keine"
+                        aria-pressed={leer[`${m.termin_typ}:${g}`] === true}
+                        onClick={() => toggleKeineAngabe(m.termin_typ, g)}
+                      >
+                        keine Angabe
+                      </button>
+                    )}
                   </div>
                   {(() => {
                     const key = `${m.termin_typ}:${g}`;
