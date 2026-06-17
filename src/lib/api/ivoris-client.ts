@@ -154,3 +154,28 @@ export async function fetchIvorisPatientsRaw() {
   }
   return payload;
 }
+
+// Single-page fetch for diagnostics: returns one page of AllPatients without
+// aggregating all pages (avoids the long-running full pull that times out).
+export async function fetchIvorisPatientsPage(page = 0) {
+  const creds = getIvorisCredentials();
+  const baseUrl = buildBaseUrl(creds.linkname);
+  const mandantIndex = process.env.IVORIS_MANDANT_INDEX;
+  const url = new URL(`${baseUrl}/Patient/v1/AllPatients`);
+  withAuthParams(url, creds);
+  url.searchParams.set("page", String(page));
+  if (mandantIndex) {
+    url.searchParams.set("mandantIndex", mandantIndex);
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(creds),
+    cache: "no-store",
+  });
+  const payload = await parseBestEffortResponse(response);
+  if (!response.ok) {
+    throw new Error(`IVORIS AllPatients Seite ${page} fehlgeschlagen (${response.status}): ${formatPayload(payload)}`);
+  }
+  return payload;
+}
