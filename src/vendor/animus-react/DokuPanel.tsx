@@ -31,6 +31,9 @@ function schoen(s: string | null | undefined): string {
 export interface DokuPanelProps {
   /** Set while the agent is dictating but no draft is ready yet. */
   building?: DokuStartInfo | null;
+  /** Live Zwischenstand while the agent is still assembling the draft. */
+  preview?: DokuEntwurf | null;
+  previewHint?: string | null;
   /** The finished draft, ready for the doctor to confirm. */
   entwurf?: DokuEntwurf | null;
   /** Spoken patient name for the header. */
@@ -47,16 +50,17 @@ export interface DokuPanelProps {
  * auf der AnimaScribe-Seite bleiben.
  */
 export function DokuPanel(props: DokuPanelProps): React.ReactElement {
-  const { building, entwurf, patient, onConfirm, onClose } = props;
+  const { building, preview, previewHint, entwurf, patient, onConfirm, onClose } = props;
   const [saving, setSaving] = useState(false);
-  const open = Boolean(building || entwurf);
+  const open = Boolean(building || preview || entwurf);
+  const activeDraft = entwurf ?? preview ?? null;
 
   const name = patient || building?.name || "";
-  const behandlungsart = entwurf?.behandlungsart ?? building?.behandlungsart ?? null;
-  const terminTyp = entwurf?.termin_typ ?? building?.termin_typ ?? "";
+  const behandlungsart = activeDraft?.behandlungsart ?? building?.behandlungsart ?? null;
+  const terminTyp = activeDraft?.termin_typ ?? building?.termin_typ ?? "";
   const metaZeile = [schoen(behandlungsart), schoen(terminTyp)].filter(Boolean).join(" · ");
-  const gruppen: DokuGruppe[] = entwurf?.gruppen ?? [];
-  const positionen = entwurf?.positionen ?? [];
+  const gruppen: DokuGruppe[] = activeDraft?.gruppen ?? [];
+  const positionen = activeDraft?.positionen ?? [];
   const chooserMode = building?.modus === "chooser";
 
   const confirm = async (): Promise<void> => {
@@ -134,9 +138,9 @@ export function DokuPanel(props: DokuPanelProps): React.ReactElement {
           </div>
 
           {/* füllt-Zustand: Agent diktiert noch, kein Entwurf */}
-          {!entwurf && building && (
+          {!entwurf && (building || preview) && (
             <div style={{ fontSize: 13, color: D_MUTED, lineHeight: 1.6, padding: "6px 0 4px" }}>
-              {chooserMode ? (building.hint ?? "ANIMUS öffnet das Doku-Menü …") : "ANIMUS hört zu und füllt den Eintrag …"}
+              {chooserMode ? (building?.hint ?? previewHint ?? "ANIMUS öffnet das Doku-Menü …") : (previewHint ?? "ANIMUS hört zu und füllt den Eintrag live aus dem Gespräch …")}
             </div>
           )}
 
@@ -191,17 +195,17 @@ export function DokuPanel(props: DokuPanelProps): React.ReactElement {
           )}
 
           {/* Eintrag */}
-          {(building || entwurf?.text) && (
+          {(building || activeDraft?.text) && (
             <Section>
               <DLabel>Eintrag</DLabel>
               <div style={{ background: D_CREAM, color: "#1c1c1c", borderRadius: 11, padding: 15, fontSize: 12.5, lineHeight: 1.6 }}>
                 {metaZeile && <div style={{ color: "#6a6a6a", fontSize: 11, marginBottom: 8 }}>{name ? `${name} · ` : ""}{metaZeile}</div>}
-                {entwurf?.text ? (
-                  entwurf.text
+                {activeDraft?.text ? (
+                  activeDraft.text
                 ) : (
                   <div>
                     <div style={{ color: "#7b746a", fontSize: 11.5, marginBottom: 10 }}>
-                      {chooserMode ? (building?.hint ?? "ANIMUS bereitet die Vorlage vor …") : "ANIMUS hört zu. Der Eintrag füllt sich gleich live aus dem Gespräch."}
+                      {chooserMode ? (building?.hint ?? previewHint ?? "ANIMUS bereitet die Vorlage vor …") : (previewHint ?? "ANIMUS hört zu. Der Eintrag füllt sich gleich live aus dem Gespräch.")}
                     </div>
                     <div style={{ height: 18, borderRadius: 6, background: "rgba(191,168,129,0.18)", marginBottom: 10, width: "88%" }} />
                     <div style={{ height: 18, borderRadius: 6, background: "rgba(191,168,129,0.12)", marginBottom: 10, width: "96%" }} />
@@ -216,10 +220,10 @@ export function DokuPanel(props: DokuPanelProps): React.ReactElement {
           )}
 
           {/* Zähne (wenn die Vorlage sie nutzt) */}
-          {entwurf && entwurf.zaehne.length > 0 && (
+          {activeDraft && activeDraft.zaehne.length > 0 && (
             <Section>
               <DLabel>Zähne</DLabel>
-              {entwurf.zaehne.map((z) => (
+              {activeDraft.zaehne.map((z) => (
                 <Chip key={z} on>{z}</Chip>
               ))}
             </Section>

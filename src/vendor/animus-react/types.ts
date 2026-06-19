@@ -90,8 +90,15 @@ export interface DokuOpenMessage {
   entwurf: DokuEntwurf;
 }
 
+export interface DokuUpdateMessage {
+  type: "doku_update";
+  patient: string;
+  entwurf: DokuEntwurf;
+  frage?: string;
+}
+
 /** Every message ANIMUS may publish on the "animus" data topic. */
-export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuOpenMessage;
+export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuUpdateMessage | DokuOpenMessage;
 
 export interface AnimusSceneCallbacks {
   onHover?: (patient: AnimusPatient | null, x: number, y: number) => void;
@@ -143,6 +150,8 @@ export interface AnimusHudProps {
   showCard?: boolean;
   /** Called when the agent starts a dictation (vorlage loaded). */
   onDokuStart?: (info: DokuStartInfo) => void;
+  /** Called while the draft is still being assembled. */
+  onDokuUpdate?: (entwurf: DokuEntwurf, patient: string, frage?: string) => void;
   /** Called when the agent hands over a finished draft. */
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
   /** Doctor confirms the draft in the panel. The host writes it through its

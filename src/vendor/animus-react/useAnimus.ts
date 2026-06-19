@@ -20,6 +20,7 @@ export interface UseAnimusOptions {
   onPatientCall?: (patient: AnimusPatient) => void;
   onPatientUnfocus?: () => void;
   onDokuStart?: (info: DokuStartInfo) => void;
+  onDokuUpdate?: (entwurf: DokuEntwurf, patient: string, frage?: string) => void;
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
 }
 
@@ -88,6 +89,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     onPatientCall,
     onPatientUnfocus,
     onDokuStart,
+    onDokuUpdate,
     onDokuOpen,
   } = options;
 
@@ -98,6 +100,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const onPatientCallRef = useRef(onPatientCall);
   const onPatientUnfocusRef = useRef(onPatientUnfocus);
   const onDokuStartRef = useRef(onDokuStart);
+  const onDokuUpdateRef = useRef(onDokuUpdate);
   const onDokuOpenRef = useRef(onDokuOpen);
   const wakeWordPhrasesRef = useRef(wakeWordPhrases);
   const connectedRef = useRef(false);
@@ -115,6 +118,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   onPatientCallRef.current = onPatientCall;
   onPatientUnfocusRef.current = onPatientUnfocus;
   onDokuStartRef.current = onDokuStart;
+  onDokuUpdateRef.current = onDokuUpdate;
   onDokuOpenRef.current = onDokuOpen;
   wakeWordPhrasesRef.current = wakeWordPhrases;
   connectedRef.current = connected;
@@ -183,6 +187,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
               hint: msg.hint,
             });
           }
+          else if (msg.type === "doku_update") onDokuUpdateRef.current?.(msg.entwurf, msg.patient, msg.frage);
           else if (msg.type === "doku_open") onDokuOpenRef.current?.(msg.entwurf, msg.patient);
         } catch {
           /* ignore malformed data messages */

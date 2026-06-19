@@ -87,7 +87,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     tokenEndpoint, room, identity, patients,
     greetingLead = "Guten Abend,", userName = "Dr. Schubert",
     autoConnect = false, wakeWord = false, wakeWordPhrases = DEFAULT_WAKE_WORD_PHRASES,
-    onPatientCall, onPatientFocus, onPatientUnfocus, onDokuStart, onDokuOpen, onDokuConfirm,
+    onPatientCall, onPatientFocus, onPatientUnfocus, onDokuStart, onDokuUpdate, onDokuOpen, onDokuConfirm,
     showCard = true, className, style,
   } = props;
 
@@ -110,6 +110,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const [datum, setDatum] = useState("—");
   const [uptime, setUptime] = useState("00:00");
   const [dokuStart, setDokuStart] = useState<DokuStartInfo | null>(null);
+  const [dokuPreview, setDokuPreview] = useState<DokuEntwurf | null>(null);
+  const [dokuPreviewHint, setDokuPreviewHint] = useState<string | null>(null);
   const [dokuEntwurf, setDokuEntwurf] = useState<DokuEntwurf | null>(null);
   const [dokuPatient, setDokuPatient] = useState<string>("");
 
@@ -133,18 +135,31 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
 
   const handleDokuStart = useCallback((info: DokuStartInfo) => {
     setDokuEntwurf(null);
+    setDokuPreview(null);
+    setDokuPreviewHint(info.hint ?? null);
     setDokuStart(info);
     onDokuStart?.(info);
   }, [onDokuStart]);
 
+  const handleDokuUpdate = useCallback((entwurf: DokuEntwurf, patient: string, frage?: string) => {
+    setDokuPreview(entwurf);
+    setDokuPatient(patient);
+    setDokuPreviewHint(frage ?? null);
+    onDokuUpdate?.(entwurf, patient, frage);
+  }, [onDokuUpdate]);
+
   const handleDokuOpen = useCallback((entwurf: DokuEntwurf, patient: string) => {
     setDokuEntwurf(entwurf);
+    setDokuPreview(entwurf);
+    setDokuPreviewHint(null);
     setDokuPatient(patient);
     onDokuOpen?.(entwurf, patient);
   }, [onDokuOpen]);
 
   const closeDoku = useCallback(() => {
     setDokuEntwurf(null);
+    setDokuPreview(null);
+    setDokuPreviewHint(null);
     setDokuStart(null);
   }, []);
 
@@ -157,6 +172,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
       modus: "chooser",
       hint: "ANIMUS blendet das Doku-Menü ein …",
     });
+    setDokuPreview(null);
+    setDokuPreviewHint("ANIMUS blendet das Doku-Menü ein …");
   }, [card, dokuPatient]);
 
   const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
@@ -187,6 +204,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     onPatientCall: handlePatientCall,
     onPatientUnfocus: handlePatientUnfocus,
     onDokuStart: handleDokuStart,
+    onDokuUpdate: handleDokuUpdate,
     onDokuOpen: handleDokuOpen,
   });
 
@@ -408,6 +426,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
 
       <DokuPanel
         building={dokuStart}
+        preview={dokuPreview}
+        previewHint={dokuPreviewHint}
         entwurf={dokuEntwurf}
         patient={dokuPatient}
         onConfirm={confirmDoku}
