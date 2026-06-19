@@ -411,22 +411,38 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
           <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
-          <button
-            className="btn ghost"
-            type="button"
-            onClick={() => {
-              setDiaryOpen((current) => {
-                const next = !current;
-                if (next) requestMemorySnapshot();
-                return next;
-              });
-            }}
-          >
-            ☰ Diary
-          </button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setDiaryOpen((current) => {
+            const next = !current;
+            if (next) requestMemorySnapshot();
+            return next;
+          });
+        }}
+        style={{
+          position: "absolute",
+          right: 32,
+          bottom: 28,
+          zIndex: 4,
+          borderRadius: 999,
+          padding: "12px 18px",
+          border: "1px solid rgba(198,171,117,.24)",
+          background: "rgba(24,18,12,.82)",
+          color: "#e7d2aa",
+          fontFamily: MONO,
+          fontSize: 13,
+          letterSpacing: ".08em",
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        Diary
+      </button>
 
       {hover && (
         <div className="nodeLabel" style={{ left: hover.x, top: hover.y }}>
