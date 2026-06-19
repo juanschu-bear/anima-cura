@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AnimusHud } from "@/vendor/animus-react";
-import type { AnimusHandle, AnimusPatient, DokuEntwurf, Gender } from "@/vendor/animus-react";
+import type { AnimusHandle, AnimusPatient, DokuEntwurf, Gender } from "@/vendor/animus-react/types";
 
 // Rohe Stammdaten eines aktiven Patienten, serverseitig geladen (page.tsx).
 export type AktiverPatient = {
