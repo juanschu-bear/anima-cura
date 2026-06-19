@@ -191,12 +191,23 @@ export function DokuPanel(props: DokuPanelProps): React.ReactElement {
           )}
 
           {/* Eintrag */}
-          {entwurf?.text && (
+          {(building || entwurf?.text) && (
             <Section>
               <DLabel>Eintrag</DLabel>
               <div style={{ background: D_CREAM, color: "#1c1c1c", borderRadius: 11, padding: 15, fontSize: 12.5, lineHeight: 1.6 }}>
                 {metaZeile && <div style={{ color: "#6a6a6a", fontSize: 11, marginBottom: 8 }}>{name ? `${name} · ` : ""}{metaZeile}</div>}
-                {entwurf.text}
+                {entwurf?.text ? (
+                  entwurf.text
+                ) : (
+                  <div>
+                    <div style={{ color: "#7b746a", fontSize: 11.5, marginBottom: 10 }}>
+                      {chooserMode ? (building?.hint ?? "ANIMUS bereitet die Vorlage vor …") : "ANIMUS hört zu. Der Eintrag füllt sich gleich live aus dem Gespräch."}
+                    </div>
+                    <div style={{ height: 18, borderRadius: 6, background: "rgba(191,168,129,0.18)", marginBottom: 10, width: "88%" }} />
+                    <div style={{ height: 18, borderRadius: 6, background: "rgba(191,168,129,0.12)", marginBottom: 10, width: "96%" }} />
+                    <div style={{ height: 18, borderRadius: 6, background: "rgba(191,168,129,0.12)", width: "74%" }} />
+                  </div>
+                )}
                 <div style={{ color: "#8a8a8a", fontSize: 10.5, marginTop: 11, borderTop: "1px dashed #cfc8ba", paddingTop: 8 }}>
                   Entwurf. Wird mit Bestätigung Teil der Akte. Aufbewahrung 10 Jahre.
                 </div>

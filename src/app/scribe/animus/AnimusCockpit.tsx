@@ -14,7 +14,10 @@ export type AktiverPatient = {
   behandlung: string | null;
   kasse: string | null;
   telefon: string | null;
+  mobiltelefon: string | null;
   email: string | null;
+  strasse: string | null;
+  plz: string | null;
   ort: string | null;
 };
 
@@ -29,7 +32,10 @@ type SucheTreffer = {
   behandlung?: string | null;
   kasse?: string | null;
   telefon?: string;
+  mobiltelefon?: string;
   email?: string;
+  strasse?: string | null;
+  plz?: string | null;
   ort?: string | null;
 };
 type SucheAntwort = { results?: SucheTreffer[]; error?: string };
@@ -103,7 +109,10 @@ function trefferZuPatient(treffer: SucheTreffer): AktiverPatient {
     behandlung: treffer.behandlung ?? null,
     kasse: treffer.kasse ?? null,
     telefon: treffer.telefon ?? null,
+    mobiltelefon: treffer.mobiltelefon ?? null,
     email: treffer.email ?? null,
+    strasse: treffer.strasse ?? null,
+    plz: treffer.plz ?? null,
     ort: treffer.ort ?? null,
   };
 }
@@ -124,9 +133,28 @@ function animusPatientZuKarte(patient: AnimusPatient): AktiverPatient {
     behandlung: patient.treatment ?? null,
     kasse: null,
     telefon: null,
+    mobiltelefon: null,
     email: null,
+    strasse: null,
+    plz: null,
     ort: null,
   };
+}
+
+function waehleExaktenTreffer(name: string, treffer: SucheTreffer[]): SucheTreffer | null {
+  const exakt = treffer.filter((eintrag) => normalisiereName(eintrag.name) === normalisiereName(name));
+  if (exakt.length === 1) return exakt[0];
+  return null;
+}
+
+function karteiTelefon(patient: AktiverPatient | null): string {
+  return patient?.telefon || patient?.mobiltelefon || "—";
+}
+
+function karteiOrt(patient: AktiverPatient | null): string {
+  if (!patient) return "—";
+  const ortsteil = [patient.plz, patient.ort].filter(Boolean).join(" ");
+  return [patient.strasse, ortsteil].filter(Boolean).join(", ") || patient.ort || "—";
 }
 
 // ANIMUS-HUD im AnimaScribe-Account. Das HUD zeigt die aktiven Patienten als
@@ -212,8 +240,10 @@ export default function AnimusCockpit({
     const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(name)}`);
     if (!res.ok) return null;
     const json = (await res.json()) as SucheAntwort;
-    if (!json.results || json.results.length !== 1) return null;
-    return trefferZuPatient(json.results[0]);
+    const treffer = json.results ?? [];
+    if (treffer.length === 1) return trefferZuPatient(treffer[0]);
+    const exakt = waehleExaktenTreffer(name, treffer);
+    return exakt ? trefferZuPatient(exakt) : null;
   }, [byId, byName]);
 
   const merkeFokus = useCallback(
@@ -241,17 +271,18 @@ export default function AnimusCockpit({
   // X-Button: erst die Kugel herauszoomen (scene.unfocus), das loest dann ueber
   // onPatientUnfocus das Schliessen der Karte aus.
   const kartenXKlick = useCallback(() => {
+    setOffen(false);
     if (hudRef.current) hudRef.current.unfocus();
-    else setOffen(false);
   }, []);
 
   const merkeAufruf = useCallback((p: AnimusPatient) => {
     if (p.name.trim()) letzterName.current = p.name.trim();
-    oeffneKarte(animusPatientZuKarte(p));
+    const ausListe = p.id ? byId.get(p.id) ?? null : null;
+    oeffneKarte(ausListe ?? animusPatientZuKarte(p));
     void resolvePatient(p).then((daten) => {
       if (daten) oeffneKarte(daten);
     });
-  }, [oeffneKarte, resolvePatient]);
+  }, [byId, oeffneKarte, resolvePatient]);
 
   const merkeDokuPatient = useCallback((_entwurf: DokuEntwurf, patient: string) => {
     if (patient.trim()) letzterName.current = patient.trim();
@@ -357,9 +388,9 @@ export default function AnimusCockpit({
         <div className="meta">{alter != null ? `${alter} Jahre · ` : ""}geb. {formatDatum(karte?.geburtsdatum ?? null)}</div>
         <div className="zeile"><span className="k">Behandlung</span><span className="v">{karte?.behandlung ?? "—"}</span></div>
         <div className="zeile"><span className="k">Kasse</span><span className="v">{karte?.kasse ?? "—"}</span></div>
-        <div className="zeile"><span className="k">Telefon</span><span className="v">{karte?.telefon ?? "—"}</span></div>
+        <div className="zeile"><span className="k">Telefon</span><span className="v">{karteiTelefon(karte)}</span></div>
         <div className="zeile"><span className="k">E-Mail</span><span className="v">{karte?.email ?? "—"}</span></div>
-        <div className="zeile"><span className="k">Ort</span><span className="v">{karte?.ort ?? "—"}</span></div>
+        <div className="zeile"><span className="k">Ort</span><span className="v">{karteiOrt(karte)}</span></div>
         {karte && (
           <a className="kartei" href={`/patienten/${karte.id}`} target="_blank" rel="noreferrer">
             Kartei öffnen ↗

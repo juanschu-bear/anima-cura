@@ -16,7 +16,7 @@ export default async function AnimusPage() {
   const supabase = createServerComponentClient();
   const { data } = await supabase
     .from("patients")
-    .select("id, vorname, nachname, geschlecht, geburtsdatum, behandlung, kasse, telefon, email, ort")
+    .select("id, vorname, nachname, geschlecht, geburtsdatum, behandlung, kasse, telefon, mobiltelefon, email, strasse, plz, ort")
     .eq("behandlung_status", "aktiv")
     .order("nachname")
     .order("vorname")

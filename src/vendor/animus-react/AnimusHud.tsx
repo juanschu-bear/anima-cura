@@ -128,7 +128,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     sceneRef.current?.unfocus();
     setCard(null);
     setHover(null);
-  }, []);
+    onPatientUnfocus?.();
+  }, [onPatientUnfocus]);
 
   const handleDokuStart = useCallback((info: DokuStartInfo) => {
     setDokuEntwurf(null);
