@@ -27,6 +27,7 @@ export interface UseAnimusOptions {
 export interface UseAnimusResult {
   connect: () => Promise<void>;
   disconnect: () => void;
+  sendControl: (message: Record<string, unknown>) => Promise<void>;
   enableWakeWord: () => Promise<void>;
   disableWakeWord: () => void;
   connected: boolean;
@@ -145,6 +146,13 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     roomRef.current?.disconnect();
     roomRef.current = null;
     setConnected(false);
+  }, []);
+
+  const sendControl = useCallback(async (message: Record<string, unknown>): Promise<void> => {
+    const room = roomRef.current;
+    if (!room) return;
+    const data = new TextEncoder().encode(JSON.stringify(message));
+    await room.localParticipant.publishData(data, { reliable: true, topic: "animus-control" });
   }, []);
 
   const connect = useCallback(async (): Promise<void> => {
@@ -329,6 +337,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   return {
     connect,
     disconnect,
+    sendControl,
     enableWakeWord,
     disableWakeWord,
     connected,

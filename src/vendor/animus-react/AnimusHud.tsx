@@ -176,14 +176,10 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     setDokuPreviewHint("ANIMUS blendet das Doku-Menü ein …");
   }, [card, dokuPatient]);
 
-  const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
-    await onDokuConfirm?.(entwurf);
-    closeDoku();
-  }, [onDokuConfirm, closeDoku]);
-
   const {
     connect,
     disconnect,
+    sendControl,
     enableWakeWord,
     disableWakeWord,
     connected,
@@ -207,6 +203,16 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     onDokuUpdate: handleDokuUpdate,
     onDokuOpen: handleDokuOpen,
   });
+
+  const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
+    await onDokuConfirm?.(entwurf);
+    try {
+      await sendControl({ type: "doku_confirmed", patient_id: entwurf.patient_id });
+    } catch {
+      /* non-fatal: confirmation already succeeded on the host */
+    }
+    closeDoku();
+  }, [onDokuConfirm, closeDoku, sendControl]);
 
   useImperativeHandle(ref, () => ({
     unfocus: () => sceneRef.current?.unfocus(),
