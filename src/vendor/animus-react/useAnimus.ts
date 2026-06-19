@@ -44,6 +44,7 @@ type WakeWordRecognition = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   onstart: (() => void) | null;
   onresult: ((event: { results: ArrayLike<WakeWordRecognitionResult>; resultIndex?: number }) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
@@ -220,6 +221,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     recognition.lang = "de-DE";
     recognition.continuous = true;
     recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
     recognition.onstart = () => {
       setWakeWordState("listening");
       setWakeWordError(null);
@@ -228,7 +230,10 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
       let transcript = "";
       const startIndex = event.resultIndex ?? 0;
       for (let i = startIndex; i < event.results.length; i++) {
-        transcript += ` ${event.results[i]?.[0]?.transcript ?? ""}`;
+        const result = event.results[i];
+        for (let j = 0; j < result.length; j++) {
+          transcript += ` ${result[j]?.transcript ?? ""}`;
+        }
       }
       if (!wakeWordMatchesTranscript(transcript, wakeWordPhrasesRef.current)) return;
       const now = Date.now();
