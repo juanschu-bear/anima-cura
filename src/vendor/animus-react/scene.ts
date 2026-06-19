@@ -7,6 +7,8 @@ const VN_M = ["Lukas", "Elias", "Noah", "Jonas", "Paul", "Leon", "Finn", "Luca",
 const NACH = ["K.", "M.", "B.", "W.", "L.", "F.", "S.", "R.", "H.", "T.", "G.", "N.", "P.", "Z.", "D.", "V."];
 const BEH = ["Aligner", "Multiband", "Herausnehmbar", "Retention"];
 const MON = ["Jun", "Jul", "Aug"];
+const MAX_RENDER_NODES = 180;
+const MIN_FOCUS_SCORE = 900;
 
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -37,6 +39,20 @@ function defaultPatients(): AnimusPatient[] {
   return list;
 }
 
+function downsamplePatients(list: AnimusPatient[], max: number): AnimusPatient[] {
+  if (list.length <= max) return list;
+  const out: AnimusPatient[] = [];
+  const seen = new Set<number>();
+  const step = (list.length - 1) / (max - 1);
+  for (let i = 0; i < max; i++) {
+    const idx = Math.round(i * step);
+    if (seen.has(idx)) continue;
+    seen.add(idx);
+    out.push(list[idx]);
+  }
+  return out;
+}
+
 function makeGlowTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
@@ -48,6 +64,58 @@ function makeGlowTexture(): THREE.CanvasTexture {
   g.fillStyle = rad;
   g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
+}
+
+function normalizeName(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function tokenMatch(query: string, candidate: string): boolean {
+  return query === candidate || query.startsWith(candidate) || candidate.startsWith(query);
+}
+
+function matchScore(query: string, candidate: string): number {
+  const q = normalizeName(query);
+  const c = normalizeName(candidate);
+  if (!q || !c) return 0;
+  if (q === c) return 1000;
+  if (c.includes(q) || q.includes(c)) return 700;
+
+  const qTokens = q.split(" ");
+  const cTokens = c.split(" ");
+  let score = 0;
+  let matched = 0;
+  for (const token of qTokens) {
+    if (
+      cTokens.some(
+        (cand) =>
+          tokenMatch(token, cand) ||
+          (token.length === 1 && cand.startsWith(token)) ||
+          (cand.length === 1 && token.startsWith(cand)),
+      )
+    ) {
+      matched += 1;
+      score += 140;
+    }
+  }
+  if (matched === 0) return 0;
+  if (matched === qTokens.length && qTokens.length > 1) score += 220;
+  const qFirst = qTokens[0];
+  const qLast = qTokens[qTokens.length - 1];
+  const cFirst = cTokens[0];
+  const cLast = cTokens[cTokens.length - 1];
+  if (tokenMatch(qFirst, cFirst)) score += 180;
+  if (tokenMatch(qLast, cLast)) score += 220;
+  if (qTokens.length > 1 && qFirst === cFirst && (qLast === cLast || qLast === cLast[0] || cLast === qLast[0])) {
+    score += 260;
+  }
+  return score;
 }
 
 interface NodeUserData {
@@ -65,7 +133,8 @@ export function createAnimusScene(
   patients: AnimusPatient[] | undefined,
   callbacks: AnimusSceneCallbacks = {},
 ): AnimusScene {
-  const data = patients && patients.length ? patients : defaultPatients();
+  const source = patients && patients.length ? patients : defaultPatients();
+  const data = downsamplePatients(source, MAX_RENDER_NODES);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -118,23 +187,18 @@ export function createAnimusScene(
   // patient nodes (shared material per gender)
   const matW = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xff8ad6), transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending, depthWrite: false });
   const matM = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0x66cfff), transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending, depthWrite: false });
-  // Neutral gold for "divers": neither the female pink nor the male blue.
-  const matD = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xf5c56b), transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending, depthWrite: false });
-  const matFor = (g: Gender): THREE.SpriteMaterial => (g === "w" ? matW : g === "d" ? matD : matM);
   const nodi = new THREE.Group();
   root.add(nodi);
 
-  // Render every patient as a node so any one can be focused, by click or by
-  // voice call. focusByName scans all sprites, so nothing is hidden behind a cap.
   const NODES = data.length;
   const sprites: THREE.Sprite[] = [];
   const pos: THREE.Vector3[] = [];
   for (let i = 0; i < NODES; i++) {
     const y = 1 - ((i + 0.5) / NODES) * 2, r = Math.sqrt(1 - y * y), phi = i * 2.399963;
-    const RR = 1.5 + Math.random() * 0.6;
+    const RR = 1.66 + Math.random() * 0.34;
     const v = new THREE.Vector3(Math.cos(phi) * r, y, Math.sin(phi) * r).multiplyScalar(RR);
     const pat = data[i];
-    const s = new THREE.Sprite(matFor(pat.gender));
+    const s = new THREE.Sprite(pat.gender === "w" ? matW : matM);
     s.position.copy(v);
     const base = 0.11;
     s.scale.setScalar(base);
@@ -144,23 +208,24 @@ export function createAnimusScene(
     pos.push(v);
   }
 
-  // connect each node to its two nearest
+  // connect each node to its three nearest
   const segs: number[] = [];
   for (let i = 0; i < NODES; i++) {
-    let n1 = -1, n2 = -1, d1 = Infinity, d2 = Infinity;
+    let n1 = -1, n2 = -1, n3 = -1, d1 = Infinity, d2 = Infinity, d3 = Infinity;
     for (let j = 0; j < NODES; j++) {
       if (j === i) continue;
       const d = pos[i].distanceToSquared(pos[j]);
-      if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = j; }
-      else if (d < d2) { d2 = d; n2 = j; }
+      if (d < d1) { d3 = d2; n3 = n2; d2 = d1; n2 = n1; d1 = d; n1 = j; }
+      else if (d < d2) { d3 = d2; n3 = n2; d2 = d; n2 = j; }
+      else if (d < d3) { d3 = d; n3 = j; }
     }
-    for (const j of [n1, n2]) {
+    for (const j of [n1, n2, n3]) {
       if (j > i) segs.push(pos[i].x, pos[i].y, pos[i].z, pos[j].x, pos[j].y, pos[j].z);
     }
   }
   const lg = new THREE.BufferGeometry();
   lg.setAttribute("position", new THREE.Float32BufferAttribute(segs, 3));
-  const lm = new THREE.LineBasicMaterial({ color: 0x6a78c4, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false });
+  const lm = new THREE.LineBasicMaterial({ color: 0x7f93eb, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
   nodi.add(new THREE.LineSegments(lg, lm));
 
   // ---- camera / focus ----
@@ -283,13 +348,20 @@ export function createAnimusScene(
   }
 
   function focusByName(name: string): boolean {
-    const low = name.trim().toLowerCase();
+    const low = name.trim();
     if (!low) return false;
+    let best: THREE.Sprite | null = null;
+    let bestScore = 0;
     for (const s of sprites) {
-      const vn = patOf(s).name.split(" ")[0].toLowerCase();
-      if (vn && low.indexOf(vn) >= 0) { focusOn(s); return true; }
+      const score = matchScore(low, patOf(s).name);
+      if (score > bestScore) {
+        bestScore = score;
+        best = s;
+      }
     }
-    return false;
+    if (!best || bestScore < MIN_FOCUS_SCORE) return false;
+    focusOn(best);
+    return true;
   }
 
   return {

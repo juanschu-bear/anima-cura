@@ -1,10 +1,10 @@
 import type { CSSProperties } from "react";
+import type { WakeWordState } from "./wakeWord";
 
 export type Gender = "w" | "m" | "d";
 
-/** A patient node in the HUD. `name` is matched on first-name for voice calls. */
+/** A patient node in the HUD. `name` is matched fuzzily for voice calls. */
 export interface AnimusPatient {
-  /** Real record id, set by the host so focus and save can map back to the source. */
   id?: string;
   name: string;
   gender: Gender;
@@ -22,11 +22,38 @@ export interface PatientCallMessage {
   patient: AnimusPatient;
 }
 
+export interface PatientUnfocusMessage {
+  type: "patient_unfocus";
+}
+
 /** One billing line in a draft, mirrors the cockpit position rows. */
 export interface DokuPosition {
   code: string;
   text: string;
   anzahl?: number;
+}
+
+export interface DokuOption {
+  text: string;
+  on: boolean;
+}
+
+export interface DokuGruppe {
+  gid: string;
+  label: string;
+  req?: boolean;
+  type?: "single" | "multi";
+  opts: DokuOption[];
+}
+
+export interface DokuStartInfo {
+  behandlungsart: string;
+  termin_typ: string;
+  name: string;
+  modus?: "dictation" | "chooser";
+  behandlungsarten?: string[];
+  termin_optionen?: string[];
+  hint?: string;
 }
 
 /** The assembled draft the agent hands to the HUD (mirror of the cockpit entry). */
@@ -40,6 +67,7 @@ export interface DokuEntwurf {
   variablen: Record<string, unknown>;
   auswahl: Record<string, Record<string, number[]>>;
   positionen: DokuPosition[];
+  gruppen?: DokuGruppe[];
   bestaetigen: boolean;
 }
 
@@ -49,6 +77,10 @@ export interface DokuStartMessage {
   behandlungsart: string;
   termin_typ: string;
   name: string;
+  modus?: "dictation" | "chooser";
+  behandlungsarten?: string[];
+  termin_optionen?: string[];
+  hint?: string;
 }
 
 /** Agent hands over the finished draft for the doctor to confirm. */
@@ -59,7 +91,7 @@ export interface DokuOpenMessage {
 }
 
 /** Every message ANIMUS may publish on the "animus" data topic. */
-export type AnimusMessage = PatientCallMessage | DokuStartMessage | DokuOpenMessage;
+export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuOpenMessage;
 
 export interface AnimusSceneCallbacks {
   onHover?: (patient: AnimusPatient | null, x: number, y: number) => void;
@@ -67,11 +99,16 @@ export interface AnimusSceneCallbacks {
   onUnfocus?: () => void;
 }
 
+export interface AnimusHandle {
+  unfocus: () => void;
+  focusByName: (name: string) => boolean;
+}
+
 /** Framework-agnostic handle returned by createAnimusScene. */
 export interface AnimusScene {
   /** 0..1 voice level; drives the reactive core. */
   setLevel: (level: number) => void;
-  /** Focus the node whose first name matches; returns false if none found. */
+  /** Focus the best-matching node for a spoken name; returns false if none found. */
   focusByName: (name: string) => boolean;
   unfocus: () => void;
   resize: (width: number, height: number) => void;
@@ -87,19 +124,25 @@ export interface AnimusHudProps {
   identity?: string;
   /** Patient nodes. Falls back to a built-in demo set when omitted. */
   patients?: AnimusPatient[];
+  /** Greeting lead, the part before the highlighted name. */
+  greetingLead?: string;
+  /** Name shown in the greeting highlight. */
+  userName?: string;
+  /** Simple standalone greeting for the minimal HUD variant. */
   greeting?: string;
   /** Connect to the agent automatically on mount. Default false. */
   autoConnect?: boolean;
+  /** Arm browser-side wake word recognition while disconnected. */
+  wakeWord?: boolean;
+  /** Accepted phrases for the wake word, e.g. ["hey animus"]. */
+  wakeWordPhrases?: string[];
   /** Called in addition to the built-in zoom when the agent calls a patient. */
   onPatientCall?: (patient: AnimusPatient) => void;
-  /** Called when a node gains focus, on voice call and on click alike. Lets the
-   *  host render its own card. */
   onPatientFocus?: (patient: AnimusPatient) => void;
-  /** Render the built-in patient card. Default true. Set false when the host
-   *  draws its own card from onPatientFocus. */
+  onPatientUnfocus?: () => void;
   showCard?: boolean;
   /** Called when the agent starts a dictation (vorlage loaded). */
-  onDokuStart?: (info: { behandlungsart: string; termin_typ: string; name: string }) => void;
+  onDokuStart?: (info: DokuStartInfo) => void;
   /** Called when the agent hands over a finished draft. */
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
   /** Doctor confirms the draft in the panel. The host writes it through its
@@ -108,3 +151,5 @@ export interface AnimusHudProps {
   className?: string;
   style?: CSSProperties;
 }
+
+export type { WakeWordState };
