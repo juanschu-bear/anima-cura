@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AnimusHud } from "@/vendor/animus-react";
-import type { AnimusPatient, DokuEntwurf, Gender } from "@/vendor/animus-react";
+import type { AnimusHandle, AnimusPatient, DokuEntwurf, Gender } from "@/vendor/animus-react";
 
 // Rohe Stammdaten eines aktiven Patienten, serverseitig geladen (page.tsx).
 export type AktiverPatient = {
@@ -19,10 +19,37 @@ export type AktiverPatient = {
 };
 
 // Treffer der bestehenden Patientensuche (/api/praxis/search), nur Fallback.
-type SucheTreffer = { id: string; name: string };
+type SucheTreffer = {
+  id: string;
+  name: string;
+  vorname?: string;
+  nachname?: string;
+  geschlecht?: string | null;
+  geburtsdatum?: string | null;
+  behandlung?: string | null;
+  kasse?: string | null;
+  telefon?: string;
+  email?: string;
+  ort?: string | null;
+};
 type SucheAntwort = { results?: SucheTreffer[]; error?: string };
 
 type Hinweis = { art: "fehler" | "ok"; text: string } | null;
+
+// Karten-Optik 1:1 aus ANIMUS-MOCKUP.html (.card), gescoped unter dem Cockpit.
+const CARD_CSS = `
+.animus-cockpit .card{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.96);z-index:6;width:min(340px,86vw);background:rgba(8,16,28,.92);border:1px solid #5ED9FF;border-radius:16px;padding:22px 22px 20px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 0 50px rgba(94,217,255,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;font-family:"JetBrains Mono",ui-monospace,monospace;color:#CFE6FF}
+.animus-cockpit .card.an{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+.animus-cockpit .card h3{font-family:'Orbitron',system-ui,sans-serif;font-size:18px;margin:0 0 2px;color:#EAF6FF}
+.animus-cockpit .card .meta{font-size:11px;color:#5E7A96;letter-spacing:.1em;margin-bottom:16px}
+.animus-cockpit .card .zeile{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:7px 0;border-bottom:1px solid rgba(94,217,255,.18)}
+.animus-cockpit .card .zeile .k{color:#5E7A96;white-space:nowrap}
+.animus-cockpit .card .zeile .v{color:#5ED9FF;font-weight:600;text-align:right;word-break:break-word}
+.animus-cockpit .card .kartei{display:inline-block;margin-top:16px;font-size:12px;color:#5ED9FF;text-decoration:none;letter-spacing:.04em}
+.animus-cockpit .card .kartei:hover{text-decoration:underline}
+.animus-cockpit .card .x{position:absolute;top:12px;right:14px;cursor:pointer;color:#5E7A96;font-size:16px;border:0;background:0}
+.animus-cockpit .card .x:hover{color:#fff}
+`;
 
 // Alter aus Geburtsdatum, identisch zur Cockpit-Logik (berechneAlter).
 function berechneAlter(geburtsdatum: string | null): number | null {
@@ -42,8 +69,7 @@ function formatDatum(iso: string | null): string {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 }
 
-// DB-Geschlecht auf die Orb-Farbe abbilden. 'd' behaelt eine eigene Farbe,
-// wird also nicht als maennlich dargestellt.
+// DB-Geschlecht auf die Orb-Farbe abbilden. 'd' behaelt eine eigene Farbe.
 function mapGender(g: string | null): Gender {
   if (g === "w") return "w";
   if (g === "d") return "d";
@@ -52,6 +78,55 @@ function mapGender(g: string | null): Gender {
 
 function vollName(p: AktiverPatient): string {
   return `${p.vorname} ${p.nachname}`.trim();
+}
+
+function normalisiereName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function trefferZuPatient(treffer: SucheTreffer): AktiverPatient {
+  const fallbackName = treffer.name.trim().split(/\s+/);
+  const fallbackVorname = fallbackName.slice(0, -1).join(" ") || fallbackName[0] || treffer.name;
+  const fallbackNachname = fallbackName.slice(-1).join(" ");
+  return {
+    id: treffer.id,
+    vorname: treffer.vorname ?? fallbackVorname,
+    nachname: treffer.nachname ?? fallbackNachname,
+    geschlecht: treffer.geschlecht ?? null,
+    geburtsdatum: treffer.geburtsdatum ?? null,
+    behandlung: treffer.behandlung ?? null,
+    kasse: treffer.kasse ?? null,
+    telefon: treffer.telefon ?? null,
+    email: treffer.email ?? null,
+    ort: treffer.ort ?? null,
+  };
+}
+
+function animusPatientZuKarte(patient: AnimusPatient): AktiverPatient {
+  const parts = patient.name.trim().split(/\s+/);
+  const vorname = parts.slice(0, -1).join(" ") || parts[0] || patient.name;
+  const nachname = parts.slice(-1).join(" ") || "";
+  const thisYear = new Date().getFullYear();
+  const birthYear = typeof patient.age === "number" ? Math.max(1900, thisYear - patient.age) : null;
+  const geburtsdatum = birthYear ? `${birthYear}-01-01` : null;
+  return {
+    id: patient.id ?? `animus-${normalisiereName(patient.name).replace(/\s+/g, "-") || "patient"}`,
+    vorname,
+    nachname,
+    geschlecht: patient.gender === "d" ? "d" : patient.gender,
+    geburtsdatum,
+    behandlung: patient.treatment ?? null,
+    kasse: null,
+    telefon: null,
+    email: null,
+    ort: null,
+  };
 }
 
 // ANIMUS-HUD im AnimaScribe-Account. Das HUD zeigt die aktiven Patienten als
@@ -87,38 +162,96 @@ export default function AnimusCockpit({
   const byName = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of patienten) {
-      const k = vollName(p).toLowerCase();
+      const k = normalisiereName(vollName(p));
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     const map = new Map<string, string>();
     for (const p of patienten) {
-      const k = vollName(p).toLowerCase();
+      const k = normalisiereName(vollName(p));
       if (counts.get(k) === 1) map.set(k, p.id);
     }
     return map;
   }, [patienten]);
+
+  // Imperativer Griff auf die Szene, um beim Schliessen der Karte wieder
+  // herauszuzoomen.
+  const hudRef = useRef<AnimusHandle>(null);
 
   // Zuletzt fokussierter Patient (Klick oder Aufruf) und zuletzt gesprochener
   // Name. Beides dient beim Bestaetigen als Schluessel auf die echte id.
   const letzterFokusId = useRef<string | null>(null);
   const letzterName = useRef<string>("");
   const [karte, setKarte] = useState<AktiverPatient | null>(null);
+  const [offen, setOffen] = useState(false);
   const [hinweis, setHinweis] = useState<Hinweis>(null);
+
+  const oeffneKarte = useCallback((patient: AktiverPatient) => {
+    letzterFokusId.current = patient.id;
+    letzterName.current = vollName(patient);
+    setKarte(patient);
+    setOffen(true);
+  }, []);
+
+  const resolvePatient = useCallback(async (patient: AnimusPatient): Promise<AktiverPatient | null> => {
+    if (patient.id) {
+      const loadedById = byId.get(patient.id);
+      if (loadedById) return loadedById;
+      const byIdRes = await fetch(`/api/praxis/search?id=${encodeURIComponent(patient.id)}`);
+      if (byIdRes.ok) {
+        const json = (await byIdRes.json()) as SucheAntwort;
+        if (json.results?.[0]) return trefferZuPatient(json.results[0]);
+      }
+    }
+
+    const name = patient.name.trim();
+    if (!name) return null;
+
+    const loadedByNameId = byName.get(normalisiereName(name));
+    if (loadedByNameId) return byId.get(loadedByNameId) ?? null;
+
+    const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(name)}`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as SucheAntwort;
+    if (!json.results || json.results.length !== 1) return null;
+    return trefferZuPatient(json.results[0]);
+  }, [byId, byName]);
 
   const merkeFokus = useCallback(
     (p: AnimusPatient) => {
       if (p.id) {
         letzterFokusId.current = p.id;
-        setKarte(byId.get(p.id) ?? null);
+        const daten = byId.get(p.id) ?? null;
+        if (daten) {
+          oeffneKarte(daten);
+          return;
+        }
       }
       if (p.name.trim()) letzterName.current = p.name.trim();
+      void resolvePatient(p).then((daten) => {
+        if (daten) oeffneKarte(daten);
+      });
     },
-    [byId]
+    [byId, oeffneKarte, resolvePatient]
   );
+
+  // Szene hat den Fokus verloren (Leerklick oder imperatives unfocus): Karte zu.
+  // Inhalt bleibt fuer die Ausblend-Transition stehen.
+  const schliesseKarte = useCallback(() => setOffen(false), []);
+
+  // X-Button: erst die Kugel herauszoomen (scene.unfocus), das loest dann ueber
+  // onPatientUnfocus das Schliessen der Karte aus.
+  const kartenXKlick = useCallback(() => {
+    if (hudRef.current) hudRef.current.unfocus();
+    else setOffen(false);
+  }, []);
 
   const merkeAufruf = useCallback((p: AnimusPatient) => {
     if (p.name.trim()) letzterName.current = p.name.trim();
-  }, []);
+    oeffneKarte(animusPatientZuKarte(p));
+    void resolvePatient(p).then((daten) => {
+      if (daten) oeffneKarte(daten);
+    });
+  }, [oeffneKarte, resolvePatient]);
 
   const merkeDokuPatient = useCallback((_entwurf: DokuEntwurf, patient: string) => {
     if (patient.trim()) letzterName.current = patient.trim();
@@ -132,7 +265,7 @@ export default function AnimusCockpit({
       if (letzterFokusId.current) return letzterFokusId.current;
 
       const name = (letzterName.current || entwurf.patient_id || "").trim();
-      const ausListe = byName.get(name.toLowerCase());
+      const ausListe = byName.get(normalisiereName(name));
       if (ausListe) return ausListe;
 
       if (name.length < 2) {
@@ -198,42 +331,45 @@ export default function AnimusCockpit({
   const alter = karte ? berechneAlter(karte.geburtsdatum) : null;
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}>
+    <div className="animus-cockpit" style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}>
+      <style>{CARD_CSS}</style>
+
       <AnimusHud
+        ref={hudRef}
         tokenEndpoint={tokenEndpoint}
-        greeting={`Guten Tag, ${nutzerName}.`}
+        greetingLead="Guten Tag,"
+        userName={nutzerName}
+        wakeWord
+        wakeWordPhrases={["hey animus", "hallo animus", "ok animus", "okay animus"]}
         patients={hudPatients}
         showCard={false}
         onPatientFocus={merkeFokus}
+        onPatientUnfocus={schliesseKarte}
         onPatientCall={merkeAufruf}
         onDokuOpen={merkeDokuPatient}
         onDokuConfirm={speichern}
         style={{ width: "100%", height: "100%" }}
       />
 
-      {karte && (
-        <div style={karteBox}>
-          <button onClick={() => setKarte(null)} aria-label="schliessen" style={karteSchliessen}>✕</button>
-          <h3 style={{ margin: "0 0 4px", fontFamily: '"Orbitron", system-ui, sans-serif', fontSize: 20 }}>
-            {vollName(karte)}
-          </h3>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 14 }}>
-            {alter != null ? `${alter} Jahre · ` : ""}geb. {formatDatum(karte.geburtsdatum)}
-          </div>
-          <KarteZeile k="Behandlung" v={karte.behandlung ?? "—"} />
-          <KarteZeile k="Kasse" v={karte.kasse ?? "—"} />
-          <KarteZeile k="Telefon" v={karte.telefon ?? "—"} />
-          <KarteZeile k="E-Mail" v={karte.email ?? "—"} />
-          <KarteZeile k="Ort" v={karte.ort ?? "—"} />
-          <a href={`/patienten/${karte.id}`} target="_blank" rel="noreferrer" style={karteLink}>
+      <div className={`card ${offen ? "an" : ""}`} aria-hidden={!offen}>
+        <button className="x" type="button" onClick={kartenXKlick} aria-label="schliessen">✕</button>
+        <h3>{karte ? vollName(karte) : "—"}</h3>
+        <div className="meta">{alter != null ? `${alter} Jahre · ` : ""}geb. {formatDatum(karte?.geburtsdatum ?? null)}</div>
+        <div className="zeile"><span className="k">Behandlung</span><span className="v">{karte?.behandlung ?? "—"}</span></div>
+        <div className="zeile"><span className="k">Kasse</span><span className="v">{karte?.kasse ?? "—"}</span></div>
+        <div className="zeile"><span className="k">Telefon</span><span className="v">{karte?.telefon ?? "—"}</span></div>
+        <div className="zeile"><span className="k">E-Mail</span><span className="v">{karte?.email ?? "—"}</span></div>
+        <div className="zeile"><span className="k">Ort</span><span className="v">{karte?.ort ?? "—"}</span></div>
+        {karte && (
+          <a className="kartei" href={`/patienten/${karte.id}`} target="_blank" rel="noreferrer">
             Kartei öffnen ↗
           </a>
-        </div>
-      )}
+        )}
+      </div>
 
       {!tokenEndpoint && (
         <div style={banner("fehler")}>
-          NEXT_PUBLIC_ANIMUS_TOKEN_ENDPOINT ist nicht gesetzt. Anima kann sich nicht verbinden.
+          NEXT_PUBLIC_ANIMUS_TOKEN_ENDPOINT ist nicht gesetzt. Animus kann sich nicht verbinden.
         </div>
       )}
 
@@ -247,49 +383,6 @@ export default function AnimusCockpit({
 }
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
-
-const karteBox: React.CSSProperties = {
-  position: "absolute",
-  top: 90,
-  right: 26,
-  width: 300,
-  padding: 18,
-  borderRadius: 14,
-  background: "rgba(8,14,26,.92)",
-  border: "1px solid rgba(94,217,255,.35)",
-  boxShadow: "0 10px 40px rgba(0,0,0,.5)",
-  color: "#dfeaff",
-  fontFamily: MONO,
-  zIndex: 30,
-};
-
-const karteSchliessen: React.CSSProperties = {
-  position: "absolute",
-  top: 10,
-  right: 12,
-  background: "none",
-  border: "none",
-  color: "#9fb6da",
-  cursor: "pointer",
-  fontSize: 16,
-};
-
-const karteLink: React.CSSProperties = {
-  display: "inline-block",
-  marginTop: 14,
-  fontSize: 13,
-  color: "#5ED9FF",
-  textDecoration: "none",
-};
-
-function KarteZeile({ k, v }: { k: string; v: string }): React.ReactElement {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "4px 0" }}>
-      <span style={{ opacity: 0.6, whiteSpace: "nowrap" }}>{k}</span>
-      <span style={{ textAlign: "right", wordBreak: "break-word" }}>{v}</span>
-    </div>
-  );
-}
 
 function banner(art: "fehler" | "ok"): React.CSSProperties {
   return {
