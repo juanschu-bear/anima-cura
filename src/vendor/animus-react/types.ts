@@ -97,8 +97,32 @@ export interface DokuUpdateMessage {
   frage?: string;
 }
 
+export interface AnimusLearningFact {
+  key: string;
+  text: string;
+  category: string;
+  count: number;
+  last_seen: string;
+}
+
+export interface AnimusDiaryEntry {
+  created_at?: string;
+  reason: string;
+  patient_name: string;
+  title: string;
+  preview: string;
+  learning_notes: string[];
+}
+
+export interface AnimusMemorySnapshot {
+  type: "memory_snapshot";
+  working_memory: Record<string, unknown>;
+  facts: AnimusLearningFact[];
+  diary_entries: AnimusDiaryEntry[];
+}
+
 /** Every message ANIMUS may publish on the "animus" data topic. */
-export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuUpdateMessage | DokuOpenMessage;
+export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuUpdateMessage | DokuOpenMessage | AnimusMemorySnapshot;
 
 export interface AnimusSceneCallbacks {
   onHover?: (patient: AnimusPatient | null, x: number, y: number) => void;

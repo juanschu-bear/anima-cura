@@ -4,8 +4,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { createAnimusScene } from "./scene";
 import { useAnimus } from "./useAnimus";
 import { DokuPanel } from "./DokuPanel";
+import { DiaryPanel } from "./DiaryPanel";
 import { handlePatientCall as applyPatientCall } from "./patientCall";
-import type { AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, DokuEntwurf, DokuStartInfo } from "./types";
+import type { AnimusMemorySnapshot, AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, DokuEntwurf, DokuStartInfo } from "./types";
 import { DEFAULT_WAKE_WORD_PHRASES } from "./wakeWord";
 
 const FONT_LINK_ID = "animus-fonts";
@@ -114,6 +115,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const [dokuPreviewHint, setDokuPreviewHint] = useState<string | null>(null);
   const [dokuEntwurf, setDokuEntwurf] = useState<DokuEntwurf | null>(null);
   const [dokuPatient, setDokuPatient] = useState<string>("");
+  const [diaryOpen, setDiaryOpen] = useState(false);
+  const [memorySnapshot, setMemorySnapshot] = useState<AnimusMemorySnapshot | null>(null);
 
   const handlePatientCall = useCallback((p: AnimusPatient) => {
     applyPatientCall({
@@ -202,6 +205,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     onDokuStart: handleDokuStart,
     onDokuUpdate: handleDokuUpdate,
     onDokuOpen: handleDokuOpen,
+    onMemorySnapshot: setMemorySnapshot,
   });
 
   const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
@@ -213,6 +217,10 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     }
     closeDoku();
   }, [onDokuConfirm, closeDoku, sendControl]);
+
+  const requestMemorySnapshot = useCallback(() => {
+    void sendControl({ type: "memory_snapshot_request" });
+  }, [sendControl]);
 
   useImperativeHandle(ref, () => ({
     unfocus: () => sceneRef.current?.unfocus(),
@@ -295,6 +303,11 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   useEffect(() => {
     if (autoConnect) void connect();
   }, [autoConnect, connect]);
+
+  useEffect(() => {
+    if (!connected) return;
+    requestMemorySnapshot();
+  }, [connected, requestMemorySnapshot]);
 
   const rufeZufall = useCallback(() => {
     if (!patients || patients.length === 0) return;
@@ -398,6 +411,19 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
           <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
+          <button
+            className="btn ghost"
+            type="button"
+            onClick={() => {
+              setDiaryOpen((current) => {
+                const next = !current;
+                if (next) requestMemorySnapshot();
+                return next;
+              });
+            }}
+          >
+            ☰ Diary
+          </button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>
@@ -438,6 +464,12 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
         patient={dokuPatient}
         onConfirm={confirmDoku}
         onClose={closeDoku}
+      />
+      <DiaryPanel
+        open={diaryOpen}
+        snapshot={memorySnapshot}
+        onClose={() => setDiaryOpen(false)}
+        onRefresh={requestMemorySnapshot}
       />
     </div>
   );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 import type { RemoteTrack } from "livekit-client";
-import type { AnimusPatient, AnimusMessage, DokuEntwurf, DokuStartInfo } from "./types";
+import type { AnimusMemorySnapshot, AnimusPatient, AnimusMessage, DokuEntwurf, DokuStartInfo } from "./types";
 import { DEFAULT_WAKE_WORD_PHRASES, type WakeWordState, wakeWordMatchesTranscript } from "./wakeWord";
 
 export interface UseAnimusOptions {
@@ -22,6 +22,7 @@ export interface UseAnimusOptions {
   onDokuStart?: (info: DokuStartInfo) => void;
   onDokuUpdate?: (entwurf: DokuEntwurf, patient: string, frage?: string) => void;
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
+  onMemorySnapshot?: (snapshot: AnimusMemorySnapshot) => void;
 }
 
 export interface UseAnimusResult {
@@ -103,6 +104,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const onDokuStartRef = useRef(onDokuStart);
   const onDokuUpdateRef = useRef(onDokuUpdate);
   const onDokuOpenRef = useRef(onDokuOpen);
+  const onMemorySnapshotRef = useRef(options.onMemorySnapshot);
   const wakeWordPhrasesRef = useRef(wakeWordPhrases);
   const connectedRef = useRef(false);
   const connectingRef = useRef(false);
@@ -121,6 +123,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   onDokuStartRef.current = onDokuStart;
   onDokuUpdateRef.current = onDokuUpdate;
   onDokuOpenRef.current = onDokuOpen;
+  onMemorySnapshotRef.current = options.onMemorySnapshot;
   wakeWordPhrasesRef.current = wakeWordPhrases;
   connectedRef.current = connected;
   connectingRef.current = connecting;
@@ -197,6 +200,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
           }
           else if (msg.type === "doku_update") onDokuUpdateRef.current?.(msg.entwurf, msg.patient, msg.frage);
           else if (msg.type === "doku_open") onDokuOpenRef.current?.(msg.entwurf, msg.patient);
+          else if (msg.type === "memory_snapshot") onMemorySnapshotRef.current?.(msg);
         } catch {
           /* ignore malformed data messages */
         }
@@ -213,6 +217,10 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
       await lk.localParticipant.setMicrophoneEnabled(true);
       roomRef.current = lk;
       setConnected(true);
+      await lk.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: "memory_snapshot_request" })),
+        { reliable: true, topic: "animus-control" },
+      );
       if (wakeWordEnabledRef.current) setWakeWordState("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
