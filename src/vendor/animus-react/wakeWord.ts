@@ -38,32 +38,30 @@ export function normalizeWakeWordInput(value: string): string {
 export function wakeWordMatchesTranscript(transcript: string, phrases: readonly string[] = DEFAULT_WAKE_WORD_PHRASES): boolean {
   const normalizedTranscript = normalizeWakeWordInput(transcript);
   if (!normalizedTranscript) return false;
-  const haystack = ` ${normalizedTranscript} `;
   if (phrases.some((phrase) => {
     const normalizedPhrase = normalizeWakeWordInput(phrase);
-    return normalizedPhrase ? haystack.includes(` ${normalizedPhrase} `) : false;
+    return normalizedPhrase
+      ? normalizedTranscript === normalizedPhrase || normalizedTranscript.startsWith(`${normalizedPhrase} `)
+      : false;
   })) {
     return true;
   }
 
   const tokens = normalizedTranscript.split(" ").filter(Boolean);
-  if (tokens.length === 0) return false;
+  if (tokens.length < 2 || tokens.length > 6) return false;
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-    const prev = i > 0 ? tokens[i - 1] : "";
-    const next = i + 1 < tokens.length ? tokens[i + 1] : "";
-    const prevLooksLikeWake = WAKE_PREFIXES.some((prefix) => levenshtein(prev, prefix) <= 1);
-    const tokenLooksLikeWakeWord = WAKE_WORD_ALIASES.some((alias) => levenshtein(token, alias) <= 2);
-    const splitTokenLooksLikeWakeWord =
-      prevLooksLikeWake && next
-        ? WAKE_WORD_ALIASES.some((alias) => levenshtein(`${token} ${next}`.replace(/\s+/g, ""), alias) <= 2)
-        : false;
-    if (tokenLooksLikeWakeWord && (prevLooksLikeWake || i === 0)) return true;
-    if (splitTokenLooksLikeWakeWord) return true;
-  }
+  const first = tokens[0] ?? "";
+  const second = tokens[1] ?? "";
+  const third = tokens[2] ?? "";
+  const prefixLooksLikeWake = WAKE_PREFIXES.some((prefix) => levenshtein(first, prefix) <= 1);
+  if (!prefixLooksLikeWake) return false;
 
-  return false;
+  const aliasLooksLikeWakeWord = WAKE_WORD_ALIASES.some((alias) => levenshtein(second, alias) <= 2);
+  if (aliasLooksLikeWakeWord) return true;
+
+  if (!third) return false;
+  const mergedAlias = `${second}${third}`;
+  return WAKE_WORD_ALIASES.some((alias) => levenshtein(mergedAlias, alias) <= 2);
 }
 
 function levenshtein(a: string, b: string): number {

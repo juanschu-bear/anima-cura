@@ -7,8 +7,12 @@ test("normalizeWakeWordInput normalizes umlauts and punctuation", () => {
   assert.equal(normalizeWakeWordInput("  Héy, Animus?! "), "hey animus");
 });
 
-test("wakeWordMatchesTranscript detects the phrase inside a longer sentence", () => {
-  assert.equal(wakeWordMatchesTranscript("kannst du bitte, hey animus, den nächsten patienten aufrufen"), true);
+test("wakeWordMatchesTranscript accepts a short wake phrase at the start", () => {
+  assert.equal(wakeWordMatchesTranscript("hey animus den nächsten patienten aufrufen"), true);
+});
+
+test("wakeWordMatchesTranscript rejects the phrase when it appears only mid-sentence", () => {
+  assert.equal(wakeWordMatchesTranscript("kannst du bitte, hey animus, den nächsten patienten aufrufen"), false);
 });
 
 test("wakeWordMatchesTranscript rejects unrelated speech", () => {
