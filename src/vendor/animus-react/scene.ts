@@ -7,7 +7,7 @@ const VN_M = ["Lukas", "Elias", "Noah", "Jonas", "Paul", "Leon", "Finn", "Luca",
 const NACH = ["K.", "M.", "B.", "W.", "L.", "F.", "S.", "R.", "H.", "T.", "G.", "N.", "P.", "Z.", "D.", "V."];
 const BEH = ["Aligner", "Multiband", "Herausnehmbar", "Retention"];
 const MON = ["Jun", "Jul", "Aug"];
-const MAX_RENDER_NODES = 180;
+const MAX_RENDER_NODES = 210;
 const MIN_FOCUS_SCORE = 900;
 
 function rand<T>(arr: T[]): T {
@@ -165,7 +165,7 @@ export function createAnimusScene(
   scene.add(root);
 
   // reactive core
-  const N = 1500, R = 0.5;
+  const N = 1700, R = 0.62;
   const corePos = new Float32Array(N * 3);
   const coreDir = new Float32Array(N * 3);
   const coreCol = new Float32Array(N * 3);
@@ -180,7 +180,7 @@ export function createAnimusScene(
   const cg = new THREE.BufferGeometry();
   cg.setAttribute("position", new THREE.BufferAttribute(corePos, 3));
   cg.setAttribute("color", new THREE.BufferAttribute(coreCol, 3));
-  const cm = new THREE.PointsMaterial({ size: 0.045, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  const cm = new THREE.PointsMaterial({ size: 0.055, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
   const kern = new THREE.Points(cg, cm);
   root.add(kern);
 
@@ -195,12 +195,12 @@ export function createAnimusScene(
   const pos: THREE.Vector3[] = [];
   for (let i = 0; i < NODES; i++) {
     const y = 1 - ((i + 0.5) / NODES) * 2, r = Math.sqrt(1 - y * y), phi = i * 2.399963;
-    const RR = 1.66 + Math.random() * 0.34;
+    const RR = 1.82 + Math.random() * 0.42;
     const v = new THREE.Vector3(Math.cos(phi) * r, y, Math.sin(phi) * r).multiplyScalar(RR);
     const pat = data[i];
     const s = new THREE.Sprite(pat.gender === "w" ? matW : matM);
     s.position.copy(v);
-    const base = 0.11;
+    const base = 0.12;
     s.scale.setScalar(base);
     s.userData = { base, pat } satisfies NodeUserData;
     nodi.add(s);
@@ -225,7 +225,7 @@ export function createAnimusScene(
   }
   const lg = new THREE.BufferGeometry();
   lg.setAttribute("position", new THREE.Float32BufferAttribute(segs, 3));
-  const lm = new THREE.LineBasicMaterial({ color: 0x7f93eb, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
+  const lm = new THREE.LineBasicMaterial({ color: 0x7f93eb, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false });
   nodi.add(new THREE.LineSegments(lg, lm));
 
   // ---- camera / focus ----
@@ -315,7 +315,7 @@ export function createAnimusScene(
     }
     kern.geometry.attributes.position.needsUpdate = true;
     cm.opacity = 0.85 + amp * 0.15;
-    cm.size = 0.045 + amp * 0.03;
+    cm.size = 0.055 + amp * 0.03;
     kern.rotation.y += 0.0016;
 
     if (!focusNode) {
@@ -342,7 +342,7 @@ export function createAnimusScene(
     const aspect = width / height;
     camera.aspect = aspect;
     const fovV = (camera.fov * Math.PI) / 180;
-    camDefaultZ = 3.6 / (0.52 * 2 * Math.tan(fovV / 2) * Math.min(1, aspect));
+    camDefaultZ = 3.02 / (0.52 * 2 * Math.tan(fovV / 2) * Math.min(1, aspect));
     if (!focusNode) camGoal.set(0, 0, camDefaultZ);
     camera.updateProjectionMatrix();
   }

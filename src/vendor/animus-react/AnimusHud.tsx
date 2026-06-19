@@ -58,7 +58,7 @@ const CHROME_CSS = `
 .ahud .sub .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);margin-right:9px;vertical-align:middle;animation:ahud-blink 1.6s ease-in-out infinite}
 @keyframes ahud-blink{0%,100%{opacity:.35}50%{opacity:1}}
 .ahud .knoepfe{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.ahud .btn{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;padding:12px 22px;border-radius:999px;cursor:pointer;border:1px solid var(--cyan);background:rgba(94,217,255,.10);color:#Dff3ff;transition:all .15s ease;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.ahud .btn{min-width:170px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;padding:12px 22px;border-radius:999px;cursor:pointer;border:1px solid var(--cyan);background:rgba(94,217,255,.10);color:#Dff3ff;transition:all .15s ease;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .ahud .btn:hover{background:rgba(94,217,255,.2);box-shadow:0 0 26px rgba(94,217,255,.45);transform:translateY(-1px)}
 .ahud .btn:disabled{cursor:default;opacity:.7;transform:none;box-shadow:none}
 .ahud .btn.ghost{border-color:var(--linie);background:transparent;color:var(--gedeckt)}
@@ -146,6 +146,17 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     setDokuEntwurf(null);
     setDokuStart(null);
   }, []);
+
+  const openManualDoku = useCallback(() => {
+    setDokuEntwurf(null);
+    setDokuStart({
+      behandlungsart: "",
+      termin_typ: "",
+      name: card?.name ?? dokuPatient ?? "",
+      modus: "chooser",
+      hint: "ANIMUS blendet das Doku-Menü ein …",
+    });
+  }, [card, dokuPatient]);
 
   const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
     await onDokuConfirm?.(entwurf);
@@ -301,8 +312,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const wakeWordLabel = !wakeWordSupported
     ? "◌ Wake Word nicht verfügbar"
     : wakeWordEnabled
-      ? "◉ Wake Word aus"
-      : "◌ Wake Word an";
+      ? "◉ Wake Word an"
+      : "◌ Wake Word aus";
 
   return (
     <div ref={wrapRef} className={`ahud ${className ?? ""}`} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#03060E", color: "#CFE6FF", fontFamily: MONO, ...style }}>
@@ -361,6 +372,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
             </button>
           )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
+          <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>
