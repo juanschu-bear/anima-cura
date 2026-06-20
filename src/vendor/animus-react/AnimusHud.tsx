@@ -77,7 +77,7 @@ const CHROME_CSS = `
 .ahud .legende{position:absolute;left:42px;bottom:82px;z-index:3;font-size:11px;letter-spacing:.08em;color:var(--gedeckt)}
 .ahud .legende span{display:flex;align-items:center;gap:9px;margin-top:9px}
 .ahud .legende i{width:11px;height:11px;border-radius:50%;display:inline-block;box-shadow:0 0 10px rgba(150,190,255,.6)}
-@media (max-width:820px){ .ahud .status,.ahud .rechts{display:none} .ahud .gruss{font-size:20px} }
+@media (max-width:820px){ .ahud .status,.ahud .rechts{display:none} .ahud .gruss{font-size:20px} .ahud .legende{display:none} }
 @media (prefers-reduced-motion: reduce){ .ahud .sub .dot{animation:none} }
 `;
 
@@ -560,3 +560,4 @@ function CardRow({ k, v }: { k: string; v: string }): React.ReactElement {
     </div>
   );
 }
+
