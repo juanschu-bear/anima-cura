@@ -369,7 +369,7 @@ export default function AnimusCockpit({
         ref={hudRef}
         tokenEndpoint={tokenEndpoint}
         greetingLead="Guten Tag,"
-        userName={nutzerName}
+        userName="Dr. Schubert"
         wakeWord
         wakeWordPhrases={["hey animus", "hallo animus", "ok animus", "okay animus"]}
         patients={hudPatients}

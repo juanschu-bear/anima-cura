@@ -57,7 +57,7 @@ const CHROME_CSS = `
 .ahud .wave{width:100%;height:60px;display:block}
 .ahud .rechts .lines{font-size:10px;line-height:2.1;color:var(--gedeckt);margin-top:12px;letter-spacing:.05em}
 .ahud .rechts .lines b{color:var(--cyan);font-weight:600}
-.ahud .greet{position:absolute;top:92px;left:0;right:0;z-index:4;text-align:center;padding:0 20px}
+.ahud .greet{position:absolute;top:58px;left:0;right:0;z-index:4;text-align:center;padding:0 20px}
 .ahud .controls{position:absolute;left:0;right:0;bottom:60px;z-index:3;text-align:center}
 .ahud .gruss{font-family:'Orbitron',sans-serif;font-weight:700;font-size:26px;letter-spacing:.04em;color:#EAF6FF;text-shadow:0 0 22px rgba(94,217,255,.6);margin:0}
 .ahud .gruss .name{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
