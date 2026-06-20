@@ -13,14 +13,15 @@ type DiaryStage = "cover" | "opening" | "open";
 
 const SHELL: CSSProperties = {
   position: "absolute",
-  inset: "28px 28px 28px auto",
-  width: "min(1120px, calc(100vw - 56px))",
-  maxWidth: "96vw",
-  maxHeight: "calc(100vh - 56px)",
+  inset: "18px",
+  width: "calc(100vw - 36px)",
+  maxWidth: "calc(100vw - 36px)",
+  height: "calc(100vh - 36px)",
+  maxHeight: "calc(100vh - 36px)",
   zIndex: 12,
   display: "grid",
-  gridTemplateColumns: "minmax(220px, 0.32fr) minmax(0, 0.68fr)",
-  borderRadius: 34,
+  gridTemplateColumns: "minmax(250px, 300px) minmax(0, 1fr)",
+  borderRadius: 30,
   overflow: "hidden",
   boxShadow: "0 34px 120px rgba(0,0,0,.58)",
   border: "1px solid rgba(170,138,89,.14)",
@@ -44,7 +45,7 @@ const PAGE: CSSProperties = {
   minHeight: 0,
 };
 
-const HAND_FONT = '"Snell Roundhand", "Bradley Hand", "Segoe Print", cursive';
+const HAND_FONT = '"Caveat", "Segoe Print", "Bradley Hand", cursive';
 const SERIF_FONT = '"Cormorant Garamond", "Iowan Old Style", "Georgia", serif';
 const DIARY_COVER = "/animus-diary/cover.png";
 const DIARY_OPENING = "/animus-diary/opening.png";
@@ -62,13 +63,13 @@ function formatDate(value?: string): string {
   if (!value) return "Gerade eben";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleString("de-DE", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function patientGroups(entries: AnimusDiaryEntry[]): Array<{ name: string; count: number }> {
   const counts = new Map<string, number>();
   for (const entry of entries) {
-    const name = (entry.contact || entry.patient_name || "Global").trim() || "Global";
+    const name = (entry.contact || "").trim() || "Private Session";
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   return Array.from(counts.entries())
@@ -79,6 +80,27 @@ function patientGroups(entries: AnimusDiaryEntry[]): Array<{ name: string; count
 function colorForFact(index: number): string {
   const palette = ["#3177b8", "#4f8f6d", "#d28039", "#8b5cc7", "#b65e63", "#3f8c8a", "#a37b2d", "#6b6cd6"];
   return palette[index % palette.length]!;
+}
+
+function humanTime(value?: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
+function looksTechnicalLabel(value?: string): boolean {
+  const text = String(value || "").trim();
+  if (!text) return true;
+  const normalized = text.toLowerCase();
+  if (normalized.includes("voice_confirmed") || normalized.includes("working") || normalized.includes("patient") || normalized.includes("juan-manuel")) return true;
+  return /^[a-z0-9_-]+$/i.test(text);
+}
+
+function displayEntryTitle(entry: AnimusDiaryEntry): string {
+  const raw = String(entry.title || "").trim();
+  if (!raw || looksTechnicalLabel(raw)) return "Private Reflection";
+  return raw;
 }
 
 function ContactChip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }): ReactElement {
@@ -121,15 +143,19 @@ function Empty({ text }: { text: string }): ReactElement {
 }
 
 function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number }): ReactElement {
+  const title = displayEntryTitle(entry);
   return (
     <article
       style={{
         position: "relative",
-        borderRadius: 28,
-        background: "linear-gradient(180deg, rgba(255,250,241,.92), rgba(241,232,215,.92))",
-        border: "1px solid rgba(153,129,101,.2)",
-        padding: "26px 28px 26px 36px",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,.65)",
+        borderRadius: 34,
+        background: "linear-gradient(180deg, rgba(255,251,244,.97), rgba(243,235,221,.94))",
+        border: "1px solid rgba(153,129,101,.18)",
+        padding: "36px 54px 48px 74px",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,.65), 0 12px 30px rgba(78,60,42,.05)",
+        maxWidth: 980,
+        width: "100%",
+        justifySelf: "center",
       }}
     >
       <div
@@ -137,27 +163,33 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
           position: "absolute",
           top: 0,
           bottom: 0,
-          left: 22,
-          width: 1,
-          background: "rgba(185,117,106,.35)",
+          left: 44,
+          width: 2,
+          background: "rgba(185,117,106,.22)",
         }}
       />
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-        <div style={{ color: "rgba(74,58,41,.58)", fontSize: 12, letterSpacing: ".28em", textTransform: "uppercase" }}>
-          {entry.reason || "Reflection"}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "rgba(93,76,55,.42)", fontSize: 12, letterSpacing: ".22em", textTransform: "uppercase" }}>
+            {entry.contact || "Diary"}
+          </div>
+          <div style={{ marginTop: 14, fontFamily: HAND_FONT, fontSize: 34, lineHeight: 1.08, color: "#2d241c", fontWeight: 600 }}>
+            {title}
+          </div>
         </div>
-        <div style={{ color: "rgba(74,58,41,.54)", fontSize: 12 }}>{formatDate(entry.created_at)}</div>
-      </div>
-      <div style={{ marginTop: 12, fontFamily: SERIF_FONT, fontSize: 42, lineHeight: 1.02 }}>
-        {entry.patient_name || "Global"}
+        <div style={{ textAlign: "right", color: "rgba(74,58,41,.48)", fontSize: 13, whiteSpace: "nowrap" }}>
+          <div>{formatDate(entry.created_at)}</div>
+          <div style={{ marginTop: 6 }}>{humanTime(entry.created_at)}</div>
+        </div>
       </div>
       <div
         style={{
-          marginTop: 18,
+          marginTop: 26,
           color: "#2d241c",
           fontFamily: HAND_FONT,
-          fontSize: 23,
-          lineHeight: 1.95,
+          fontSize: 18,
+          lineHeight: 2.05,
+          letterSpacing: ".01em",
           whiteSpace: "pre-wrap",
         }}
       >
@@ -231,7 +263,7 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
           ))}
         </div>
       ) : null}
-      <div style={{ position: "absolute", top: 18, right: 24, color: "rgba(90,72,52,.12)", fontFamily: SERIF_FONT, fontSize: 52 }}>
+      <div style={{ position: "absolute", top: 28, right: 30, color: "rgba(90,72,52,.08)", fontFamily: SERIF_FONT, fontSize: 56 }}>
         {String(index + 1).padStart(2, "0")}
       </div>
     </article>
@@ -246,8 +278,11 @@ function FactCloud({ facts }: { facts: AnimusLearningFact[] }): ReactElement {
         borderRadius: 30,
         border: "1px solid rgba(153,129,101,.18)",
         background: "rgba(255,250,241,.86)",
-        padding: "30px 32px",
+        padding: "34px 38px",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,.62)",
+        maxWidth: 980,
+        width: "100%",
+        justifySelf: "center",
       }}
     >
       <div style={{ color: "rgba(74,58,41,.56)", fontSize: 12, letterSpacing: ".32em", textTransform: "uppercase" }}>Evolved Skills</div>
@@ -257,13 +292,13 @@ function FactCloud({ facts }: { facts: AnimusLearningFact[] }): ReactElement {
             key={fact.key}
             style={{
               color: colorForFact(index),
-              fontFamily: HAND_FONT,
-              fontSize: 30,
-              lineHeight: 1.1,
+              fontFamily: SERIF_FONT,
+              fontSize: 24,
+              lineHeight: 1.2,
             }}
           >
             {fact.text}
-            <span style={{ fontSize: 20, opacity: 0.7 }}> +{fact.count}</span>
+            <span style={{ fontSize: 16, opacity: 0.7 }}> +{fact.count}</span>
           </span>
         ))}
       </div>
@@ -333,7 +368,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
   const diary = snapshot?.diary_entries ?? [];
   const facts = snapshot?.facts ?? [];
   const contacts = useMemo(() => patientGroups(diary), [diary]);
-  const filteredDiary = contactFilter === "all" ? diary : diary.filter((entry) => ((entry.patient_name || "Global").trim() || "Global") === contactFilter);
+  const filteredDiary = contactFilter === "all" ? diary : diary.filter((entry) => (((entry.contact || "").trim() || "Private Session")) === contactFilter);
   const repeatedPatterns = facts.filter((fact) => fact.count > 1);
 
   useEffect(() => {
@@ -458,7 +493,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
       </section>
 
       <section style={PAGE}>
-        <header style={{ padding: "28px 34px 18px", borderBottom: "1px solid rgba(141,119,93,.16)" }}>
+        <header style={{ padding: "26px 36px 18px", borderBottom: "1px solid rgba(141,119,93,.16)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
             <div>
               <div style={{ color: "rgba(74,58,41,.44)", fontSize: 12, letterSpacing: ".38em", textTransform: "uppercase" }}>Diary</div>
@@ -486,21 +521,31 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
             <img
               src={DIARY_OPEN}
               alt="Geoeffnetes ANIMUS Diary"
-              style={{ width: "100%", display: "block", maxHeight: 270, objectFit: "cover", objectPosition: "center 58%" }}
+              style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover", objectPosition: "center 56%" }}
             />
           </div>
         </header>
 
-        <div style={{ padding: "18px 34px 0", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div
+          style={{
+            padding: "16px 36px 16px",
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "center",
+            borderBottom: "1px solid rgba(141,119,93,.12)",
+            background: "linear-gradient(180deg, rgba(246,239,223,.98), rgba(241,232,215,.94))",
+          }}
+        >
           {TABS.map((entry) => (
             <ContactChip key={entry.key} label={entry.label} selected={tab === entry.key} onClick={() => setTab(entry.key)} />
           ))}
           {onRefresh ? <ContactChip label="Refresh" selected={false} onClick={onRefresh} /> : null}
         </div>
 
-        <div style={{ padding: "22px 34px 34px", overflow: "auto", display: "grid", gap: 22 }}>
+        <div style={{ padding: "26px 36px 40px", overflow: "auto", display: "grid", gap: 24, alignContent: "start" }}>
           {(tab === "all" || tab === "contacts") && contacts.length ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, maxWidth: 980, width: "100%", justifySelf: "center" }}>
               <ContactChip label={`All (${contacts.reduce((sum, item) => sum + item.count, 0)})`} selected={contactFilter === "all"} onClick={() => setContactFilter("all")} />
               {contacts.map((contact) => (
                 <ContactChip
@@ -514,7 +559,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
           ) : null}
 
           {tab === "all" ? (
-            filteredDiary.length ? <div style={{ display: "grid", gap: 18 }}>{filteredDiary.map((entry, index) => <JournalEntry key={`${entry.created_at ?? "entry"}-${index}`} entry={entry} index={index} />)}</div> : <Empty text="Noch keine Diary-Einträge vorhanden." />
+            filteredDiary.length ? <div style={{ display: "grid", gap: 22 }}>{filteredDiary.map((entry, index) => <JournalEntry key={`${entry.created_at ?? "entry"}-${index}`} entry={entry} index={index} />)}</div> : <Empty text="Noch keine Diary-Einträge vorhanden." />
           ) : null}
 
           {tab === "skills" ? <FactCloud facts={facts} /> : null}
