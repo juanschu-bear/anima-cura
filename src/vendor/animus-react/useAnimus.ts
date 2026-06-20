@@ -31,6 +31,7 @@ export interface UseAnimusResult {
   connect: () => Promise<void>;
   disconnect: () => void;
   sendControl: (message: Record<string, unknown>) => Promise<void>;
+  fetchMemorySnapshot: () => Promise<void>;
   requestTtsStatus: () => Promise<void>;
   setTtsModel: (model: string) => Promise<void>;
   enableWakeWord: () => Promise<void>;
@@ -173,6 +174,13 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     onTtsStatusRef.current?.(status as AnimusTtsStatus);
   }, [tokenEndpoint]);
 
+  const fetchMemorySnapshot = useCallback(async (): Promise<void> => {
+    const res = await fetch(`${tokenEndpoint}/memory`);
+    if (!res.ok) throw new Error(`memory snapshot failed (${res.status})`);
+    const snapshot = (await res.json()) as AnimusMemorySnapshot;
+    onMemorySnapshotRef.current?.(snapshot);
+  }, [tokenEndpoint]);
+
   const setTtsModel = useCallback(async (model: string): Promise<void> => {
     const res = await fetch(`${tokenEndpoint}/tts-model?model=${encodeURIComponent(model)}`, { method: "POST" });
     if (!res.ok) throw new Error(`tts switch failed (${res.status})`);
@@ -245,10 +253,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
       await lk.localParticipant.setMicrophoneEnabled(true);
       roomRef.current = lk;
       setConnected(true);
-      await lk.localParticipant.publishData(
-        new TextEncoder().encode(JSON.stringify({ type: "memory_snapshot_request" })),
-        { reliable: true, topic: "animus-control" },
-      );
+      void fetchMemorySnapshot();
       void requestTtsStatus();
       if (wakeWordEnabledRef.current) setWakeWordState("idle");
     } catch (e) {
@@ -257,7 +262,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     } finally {
       setConnecting(false);
     }
-  }, [tokenEndpoint, room, identity, requestTtsStatus]);
+  }, [fetchMemorySnapshot, tokenEndpoint, room, identity, requestTtsStatus]);
 
   const startWakeWordRecognition = useCallback((triggerConnect: () => Promise<void>): void => {
     if (!wakeWordSupported || !wakeWordEnabledRef.current || connectedRef.current || connectingRef.current || recognitionRef.current) return;
@@ -375,6 +380,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     connect,
     disconnect,
     sendControl,
+    fetchMemorySnapshot,
     requestTtsStatus,
     setTtsModel,
     enableWakeWord,
