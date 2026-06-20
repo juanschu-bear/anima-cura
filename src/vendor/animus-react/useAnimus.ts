@@ -31,6 +31,8 @@ export interface UseAnimusResult {
   connect: () => Promise<void>;
   disconnect: () => void;
   sendControl: (message: Record<string, unknown>) => Promise<void>;
+  requestTtsStatus: () => Promise<void>;
+  setTtsModel: (model: string) => Promise<void>;
   enableWakeWord: () => Promise<void>;
   disableWakeWord: () => void;
   connected: boolean;
@@ -164,6 +166,20 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     await room.localParticipant.publishData(data, { reliable: true, topic: "animus-control" });
   }, []);
 
+  const requestTtsStatus = useCallback(async (): Promise<void> => {
+    const res = await fetch(`${tokenEndpoint}/tts-model`);
+    if (!res.ok) throw new Error(`tts status failed (${res.status})`);
+    const status = (await res.json()) as { current_model: string; voice_id?: string; restarting?: boolean };
+    onTtsStatusRef.current?.(status as AnimusTtsStatus);
+  }, [tokenEndpoint]);
+
+  const setTtsModel = useCallback(async (model: string): Promise<void> => {
+    const res = await fetch(`${tokenEndpoint}/tts-model?model=${encodeURIComponent(model)}`, { method: "POST" });
+    if (!res.ok) throw new Error(`tts switch failed (${res.status})`);
+    const status = (await res.json()) as { current_model: string; voice_id?: string; restarting?: boolean };
+    onTtsStatusRef.current?.(status as AnimusTtsStatus);
+  }, [tokenEndpoint]);
+
   const connect = useCallback(async (): Promise<void> => {
     if (roomRef.current) return;
     setConnecting(true);
@@ -233,10 +249,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
         new TextEncoder().encode(JSON.stringify({ type: "memory_snapshot_request" })),
         { reliable: true, topic: "animus-control" },
       );
-      await lk.localParticipant.publishData(
-        new TextEncoder().encode(JSON.stringify({ type: "tts_model_request" })),
-        { reliable: true, topic: "animus-control" },
-      );
+      void requestTtsStatus();
       if (wakeWordEnabledRef.current) setWakeWordState("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -244,7 +257,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     } finally {
       setConnecting(false);
     }
-  }, [tokenEndpoint, room, identity]);
+  }, [tokenEndpoint, room, identity, requestTtsStatus]);
 
   const startWakeWordRecognition = useCallback((triggerConnect: () => Promise<void>): void => {
     if (!wakeWordSupported || !wakeWordEnabledRef.current || connectedRef.current || connectingRef.current || recognitionRef.current) return;
@@ -362,6 +375,8 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
     connect,
     disconnect,
     sendControl,
+    requestTtsStatus,
+    setTtsModel,
     enableWakeWord,
     disableWakeWord,
     connected,

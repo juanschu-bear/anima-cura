@@ -192,6 +192,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     connect,
     disconnect,
     sendControl,
+    requestTtsStatus,
+    setTtsModel,
     enableWakeWord,
     disableWakeWord,
     connected,
@@ -237,19 +239,16 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     void sendControl({ type: "memory_snapshot_request" });
   }, [sendControl]);
 
-  const requestTtsStatus = useCallback(() => {
-    void sendControl({ type: "tts_model_request" });
-  }, [sendControl]);
-
   const applyTtsModel = useCallback(async () => {
-    if (!connected || ttsApplying) return;
+    if (connected || connecting || ttsApplying) return;
     setTtsApplying(true);
     try {
-      await sendControl({ type: "set_tts_model", model: ttsSelection });
-    } catch {
+      await setTtsModel(ttsSelection);
+      await requestTtsStatus();
+    } finally {
       setTtsApplying(false);
     }
-  }, [connected, sendControl, ttsApplying, ttsSelection]);
+  }, [connected, connecting, requestTtsStatus, setTtsModel, ttsApplying, ttsSelection]);
 
   useImperativeHandle(ref, () => ({
     unfocus: () => sceneRef.current?.unfocus(),
@@ -336,8 +335,12 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   useEffect(() => {
     if (!connected) return;
     requestMemorySnapshot();
-    requestTtsStatus();
+    void requestTtsStatus();
   }, [connected, requestMemorySnapshot, requestTtsStatus]);
+
+  useEffect(() => {
+    void requestTtsStatus();
+  }, [requestTtsStatus]);
 
   const rufeZufall = useCallback(() => {
     if (!patients || patients.length === 0) return;
@@ -443,11 +446,11 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={!connected || ttsApplying}>
+          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={connected || connecting || ttsApplying}>
             {ttsApplying ? "TTS wechselt …" : "TTS übernehmen"}
           </button>
           <div style={{ fontSize: 11, opacity: 0.62, lineHeight: 1.5, textAlign: "right" }}>
-            {connected ? "Wechsel startet ANIMUS kurz neu." : "TTS-Wechsel nur im aktiven Gespräch."}
+            {connected ? "Zum Wechsel erst den Call beenden." : "Gilt für den nächsten Start von ANIMUS."}
           </div>
         </div>
       </div>
