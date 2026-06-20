@@ -122,18 +122,18 @@ export interface AnimusLearningFact {
 }
 
 export interface AnimusDiaryEntry {
+  timestamp?: string;
   created_at?: string;
-  reason: string;
-  patient_name: string;
+  sequence?: number;
   title: string;
-  preview: string;
-  body?: string;
+  body: string;
   contact?: string;
+  tags?: string[];
   skills?: string[];
   patterns?: string[];
   growth?: string[];
+  distilled_facts?: string[];
   source_mode?: string;
-  learning_notes: string[];
 }
 
 export interface AnimusMemorySnapshot {

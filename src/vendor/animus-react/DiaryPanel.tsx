@@ -104,6 +104,19 @@ function displayEntryTitle(entry: AnimusDiaryEntry): string {
   return raw;
 }
 
+function displayEntryNumber(entry: AnimusDiaryEntry, index: number, total: number): string {
+  const sequence = Number(entry.sequence || 0);
+  const value = sequence > 0 ? sequence : total - index;
+  return String(Math.max(1, value)).padStart(2, "0");
+}
+
+function entryParagraphs(entry: AnimusDiaryEntry): string[] {
+  return String(entry.body || "")
+    .split(/\n\s*\n/g)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function ContactChip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }): ReactElement {
   return (
     <button
@@ -145,6 +158,7 @@ function Empty({ text }: { text: string }): ReactElement {
 
 function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number }): ReactElement {
   const title = displayEntryTitle(entry);
+  const paragraphs = entryParagraphs(entry);
   return (
     <article
       style={{
@@ -171,10 +185,7 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
       />
       <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start" }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ color: "rgba(93,76,55,.42)", fontSize: 12, letterSpacing: ".22em", textTransform: "uppercase" }}>
-            {entry.contact || "Diary"}
-          </div>
-          <div style={{ marginTop: 14, fontFamily: HAND_FONT, fontSize: 34, lineHeight: 1.08, color: "#2d241c", fontWeight: 600 }}>
+          <div style={{ marginTop: 4, fontFamily: HAND_FONT, fontSize: 34, lineHeight: 1.08, color: "#2d241c", fontWeight: 600 }}>
             {title}
           </div>
         </div>
@@ -183,6 +194,26 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
           <div style={{ marginTop: 6 }}>{humanTime(entry.created_at)}</div>
         </div>
       </div>
+      {entry.tags?.length ? (
+        <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {entry.tags.map((tag, tagIndex) => (
+            <span
+              key={`${entry.created_at ?? "tag"}-${tagIndex}`}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid rgba(151,124,95,.22)",
+                background: "rgba(252,247,239,.82)",
+                color: "#7b654c",
+                fontSize: 12,
+                letterSpacing: ".04em",
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div
         style={{
           marginTop: 26,
@@ -191,13 +222,20 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
           fontSize: 18,
           lineHeight: 2.05,
           letterSpacing: ".01em",
-          whiteSpace: "pre-wrap",
         }}
       >
-        {entry.body || entry.preview || "Noch kein ausgeschriebener Eintrag vorhanden."}
+        {paragraphs.length ? paragraphs.map((paragraph, paragraphIndex) => (
+          <p key={`${entry.created_at ?? "p"}-${paragraphIndex}`} style={{ margin: paragraphIndex === 0 ? "0 0 26px" : "0 0 26px" }}>
+            {paragraph}
+          </p>
+        )) : <p style={{ margin: 0 }}>Noch kein ausgeschriebener Eintrag vorhanden.</p>}
       </div>
-      {(entry.skills?.length || entry.patterns?.length || entry.growth?.length || entry.learning_notes.length) ? (
-        <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {(entry.skills?.length || entry.patterns?.length || entry.growth?.length) ? (
+        <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
+          {entry.skills?.length ? (
+            <div>
+              <div style={{ color: "rgba(74,58,41,.48)", fontSize: 12, letterSpacing: ".24em", textTransform: "uppercase", marginBottom: 8 }}>Skills</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(entry.skills || []).map((note, noteIndex) => (
             <span
               key={`${entry.created_at ?? "skill"}-${noteIndex}`}
@@ -214,6 +252,13 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
               {note}
             </span>
           ))}
+              </div>
+            </div>
+          ) : null}
+          {entry.patterns?.length ? (
+            <div>
+              <div style={{ color: "rgba(74,58,41,.48)", fontSize: 12, letterSpacing: ".24em", textTransform: "uppercase", marginBottom: 8 }}>Patterns</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(entry.patterns || []).map((note, noteIndex) => (
             <span
               key={`${entry.created_at ?? "pattern"}-${noteIndex}`}
@@ -230,6 +275,13 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
               {note}
             </span>
           ))}
+              </div>
+            </div>
+          ) : null}
+          {entry.growth?.length ? (
+            <div>
+              <div style={{ color: "rgba(74,58,41,.48)", fontSize: 12, letterSpacing: ".24em", textTransform: "uppercase", marginBottom: 8 }}>Growth</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(entry.growth || []).map((note, noteIndex) => (
             <span
               key={`${entry.created_at ?? "growth"}-${noteIndex}`}
@@ -246,26 +298,25 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
               {note}
             </span>
           ))}
-          {entry.learning_notes.map((note, noteIndex) => (
-            <span
-              key={`${entry.created_at ?? "note"}-${noteIndex}`}
-              style={{
-                padding: "6px 11px",
-                borderRadius: 999,
-                border: "1px solid rgba(151,124,95,.22)",
-                background: "rgba(252,247,239,.82)",
-                color: "#7b654c",
-                fontSize: 12,
-                letterSpacing: ".04em",
-              }}
-            >
-              {note}
-            </span>
-          ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {entry.distilled_facts?.length ? (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ color: "rgba(74,58,41,.48)", fontSize: 12, letterSpacing: ".24em", textTransform: "uppercase", marginBottom: 10 }}>Distilled Facts</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {entry.distilled_facts.map((fact, factIndex) => (
+              <div key={`${entry.created_at ?? "fact"}-${factIndex}`} style={{ color: "#524233", fontSize: 16, lineHeight: 1.6 }}>
+                {fact}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
       <div style={{ position: "absolute", top: 28, right: 30, color: "rgba(90,72,52,.08)", fontFamily: SERIF_FONT, fontSize: 56 }}>
-        {String(index + 1).padStart(2, "0")}
+        {displayEntryNumber(entry, index, 0)}
       </div>
     </article>
   );
