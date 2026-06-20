@@ -423,6 +423,33 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           <div>LATENZ <b>&lt; 1 s</b></div>
           <div>SESSION <b>{uptime}</b></div>
         </div>
+        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+          <select
+            value={ttsSelection}
+            onChange={(e) => setTtsSelection(e.target.value)}
+            style={{
+              width: "100%",
+              minWidth: 0,
+              borderRadius: 999,
+              border: "1px solid rgba(94,217,255,.22)",
+              background: "rgba(6,14,24,.74)",
+              color: "#Dff3ff",
+              padding: "10px 16px",
+              fontFamily: MONO,
+              fontSize: 12,
+            }}
+          >
+            {TTS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={!connected || ttsApplying}>
+            {ttsApplying ? "TTS wechselt …" : "TTS übernehmen"}
+          </button>
+          <div style={{ fontSize: 11, opacity: 0.62, lineHeight: 1.5, textAlign: "right" }}>
+            {connected ? "Wechsel startet ANIMUS kurz neu." : "TTS-Wechsel nur im aktiven Gespräch."}
+          </div>
+        </div>
       </div>
 
       <div className="controls">
@@ -442,29 +469,6 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
           <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
-        </div>
-        <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-          <select
-            value={ttsSelection}
-            onChange={(e) => setTtsSelection(e.target.value)}
-            style={{
-              minWidth: 220,
-              borderRadius: 999,
-              border: "1px solid rgba(94,217,255,.22)",
-              background: "rgba(6,14,24,.74)",
-              color: "#Dff3ff",
-              padding: "10px 16px",
-              fontFamily: MONO,
-              fontSize: 12,
-            }}
-          >
-            {TTS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={!connected || ttsApplying}>
-            {ttsApplying ? "TTS wechselt …" : "TTS übernehmen"}
-          </button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>
