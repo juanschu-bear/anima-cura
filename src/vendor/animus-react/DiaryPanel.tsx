@@ -40,9 +40,10 @@ const COVER: CSSProperties = {
 const PAGE: CSSProperties = {
   background: "linear-gradient(180deg, #f6efdf 0%, #f1e8d7 100%)",
   color: "#3b3025",
-  display: "grid",
-  gridTemplateRows: "auto auto 1fr",
+  display: "block",
   minHeight: 0,
+  overflowY: "auto",
+  overflowX: "hidden",
 };
 
 const HAND_FONT = '"Caveat", "Segoe Print", "Bradley Hand", cursive';
@@ -543,7 +544,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
           {onRefresh ? <ContactChip label="Refresh" selected={false} onClick={onRefresh} /> : null}
         </div>
 
-        <div style={{ padding: "26px 36px 40px", overflow: "auto", display: "grid", gap: 24, alignContent: "start" }}>
+        <div style={{ padding: "26px 36px 40px", display: "grid", gap: 24, alignContent: "start" }}>
           {(tab === "all" || tab === "contacts") && contacts.length ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, maxWidth: 980, width: "100%", justifySelf: "center" }}>
               <ContactChip label={`All (${contacts.reduce((sum, item) => sum + item.count, 0)})`} selected={contactFilter === "all"} onClick={() => setContactFilter("all")} />
