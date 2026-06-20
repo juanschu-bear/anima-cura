@@ -97,6 +97,15 @@ export interface DokuUpdateMessage {
   frage?: string;
 }
 
+export interface DokuConfirmedMessage {
+  type: "doku_confirmed";
+}
+
+export interface SessionEndMessage {
+  type: "session_end";
+  delay_ms?: number;
+}
+
 export interface AnimusLearningFact {
   key: string;
   text: string;
@@ -122,7 +131,7 @@ export interface AnimusMemorySnapshot {
 }
 
 /** Every message ANIMUS may publish on the "animus" data topic. */
-export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuUpdateMessage | DokuOpenMessage | AnimusMemorySnapshot;
+export type AnimusMessage = PatientCallMessage | PatientUnfocusMessage | DokuStartMessage | DokuUpdateMessage | DokuOpenMessage | DokuConfirmedMessage | SessionEndMessage | AnimusMemorySnapshot;
 
 export interface AnimusSceneCallbacks {
   onHover?: (patient: AnimusPatient | null, x: number, y: number) => void;
@@ -178,6 +187,8 @@ export interface AnimusHudProps {
   onDokuUpdate?: (entwurf: DokuEntwurf, patient: string, frage?: string) => void;
   /** Called when the agent hands over a finished draft. */
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
+  /** Called when the agent confirms and archives the draft by voice. */
+  onDokuConfirmed?: () => void;
   /** Doctor confirms the draft in the panel. The host writes it through its
    *  authenticated AnimaScribe session (POST /api/doku/eintrag). */
   onDokuConfirm?: (entwurf: DokuEntwurf) => void | Promise<void>;

@@ -205,6 +205,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     onDokuStart: handleDokuStart,
     onDokuUpdate: handleDokuUpdate,
     onDokuOpen: handleDokuOpen,
+    onDokuConfirmed: closeDoku,
     onMemorySnapshot: setMemorySnapshot,
   });
 

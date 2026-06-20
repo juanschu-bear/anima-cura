@@ -22,6 +22,7 @@ export interface UseAnimusOptions {
   onDokuStart?: (info: DokuStartInfo) => void;
   onDokuUpdate?: (entwurf: DokuEntwurf, patient: string, frage?: string) => void;
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
+  onDokuConfirmed?: () => void;
   onMemorySnapshot?: (snapshot: AnimusMemorySnapshot) => void;
 }
 
@@ -104,6 +105,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const onDokuStartRef = useRef(onDokuStart);
   const onDokuUpdateRef = useRef(onDokuUpdate);
   const onDokuOpenRef = useRef(onDokuOpen);
+  const onDokuConfirmedRef = useRef(options.onDokuConfirmed);
   const onMemorySnapshotRef = useRef(options.onMemorySnapshot);
   const wakeWordPhrasesRef = useRef(wakeWordPhrases);
   const connectedRef = useRef(false);
@@ -123,6 +125,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   onDokuStartRef.current = onDokuStart;
   onDokuUpdateRef.current = onDokuUpdate;
   onDokuOpenRef.current = onDokuOpen;
+  onDokuConfirmedRef.current = options.onDokuConfirmed;
   onMemorySnapshotRef.current = options.onMemorySnapshot;
   wakeWordPhrasesRef.current = wakeWordPhrases;
   connectedRef.current = connected;
@@ -200,6 +203,11 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
           }
           else if (msg.type === "doku_update") onDokuUpdateRef.current?.(msg.entwurf, msg.patient, msg.frage);
           else if (msg.type === "doku_open") onDokuOpenRef.current?.(msg.entwurf, msg.patient);
+          else if (msg.type === "doku_confirmed") onDokuConfirmedRef.current?.();
+          else if (msg.type === "session_end") {
+            const delay = typeof msg.delay_ms === "number" ? Math.max(0, msg.delay_ms) : 0;
+            window.setTimeout(() => disconnect(), delay);
+          }
           else if (msg.type === "memory_snapshot") onMemorySnapshotRef.current?.(msg);
         } catch {
           /* ignore malformed data messages */
