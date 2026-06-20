@@ -6,7 +6,7 @@ import { useAnimus } from "./useAnimus";
 import { DokuPanel } from "./DokuPanel";
 import { DiaryPanel } from "./DiaryPanel";
 import { handlePatientCall as applyPatientCall } from "./patientCall";
-import type { AnimusMemorySnapshot, AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, DokuEntwurf, DokuStartInfo } from "./types";
+import type { AnimusMemorySnapshot, AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, AnimusTtsStatus, DokuEntwurf, DokuStartInfo } from "./types";
 import { DEFAULT_WAKE_WORD_PHRASES } from "./wakeWord";
 
 const FONT_LINK_ID = "animus-fonts";
@@ -23,6 +23,12 @@ function ensureFonts(): void {
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 const DISPLAY = '"Orbitron", system-ui, sans-serif';
+const TTS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "eleven_multilingual_v2", label: "Multilingual v2" },
+  { value: "eleven_turbo_v2_5", label: "Turbo v2.5" },
+  { value: "eleven_flash_v2_5", label: "Flash v2.5" },
+  { value: "eleven_v3", label: "Eleven v3" },
+];
 
 // Mockup chrome, scoped under .ahud so it does not leak. Ported 1:1 from
 // ANIMUS-MOCKUP.html (fixed -> absolute within the HUD wrap).
@@ -117,6 +123,9 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const [dokuPatient, setDokuPatient] = useState<string>("");
   const [diaryOpen, setDiaryOpen] = useState(false);
   const [memorySnapshot, setMemorySnapshot] = useState<AnimusMemorySnapshot | null>(null);
+  const [ttsStatus, setTtsStatus] = useState<AnimusTtsStatus | null>(null);
+  const [ttsSelection, setTtsSelection] = useState("eleven_multilingual_v2");
+  const [ttsApplying, setTtsApplying] = useState(false);
 
   const handlePatientCall = useCallback((p: AnimusPatient) => {
     applyPatientCall({
@@ -207,6 +216,11 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     onDokuOpen: handleDokuOpen,
     onDokuConfirmed: closeDoku,
     onMemorySnapshot: setMemorySnapshot,
+    onTtsStatus: (status) => {
+      setTtsStatus(status);
+      setTtsSelection(status.current_model);
+      setTtsApplying(Boolean(status.restarting));
+    },
   });
 
   const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
@@ -222,6 +236,20 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const requestMemorySnapshot = useCallback(() => {
     void sendControl({ type: "memory_snapshot_request" });
   }, [sendControl]);
+
+  const requestTtsStatus = useCallback(() => {
+    void sendControl({ type: "tts_model_request" });
+  }, [sendControl]);
+
+  const applyTtsModel = useCallback(async () => {
+    if (!connected || ttsApplying) return;
+    setTtsApplying(true);
+    try {
+      await sendControl({ type: "set_tts_model", model: ttsSelection });
+    } catch {
+      setTtsApplying(false);
+    }
+  }, [connected, sendControl, ttsApplying, ttsSelection]);
 
   useImperativeHandle(ref, () => ({
     unfocus: () => sceneRef.current?.unfocus(),
@@ -308,7 +336,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   useEffect(() => {
     if (!connected) return;
     requestMemorySnapshot();
-  }, [connected, requestMemorySnapshot]);
+    requestTtsStatus();
+  }, [connected, requestMemorySnapshot, requestTtsStatus]);
 
   const rufeZufall = useCallback(() => {
     if (!patients || patients.length === 0) return;
@@ -383,6 +412,7 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
         <div className="row"><span className="k">ANSICHT</span><span className="v">REMIX</span></div>
         <div className="row"><span className="k">MIKROFON</span><span className={`v ${connected ? "" : "dim"}`}>{micStatus}</span></div>
         {wakeWord && <div className="row"><span className="k">WAKE WORD</span><span className={`v ${wakeWordEnabled ? "" : "dim"}`}>{wakeStatus}</span></div>}
+        <div className="row"><span className="k">TTS</span><span className={`v ${ttsApplying ? "" : "dim"}`}>{ttsStatus?.current_model ?? "—"}</span></div>
         <div className="row"><span className="k">PEGEL</span><span className="v">{Math.round(level * 100)}%</span></div>
       </div>
 
@@ -412,6 +442,29 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
           <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+          <select
+            value={ttsSelection}
+            onChange={(e) => setTtsSelection(e.target.value)}
+            style={{
+              minWidth: 220,
+              borderRadius: 999,
+              border: "1px solid rgba(94,217,255,.22)",
+              background: "rgba(6,14,24,.74)",
+              color: "#Dff3ff",
+              padding: "10px 16px",
+              fontFamily: MONO,
+              fontSize: 12,
+            }}
+          >
+            {TTS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={!connected || ttsApplying}>
+            {ttsApplying ? "TTS wechselt …" : "TTS übernehmen"}
+          </button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>

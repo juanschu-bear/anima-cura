@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 import type { RemoteTrack } from "livekit-client";
-import type { AnimusMemorySnapshot, AnimusPatient, AnimusMessage, DokuEntwurf, DokuStartInfo } from "./types";
+import type { AnimusMemorySnapshot, AnimusPatient, AnimusMessage, AnimusTtsStatus, DokuEntwurf, DokuStartInfo } from "./types";
 import { DEFAULT_WAKE_WORD_PHRASES, type WakeWordState, wakeWordMatchesTranscript } from "./wakeWord";
 
 export interface UseAnimusOptions {
@@ -24,6 +24,7 @@ export interface UseAnimusOptions {
   onDokuOpen?: (entwurf: DokuEntwurf, patient: string) => void;
   onDokuConfirmed?: () => void;
   onMemorySnapshot?: (snapshot: AnimusMemorySnapshot) => void;
+  onTtsStatus?: (status: AnimusTtsStatus) => void;
 }
 
 export interface UseAnimusResult {
@@ -107,6 +108,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const onDokuOpenRef = useRef(onDokuOpen);
   const onDokuConfirmedRef = useRef(options.onDokuConfirmed);
   const onMemorySnapshotRef = useRef(options.onMemorySnapshot);
+  const onTtsStatusRef = useRef(options.onTtsStatus);
   const wakeWordPhrasesRef = useRef(wakeWordPhrases);
   const connectedRef = useRef(false);
   const connectingRef = useRef(false);
@@ -127,6 +129,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   onDokuOpenRef.current = onDokuOpen;
   onDokuConfirmedRef.current = options.onDokuConfirmed;
   onMemorySnapshotRef.current = options.onMemorySnapshot;
+  onTtsStatusRef.current = options.onTtsStatus;
   wakeWordPhrasesRef.current = wakeWordPhrases;
   connectedRef.current = connected;
   connectingRef.current = connecting;
@@ -208,6 +211,7 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
             const delay = typeof msg.delay_ms === "number" ? Math.max(0, msg.delay_ms) : 0;
             window.setTimeout(() => disconnect(), delay);
           }
+          else if (msg.type === "tts_model_status") onTtsStatusRef.current?.(msg);
           else if (msg.type === "memory_snapshot") onMemorySnapshotRef.current?.(msg);
         } catch {
           /* ignore malformed data messages */
@@ -227,6 +231,10 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
       setConnected(true);
       await lk.localParticipant.publishData(
         new TextEncoder().encode(JSON.stringify({ type: "memory_snapshot_request" })),
+        { reliable: true, topic: "animus-control" },
+      );
+      await lk.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: "tts_model_request" })),
         { reliable: true, topic: "animus-control" },
       );
       if (wakeWordEnabledRef.current) setWakeWordState("idle");
