@@ -68,7 +68,7 @@ function formatDate(value?: string): string {
 function patientGroups(entries: AnimusDiaryEntry[]): Array<{ name: string; count: number }> {
   const counts = new Map<string, number>();
   for (const entry of entries) {
-    const name = (entry.patient_name || "Global").trim() || "Global";
+    const name = (entry.contact || entry.patient_name || "Global").trim() || "Global";
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   return Array.from(counts.entries())
@@ -161,10 +161,58 @@ function JournalEntry({ entry, index }: { entry: AnimusDiaryEntry; index: number
           whiteSpace: "pre-wrap",
         }}
       >
-        {entry.preview || "Noch kein ausgeschriebener Eintrag vorhanden."}
+        {entry.body || entry.preview || "Noch kein ausgeschriebener Eintrag vorhanden."}
       </div>
-      {entry.learning_notes.length ? (
+      {(entry.skills?.length || entry.patterns?.length || entry.growth?.length || entry.learning_notes.length) ? (
         <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {(entry.skills || []).map((note, noteIndex) => (
+            <span
+              key={`${entry.created_at ?? "skill"}-${noteIndex}`}
+              style={{
+                padding: "6px 11px",
+                borderRadius: 999,
+                border: "1px solid rgba(109,142,182,.28)",
+                background: "rgba(242,248,255,.74)",
+                color: "#476b94",
+                fontSize: 12,
+                letterSpacing: ".04em",
+              }}
+            >
+              {note}
+            </span>
+          ))}
+          {(entry.patterns || []).map((note, noteIndex) => (
+            <span
+              key={`${entry.created_at ?? "pattern"}-${noteIndex}`}
+              style={{
+                padding: "6px 11px",
+                borderRadius: 999,
+                border: "1px solid rgba(151,124,95,.22)",
+                background: "rgba(252,247,239,.82)",
+                color: "#7b654c",
+                fontSize: 12,
+                letterSpacing: ".04em",
+              }}
+            >
+              {note}
+            </span>
+          ))}
+          {(entry.growth || []).map((note, noteIndex) => (
+            <span
+              key={`${entry.created_at ?? "growth"}-${noteIndex}`}
+              style={{
+                padding: "6px 11px",
+                borderRadius: 999,
+                border: "1px solid rgba(124,162,104,.24)",
+                background: "rgba(243,252,240,.78)",
+                color: "#557a4f",
+                fontSize: 12,
+                letterSpacing: ".04em",
+              }}
+            >
+              {note}
+            </span>
+          ))}
           {entry.learning_notes.map((note, noteIndex) => (
             <span
               key={`${entry.created_at ?? "note"}-${noteIndex}`}

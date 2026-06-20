@@ -120,6 +120,12 @@ export interface AnimusDiaryEntry {
   patient_name: string;
   title: string;
   preview: string;
+  body?: string;
+  contact?: string;
+  skills?: string[];
+  patterns?: string[];
+  growth?: string[];
+  source_mode?: string;
   learning_notes: string[];
 }
 
