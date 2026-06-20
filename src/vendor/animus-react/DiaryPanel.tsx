@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from "react";
 import type { AnimusDiaryEntry, AnimusLearningFact, AnimusMemorySnapshot } from "./types";
 
 type DiaryPanelProps = {
@@ -9,6 +9,7 @@ type DiaryPanelProps = {
 };
 
 type DiaryTab = "all" | "skills" | "patterns" | "contacts" | "growth";
+type DiaryStage = "cover" | "opening" | "open";
 
 const SHELL: CSSProperties = {
   position: "absolute",
@@ -45,6 +46,9 @@ const PAGE: CSSProperties = {
 
 const HAND_FONT = '"Snell Roundhand", "Bradley Hand", "Segoe Print", cursive';
 const SERIF_FONT = '"Cormorant Garamond", "Iowan Old Style", "Georgia", serif';
+const DIARY_COVER = "/animus-diary/cover.png";
+const DIARY_OPENING = "/animus-diary/opening.png";
+const DIARY_OPEN = "/animus-diary/open.png";
 
 const TABS: ReadonlyArray<{ key: DiaryTab; label: string }> = [
   { key: "all", label: "All" },
@@ -276,6 +280,7 @@ function GrowthBoard({ diaryCount, factCount, patternCount, contactCount }: { di
 export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelProps): ReactElement | null {
   const [tab, setTab] = useState<DiaryTab>("all");
   const [contactFilter, setContactFilter] = useState<string>("all");
+  const [stage, setStage] = useState<DiaryStage>("cover");
 
   const diary = snapshot?.diary_entries ?? [];
   const facts = snapshot?.facts ?? [];
@@ -283,7 +288,90 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
   const filteredDiary = contactFilter === "all" ? diary : diary.filter((entry) => ((entry.patient_name || "Global").trim() || "Global") === contactFilter);
   const repeatedPatterns = facts.filter((fact) => fact.count > 1);
 
+  useEffect(() => {
+    if (!open) {
+      setStage("cover");
+      return;
+    }
+    setStage("cover");
+  }, [open]);
+
+  useEffect(() => {
+    if (stage !== "opening") return;
+    const id = window.setTimeout(() => setStage("open"), 650);
+    return () => window.clearTimeout(id);
+  }, [stage]);
+
   if (!open) return null;
+
+  if (stage !== "open") {
+    const image = stage === "opening" ? DIARY_OPENING : DIARY_COVER;
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 14,
+          background: "radial-gradient(circle at 50% 40%, rgba(75,132,181,.16), rgba(4,8,16,.82) 46%, rgba(2,4,10,.96) 100%)",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: "rgba(225,235,247,.78)",
+            fontSize: 28,
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
+        <div style={{ textAlign: "center", maxWidth: 1120 }}>
+          <div style={{ color: "rgba(182,204,224,.54)", fontSize: 12, letterSpacing: ".42em", textTransform: "uppercase", marginBottom: 24 }}>
+            Diary Archive
+          </div>
+          <button
+            onClick={() => setStage("opening")}
+            style={{
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              cursor: "pointer",
+              transform: stage === "opening" ? "scale(1.08) translateY(-12px)" : "scale(1)",
+              transition: "transform 620ms cubic-bezier(.22,1,.36,1), opacity 320ms ease",
+              opacity: stage === "opening" ? 0.96 : 1,
+            }}
+          >
+            <img
+              src={image}
+              alt="ANIMUS Diary Buch"
+              style={{
+                width: "min(980px, 88vw)",
+                maxHeight: "68vh",
+                objectFit: "contain",
+                filter: stage === "opening" ? "drop-shadow(0 28px 90px rgba(0,0,0,.58)) brightness(1.04)" : "drop-shadow(0 26px 72px rgba(0,0,0,.52))",
+                borderRadius: 22,
+              }}
+            />
+          </button>
+          <div style={{ marginTop: 26, fontFamily: SERIF_FONT, fontSize: 42, lineHeight: 1.08, color: "#edf4fb" }}>
+            ANIMUS&apos; Diary
+          </div>
+          <div style={{ marginTop: 12, color: "rgba(205,221,237,.76)", fontFamily: SERIF_FONT, fontStyle: "italic", fontSize: 24 }}>
+            {stage === "opening" ? "opening the reflection archive ..." : "tap the book to open the reflection archive"}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={SHELL}>
@@ -337,6 +425,21 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
             >
               ×
             </button>
+          </div>
+          <div
+            style={{
+              marginTop: 24,
+              borderRadius: 24,
+              overflow: "hidden",
+              border: "1px solid rgba(141,119,93,.18)",
+              boxShadow: "0 14px 40px rgba(60,46,28,.12)",
+            }}
+          >
+            <img
+              src={DIARY_OPEN}
+              alt="Geoeffnetes ANIMUS Diary"
+              style={{ width: "100%", display: "block", maxHeight: 270, objectFit: "cover", objectPosition: "center 58%" }}
+            />
           </div>
         </header>
 
