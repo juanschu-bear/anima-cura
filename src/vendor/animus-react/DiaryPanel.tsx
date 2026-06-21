@@ -18,6 +18,29 @@ type AggregatedFacet = {
   entryKeys: string[];
 };
 
+type ParsedTagKind = "skill" | "pattern" | "contact" | "other";
+
+type ParsedTag = {
+  key: string;
+  label: string;
+  kind: ParsedTagKind;
+};
+
+type PreparedEntry = {
+  raw: AnimusDiaryEntry;
+  key: string;
+  timestamp: string;
+  dateKey: string;
+  title: string;
+  body: string;
+  contact: string;
+  tags: ParsedTag[];
+  skills: string[];
+  patterns: string[];
+  growth: string[];
+  time: string | null;
+};
+
 const SHELL: CSSProperties = {
   position: "absolute",
   inset: "18px",
@@ -71,23 +94,49 @@ const SKILL_COLORS = ["#1d7a5a", "#6b5aad", "#2a6ba0", "#b07d2a", "#b84a2a", "#a
 const TAG_COLORS: Record<string, string> = {
   skill: "#1d7a5a",
   pattern: "#6b5aad",
+  contact: "#b07d2a",
   growth: "#b07d2a",
   other: "#8a8578",
 };
 
+function tagColor(kind: ParsedTagKind): string {
+  return TAG_COLORS[kind] || TAG_COLORS.other;
+}
+
 function cleanText(value?: string): string {
   return String(value || "").split(/\s+/).filter(Boolean).join(" ").trim();
+}
+
+function cleanBlock(value?: string): string {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split(/\n\s*\n/g)
+    .map((part) => part.split("\n").map((line) => cleanText(line)).filter(Boolean).join("\n"))
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
 }
 
 function entryKey(entry: AnimusDiaryEntry, index = 0): string {
   return String(entry.created_at || entry.timestamp || entry.title || `entry-${index}`);
 }
 
-function bodyParagraphs(entry: AnimusDiaryEntry): string[] {
-  return String(entry.body || "")
+function bodyParagraphs(body: string): string[] {
+  const parts = String(body || "")
     .split(/\n\s*\n/g)
     .map((part) => part.trim())
     .filter(Boolean);
+  if (parts.length !== 1 || parts[0].length < 420) return parts;
+  const sentences = (parts[0].match(/[^.!?]+(?:[.!?]+|$)/g) || [])
+    .map((part) => cleanText(part))
+    .filter(Boolean);
+  if (sentences.length < 4) return parts;
+  const rebuilt: string[] = [];
+  for (let index = 0; index < sentences.length; index += 2) {
+    rebuilt.push(sentences.slice(index, index + 2).join(" "));
+  }
+  return rebuilt;
 }
 
 function looksTechnicalTitle(title?: string): boolean {
@@ -120,7 +169,7 @@ function displayTitle(entry: AnimusDiaryEntry): string {
     }
     if (!looksTechnicalTitle(raw)) return raw;
   }
-  const firstParagraph = bodyParagraphs(entry)[0] || "";
+  const firstParagraph = bodyParagraphs(cleanBlock(entry.body))[0] || "";
   const firstSentence = cleanText(firstParagraph.split(/(?<=[.!?])/)[0]);
   if (!firstSentence) return "Private Reflection";
   const words = firstSentence.split(/\s+/).slice(0, 9).join(" ");
@@ -130,16 +179,113 @@ function displayTitle(entry: AnimusDiaryEntry): string {
 function normalizeContact(value?: string): string {
   const text = cleanText(value);
   if (!text) return "Unknown";
-  const normalized = text.toLowerCase();
-  if (normalized.includes("schubert")) return "Dr. Schubert";
-  const firstWord = text.split(/\s+/)[0] || "Unknown";
-  if (/[0-9|]/.test(firstWord)) return "Unknown";
-  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+  const normalized = text.toLowerCase().replace(/[|,.;:]/g, " ");
+  if (normalized.includes("dr schubert") || normalized.includes("dr. schubert")) return "Dr. Schubert";
+  const blocked = new Set(["dr", "praxis", "patient", "patientin", "unknown", "aligner", "multiband", "routinekontrolle"]);
+  const token = normalized
+    .split(/\s+/)
+    .map((part) => part.replace(/[^a-zA-ZÄÖÜäöüß-]/g, ""))
+    .find((part) => part && !blocked.has(part.toLowerCase()));
+  if (!token) return "Unknown";
+  return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
 }
 
-function aggregate(entries: AnimusDiaryEntry[], key: "skills" | "patterns" | "growth"): AggregatedFacet[] {
+function humanizeTag(value: string): string {
+  const text = cleanText(value);
+  if (!text) return "";
+  if (!/^[a-z0-9_-]+$/i.test(text)) return text;
+  return text
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function parseTag(raw: string): ParsedTag | null {
+  const text = cleanText(raw);
+  if (!text) return null;
+  const match = text.match(/^(skill|pattern|contact|other)\/(.+)$/i);
+  if (!match) {
+    return { key: text.toLowerCase(), label: text, kind: "other" };
+  }
+  const kind = match[1].toLowerCase() as ParsedTagKind;
+  const label = humanizeTag(match[2] || "");
+  if (!label) return null;
+  return { key: `${kind}:${label.toLowerCase()}`, label, kind };
+}
+
+function buildTags(entry: AnimusDiaryEntry): ParsedTag[] {
+  const out: ParsedTag[] = [];
+  const seen = new Set<string>();
+  const push = (tag: ParsedTag | null) => {
+    if (!tag || seen.has(tag.key)) return;
+    seen.add(tag.key);
+    out.push(tag);
+  };
+  (entry.tags || []).forEach((tag) => push(parseTag(tag)));
+  (entry.skills || []).forEach((value) => push({ key: `skill:${cleanText(value).toLowerCase()}`, label: cleanText(value), kind: "skill" }));
+  (entry.patterns || []).forEach((value) => push({ key: `pattern:${cleanText(value).toLowerCase()}`, label: cleanText(value), kind: "pattern" }));
+  (entry.growth || []).forEach((value) => push({ key: `other:${cleanText(value).toLowerCase()}`, label: cleanText(value), kind: "other" }));
+  const contact = normalizeContact(entry.contact);
+  if (contact !== "Unknown") {
+    push({ key: `contact:${contact.toLowerCase()}`, label: contact, kind: "contact" });
+  }
+  return out;
+}
+
+function prepareEntries(entries: AnimusDiaryEntry[]): PreparedEntry[] {
+  const prepared = entries.map((entry, index) => {
+    const tags = buildTags(entry);
+    const body = cleanBlock(entry.body);
+    const skills = Array.from(new Set([
+      ...(entry.skills || []).map((item) => cleanText(item)).filter(Boolean),
+      ...tags.filter((tag) => tag.kind === "skill").map((tag) => tag.label),
+    ]));
+    const patterns = Array.from(new Set([
+      ...(entry.patterns || []).map((item) => cleanText(item)).filter(Boolean),
+      ...tags.filter((tag) => tag.kind === "pattern").map((tag) => tag.label),
+    ]));
+    const growth = Array.from(new Set((entry.growth || []).map((item) => cleanText(item)).filter(Boolean)));
+    const timestamp = String(entry.created_at || entry.timestamp || "");
+    return {
+      raw: entry,
+      key: entryKey(entry, index),
+      timestamp,
+      dateKey: timestamp.slice(0, 10) || "unknown",
+      title: displayTitle(entry),
+      body,
+      contact: (tags.find((tag) => tag.kind === "contact")?.label) || normalizeContact(entry.contact),
+      tags,
+      skills,
+      patterns,
+      growth,
+      time: formatTime(timestamp),
+    };
+  });
+
+  prepared.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const deduped: PreparedEntry[] = [];
+  prepared.forEach((entry) => {
+    const entryTime = Date.parse(entry.timestamp || "");
+    const existingIndex = deduped.findIndex((candidate) => {
+      const candidateTime = Date.parse(candidate.timestamp || "");
+      if (Number.isNaN(entryTime) || Number.isNaN(candidateTime)) return false;
+      return candidate.title.toLowerCase() === entry.title.toLowerCase() && Math.abs(entryTime - candidateTime) <= 5 * 60 * 1000;
+    });
+    if (existingIndex === -1) {
+      deduped.push(entry);
+      return;
+    }
+    if ((entry.timestamp || "") > (deduped[existingIndex]?.timestamp || "")) {
+      deduped[existingIndex] = entry;
+    }
+  });
+  return deduped.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+function aggregate(entries: PreparedEntry[], key: "skills" | "patterns" | "growth"): AggregatedFacet[] {
   const counts = new Map<string, AggregatedFacet>();
-  entries.forEach((entry, index) => {
+  entries.forEach((entry) => {
     const items = Array.isArray(entry[key]) ? entry[key] : [];
     items.forEach((item) => {
       const label = cleanText(item);
@@ -148,13 +294,13 @@ function aggregate(entries: AnimusDiaryEntry[], key: "skills" | "patterns" | "gr
       const existing = counts.get(normalized);
       if (existing) {
         existing.count += 1;
-        if (!existing.entryKeys.includes(entryKey(entry, index))) existing.entryKeys.push(entryKey(entry, index));
+        if (!existing.entryKeys.includes(entry.key)) existing.entryKeys.push(entry.key);
       } else {
         counts.set(normalized, {
           key: normalized,
           label,
           count: 1,
-          entryKeys: [entryKey(entry, index)],
+          entryKeys: [entry.key],
         });
       }
     });
@@ -162,21 +308,22 @@ function aggregate(entries: AnimusDiaryEntry[], key: "skills" | "patterns" | "gr
   return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
 }
 
-function aggregateContacts(entries: AnimusDiaryEntry[]): AggregatedFacet[] {
+function aggregateContacts(entries: PreparedEntry[]): AggregatedFacet[] {
   const counts = new Map<string, AggregatedFacet>();
-  entries.forEach((entry, index) => {
-    const label = normalizeContact(entry.contact);
+  entries.forEach((entry) => {
+    const label = entry.contact;
+    if (!label || label === "Unknown") return;
     const normalized = label.toLowerCase();
     const existing = counts.get(normalized);
     if (existing) {
       existing.count += 1;
-      existing.entryKeys.push(entryKey(entry, index));
+      existing.entryKeys.push(entry.key);
     } else {
       counts.set(normalized, {
         key: normalized,
         label,
         count: 1,
-        entryKeys: [entryKey(entry, index)],
+        entryKeys: [entry.key],
       });
     }
   });
@@ -195,10 +342,10 @@ function fallbackFacts(facts: AnimusLearningFact[], category: string): Aggregate
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
 }
 
-function groupByDay(entries: AnimusDiaryEntry[]): Array<{ date: string; entries: AnimusDiaryEntry[] }> {
-  const groups = new Map<string, AnimusDiaryEntry[]>();
+function groupByDay(entries: PreparedEntry[]): Array<{ date: string; entries: PreparedEntry[] }> {
+  const groups = new Map<string, PreparedEntry[]>();
   entries.forEach((entry) => {
-    const dateKey = String(entry.created_at || entry.timestamp || "").slice(0, 10) || "unknown";
+    const dateKey = entry.dateKey || "unknown";
     groups.set(dateKey, [...(groups.get(dateKey) || []), entry]);
   });
   return Array.from(groups.entries())
@@ -331,8 +478,7 @@ function SkillBox({
   );
 }
 
-function EntryView({ entry }: { entry: AnimusDiaryEntry }): ReactElement {
-  const time = formatTime(entry.created_at || entry.timestamp);
+function EntryView({ entry }: { entry: PreparedEntry }): ReactElement {
   return (
     <div style={{ marginBottom: 50, paddingLeft: 22, borderLeft: "1.5px solid #d4cfc4", position: "relative" }}>
       <div
@@ -349,22 +495,21 @@ function EntryView({ entry }: { entry: AnimusDiaryEntry }): ReactElement {
       />
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
         <p style={{ margin: 0, fontFamily: HAND_FONT, fontSize: 28, fontWeight: 600, color: "#2c2a25", lineHeight: 1.2 }}>
-          {displayTitle(entry)}
+          {entry.title}
         </p>
-        {time ? <span style={{ fontFamily: HAND_FONT, fontSize: 20, color: "#a09b90", whiteSpace: "nowrap", lineHeight: 1 }}>{time}</span> : null}
+        {entry.time ? <span style={{ fontFamily: HAND_FONT, fontSize: 20, color: "#a09b90", whiteSpace: "nowrap", lineHeight: 1 }}>{entry.time}</span> : null}
       </div>
       <div style={{ fontFamily: HAND_FONT, fontSize: 24, lineHeight: 1.75, color: "#3d3a34", whiteSpace: "pre-wrap" }}>
-        {bodyParagraphs(entry).join("\n\n")}
+        {bodyParagraphs(entry.body).join("\n\n")}
       </div>
-      {entry.tags?.length ? (
+      {entry.tags.length ? (
         <div style={{ fontFamily: HAND_FONT, fontSize: 20, lineHeight: 1.8, color: "#8a8578", marginTop: 18 }}>
           <span style={{ fontStyle: "italic", color: "#a09b90" }}>Tags: </span>
           {entry.tags.map((tag, index) => {
-            const color = TAG_COLORS[index % 2 === 0 ? "skill" : "pattern"] || "#8a8578";
             return (
-              <span key={`${entryKey(entry, index)}-tag-${index}`}>
-                <span style={{ color }}>{tag}</span>
-                {index < entry.tags!.length - 1 ? <span>, </span> : null}
+              <span key={`${entry.key}-tag-${index}`}>
+                <span style={{ color: tagColor(tag.kind) }}>{tag.label}</span>
+                {index < entry.tags.length - 1 ? <span>, </span> : null}
               </span>
             );
           })}
@@ -390,25 +535,26 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
 
   const diary = snapshot?.diary_entries ?? [];
   const facts = snapshot?.facts ?? [];
+  const preparedEntries = useMemo(() => prepareEntries(diary), [diary]);
 
   const skillAggs = useMemo(() => {
-    const diaryAggs = aggregate(diary, "skills");
+    const diaryAggs = aggregate(preparedEntries, "skills");
     return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "skill");
-  }, [diary, facts]);
+  }, [preparedEntries, facts]);
   const patternAggs = useMemo(() => {
-    const diaryAggs = aggregate(diary, "patterns");
+    const diaryAggs = aggregate(preparedEntries, "patterns");
     return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "pattern");
-  }, [diary, facts]);
+  }, [preparedEntries, facts]);
   const growthAggs = useMemo(() => {
-    const diaryAggs = aggregate(diary, "growth");
+    const diaryAggs = aggregate(preparedEntries, "growth");
     return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "growth");
-  }, [diary, facts]);
-  const contactAggs = useMemo(() => aggregateContacts(diary), [diary]);
+  }, [preparedEntries, facts]);
+  const contactAggs = useMemo(() => aggregateContacts(preparedEntries), [preparedEntries]);
 
   const filteredEntries = useMemo(() => {
-    return diary.filter((entry, index) => {
-      const key = entryKey(entry, index);
-      if (selectedContact && normalizeContact(entry.contact).toLowerCase() !== selectedContact) return false;
+    return preparedEntries.filter((entry) => {
+      const key = entry.key;
+      if (selectedContact && entry.contact.toLowerCase() !== selectedContact) return false;
       if (selectedSkill) {
         const source = skillAggs.find((item) => item.key === selectedSkill);
         if (source && source.entryKeys.length && !source.entryKeys.includes(key)) return false;
@@ -423,7 +569,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
       }
       return true;
     });
-  }, [diary, growthAggs, patternAggs, selectedContact, selectedGrowth, selectedPattern, selectedSkill, skillAggs]);
+  }, [preparedEntries, growthAggs, patternAggs, selectedContact, selectedGrowth, selectedPattern, selectedSkill, skillAggs]);
 
   const groups = useMemo(() => groupByDay(filteredEntries), [filteredEntries]);
 
@@ -448,6 +594,15 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
     });
     setOpenDays(next);
   }, [groups]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || document.getElementById("animus-diary-fonts")) return;
+    const link = document.createElement("link");
+    link.id = "animus-diary-fonts";
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&display=swap";
+    document.head.appendChild(link);
+  }, []);
 
   if (!open) return null;
 
@@ -522,6 +677,31 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
 
   return (
     <div style={SHELL}>
+      <button
+        onClick={onClose}
+        aria-label="Diary schließen"
+        style={{
+          position: "absolute",
+          top: 18,
+          right: 18,
+          zIndex: 4,
+          width: 42,
+          height: 42,
+          borderRadius: 999,
+          border: "1px solid rgba(140,120,86,.22)",
+          background: "rgba(246,241,233,.92)",
+          color: "#75684e",
+          cursor: "pointer",
+          fontSize: 28,
+          lineHeight: 1,
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 8px 24px rgba(60,46,28,.12)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        ×
+      </button>
       <section style={COVER}>
         <div
           style={{
@@ -544,7 +724,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
           </div>
         </div>
         <div>
-          <div style={{ color: "rgba(215,194,154,.58)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>{diary.length} entries</div>
+          <div style={{ color: "rgba(215,194,154,.58)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>{preparedEntries.length} entries</div>
           <div style={{ marginTop: 10, color: "rgba(215,194,154,.42)", fontFamily: SERIF_FONT, fontSize: 17, fontStyle: "italic" }}>
             tap to open the next layer of learning
           </div>
@@ -559,7 +739,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
             <p style={{ fontStyle: "italic", fontSize: 17, color: "#8a8578", margin: "0 0 14px", fontFamily: SERIF_FONT }}>
               What I learned, what I noticed, what I would do differently.
             </p>
-            <p style={{ fontSize: 12, color: "#a09b90", letterSpacing: 2, textTransform: "uppercase" }}>{diary.length} entries</p>
+            <p style={{ fontSize: 12, color: "#a09b90", letterSpacing: 2, textTransform: "uppercase" }}>{preparedEntries.length} entries</p>
           </div>
 
           <div style={{ width: 50, height: 1, background: "#d4cfc4", margin: "0 auto 32px" }} />
@@ -578,7 +758,7 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
 
           {contactAggs.length > 1 ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
-              <ContactPill active={selectedContact === null} label={`All (${diary.length})`} onClick={() => setSelectedContact(null)} />
+              <ContactPill active={selectedContact === null} label={`All (${preparedEntries.length})`} onClick={() => setSelectedContact(null)} />
               {contactAggs.map((contact) => (
                 <ContactPill
                   key={contact.key}
@@ -682,8 +862,8 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
                 </div>
                 {openDays[group.date] ? (
                   <div>
-                    {group.entries.map((entry, index) => (
-                      <EntryView key={entryKey(entry, index)} entry={entry} />
+                    {group.entries.map((entry) => (
+                      <EntryView key={entry.key} entry={entry} />
                     ))}
                   </div>
                 ) : null}
