@@ -13,3 +13,4 @@ test.mp3
 .env
 .env.local
 .env.*.local
+.vercel

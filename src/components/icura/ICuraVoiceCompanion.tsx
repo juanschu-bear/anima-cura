@@ -32,6 +32,11 @@ type BrowserSpeechRecognitionResult = ArrayLike<BrowserSpeechRecognitionAlternat
 
 type BrowserSpeechRecognitionEvent = {
   results: ArrayLike<BrowserSpeechRecognitionResult>;
+  resultIndex?: number;
+};
+
+type BrowserSpeechRecognitionErrorEvent = {
+  error?: string;
 };
 
 type BrowserSpeechRecognition = {
@@ -39,20 +44,17 @@ type BrowserSpeechRecognition = {
   continuous: boolean;
   interimResults: boolean;
   onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };
 
 type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
-    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
-  }
-}
+type SpeechWindow = Window & {
+  webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+};
 
 export default function ICuraVoiceCompanion() {
   const pathname = usePathname();
@@ -361,7 +363,8 @@ export default function ICuraVoiceCompanion() {
   );
 
   const startBrowserRecognition = useCallback(() => {
-    const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const speechWindow = window as SpeechWindow;
+    const RecognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!RecognitionCtor) {
       return;
     }

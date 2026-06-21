@@ -9,8 +9,8 @@ not to copied source, which compiles fine against this app's React 18.
 ## Source
 
 - Repo: `juanschu-bear/animus`, path `react/src/`
-- Commit: `2a70a5e` ("ANIMUS HUD: Doku-Flaeche (DokuPanel + Events)")
-- Vendored on: 2026-06-18
+- Commit: `5a2d822` ("ANIMUS HUD: Doku-Flaeche (DokuPanel + Events)")
+- Vendored on: 2026-06-19
 
 ## Runtime dependencies
 
@@ -32,17 +32,46 @@ data. Re-apply them after any re-sync, or fold them upstream:
   true; the host sets it false to draw its own card).
 - `scene.ts`: a third sprite material (neutral gold `0xf5c56b`) for `"d"`, and
   the node cap was removed (`NODES = data.length`) so every active patient is a
-  node and `focusByName` can find any of them, not just the first 300.
+  node and `focusByName` can find any of them, not just the first 300. The
+  reactive core was made small and subtle (fewer, smaller, dimmer points, still
+  voice-reactive), and the patient field was tuned to the mockup NETZ look:
+  distance-threshold links at low opacity, smaller node sprites, and a depth cue
+  that shrinks farther nodes. focusByName/unfocus and the per-node patient data
+  are untouched.
 - `AnimusHud.tsx`: wires `onPatientFocus` to the scene focus callback, gates the
   built-in card behind `showCard`, and adds a "divers" legend entry.
+- Visible layer rebuilt to match `ANIMUS-MOCKUP.html` (repo root), then adjusted
+  past the mockup per later requests: topbar with a live clock, the left SYSTEM
+  panel (STATUS, ANSICHT, MIKROFON, PEGEL), the right SIGNAL panel with a live
+  waveform (LATENZ, SESSION), the greeting moved to the prominent top slot below
+  the topbar, the buttons and command line at the bottom, the corner frame, grid
+  and glow. The mode tabs, the bottom hint line, the MODELL and KANAL rows were
+  removed. All chrome lives in a scoped `CHROME_CSS` block under `.ahud`. Clock
+  and waveform effects run before the scene effect, and the scene schedules its
+  first frame via rAF, so a scene failure can never block them. The wiring
+  (useAnimus, LiveKit, DokuPanel, callbacks) is unchanged.
+- `types.ts`/`AnimusHud.tsx`: the `greeting` prop was replaced by `greetingLead`
+  + `userName` so the name can be shown in the gradient highlight. Added
+  `onPatientUnfocus?` (host closes its card) and an imperative `AnimusHandle`
+  (`unfocus`, `focusByName`) exposed via `forwardRef` so the host can zoom the
+  orb back out when it closes its own card.
 
 ## Updating
 
-Do not hand-edit these files. To pull a newer version, re-copy all of
-`AnimusHud.tsx`, `DokuPanel.tsx`, `useAnimus.ts`, `scene.ts`, `types.ts`,
-`index.ts` from the upstream repo, bump the commit hash above, and re-check the
-two dependency versions. Local edits would be lost on the next sync and would
-make this copy drift from GitHub `main`, which is the source of truth.
+The shared core logic should not be copied by hand. Use:
+
+```bash
+npm run sync:animus-react
+```
+
+The sync script copies the shared core files `useAnimus.ts`, `scene.ts`,
+`types.ts`, `index.ts` and `patientCall.ts` from the upstream ANIMUS repo and
+updates the commit hash above. By default it reads from the sibling checkout at
+`../../ANIMUS/animus-git/react/src`. If your local path differs, set
+`ANIMUS_REACT_SOURCE=/path/to/animus/react/src`.
+
+`AnimusHud.tsx` and `DokuPanel.tsx` stay app-local here because `anima-cura`
+deliberately carries custom cockpit chrome and workflow behavior on top.
 
 ## How it's wired here
 

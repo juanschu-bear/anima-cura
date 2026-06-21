@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ANIMA · HUD-Varianten</title>
+<!--
+  EXTERNE ABHAENGIGKEITEN: Three.js r128 (cdnjs), Google Fonts Orbitron + JetBrains Mono,
+  Web Audio API + getUserMedia (Mikrofon). Reines Design-Mockup, keine echte Sprachlogik.
+  Patienten im Netz-Modus sind frei erfundene Demo-Daten.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{ --bg:#03060E; --cyan:#5ED9FF; --blau:#2E78FF; --violet:#9A7CFF; --schrift:#CFE6FF; --gedeckt:#5E7A96; --leise:#33485E; --linie:rgba(94,217,255,.18); }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:'JetBrains Mono',monospace;color:var(--schrift)}
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;touch-action:none}
+  .glow{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);width:60vmin;height:60vmin;z-index:0;pointer-events:none;
+    background:radial-gradient(circle,rgba(94,217,255,.30),rgba(154,124,255,.10) 42%,transparent 68%);filter:blur(8px)}
+  .grid{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(94,217,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(94,217,255,.05) 1px,transparent 1px);
+    background-size:46px 46px;mask-image:radial-gradient(circle at 50% 50%,#000 30%,transparent 80%)}
+
+  .hud{position:fixed;inset:0;z-index:2;pointer-events:none}
+  .hud > *{pointer-events:auto}
+  .ecke{position:fixed;width:46px;height:46px;border:2px solid var(--cyan);opacity:.55;z-index:3}
+  .ecke.tl{top:22px;left:22px;border-right:0;border-bottom:0}
+  .ecke.tr{top:22px;right:22px;border-left:0;border-bottom:0}
+  .ecke.bl{bottom:22px;left:22px;border-right:0;border-top:0}
+  .ecke.br{bottom:22px;right:22px;border-left:0;border-top:0}
+
+  .topbar{position:fixed;top:30px;left:42px;right:42px;display:flex;justify-content:space-between;align-items:flex-start;z-index:3}
+  .marke{font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.32em;font-size:15px;color:#EAF6FF;text-shadow:0 0 18px var(--cyan)}
+  .marke small{display:block;font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:.34em;font-size:9.5px;color:var(--gedeckt);margin-top:6px}
+  .uhr{text-align:right;font-family:'Orbitron',sans-serif;font-weight:700;font-size:22px;color:#EAF6FF;text-shadow:0 0 16px var(--blau)}
+  .uhr small{display:block;font-family:'JetBrains Mono',monospace;font-weight:400;font-size:10px;letter-spacing:.24em;color:var(--gedeckt);margin-top:5px}
+
+  /* Modus-Tabs */
+  .tabs{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:8px;background:rgba(6,12,22,.6);border:1px solid var(--linie);border-radius:999px;padding:5px;backdrop-filter:blur(8px)}
+  .tab{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.12em;padding:8px 18px;border-radius:999px;cursor:pointer;color:var(--gedeckt);border:0;background:transparent;transition:all .15s}
+  .tab:hover{color:var(--schrift)}
+  .tab.an{color:#04121e;background:linear-gradient(90deg,var(--cyan),var(--violet));box-shadow:0 0 22px rgba(94,217,255,.4)}
+
+  .status{position:fixed;top:50%;left:42px;transform:translateY(-50%);z-index:3;font-size:11px;line-height:2.2;letter-spacing:.06em;width:210px}
+  .status .row{display:flex;justify-content:space-between;border-bottom:1px solid var(--linie);padding:4px 0}
+  .status .k{color:var(--gedeckt)} .status .v{color:var(--cyan)} .status .v.dim{color:var(--leise)}
+  .status .titel{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:.26em;color:var(--gedeckt);margin-bottom:8px}
+
+  .rechts{position:fixed;top:50%;right:42px;transform:translateY(-50%);z-index:3;width:210px;text-align:right}
+  .rechts .titel{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:.26em;color:var(--gedeckt);margin-bottom:10px}
+  #wave{width:100%;height:60px;display:block}
+  .rechts .lines{font-size:10px;line-height:2.1;color:var(--gedeckt);margin-top:12px;letter-spacing:.05em}
+  .rechts .lines b{color:var(--cyan);font-weight:600}
+
+  .center{position:fixed;left:0;right:0;bottom:60px;z-index:3;text-align:center}
+  .center::before{content:"";position:absolute;left:50%;top:-46px;transform:translateX(-50%);width:min(720px,94vw);height:300px;z-index:-1;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(3,6,14,.85),rgba(3,6,14,.5) 45%,transparent 75%)}
+  .gruss{font-family:'Orbitron',sans-serif;font-weight:700;font-size:26px;letter-spacing:.04em;color:#EAF6FF;text-shadow:0 0 22px rgba(94,217,255,.6);margin:0}
+  .gruss .name{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:12px;letter-spacing:.22em;color:var(--gedeckt);margin:12px 0 22px;text-transform:uppercase}
+  .sub .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);margin-right:9px;vertical-align:middle;animation:blink 1.6s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+  .knoepfe{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;padding:12px 22px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--cyan);background:rgba(94,217,255,.10);color:#Dff3ff;transition:all .15s ease;backdrop-filter:blur(6px)}
+  .btn:hover{background:rgba(94,217,255,.2);box-shadow:0 0 26px rgba(94,217,255,.45);transform:translateY(-1px)}
+  .btn.ghost{border-color:var(--linie);background:transparent;color:var(--gedeckt)}
+  .btn.ghost:hover{border-color:var(--cyan);color:var(--schrift);box-shadow:none}
+
+  /* Netz: Hover-Label + Patientenkarte */
+  .nodeLabel{position:fixed;z-index:5;pointer-events:none;font-size:11px;letter-spacing:.08em;color:#EAF6FF;background:rgba(6,14,24,.85);border:1px solid var(--cyan);
+    padding:5px 10px;border-radius:7px;transform:translate(-50%,-150%);white-space:nowrap;display:none;box-shadow:0 0 18px rgba(94,217,255,.35)}
+  .card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.96);z-index:6;width:min(340px,86vw);background:rgba(8,16,28,.92);
+    border:1px solid var(--cyan);border-radius:16px;padding:22px 22px 20px;backdrop-filter:blur(12px);box-shadow:0 0 50px rgba(94,217,255,.25);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+  .card.an{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+  .card h3{font-family:'Orbitron',sans-serif;font-size:18px;margin:0 0 2px;color:#EAF6FF}
+  .card .meta{font-size:11px;color:var(--gedeckt);letter-spacing:.1em;margin-bottom:16px}
+  .card .zeile{display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--linie)}
+  .card .zeile .k{color:var(--gedeckt)} .card .zeile .v{color:var(--cyan);font-weight:600}
+  .card .bar{height:6px;border-radius:999px;background:rgba(94,217,255,.15);margin-top:14px;overflow:hidden}
+  .card .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+  .card .demo{font-size:9px;letter-spacing:.2em;color:var(--leise);margin-top:16px;text-align:center}
+  .card .x{position:absolute;top:12px;right:14px;cursor:pointer;color:var(--gedeckt);font-size:16px;border:0;background:0}
+  .card .x:hover{color:#fff}
+
+  .hinweis{position:fixed;bottom:24px;left:0;right:0;text-align:center;z-index:3;font-size:10px;letter-spacing:.14em;color:var(--leise)}
+  .legende{position:fixed;left:42px;bottom:82px;z-index:3;display:none;font-size:11px;letter-spacing:.08em;color:var(--gedeckt)}
+  .legende span{display:flex;align-items:center;gap:9px;margin-top:9px}
+  .legende i{width:11px;height:11px;border-radius:50%;display:inline-block;box-shadow:0 0 10px rgba(150,190,255,.6)}
+  .cmd{margin:14px auto 0;display:block;width:min(320px,80vw);text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.04em;
+    color:#Dff3ff;background:rgba(6,14,24,.6);border:1px solid var(--linie);border-radius:999px;padding:10px 16px;outline:none}
+  .cmd:focus{border-color:var(--cyan);box-shadow:0 0 18px rgba(94,217,255,.3)}
+  .cmd::placeholder{color:var(--leise)}
+  @media (max-width:820px){ .status,.rechts{display:none} .gruss{font-size:20px} }
+  @media (prefers-reduced-motion: reduce){ .sub .dot{animation:none} }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div class="glow"></div>
+  <div class="grid"></div>
+  <div class="ecke tl"></div><div class="ecke tr"></div><div class="ecke bl"></div><div class="ecke br"></div>
+
+  <div class="topbar">
+    <div class="marke">ANIMA<small>ORTHODONTIC INTELLIGENCE</small></div>
+    <div class="uhr"><span id="zeit">--:--:--</span><small id="datum">—</small></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab an" data-m="puls">◐ PULS</button>
+    <button class="tab" data-m="netz">⬡ NETZ</button>
+    <button class="tab" data-m="kern">◉ KERN</button>
+    <button class="tab" data-m="remix">✦ REMIX</button>
+  </div>
+
+  <div class="status">
+    <div class="titel">SYSTEM</div>
+    <div class="row"><span class="k">STATUS</span><span class="v" id="sysStatus">BEREIT</span></div>
+    <div class="row"><span class="k">ANSICHT</span><span class="v" id="ansicht">PULS</span></div>
+    <div class="row"><span class="k">MIKROFON</span><span class="v dim" id="micStatus">inaktiv</span></div>
+    <div class="row"><span class="k">PEGEL</span><span class="v" id="pegel">0%</span></div>
+    <div class="row"><span class="k">MODELL</span><span class="v">claude · realtime</span></div>
+  </div>
+
+  <div class="rechts">
+    <div class="titel">SIGNAL</div>
+    <canvas id="wave"></canvas>
+    <div class="lines">
+      <div>LATENZ <b>&lt; 1 s</b></div>
+      <div>KANAL <b>STT · LLM · TTS</b></div>
+      <div>SESSION <b id="uptime">00:00</b></div>
+    </div>
+  </div>
+
+  <div class="center">
+    <p class="gruss">Guten Abend, <span class="name">Dr. Schubert</span>.</p>
+    <p class="sub"><span class="dot"></span><span id="zustand">Sagen Sie mir die Diagnose, ich dokumentiere</span></p>
+    <div class="knoepfe">
+      <button class="btn" id="aktivieren">▸ Anima aktivieren</button>
+      <button class="btn ghost" id="simulieren">Sprechen simulieren</button>
+      <button class="btn ghost" id="aufrufen" style="display:none">▤ Patient aufrufen</button>
+    </div>
+    <input id="cmd" class="cmd" placeholder='Befehl tippen: „Ruf Anna auf"' style="display:none" />
+  </div>
+
+  <div class="nodeLabel" id="nodeLabel"></div>
+  <div class="card" id="card">
+    <button class="x" id="cardX">✕</button>
+    <h3 id="cName">—</h3>
+    <div class="meta" id="cMeta">—</div>
+    <div class="zeile"><span class="k">Behandlung</span><span class="v" id="cBeh">—</span></div>
+    <div class="zeile"><span class="k">Phase</span><span class="v" id="cPhase">—</span></div>
+    <div class="zeile"><span class="k">Nächster Termin</span><span class="v" id="cTermin">—</span></div>
+    <div class="bar"><i id="cBar" style="width:0%"></i></div>
+    <div class="demo">DEMO-DATEN · NUR ZUR VERANSCHAULICHUNG</div>
+  </div>
+
+  <div class="legende" id="legende">
+    <span><i style="background:#FF8AD6"></i> weiblich</span>
+    <span><i style="background:#5ED9FF"></i> männlich</span>
+  </div>
+
+  <div class="hinweis">ANIMUS HUD · REMIX · „ANIMA AKTIVIEREN" VERBINDET MIT DEM AGENTEN (LIVEKIT) · OHNE TOKEN-SERVER FÄLLT ES AUF DEMO ZURÜCK</div>
+
+<script>
+(function(){
+  if(!window.THREE){ document.getElementById('zustand').textContent='Three.js konnte nicht geladen werden'; return; }
+  const TH=THREE, canvas=document.getElementById('scene');
+  const renderer=new TH.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  const scene=new TH.Scene();
+  const camera=new TH.PerspectiveCamera(55,1,0.1,100);
+  let camDefaultZ=6;
+
+  // weiche Glut-Textur fuer Punkte/Knoten
+  function makeGlow(){
+    const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+    const rad=g.createRadialGradient(32,32,0,32,32,32);
+    rad.addColorStop(0,'rgba(255,255,255,1)'); rad.addColorStop(.35,'rgba(180,230,255,.8)');
+    rad.addColorStop(1,'rgba(120,180,255,0)');
+    g.fillStyle=rad; g.fillRect(0,0,64,64);
+    const t=new TH.CanvasTexture(c); return t;
+  }
+  const glowTex=makeGlow();
+
+  // ferner Sternenstaub (immer sichtbar, Tiefe)
+  (function stars(){
+    const M=600, p=new Float32Array(M*3);
+    for(let i=0;i<M;i++){ const r=14+Math.random()*16, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+      p[i*3]=r*Math.sin(ph)*Math.cos(th); p[i*3+1]=r*Math.sin(ph)*Math.sin(th); p[i*3+2]=r*Math.cos(ph); }
+    const g=new TH.BufferGeometry(); g.setAttribute('position',new TH.BufferAttribute(p,3));
+    const m=new TH.PointsMaterial({color:0x6f9fd0,size:0.06,transparent:true,opacity:0.5,blending:TH.AdditiveBlending,depthWrite:false});
+    scene.add(new TH.Points(g,m));
+  })();
+
+  function lerpColor(a,b,t){ return new TH.Color(a).lerp(new TH.Color(b),t); }
+  // weiblich: Rosé/Violett, männlich: Blau/Cyan
+  function genderTint(g){ return g==='w' ? lerpColor(0xFF8AD6,0xC77BFF,Math.random()) : lerpColor(0x5ED9FF,0x4D9FFF,Math.random()); }
+
+  // ===== MODUS: PULS (reaktive Cyan-Violett-Kugel) =====
+  function modusPuls(){
+    const root=new TH.Group(); scene.add(root);
+    function shell(N,R,size,op){
+      const pos=new Float32Array(N*3), dir=new Float32Array(N*3), col=new Float32Array(N*3);
+      for(let i=0;i<N;i++){ const y=1-(i/(N-1))*2, r=Math.sqrt(1-y*y), phi=i*Math.PI*(3-Math.sqrt(5));
+        const x=Math.cos(phi)*r, z=Math.sin(phi)*r;
+        dir[i*3]=x;dir[i*3+1]=y;dir[i*3+2]=z; pos[i*3]=x*R;pos[i*3+1]=y*R;pos[i*3+2]=z*R;
+        const c=lerpColor(0x5ED9FF,0x9A7CFF,(y+1)/2); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
+      const g=new TH.BufferGeometry();
+      g.setAttribute('position',new TH.BufferAttribute(pos,3));
+      g.setAttribute('color',new TH.BufferAttribute(col,3));
+      const m=new TH.PointsMaterial({size,vertexColors:true,transparent:true,opacity:op,blending:TH.AdditiveBlending,depthWrite:false});
+      const pt=new TH.Points(g,m); pt.userData={dir,R,N}; root.add(pt); return pt;
+    }
+    const aussen=shell(4600,1.55,0.04,0.9), innen=shell(1500,0.82,0.05,0.95);
+    return {
+      root,
+      update(amp,t){
+        [aussen,innen].forEach((pt,k)=>{
+          const {dir,R,N}=pt.userData, p=pt.geometry.attributes.position.array;
+          const breath=1+Math.sin(t*0.9)*0.015, push=1+amp*0.45;
+          for(let i=0;i<N;i++){ const rr=R*breath*push + Math.sin(t*2.1+i)*0.012*(0.4+amp);
+            p[i*3]=dir[i*3]*rr;p[i*3+1]=dir[i*3+1]*rr;p[i*3+2]=dir[i*3+2]*rr; }
+          pt.geometry.attributes.position.needsUpdate=true;
+          pt.material.opacity=(k?0.85:0.7)+amp*0.3; pt.material.size=(k?0.05:0.04)+amp*0.03;
+        });
+        aussen.rotation.y+=0.0015+amp*0.006; aussen.rotation.x=Math.sin(t*0.2)*0.14;
+        innen.rotation.y-=0.0026+amp*0.004; innen.rotation.x=aussen.rotation.x;
+      },
+      pickable:[], onPick:null, dispose(){ scene.remove(root); }
+    };
+  }
+
+  // ===== MODUS: NETZ (Patienten als Knoten, Klick zoomt heran) =====
+  const vnW=['Anna','Sophie','Mia','Lea','Emma','Lina','Marie','Lena','Hannah','Clara','Emilia','Ella','Nele','Frieda','Ida','Pia','Johanna','Greta','Maja','Elisabeth','Anastasia','Charlotte','Paula','Helena','Mathilda','Luisa','Amelie','Romy'];
+  const vnM=['Lukas','Elias','Noah','Jonas','Paul','Leon','Finn','Luca','Ben','Felix','Max','Moritz','Jakob','Henry','Anton','Emil','David','Julian','Tim','Niklas','Oskar','Theo','Samuel','Jan','Linus','Tom','Erik','Matteo'];
+  const nachInit=['K.','M.','B.','W.','L.','F.','S.','R.','H.','T.','G.','N.','P.','Z.','D.','V.'];
+  const behArten=['Aligner','Multiband','Herausnehmbar','Retention'];
+  const monate=['Jun','Jul','Aug'];
+  function machPatient(w,vnFix){ const pool=w?vnW:vnM, vn=vnFix||pool[Math.floor(Math.random()*pool.length)];
+    const tot=6+Math.floor(Math.random()*8), cur=1+Math.floor(Math.random()*tot);
+    return { n:vn+' '+nachInit[Math.floor(Math.random()*nachInit.length)], a:8+Math.floor(Math.random()*12),
+      beh:behArten[Math.floor(Math.random()*behArten.length)], ph:cur+' / '+tot,
+      ter:(10+Math.floor(Math.random()*19))+'. '+monate[Math.floor(Math.random()*monate.length)], pr:Math.round(cur/tot*100), g:w?'w':'m' }; }
+  const demoPatienten=[];
+  // feste, einprägsame Namen zuerst (auch für Sprachbefehle gut erkennbar)
+  [['w','Anna'],['w','Anastasia'],['w','Elisabeth'],['w','Sophie'],['m','Lukas'],['m','Noah'],['w','Mia'],['m','Elias']].forEach(([g,vn])=>demoPatienten.push(machPatient(g==='w',vn)));
+  for(let i=0;i<292;i++) demoPatienten.push(machPatient(Math.random()<0.52));
+  function modusNetz(){
+    const root=new TH.Group(); scene.add(root);
+    const NODES=46, sprites=[], data=[];
+    for(let i=0;i<NODES;i++){
+      const y=1-(i/(NODES-1))*2, r=Math.sqrt(1-y*y), phi=i*2.399963;
+      const R=1.25+Math.random()*0.35;
+      const v=new TH.Vector3(Math.cos(phi)*r,y,Math.sin(phi)*r).multiplyScalar(R);
+      const pat=demoPatienten[i%demoPatienten.length];
+      const tint=genderTint(pat.g);
+      const m=new TH.SpriteMaterial({map:glowTex,color:tint,transparent:true,opacity:0.95,blending:TH.AdditiveBlending,depthWrite:false});
+      const s=new TH.Sprite(m); s.position.copy(v); const base=0.17; s.scale.setScalar(base);
+      s.userData={base,tint:tint.clone(),pat,home:v.clone()};
+      root.add(s); sprites.push(s); data.push(v);
+    }
+    // Verbindungen zwischen nahen Knoten
+    const segs=[];
+    for(let i=0;i<NODES;i++) for(let j=i+1;j<NODES;j++){
+      if(data[i].distanceTo(data[j])<0.92){ segs.push(data[i].x,data[i].y,data[i].z, data[j].x,data[j].y,data[j].z); }
+    }
+    const lg=new TH.BufferGeometry(); lg.setAttribute('position',new TH.Float32BufferAttribute(segs,3));
+    const lm=new TH.LineBasicMaterial({color:0x4d86c4,transparent:true,opacity:0.22,blending:TH.AdditiveBlending,depthWrite:false});
+    root.add(new TH.LineSegments(lg,lm));
+    return {
+      root,
+      update(amp,t){ if(!focusNode){ root.rotation.y+=0.0016; root.rotation.x=Math.sin(t*0.15)*0.12; }
+        sprites.forEach((s,i)=>{ const pulse=1+Math.sin(t*2+i)*0.06; const tgt=(s===hoverNode?1.7:(s===focusNode?1.9:1))*pulse;
+          s.scale.setScalar(s.userData.base*(s.scale.x/s.userData.base + (tgt-s.scale.x/s.userData.base)*0.2)); });
+      },
+      pickable:sprites, onPick:focusOn, dispose(){ scene.remove(root); }
+    };
+  }
+
+  // ===== MODUS: KERN (Reaktor mit Ringen) =====
+  function modusKern(){
+    const root=new TH.Group(); scene.add(root);
+    // dichter Kern
+    const N=2600, pos=new Float32Array(N*3), dir=new Float32Array(N*3), col=new Float32Array(N*3), R=0.95;
+    for(let i=0;i<N;i++){ const y=1-(i/(N-1))*2, r=Math.sqrt(1-y*y), phi=i*Math.PI*(3-Math.sqrt(5));
+      const x=Math.cos(phi)*r, z=Math.sin(phi)*r; dir[i*3]=x;dir[i*3+1]=y;dir[i*3+2]=z;
+      pos[i*3]=x*R;pos[i*3+1]=y*R;pos[i*3+2]=z*R;
+      const c=lerpColor(0x9A7CFF,0x5ED9FF,r); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
+    const g=new TH.BufferGeometry(); g.setAttribute('position',new TH.BufferAttribute(pos,3)); g.setAttribute('color',new TH.BufferAttribute(col,3));
+    const m=new TH.PointsMaterial({size:0.05,vertexColors:true,transparent:true,opacity:0.95,blending:TH.AdditiveBlending,depthWrite:false});
+    const kern=new TH.Points(g,m); kern.userData={dir,R,N}; root.add(kern);
+    // Ringe
+    const ringe=[];
+    [[1.5,0x5ED9FF,0],[1.85,0x9A7CFF,1.1],[2.15,0x2E78FF,0.5]].forEach(([rad,color,tilt])=>{
+      const tg=new TH.TorusGeometry(rad,0.006,8,140);
+      const tm=new TH.MeshBasicMaterial({color,transparent:true,opacity:0.5,blending:TH.AdditiveBlending,depthWrite:false});
+      const ring=new TH.Mesh(tg,tm); ring.rotation.x=Math.PI/2+tilt; ring.userData={spd:0.003+Math.random()*0.004}; root.add(ring); ringe.push(ring);
+    });
+    return {
+      root,
+      update(amp,t){ const p=kern.geometry.attributes.position.array, breath=1+Math.sin(t*1.1)*0.02, push=1+amp*0.4;
+        for(let i=0;i<N;i++){ const rr=R*breath*push; p[i*3]=dir[i*3]*rr;p[i*3+1]=dir[i*3+1]*rr;p[i*3+2]=dir[i*3+2]*rr; }
+        kern.geometry.attributes.position.needsUpdate=true; kern.material.opacity=0.85+amp*0.15; kern.rotation.y+=0.001;
+        ringe.forEach((r,i)=>{ r.rotation.z+=r.userData.spd*(1+amp*1.5); r.material.opacity=0.4+amp*0.4+Math.sin(t+i)*0.05; });
+      },
+      pickable:[], onPick:null, dispose(){ scene.remove(root); }
+    };
+  }
+
+  // ===== MODUS: REMIX (reaktiver Kern + Patientennetz) =====
+  function modusRemix(){
+    const root=new TH.Group(); scene.add(root);
+    // reaktiver Kern
+    const N=1500,R=0.5,pos=new Float32Array(N*3),dir=new Float32Array(N*3),col=new Float32Array(N*3);
+    for(let i=0;i<N;i++){ const y=1-(i/(N-1))*2,r=Math.sqrt(1-y*y),phi=i*Math.PI*(3-Math.sqrt(5)); const x=Math.cos(phi)*r,z=Math.sin(phi)*r;
+      dir[i*3]=x;dir[i*3+1]=y;dir[i*3+2]=z; pos[i*3]=x*R;pos[i*3+1]=y*R;pos[i*3+2]=z*R;
+      const c=lerpColor(0x5ED9FF,0x9A7CFF,(y+1)/2); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
+    const cg=new TH.BufferGeometry(); cg.setAttribute('position',new TH.BufferAttribute(pos,3)); cg.setAttribute('color',new TH.BufferAttribute(col,3));
+    const cm=new TH.PointsMaterial({size:0.045,vertexColors:true,transparent:true,opacity:0.95,blending:TH.AdditiveBlending,depthWrite:false});
+    const kern=new TH.Points(cg,cm); root.add(kern);
+    // Patientenknoten in Schale (mehrere hundert), Material je Geschlecht geteilt (leicht)
+    const matW=new TH.SpriteMaterial({map:glowTex,color:new TH.Color(0xFF8AD6),transparent:true,opacity:0.82,blending:TH.AdditiveBlending,depthWrite:false});
+    const matM=new TH.SpriteMaterial({map:glowTex,color:new TH.Color(0x66CFFF),transparent:true,opacity:0.82,blending:TH.AdditiveBlending,depthWrite:false});
+    const nodi=new TH.Group(); root.add(nodi);
+    const NODES=Math.min(300,demoPatienten.length), sprites=[], data=[];
+    for(let i=0;i<NODES;i++){ const y=1-(i+0.5)/NODES*2,r=Math.sqrt(1-y*y),phi=i*2.399963; const RR=1.5+Math.random()*0.6;
+      const v=new TH.Vector3(Math.cos(phi)*r,y,Math.sin(phi)*r).multiplyScalar(RR);
+      const pat=demoPatienten[i];
+      const s=new TH.Sprite(pat.g==='w'?matW:matM); s.position.copy(v); const base=0.11; s.scale.setScalar(base);
+      s.userData={base,pat,home:v.clone()}; nodi.add(s); sprites.push(s); data.push(v); }
+    // jede Node mit ihren 2 nächsten verbinden
+    const segs=[];
+    for(let i=0;i<NODES;i++){ let n1=-1,n2=-1,d1=1e9,d2=1e9;
+      for(let j=0;j<NODES;j++){ if(j===i) continue; const d=data[i].distanceToSquared(data[j]); if(d<d1){d2=d1;n2=n1;d1=d;n1=j;} else if(d<d2){d2=d;n2=j;} }
+      [n1,n2].forEach(j=>{ if(j>i){ segs.push(data[i].x,data[i].y,data[i].z,data[j].x,data[j].y,data[j].z); } }); }
+    const lg=new TH.BufferGeometry(); lg.setAttribute('position',new TH.Float32BufferAttribute(segs,3));
+    const lm=new TH.LineBasicMaterial({color:0x6a78c4,transparent:true,opacity:0.13,blending:TH.AdditiveBlending,depthWrite:false});
+    nodi.add(new TH.LineSegments(lg,lm));
+    return {
+      root,
+      update(amp,t){ const p=kern.geometry.attributes.position.array,breath=1+Math.sin(t*1.1)*0.02,push=1+amp*0.5;
+        for(let i=0;i<N;i++){ const rr=R*breath*push; p[i*3]=dir[i*3]*rr;p[i*3+1]=dir[i*3+1]*rr;p[i*3+2]=dir[i*3+2]*rr; }
+        kern.geometry.attributes.position.needsUpdate=true; kern.material.opacity=0.85+amp*0.15; kern.material.size=0.045+amp*0.03; kern.rotation.y+=0.0016;
+        if(!focusNode){ nodi.rotation.y+=0.0014; nodi.rotation.x=Math.sin(t*0.13)*0.10; }
+        sprites.forEach((s,i)=>{ const pulse=1+Math.sin(t*2+i)*0.06; const tgt=(s===hoverNode?1.7:(s===focusNode?1.9:1))*pulse;
+          s.scale.setScalar(s.userData.base*(s.scale.x/s.userData.base+(tgt-s.scale.x/s.userData.base)*0.2)); });
+      },
+      pickable:sprites, onPick:focusOn, dispose(){ scene.remove(root); }
+    };
+  }
+
+  // ===== Kamera-/Fokus-Steuerung =====
+  let focusNode=null, hoverNode=null;
+  const camGoal=new TH.Vector3(0,0,camDefaultZ), lookGoal=new TH.Vector3(0,0,0), lookCur=new TH.Vector3(0,0,0);
+  const card=document.getElementById('card');
+  function focusOn(sprite){
+    focusNode=sprite;
+    const wp=new TH.Vector3(); sprite.getWorldPosition(wp);
+    const dirv=wp.clone(); if(dirv.length()<0.001) dirv.set(0,0,1); dirv.normalize();
+    camGoal.copy(wp).add(dirv.multiplyScalar(2.1)); lookGoal.copy(wp);
+    const d=sprite.userData.pat;
+    document.getElementById('cName').textContent=d.n;
+    document.getElementById('cMeta').textContent=d.a+' Jahre · Patient:in';
+    document.getElementById('cBeh').textContent=d.beh;
+    document.getElementById('cPhase').textContent=d.ph;
+    document.getElementById('cTermin').textContent=d.ter;
+    document.getElementById('cBar').style.width=d.pr+'%';
+    card.classList.add('an');
+  }
+  function unfocus(){ focusNode=null; card.classList.remove('an'); camGoal.set(0,0,camDefaultZ); lookGoal.set(0,0,0); }
+  document.getElementById('cardX').addEventListener('click',unfocus);
+
+  // Zeiger: Hover + Klick (Bildschirm-Projektion, robust)
+  const label=document.getElementById('nodeLabel');
+  const _v=new TH.Vector3();
+  function screenOf(obj){ obj.getWorldPosition(_v); _v.project(camera);
+    return { x:(_v.x*0.5+0.5)*window.innerWidth, y:(-_v.y*0.5+0.5)*window.innerHeight, vis:_v.z<1 }; }
+  function pickAt(px,py){ if(!current||!current.pickable.length) return null; let best=null,bd=30;
+    for(const s of current.pickable){ const sc=screenOf(s); if(!sc.vis) continue; const d=Math.hypot(sc.x-px,sc.y-py); if(d<bd){bd=d;best=s;} } return best; }
+  canvas.addEventListener('pointermove',(e)=>{
+    const px=e.clientX, py=e.clientY, hit=pickAt(px,py); hoverNode=hit;
+    if(hit){ const d=hit.userData.pat; label.textContent=d.n+' · '+d.beh; label.style.left=px+'px'; label.style.top=py+'px'; label.style.display='block'; canvas.style.cursor='pointer'; }
+    else { label.style.display='none'; canvas.style.cursor='default'; }
+  });
+  canvas.addEventListener('pointerdown',(e)=>{
+    const hit=pickAt(e.clientX,e.clientY);
+    if(hit && current.onPick) current.onPick(hit);
+    else if(focusNode) unfocus();
+  });
+
+  // ===== Audio (geteilt) =====
+  let analyser=null, freq=null, speakUntil=0, agentLevel=0, liveRoom=null;
+  const micStatus=document.getElementById('micStatus'), pegelEl=document.getElementById('pegel'),
+        zustand=document.getElementById('zustand'), sysStatus=document.getElementById('sysStatus');
+  function speakSim(ms,text){ speakUntil=performance.now()+ms; if(text) zustand.textContent=text; sysStatus.textContent='SPRICHT'; }
+  async function startDemoMic(){
+    // 1) Mikrofon-Pegel (optional, nur fuers Pulsieren)
+    try{ const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const ctx=new (window.AudioContext||window.webkitAudioContext)(); const src=ctx.createMediaStreamSource(stream);
+      analyser=ctx.createAnalyser(); analyser.fftSize=256; freq=new Uint8Array(analyser.frequencyBinCount); src.connect(analyser);
+      micStatus.textContent='aktiv'; micStatus.classList.remove('dim');
+    }catch(err){ micStatus.textContent='blockiert'; }
+    const sp=startSpeech(); sysStatus.textContent='HÖRT ZU';
+    zustand.textContent = sp ? 'Sag zum Beispiel: „Ruf Anna auf"' : 'Sprachbefehle brauchen Chrome · nutze das Tippfeld';
+  }
+  document.getElementById('aktivieren').addEventListener('click',async()=>{
+    // Echtbetrieb: ueber LiveKit mit dem ANIMUS-Agenten verbinden.
+    if(window.AnimusLive){
+      try{
+        sysStatus.textContent='VERBINDE';
+        const base=window.ANIMUS_TOKEN_SERVER||'http://localhost:8080';
+        const res=await fetch(base+'/token?room=animus&identity=dr-schubert');
+        if(!res.ok) throw new Error('token '+res.status);
+        const {token,url}=await res.json();
+        liveRoom=await window.AnimusLive.connect({url,token,
+          onLevel:(v)=>{ agentLevel=v; },
+          onPatientCall:(p)=>window.__animusHud.patientCall(p)});
+        micStatus.textContent='live'; micStatus.classList.remove('dim');
+        sysStatus.textContent='VERBUNDEN'; zustand.textContent='Sprich mit Anima …';
+        return;
+      }catch(err){ console.warn('ANIMUS live connect failed, Demo-Fallback:',err);
+        sysStatus.textContent='DEMO'; }
+    }
+    // Fallback (kein Token-Server / keine Verbindung): lokale Demo.
+    startDemoMic();
+  });
+  document.getElementById('simulieren').addEventListener('click',()=>speakSim(5000,'Ich höre zu …'));
+  function rufePatient(sprite){ if(!current||!current.pickable.length) return;
+    const s=sprite||current.pickable[Math.floor(Math.random()*current.pickable.length)];
+    speakSim(2600,'Anima: „Ich rufe '+s.userData.pat.n+' auf …"');
+    setTimeout(()=>{ if(current&&current.pickable.indexOf(s)>=0) focusOn(s); }, 650);
+  }
+  document.getElementById('aufrufen').addEventListener('click',()=>rufePatient());
+
+  // ===== Sprach-/Textbefehl: „Ruf <Name> auf" =====
+  function nameZuKnoten(txt){ if(!current||!current.pickable.length) return null; const low=txt.toLowerCase();
+    for(const s of current.pickable){ const vn=s.userData.pat.n.split(' ')[0].toLowerCase(); if(vn && low.indexOf(vn)>=0) return s; } return null; }
+  function handleCommand(txt){ if(!txt||!txt.trim()) return; zustand.textContent='Gehört: „'+txt.trim()+'"';
+    const s=nameZuKnoten(txt);
+    if(s) setTimeout(()=>rufePatient(s),350);
+    else setTimeout(()=>{ if(performance.now()>=speakUntil) zustand.textContent='Keinen passenden Patienten erkannt'; },1100);
+  }
+  // Bridge fuer den Live-Agenten: patient_call vom ANIMUS-Agenten -> Zoom + Karte.
+  window.__animusHud={
+    patientCall:(p)=>{ if(!p) return; const s=p.name?nameZuKnoten(p.name):null;
+      if(s){ rufePatient(s); }
+      else { sysStatus.textContent='SPRICHT'; speakUntil=performance.now()+2000;
+             zustand.textContent='Anima ruft '+p.name+' auf'; } }
+  };
+  const cmd=document.getElementById('cmd');
+  cmd.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ handleCommand(cmd.value); cmd.value=''; } });
+  // Echte Browser-Spracherkennung (Chrome/Edge, nur Demo)
+  let rec=null, listening=false;
+  function startSpeech(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR) return false; if(listening) return true;
+    rec=new SR(); rec.lang='de-DE'; rec.continuous=true; rec.interimResults=false;
+    rec.onresult=(e)=>{ const t=e.results[e.results.length-1][0].transcript; handleCommand(t); };
+    rec.onerror=()=>{}; rec.onend=()=>{ if(listening){ try{rec.start();}catch(_){} } };
+    try{ rec.start(); listening=true; }catch(_){}
+    return true;
+  }
+
+  // ===== Wellenform + Uhr =====
+  const wave=document.getElementById('wave'), wctx=wave.getContext('2d');
+  function zeichneWave(amp){ const w=wave.width=wave.clientWidth||210, h=wave.height=60; wctx.clearRect(0,0,w,h);
+    wctx.strokeStyle='#5ED9FF'; wctx.lineWidth=2; wctx.beginPath();
+    for(let x=0;x<w;x++){ const t=performance.now()/240; const y=h/2+Math.sin(x*0.14+t)*(6+amp*22)*Math.sin(x*0.03+t*0.7); x===0?wctx.moveTo(x,y):wctx.lineTo(x,y);} wctx.stroke(); }
+  const zEl=document.getElementById('zeit'),dEl=document.getElementById('datum'),up=document.getElementById('uptime'),start=Date.now();
+  function uhr(){ const n=new Date(); zEl.textContent=n.toLocaleTimeString('de-DE');
+    dEl.textContent=n.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).toUpperCase();
+    const s=Math.floor((Date.now()-start)/1000); up.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+  setInterval(uhr,1000); uhr();
+
+  // ===== Modus-Wechsel =====
+  let current=null;
+  const Modi={puls:modusPuls,netz:modusNetz,kern:modusKern,remix:modusRemix};
+  function setMode(name){
+    if(current&&current.dispose) current.dispose();
+    unfocus(); hoverNode=null; label.style.display='none';
+    current=Modi[name]();
+    document.getElementById('ansicht').textContent=name.toUpperCase();
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('an',t.dataset.m===name));
+    const hatNetz=(name==='netz'||name==='remix');
+    document.getElementById('legende').style.display=hatNetz?'block':'none';
+    document.getElementById('aufrufen').style.display=hatNetz?'inline-block':'none';
+    document.getElementById('cmd').style.display=hatNetz?'block':'none';
+  }
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setMode(t.dataset.m)));
+
+  // ===== Resize (Kamera-Abstand passend zur kleineren Bildschirmseite) =====
+  function resize(){ const w=window.innerWidth,h=window.innerHeight; if(!w||!h) return;
+    renderer.setSize(w,h,false); const aspect=w/h; camera.aspect=aspect;
+    const fovV=camera.fov*Math.PI/180;
+    camDefaultZ=3.6/(0.52*2*Math.tan(fovV/2)*Math.min(1,aspect));
+    if(!focusNode) camGoal.set(0,0,camDefaultZ);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize',resize); window.addEventListener('load',resize);
+  resize(); setTimeout(resize,60); setTimeout(resize,300);
+
+  // ===== Render-Schleife =====
+  let amp=0;
+  function anim(){ requestAnimationFrame(anim);
+    let target=0;
+    if(analyser){ analyser.getByteFrequencyData(freq); let s=0; for(let i=0;i<freq.length;i++)s+=freq[i]; target=Math.min(1,(s/freq.length)/96); }
+    const nowp=performance.now();
+    if(nowp<speakUntil){ const tt=nowp/1000; let env=0.45+0.4*Math.sin(tt*8.5)+0.2*Math.sin(tt*3.1+1); env=Math.max(0,env)*(0.7+0.3*Math.sin(tt*17)); target=Math.max(target,Math.min(1,env)); }
+    else if(sysStatus.textContent==='SPRICHT'){ sysStatus.textContent='BEREIT'; }
+    target=Math.max(target,agentLevel);
+    amp+=(target-amp)*0.2;
+    pegelEl.textContent=Math.round(amp*100)+'%';
+    const t=performance.now()/1000;
+    if(current&&current.update) current.update(amp,t);
+    camera.position.lerp(camGoal,0.06); lookCur.lerp(lookGoal,0.08); camera.lookAt(lookCur);
+    document.querySelector('.glow').style.opacity=0.55+amp*0.45;
+    zeichneWave(amp); renderer.render(scene,camera);
+  }
+  setMode('remix'); anim();
+})();
+</script>
+<!-- Live-Verbindung zum ANIMUS-Agenten (LiveKit). Token-Server-URL hier setzen. -->
+<script>window.ANIMUS_TOKEN_SERVER = window.ANIMUS_TOKEN_SERVER || "http://localhost:8080";</script>
+<script type="module">
+  // Mirrors web/animus-client.js, inlined for standalone use via CDN.
+  import { Room, RoomEvent } from "https://cdn.jsdelivr.net/npm/livekit-client@2.19.2/+esm";
+  window.AnimusLive = {
+    async connect({ url, token, onLevel, onPatientCall }) {
+      const room = new Room({ adaptiveStream: true });
+      room.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind !== "audio") return;
+        const el = track.attach(); el.style.display = "none"; document.body.appendChild(el);
+        if (onLevel) meterFromTrack(track.mediaStreamTrack, onLevel);
+      });
+      room.on(RoomEvent.DataReceived, (payload, _p, _k, topic) => {
+        if (topic !== "animus") return;
+        try {
+          const m = JSON.parse(new TextDecoder().decode(payload));
+          if (m.type === "patient_call" && onPatientCall) onPatientCall(m.patient);
+        } catch (e) { console.warn("animus: bad data message", e); }
+      });
+      await room.connect(url, token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      return room;
+    }
+  };
+  function meterFromTrack(tr, cb) {
+    const AC = window.AudioContext || window.webkitAudioContext; const c = new AC();
+    const src = c.createMediaStreamSource(new MediaStream([tr]));
+    const an = c.createAnalyser(); an.fftSize = 256; src.connect(an);
+    const b = new Uint8Array(an.frequencyBinCount);
+    (function tick(){ an.getByteFrequencyData(b); let q=0; for(let i=0;i<b.length;i++) q+=b[i];
+      cb(Math.min(1, q/b.length/96)); requestAnimationFrame(tick); })();
+  }
+</script>
+</body>
+</html>

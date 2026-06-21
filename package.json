@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "sync:animus-react": "node scripts/sync-animus-react.mjs",
+    "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "cron:bank-sync": "tsx src/lib/services/bank-sync.ts",

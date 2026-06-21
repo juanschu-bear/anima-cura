@@ -4,10 +4,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { createAnimusScene } from "./scene";
 import { useAnimus } from "./useAnimus";
 import { DokuPanel } from "./DokuPanel";
-import { DiaryPanel } from "./DiaryPanel";
-import { handlePatientCall as applyPatientCall } from "./patientCall";
-import type { AnimusMemorySnapshot, AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, AnimusTtsStatus, DokuEntwurf, DokuStartInfo } from "./types";
-import { DEFAULT_WAKE_WORD_PHRASES } from "./wakeWord";
+import type { AnimusPatient, AnimusScene, AnimusHudProps, AnimusHandle, DokuEntwurf } from "./types";
 
 const FONT_LINK_ID = "animus-fonts";
 const FONT_HREF = "https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap";
@@ -23,12 +20,6 @@ function ensureFonts(): void {
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 const DISPLAY = '"Orbitron", system-ui, sans-serif';
-const TTS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "eleven_multilingual_v2", label: "Multilingual v2" },
-  { value: "eleven_turbo_v2_5", label: "Turbo v2.5" },
-  { value: "eleven_flash_v2_5", label: "Flash v2.5" },
-  { value: "eleven_v3", label: "Eleven v3" },
-];
 
 // Mockup chrome, scoped under .ahud so it does not leak. Ported 1:1 from
 // ANIMUS-MOCKUP.html (fixed -> absolute within the HUD wrap).
@@ -57,7 +48,7 @@ const CHROME_CSS = `
 .ahud .wave{width:100%;height:60px;display:block}
 .ahud .rechts .lines{font-size:10px;line-height:2.1;color:var(--gedeckt);margin-top:12px;letter-spacing:.05em}
 .ahud .rechts .lines b{color:var(--cyan);font-weight:600}
-.ahud .greet{position:absolute;top:58px;left:0;right:0;z-index:4;text-align:center;padding:0 20px}
+.ahud .greet{position:absolute;top:92px;left:0;right:0;z-index:4;text-align:center;padding:0 20px}
 .ahud .controls{position:absolute;left:0;right:0;bottom:60px;z-index:3;text-align:center}
 .ahud .gruss{font-family:'Orbitron',sans-serif;font-weight:700;font-size:26px;letter-spacing:.04em;color:#EAF6FF;text-shadow:0 0 22px rgba(94,217,255,.6);margin:0}
 .ahud .gruss .name{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -65,7 +56,7 @@ const CHROME_CSS = `
 .ahud .sub .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);margin-right:9px;vertical-align:middle;animation:ahud-blink 1.6s ease-in-out infinite}
 @keyframes ahud-blink{0%,100%{opacity:.35}50%{opacity:1}}
 .ahud .knoepfe{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.ahud .btn{min-width:170px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;padding:12px 22px;border-radius:999px;cursor:pointer;border:1px solid var(--cyan);background:rgba(94,217,255,.10);color:#Dff3ff;transition:all .15s ease;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.ahud .btn{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;padding:12px 22px;border-radius:999px;cursor:pointer;border:1px solid var(--cyan);background:rgba(94,217,255,.10);color:#Dff3ff;transition:all .15s ease;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .ahud .btn:hover{background:rgba(94,217,255,.2);box-shadow:0 0 26px rgba(94,217,255,.45);transform:translateY(-1px)}
 .ahud .btn:disabled{cursor:default;opacity:.7;transform:none;box-shadow:none}
 .ahud .btn.ghost{border-color:var(--linie);background:transparent;color:var(--gedeckt)}
@@ -77,7 +68,7 @@ const CHROME_CSS = `
 .ahud .legende{position:absolute;left:42px;bottom:82px;z-index:3;font-size:11px;letter-spacing:.08em;color:var(--gedeckt)}
 .ahud .legende span{display:flex;align-items:center;gap:9px;margin-top:9px}
 .ahud .legende i{width:11px;height:11px;border-radius:50%;display:inline-block;box-shadow:0 0 10px rgba(150,190,255,.6)}
-@media (max-width:820px){ .ahud .status,.ahud .rechts{display:none} .ahud .gruss{font-size:20px} .ahud .legende{display:none} }
+@media (max-width:820px){ .ahud .status,.ahud .rechts{display:none} .ahud .gruss{font-size:20px} }
 @media (prefers-reduced-motion: reduce){ .ahud .sub .dot{animation:none} }
 `;
 
@@ -93,8 +84,8 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const {
     tokenEndpoint, room, identity, patients,
     greetingLead = "Guten Abend,", userName = "Dr. Schubert",
-    autoConnect = false, wakeWord = false, wakeWordPhrases = DEFAULT_WAKE_WORD_PHRASES,
-    onPatientCall, onPatientFocus, onPatientUnfocus, onDokuStart, onDokuUpdate, onDokuOpen, onDokuConfirm,
+    autoConnect = false,
+    onPatientCall, onPatientFocus, onPatientUnfocus, onDokuStart, onDokuOpen, onDokuConfirm,
     showCard = true, className, style,
   } = props;
 
@@ -116,146 +107,46 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
   const [zeit, setZeit] = useState("--:--:--");
   const [datum, setDatum] = useState("—");
   const [uptime, setUptime] = useState("00:00");
-  const [dokuStart, setDokuStart] = useState<DokuStartInfo | null>(null);
-  const [dokuPreview, setDokuPreview] = useState<DokuEntwurf | null>(null);
-  const [dokuPreviewHint, setDokuPreviewHint] = useState<string | null>(null);
+  const [dokuStart, setDokuStart] = useState<{ behandlungsart: string; termin_typ: string; name: string } | null>(null);
   const [dokuEntwurf, setDokuEntwurf] = useState<DokuEntwurf | null>(null);
   const [dokuPatient, setDokuPatient] = useState<string>("");
-  const [diaryOpen, setDiaryOpen] = useState(false);
-  const [memorySnapshot, setMemorySnapshot] = useState<AnimusMemorySnapshot | null>(null);
-  const [ttsStatus, setTtsStatus] = useState<AnimusTtsStatus | null>(null);
-  const [ttsSelection, setTtsSelection] = useState("eleven_multilingual_v2");
-  const [ttsApplying, setTtsApplying] = useState(false);
-  const [schnelldiktatActive, setSchnelldiktatActive] = useState(false);
 
   const handlePatientCall = useCallback((p: AnimusPatient) => {
-    applyPatientCall({
-      scene: sceneRef.current,
-      patient: p,
-      showCard,
-      setCard,
-      onPatientCall,
-      onPatientFocus: onPatientFocusRef.current,
-    });
-  }, [onPatientCall, showCard]);
+    sceneRef.current?.focusByName(p.name);
+    onPatientCall?.(p);
+  }, [onPatientCall]);
 
-  const handlePatientUnfocus = useCallback(() => {
-    sceneRef.current?.unfocus();
-    setCard(null);
-    setHover(null);
-    onPatientUnfocus?.();
-  }, [onPatientUnfocus]);
-
-  const handleDokuStart = useCallback((info: DokuStartInfo) => {
+  const handleDokuStart = useCallback((info: { behandlungsart: string; termin_typ: string; name: string }) => {
     setDokuEntwurf(null);
-    setDokuPreview(null);
-    setDokuPreviewHint(info.hint ?? null);
     setDokuStart(info);
     onDokuStart?.(info);
   }, [onDokuStart]);
 
-  const handleDokuUpdate = useCallback((entwurf: DokuEntwurf, patient: string, frage?: string) => {
-    setDokuPreview(entwurf);
-    setDokuPatient(patient);
-    setDokuPreviewHint(frage ?? null);
-    onDokuUpdate?.(entwurf, patient, frage);
-  }, [onDokuUpdate]);
-
   const handleDokuOpen = useCallback((entwurf: DokuEntwurf, patient: string) => {
     setDokuEntwurf(entwurf);
-    setDokuPreview(entwurf);
-    setDokuPreviewHint(null);
     setDokuPatient(patient);
     onDokuOpen?.(entwurf, patient);
   }, [onDokuOpen]);
 
   const closeDoku = useCallback(() => {
     setDokuEntwurf(null);
-    setDokuPreview(null);
-    setDokuPreviewHint(null);
     setDokuStart(null);
   }, []);
 
-  const openManualDoku = useCallback(() => {
-    setDokuEntwurf(null);
-    setDokuStart({
-      behandlungsart: "",
-      termin_typ: "",
-      name: card?.name ?? dokuPatient ?? "",
-      modus: "chooser",
-      hint: "ANIMUS blendet das Doku-Menü ein …",
-    });
-    setDokuPreview(null);
-    setDokuPreviewHint("ANIMUS blendet das Doku-Menü ein …");
-  }, [card, dokuPatient]);
+  const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
+    await onDokuConfirm?.(entwurf);
+    closeDoku();
+  }, [onDokuConfirm, closeDoku]);
 
-  const {
-    connect,
-    disconnect,
-    sendControl,
-    requestTtsStatus,
-    setTtsModel,
-    enableWakeWord,
-    disableWakeWord,
-    connected,
-    connecting,
-    error,
-    wakeWordSupported,
-    wakeWordEnabled,
-    wakeWordListening,
-    wakeWordState,
-    wakeWordError,
-  } = useAnimus({
+  const { connect, connected, connecting, error } = useAnimus({
     tokenEndpoint,
     room,
     identity,
-    wakeWord,
-    wakeWordPhrases,
     onLevel: (v) => { sceneRef.current?.setLevel(v); levelRef.current = v; setLevel(v); },
     onPatientCall: handlePatientCall,
-    onPatientUnfocus: handlePatientUnfocus,
     onDokuStart: handleDokuStart,
-    onDokuUpdate: handleDokuUpdate,
     onDokuOpen: handleDokuOpen,
-    onDokuConfirmed: closeDoku,
-    onMemorySnapshot: setMemorySnapshot,
-    onTtsStatus: (status) => {
-      setTtsStatus(status);
-      setTtsSelection(status.current_model);
-      setTtsApplying(Boolean(status.restarting));
-    },
   });
-
-  const confirmDoku = useCallback(async (entwurf: DokuEntwurf) => {
-    await onDokuConfirm?.(entwurf);
-    try {
-      await sendControl({ type: "doku_confirmed", patient_id: entwurf.patient_id });
-    } catch {
-      /* non-fatal: confirmation already succeeded on the host */
-    }
-    closeDoku();
-  }, [onDokuConfirm, closeDoku, sendControl]);
-
-  const requestMemorySnapshot = useCallback(() => {
-    void sendControl({ type: "memory_snapshot_request" });
-  }, [sendControl]);
-
-  const applyTtsModel = useCallback(async () => {
-    if (connected || connecting || ttsApplying) return;
-    setTtsApplying(true);
-    try {
-      await setTtsModel(ttsSelection);
-      await requestTtsStatus();
-    } finally {
-      setTtsApplying(false);
-    }
-  }, [connected, connecting, requestTtsStatus, setTtsModel, ttsApplying, ttsSelection]);
-
-  const toggleSchnelldiktat = useCallback(() => {
-    const next = !schnelldiktatActive;
-    setSchnelldiktatActive(next);
-    void sendControl({ type: "schnelldiktat_mode", active: next });
-  }, [schnelldiktatActive, sendControl]);
 
   useImperativeHandle(ref, () => ({
     unfocus: () => sceneRef.current?.unfocus(),
@@ -339,16 +230,6 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     if (autoConnect) void connect();
   }, [autoConnect, connect]);
 
-  useEffect(() => {
-    if (!connected) return;
-    requestMemorySnapshot();
-    void requestTtsStatus();
-  }, [connected, requestMemorySnapshot, requestTtsStatus]);
-
-  useEffect(() => {
-    void requestTtsStatus();
-  }, [requestTtsStatus]);
-
   const rufeZufall = useCallback(() => {
     if (!patients || patients.length === 0) return;
     const p = patients[Math.floor(Math.random() * patients.length)];
@@ -362,36 +243,16 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
     e.currentTarget.value = "";
   }, []);
 
-  const wakeLabel = wakeWordPhrases[0] ?? DEFAULT_WAKE_WORD_PHRASES[0];
-  const liveError = error ?? wakeWordError;
-  const sysStatus = liveError ? "FEHLER" : connecting ? "VERBINDE" : connected ? "VERBUNDEN" : wakeWordEnabled ? "WAKE" : "BEREIT";
-  const micStatus = connected ? "live" : wakeWordListening ? "wake" : "inaktiv";
-  const wakeStatus = !wakeWord
-    ? "—"
-    : !wakeWordSupported
-      ? "nicht verfügbar"
-      : wakeWordEnabled
-        ? wakeWordState === "detected"
-          ? "erkannt"
-          : wakeWordListening
-            ? "lauscht"
-            : "bereit"
-        : "aus";
-  const zustand = liveError
-    ? liveError
-    : connected
-      ? "Sprich mit Animus …"
-      : connecting
-        ? "verbinde …"
-        : wakeWordEnabled
-          ? `Sag „${wakeLabel}“ zum Aktivieren`
-          : "Sagen Sie mir die Diagnose, ich dokumentiere";
-  const aktivierenLabel = connecting ? "verbinde …" : connected ? "■ Animus beenden" : "▸ Animus aktivieren";
-  const wakeWordLabel = !wakeWordSupported
-    ? "◌ Wake Word nicht verfügbar"
-    : wakeWordEnabled
-      ? "◉ Wake Word an"
-      : "◌ Wake Word aus";
+  const sysStatus = error ? "FEHLER" : connecting ? "VERBINDE" : connected ? "VERBUNDEN" : "BEREIT";
+  const micStatus = connected ? "live" : "inaktiv";
+  const zustand = error
+    ? error
+    : connecting
+      ? "verbinde …"
+      : connected
+        ? "Sprich mit Animus …"
+        : "Sagen Sie mir die Diagnose, ich dokumentiere";
+  const aktivierenLabel = connected ? "Animus verbunden" : connecting ? "verbinde …" : "▸ Animus aktivieren";
 
   return (
     <div ref={wrapRef} className={`ahud ${className ?? ""}`} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#03060E", color: "#CFE6FF", fontFamily: MONO, ...style }}>
@@ -421,8 +282,6 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
         <div className="row"><span className="k">STATUS</span><span className="v">{sysStatus}</span></div>
         <div className="row"><span className="k">ANSICHT</span><span className="v">REMIX</span></div>
         <div className="row"><span className="k">MIKROFON</span><span className={`v ${connected ? "" : "dim"}`}>{micStatus}</span></div>
-        {wakeWord && <div className="row"><span className="k">WAKE WORD</span><span className={`v ${wakeWordEnabled ? "" : "dim"}`}>{wakeStatus}</span></div>}
-        <div className="row"><span className="k">TTS</span><span className={`v ${ttsApplying ? "" : "dim"}`}>{ttsStatus?.current_model ?? "—"}</span></div>
         <div className="row"><span className="k">PEGEL</span><span className="v">{Math.round(level * 100)}%</span></div>
       </div>
 
@@ -433,87 +292,17 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
           <div>LATENZ <b>&lt; 1 s</b></div>
           <div>SESSION <b>{uptime}</b></div>
         </div>
-        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-          <select
-            value={ttsSelection}
-            onChange={(e) => setTtsSelection(e.target.value)}
-            style={{
-              width: "100%",
-              minWidth: 0,
-              borderRadius: 999,
-              border: "1px solid rgba(94,217,255,.22)",
-              background: "rgba(6,14,24,.74)",
-              color: "#Dff3ff",
-              padding: "10px 16px",
-              fontFamily: MONO,
-              fontSize: 12,
-            }}
-          >
-            {TTS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <button className="btn ghost" type="button" onClick={() => void applyTtsModel()} disabled={connected || connecting || ttsApplying}>
-            {ttsApplying ? "TTS wechselt …" : "TTS übernehmen"}
-          </button>
-          <div style={{ fontSize: 11, opacity: 0.62, lineHeight: 1.5, textAlign: "right" }}>
-            {connected ? "Zum Wechsel erst den Call beenden." : "Gilt für den nächsten Start von ANIMUS."}
-          </div>
-        </div>
       </div>
 
       <div className="controls">
         <div className="knoepfe">
-          <button className="btn" type="button" onClick={() => { if (connected) disconnect(); else void connect(); }} disabled={connecting}>
+          <button className="btn" type="button" onClick={() => { void connect(); }} disabled={connected || connecting}>
             {aktivierenLabel}
           </button>
-          {wakeWord && (
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={() => { if (wakeWordEnabled) disableWakeWord(); else void enableWakeWord(); }}
-              disabled={!wakeWordSupported}
-            >
-              {wakeWordLabel}
-            </button>
-          )}
           <button className="btn ghost" type="button" onClick={rufeZufall}>▤ Patient aufrufen</button>
-          <button className="btn ghost" type="button" onClick={openManualDoku}>✎ Doku-Menü</button>
-          <button className={`btn ${schnelldiktatActive ? "" : "ghost"}`} type="button" onClick={toggleSchnelldiktat} disabled={!connected}>
-            {schnelldiktatActive ? "● Schnelldiktat aktiv" : "⚡ Schnelldiktat"}
-          </button>
         </div>
         <input className="cmd" placeholder={'Befehl tippen: „Ruf Anna auf"'} onKeyDown={onCmd} />
       </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          setDiaryOpen((current) => {
-            const next = !current;
-            if (next) requestMemorySnapshot();
-            return next;
-          });
-        }}
-        style={{
-          position: "absolute",
-          right: 32,
-          bottom: 28,
-          zIndex: 4,
-          borderRadius: 999,
-          padding: "12px 18px",
-          border: "1px solid rgba(198,171,117,.24)",
-          background: "rgba(24,18,12,.82)",
-          color: "#e7d2aa",
-          fontFamily: MONO,
-          fontSize: 13,
-          letterSpacing: ".08em",
-          cursor: "pointer",
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        Diary
-      </button>
 
       {hover && (
         <div className="nodeLabel" style={{ left: hover.x, top: hover.y }}>
@@ -545,18 +334,10 @@ export const AnimusHud = forwardRef<AnimusHandle, AnimusHudProps>(function Animu
 
       <DokuPanel
         building={dokuStart}
-        preview={dokuPreview}
-        previewHint={dokuPreviewHint}
         entwurf={dokuEntwurf}
         patient={dokuPatient}
         onConfirm={confirmDoku}
         onClose={closeDoku}
-      />
-      <DiaryPanel
-        open={diaryOpen}
-        snapshot={memorySnapshot}
-        onClose={() => setDiaryOpen(false)}
-        onRefresh={requestMemorySnapshot}
       />
     </div>
   );
@@ -570,5 +351,3 @@ function CardRow({ k, v }: { k: string; v: string }): React.ReactElement {
     </div>
   );
 }
-
-
