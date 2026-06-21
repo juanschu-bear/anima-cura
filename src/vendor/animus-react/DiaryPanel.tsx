@@ -112,7 +112,7 @@ function cleanBlock(value?: string): string {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split(/\n\s*\n/g)
-    .map((part) => part.split("\n").map((line) => cleanText(line)).filter(Boolean).join("\n"))
+    .map((part) => part.split("\n").map((line) => cleanText(line)).filter(Boolean).join(" "))
     .filter(Boolean)
     .join("\n\n")
     .trim();
