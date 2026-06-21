@@ -174,6 +174,12 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
 
     const payload = new TextEncoder().encode(JSON.stringify({ type: "session_closed" }));
     void room.localParticipant.publishData(payload, { reliable: true, topic: "animus-control" }).catch(() => undefined);
+    void fetch(`${tokenEndpoint}/memory/archive-session?reason=session_closed`, { method: "POST" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((snapshot) => {
+        if (snapshot) onMemorySnapshotRef.current?.(snapshot as AnimusMemorySnapshot);
+      })
+      .catch(() => undefined);
 
     window.setTimeout(() => {
       room.disconnect();
