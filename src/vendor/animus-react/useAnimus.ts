@@ -141,6 +141,17 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const speechWindow = typeof window === "undefined" ? undefined : (window as any);
   const wakeWordSupported = Boolean(speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition);
 
+  const refreshSnapshotAfterDisconnect = useCallback((): void => {
+    window.setTimeout(() => {
+      void fetch(`${tokenEndpoint}/memory`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((snapshot) => {
+          if (snapshot) onMemorySnapshotRef.current?.(snapshot as AnimusMemorySnapshot);
+        })
+        .catch(() => undefined);
+    }, 500);
+  }, [tokenEndpoint]);
+
   const stopWakeWordRecognition = useCallback((): void => {
     const recognition = recognitionRef.current;
     if (!recognition) return;
@@ -155,10 +166,22 @@ export function useAnimus(options: UseAnimusOptions): UseAnimusResult {
   const disconnect = useCallback((): void => {
     stopMeterRef.current?.();
     stopMeterRef.current = null;
-    roomRef.current?.disconnect();
-    roomRef.current = null;
-    setConnected(false);
-  }, []);
+    const room = roomRef.current;
+    if (!room) {
+      setConnected(false);
+      return;
+    }
+
+    const payload = new TextEncoder().encode(JSON.stringify({ type: "session_closed" }));
+    void room.localParticipant.publishData(payload, { reliable: true, topic: "animus-control" }).catch(() => undefined);
+
+    window.setTimeout(() => {
+      room.disconnect();
+      roomRef.current = null;
+      setConnected(false);
+      refreshSnapshotAfterDisconnect();
+    }, 140);
+  }, [refreshSnapshotAfterDisconnect]);
 
   const sendControl = useCallback(async (message: Record<string, unknown>): Promise<void> => {
     const room = roomRef.current;

@@ -10,7 +10,6 @@ type DiaryPanelProps = {
 
 type DiaryTab = "all" | "skills" | "patterns" | "contacts" | "growth";
 type DiaryStage = "cover" | "opening" | "open";
-type DiaryFacetKey = "skills" | "patterns" | "growth" | "contacts";
 
 type AggregatedFacet = {
   key: string;
@@ -46,20 +45,19 @@ const COVER: CSSProperties = {
 };
 
 const PAGE: CSSProperties = {
-  background: "linear-gradient(180deg, #f6efdf 0%, #f1e8d7 100%)",
-  color: "#3b3025",
+  background: "#f6f1e9",
+  color: "#2c2a25",
   display: "block",
   minHeight: 0,
   overflowY: "auto",
   overflowX: "hidden",
 };
 
-const HAND_FONT = '"Noteworthy", "Segoe Print", "Bradley Hand", "Caveat", cursive';
 const SERIF_FONT = '"Cormorant Garamond", "Iowan Old Style", "Georgia", serif';
+const HAND_FONT = '"Caveat", "Noteworthy", "Segoe Print", "Bradley Hand", cursive';
 const DIARY_COVER = "/animus-diary/cover.png";
 const DIARY_OPENING = "/animus-diary/opening.png";
 const DIARY_OPEN = "/animus-diary/open.png";
-const SKILL_COLORS = ["#1e8c66", "#6155d6", "#2f78be", "#c17b22", "#ca5e4f", "#3b9b9a", "#9662ce", "#8f6d1f"];
 
 const TABS: ReadonlyArray<{ key: DiaryTab; label: string }> = [
   { key: "all", label: "All" },
@@ -69,46 +67,20 @@ const TABS: ReadonlyArray<{ key: DiaryTab; label: string }> = [
   { key: "growth", label: "Growth" },
 ];
 
+const SKILL_COLORS = ["#1d7a5a", "#6b5aad", "#2a6ba0", "#b07d2a", "#b84a2a", "#a03d6a"];
+const TAG_COLORS: Record<string, string> = {
+  skill: "#1d7a5a",
+  pattern: "#6b5aad",
+  growth: "#b07d2a",
+  other: "#8a8578",
+};
+
 function cleanText(value?: string): string {
   return String(value || "").split(/\s+/).filter(Boolean).join(" ").trim();
 }
 
 function entryKey(entry: AnimusDiaryEntry, index = 0): string {
   return String(entry.created_at || entry.timestamp || entry.title || `entry-${index}`);
-}
-
-function formatDate(value?: string): string {
-  if (!value) return "Gerade eben";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("de-DE", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function humanTime(value?: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-}
-
-function looksTechnicalLabel(value?: string): boolean {
-  const text = cleanText(value);
-  if (!text) return true;
-  const normalized = text.toLowerCase();
-  if (
-    normalized.includes("voice_confirmed") ||
-    normalized.includes("working") ||
-    normalized.includes("patient") ||
-    normalized.includes("aligner") ||
-    normalized.includes("multiband") ||
-    normalized.includes("kontrolle") ||
-    normalized.includes("behandlung") ||
-    normalized.includes("bogenwechsel") ||
-    normalized.includes("schiene")
-  ) {
-    return true;
-  }
-  return /^[a-z0-9_-]+$/i.test(text);
 }
 
 function bodyParagraphs(entry: AnimusDiaryEntry): string[] {
@@ -118,92 +90,95 @@ function bodyParagraphs(entry: AnimusDiaryEntry): string[] {
     .filter(Boolean);
 }
 
-function fallbackTitleFromBody(entry: AnimusDiaryEntry): string {
+function looksTechnicalTitle(title?: string): boolean {
+  const text = cleanText(title);
+  if (!text) return true;
+  const normalized = text.toLowerCase();
+  return (
+    normalized.includes("voice_confirmed") ||
+    normalized.includes("patient") ||
+    normalized.includes("behandlung") ||
+    normalized.includes("multiband") ||
+    normalized.includes("aligner") ||
+    normalized.includes("bogenwechsel") ||
+    /^[a-z0-9_-]+$/i.test(text)
+  );
+}
+
+function displayTitle(entry: AnimusDiaryEntry): string {
+  const raw = cleanText(entry.title);
+  if (raw) {
+    const pipeParts = raw.split("|").map((part) => cleanText(part)).filter(Boolean);
+    if (pipeParts.length > 1) {
+      const candidate = pipeParts[pipeParts.length - 1] || "";
+      if (candidate && !looksTechnicalTitle(candidate)) return candidate;
+    }
+    const dashParts = raw.split(/[–-]/).map((part) => cleanText(part)).filter(Boolean);
+    if (dashParts.length > 1) {
+      const candidate = dashParts[dashParts.length - 1] || "";
+      if (candidate && !looksTechnicalTitle(candidate)) return candidate;
+    }
+    if (!looksTechnicalTitle(raw)) return raw;
+  }
   const firstParagraph = bodyParagraphs(entry)[0] || "";
   const firstSentence = cleanText(firstParagraph.split(/(?<=[.!?])/)[0]);
   if (!firstSentence) return "Private Reflection";
-  const words = firstSentence.split(/\s+/).slice(0, 10).join(" ");
+  const words = firstSentence.split(/\s+/).slice(0, 9).join(" ");
   return words.length >= firstSentence.length ? firstSentence : `${words}...`;
 }
 
-function displayEntryTitle(entry: AnimusDiaryEntry): string {
-  const raw = cleanText(entry.title);
-  if (raw && !looksTechnicalLabel(raw)) {
-    const parts = raw.split(/\s+[|/-]\s+|\|/g).map((part) => cleanText(part)).filter(Boolean);
-    if (parts.length > 1) {
-      const candidate = parts[parts.length - 1]!;
-      if (!looksTechnicalLabel(candidate)) return candidate;
-    }
-    return raw;
-  }
-  return fallbackTitleFromBody(entry);
-}
-
-function displayEntryNumber(entry: AnimusDiaryEntry, index: number, total: number): string {
-  const sequence = Number(entry.sequence || 0);
-  const value = sequence > 0 ? sequence : total - index;
-  return String(Math.max(1, value)).padStart(2, "0");
-}
-
-function normalizeContactLabel(value?: string): string {
+function normalizeContact(value?: string): string {
   const text = cleanText(value);
-  if (!text) return "";
+  if (!text) return "Unknown";
   const normalized = text.toLowerCase();
   if (normalized.includes("schubert")) return "Dr. Schubert";
-  if (
-    text.length > 34 ||
-    /[0-9]/.test(text) ||
-    text.includes("|") ||
-    text.includes("ID ") ||
-    text.includes("Patient") ||
-    text.includes("Praxis") ||
-    text.includes(". ")
-  ) {
-    return "";
-  }
-  const words = text.split(/\s+/);
-  if (words.length > 3) return "";
-  return text;
+  const firstWord = text.split(/\s+/)[0] || "Unknown";
+  if (/[0-9|]/.test(firstWord)) return "Unknown";
+  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
 }
 
-function groupContacts(entries: AnimusDiaryEntry[]): AggregatedFacet[] {
-  const counts = new Map<string, AggregatedFacet>();
-  entries.forEach((entry, index) => {
-    const label = normalizeContactLabel(entry.contact);
-    if (!label) return;
-    const key = label.toLowerCase();
-    const existing = counts.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.entryKeys.push(entryKey(entry, index));
-      return;
-    }
-    counts.set(key, { key, label, count: 1, entryKeys: [entryKey(entry, index)] });
-  });
-  return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
-}
-
-function aggregateDiaryTerms(entries: AnimusDiaryEntry[], key: "skills" | "patterns" | "growth"): AggregatedFacet[] {
+function aggregate(entries: AnimusDiaryEntry[], key: "skills" | "patterns" | "growth"): AggregatedFacet[] {
   const counts = new Map<string, AggregatedFacet>();
   entries.forEach((entry, index) => {
     const items = Array.isArray(entry[key]) ? entry[key] : [];
-    items.forEach((raw) => {
-      const label = cleanText(raw);
+    items.forEach((item) => {
+      const label = cleanText(item);
       if (!label) return;
       const normalized = label.toLowerCase();
       const existing = counts.get(normalized);
       if (existing) {
         existing.count += 1;
         if (!existing.entryKeys.includes(entryKey(entry, index))) existing.entryKeys.push(entryKey(entry, index));
-        return;
+      } else {
+        counts.set(normalized, {
+          key: normalized,
+          label,
+          count: 1,
+          entryKeys: [entryKey(entry, index)],
+        });
       }
+    });
+  });
+  return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
+}
+
+function aggregateContacts(entries: AnimusDiaryEntry[]): AggregatedFacet[] {
+  const counts = new Map<string, AggregatedFacet>();
+  entries.forEach((entry, index) => {
+    const label = normalizeContact(entry.contact);
+    const normalized = label.toLowerCase();
+    const existing = counts.get(normalized);
+    if (existing) {
+      existing.count += 1;
+      existing.entryKeys.push(entryKey(entry, index));
+    } else {
       counts.set(normalized, {
         key: normalized,
         label,
         count: 1,
         entryKeys: [entryKey(entry, index)],
       });
-    });
+    }
   });
   return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
 }
@@ -220,13 +195,34 @@ function fallbackFacts(facts: AnimusLearningFact[], category: string): Aggregate
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "de"));
 }
 
-function groupEntriesByDate(entries: AnimusDiaryEntry[]): Array<{ date: string; entries: AnimusDiaryEntry[] }> {
+function groupByDay(entries: AnimusDiaryEntry[]): Array<{ date: string; entries: AnimusDiaryEntry[] }> {
   const groups = new Map<string, AnimusDiaryEntry[]>();
   entries.forEach((entry) => {
-    const label = formatDate(entry.created_at || entry.timestamp);
-    groups.set(label, [...(groups.get(label) || []), entry]);
+    const dateKey = String(entry.created_at || entry.timestamp || "").slice(0, 10) || "unknown";
+    groups.set(dateKey, [...(groups.get(dateKey) || []), entry]);
   });
-  return Array.from(groups.entries()).map(([date, items]) => ({ date, entries: items }));
+  return Array.from(groups.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, items]) => ({ date, entries: items }));
+}
+
+function formatPillDate(date: string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatLongDate(date: string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function formatTime(value?: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
 function DiaryTabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }): ReactElement {
@@ -234,15 +230,16 @@ function DiaryTabButton({ active, label, onClick }: { active: boolean; label: st
     <button
       onClick={onClick}
       style={{
-        borderRadius: 999,
-        padding: "10px 18px",
-        border: `1px solid ${active ? "rgba(58,45,34,.25)" : "rgba(119,99,73,.18)"}`,
-        background: active ? "#2d241d" : "rgba(255,255,255,.38)",
-        color: active ? "#fbf4e8" : "#73624b",
+        padding: "6px 18px",
+        borderRadius: 20,
+        fontSize: 13,
         cursor: "pointer",
+        border: active ? "1px solid #d4cfc4" : "1px solid transparent",
+        background: active ? "#e8e2d6" : "transparent",
+        color: active ? "#4a4640" : "#a09b90",
         fontFamily: SERIF_FONT,
-        fontSize: 16,
-        boxShadow: active ? "0 10px 24px rgba(35,24,16,.18)" : "none",
+        fontWeight: 500,
+        letterSpacing: "0.5px",
       }}
     >
       {label}
@@ -250,296 +247,185 @@ function DiaryTabButton({ active, label, onClick }: { active: boolean; label: st
   );
 }
 
-function Empty({ text }: { text: string }): ReactElement {
+function ContactPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }): ReactElement {
   return (
-    <div
+    <button
+      onClick={onClick}
       style={{
-        minHeight: 220,
-        display: "grid",
-        placeItems: "center",
-        color: "rgba(71,57,42,.62)",
-        fontFamily: SERIF_FONT,
-        fontStyle: "italic",
-        fontSize: 22,
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
-function MetaChip({ label }: { label: string }): ReactElement {
-  return (
-    <span
-      style={{
-        padding: "7px 13px",
+        flex: "0 0 auto",
+        padding: "10px 20px",
         borderRadius: 999,
-        border: "1px solid rgba(151,124,95,.22)",
-        background: "rgba(255,250,241,.92)",
-        color: "#7b654c",
-        fontSize: 12,
-        letterSpacing: ".03em",
+        border: "1px solid #d4cfc4",
+        background: active ? "#2c2a25" : "transparent",
+        color: active ? "#f6f1e9" : "#8a8578",
+        fontFamily: SERIF_FONT,
+        fontSize: 13,
+        cursor: "pointer",
       }}
     >
       {label}
-    </span>
+    </button>
   );
 }
 
-function JournalEntry({ entry, index, total }: { entry: AnimusDiaryEntry; index: number; total: number }): ReactElement {
-  const title = displayEntryTitle(entry);
-  const paragraphs = bodyParagraphs(entry);
-  return (
-    <article
-      style={{
-        position: "relative",
-        paddingLeft: 34,
-        maxWidth: 980,
-        width: "100%",
-        justifySelf: "center",
-      }}
-    >
-      <div style={{ position: "absolute", top: 8, bottom: 10, left: 8, width: 1.5, background: "rgba(181,158,132,.34)" }} />
-      <div
-        style={{
-          position: "absolute",
-          top: 14,
-          left: 3,
-          width: 10,
-          height: 10,
-          borderRadius: 999,
-          background: "rgba(181,158,132,.86)",
-        }}
-      />
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: HAND_FONT, fontSize: 34, lineHeight: 1.08, color: "#2d241c", fontWeight: 600 }}>{title}</div>
-        </div>
-        <div style={{ textAlign: "right", color: "rgba(74,58,41,.5)", fontSize: 13, whiteSpace: "nowrap", paddingTop: 4 }}>
-          <div>{humanTime(entry.created_at || entry.timestamp)}</div>
-          <div style={{ marginTop: 8, fontFamily: SERIF_FONT, fontSize: 42, lineHeight: 1, opacity: 0.16 }}>
-            {displayEntryNumber(entry, index, total)}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          marginTop: 20,
-          color: "#2d241c",
-          fontFamily: HAND_FONT,
-          fontSize: 18,
-          lineHeight: 1.95,
-          letterSpacing: ".01em",
-          maxWidth: 900,
-        }}
-      >
-        {paragraphs.length ? (
-          paragraphs.map((paragraph, paragraphIndex) => (
-            <p key={`${entryKey(entry, paragraphIndex)}-p-${paragraphIndex}`} style={{ margin: paragraphIndex === paragraphs.length - 1 ? 0 : "0 0 28px" }}>
-              {paragraph}
-            </p>
-          ))
-        ) : (
-          <p style={{ margin: 0 }}>Noch kein ausgeschriebener Eintrag vorhanden.</p>
-        )}
-      </div>
-
-      {entry.tags?.length ? (
-        <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {entry.tags.map((tag, tagIndex) => (
-            <MetaChip key={`${entryKey(entry, tagIndex)}-tag-${tagIndex}`} label={tag} />
-          ))}
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
-function SkillConstellation({
-  title,
+function SkillBox({
   items,
+  shut,
+  onToggle,
   selectedKey,
   onSelect,
 }: {
-  title: string;
   items: AggregatedFacet[];
-  selectedKey: string;
-  onSelect: (value: string) => void;
-}): ReactElement {
-  if (!items.length) return <Empty text={`Noch keine ${title.toLowerCase()} vorhanden.`} />;
-  return (
-    <section
-      style={{
-        borderRadius: 32,
-        border: "1px solid rgba(153,129,101,.14)",
-        background: "rgba(250,244,234,.76)",
-        padding: "28px 34px 32px",
-        maxWidth: 1040,
-        width: "100%",
-        justifySelf: "center",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,.62)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-        <div style={{ color: "rgba(74,58,41,.52)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>{title}</div>
-        {selectedKey ? <DiaryTabButton active={false} label="Filter loesen" onClick={() => onSelect("")} /> : null}
-      </div>
-      <div style={{ marginTop: 22, display: "flex", flexWrap: "wrap", gap: "16px 18px" }}>
-        {items.map((item, index) => {
-          const active = selectedKey === item.key;
-          return (
-            <button
-              key={item.key}
-              onClick={() => onSelect(active ? "" : item.key)}
-              style={{
-                border: "none",
-                background: "transparent",
-                padding: 0,
-                cursor: "pointer",
-                color: SKILL_COLORS[index % SKILL_COLORS.length],
-                fontFamily: HAND_FONT,
-                fontSize: 24,
-                lineHeight: 1.15,
-                textDecoration: active ? "underline" : "none",
-                textUnderlineOffset: "6px",
-              }}
-            >
-              {item.label}
-              <span style={{ marginLeft: 4, fontSize: 18, opacity: 0.72 }}>+{item.count}</span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function CompactFacetSection({
-  title,
-  items,
-  selectedKey,
-  onSelect,
-}: {
-  title: string;
-  items: AggregatedFacet[];
+  shut: boolean;
+  onToggle: () => void;
   selectedKey: string;
   onSelect: (value: string) => void;
 }): ReactElement | null {
   if (!items.length) return null;
   return (
-    <details
-      open={Boolean(selectedKey)}
+    <div
       style={{
-        maxWidth: 1040,
-        width: "100%",
-        justifySelf: "center",
-        borderRadius: 24,
-        border: "1px solid rgba(153,129,101,.12)",
-        background: "rgba(255,249,239,.62)",
-        padding: "14px 18px 16px",
+        marginBottom: shut ? 24 : 40,
+        padding: "20px 24px",
+        background: "#eee9de",
+        borderRadius: 12,
+        cursor: "pointer",
       }}
+      onClick={onToggle}
     >
-      <summary style={{ cursor: "pointer", listStyle: "none", color: "rgba(74,58,41,.56)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>
-        {title}
-      </summary>
-      <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 10 }}>
-        {items.map((item) => {
-          const active = selectedKey === item.key;
-          return (
-            <DiaryTabButton
-              key={item.key}
-              active={active}
-              label={`${item.label} (${item.count})`}
-              onClick={() => onSelect(active ? "" : item.key)}
-            />
-          );
-        })}
+      <div style={{ fontSize: 12, color: "#a09b90", letterSpacing: "2px", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8 }}>
+        ✦ Evolved skills
+        <span style={{ marginLeft: "auto", fontSize: 11, transform: shut ? "rotate(-90deg)" : "none", transition: "transform .25s" }}>▼</span>
       </div>
-    </details>
-  );
-}
-
-function ContactsBoard({
-  contacts,
-  selectedKey,
-  onSelect,
-}: {
-  contacts: AggregatedFacet[];
-  selectedKey: string;
-  onSelect: (value: string) => void;
-}): ReactElement {
-  if (!contacts.length) return <Empty text="Noch keine sauberen Kontaktspuren vorhanden." />;
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18, maxWidth: 1040, width: "100%", justifySelf: "center" }}>
-      {contacts.map((contact, index) => (
-        <button
-          key={contact.key}
-          onClick={() => onSelect(selectedKey === contact.key ? "" : contact.key)}
-          style={{
-            borderRadius: 26,
-            border: `1px solid ${selectedKey === contact.key ? "rgba(58,45,34,.25)" : "rgba(153,129,101,.18)"}`,
-            background: selectedKey === contact.key ? "rgba(56,43,32,.92)" : "rgba(255,250,241,.86)",
-            color: selectedKey === contact.key ? "#f7ede0" : "#3b3025",
-            padding: "24px",
-            textAlign: "left",
-            cursor: "pointer",
-          }}
-        >
-          <div style={{ color: selectedKey === contact.key ? "rgba(251,244,232,.62)" : "rgba(74,58,41,.46)", fontSize: 11, letterSpacing: ".28em", textTransform: "uppercase" }}>
-            {String(index + 1).padStart(2, "0")}
-          </div>
-          <div style={{ marginTop: 18, fontFamily: SERIF_FONT, fontSize: 34, lineHeight: 1.05 }}>{contact.label}</div>
-          <div style={{ marginTop: 10, color: selectedKey === contact.key ? "rgba(251,244,232,.8)" : "rgba(74,58,41,.62)", fontStyle: "italic", fontSize: 16 }}>
-            {contact.count} Diary-Eintraege
-          </div>
-        </button>
-      ))}
+      {!shut ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+          {items.map((item, index) => (
+            <button
+              key={item.key}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect(selectedKey === item.key ? "" : item.key);
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: HAND_FONT,
+                fontSize: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                color: SKILL_COLORS[index % SKILL_COLORS.length],
+                textDecoration: selectedKey === item.key ? "underline" : "none",
+                textUnderlineOffset: "4px",
+              }}
+            >
+              {item.label}
+              <span style={{ fontSize: 14, opacity: 0.5 }}>+{item.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
 
+function EntryView({ entry }: { entry: AnimusDiaryEntry }): ReactElement {
+  const time = formatTime(entry.created_at || entry.timestamp);
+  return (
+    <div style={{ marginBottom: 50, paddingLeft: 22, borderLeft: "1.5px solid #d4cfc4", position: "relative" }}>
+      <div
+        style={{
+          content: '""',
+          position: "absolute",
+          left: -4,
+          top: 8,
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: "#c4bdb0",
+        }}
+      />
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+        <p style={{ margin: 0, fontFamily: HAND_FONT, fontSize: 28, fontWeight: 600, color: "#2c2a25", lineHeight: 1.2 }}>
+          {displayTitle(entry)}
+        </p>
+        {time ? <span style={{ fontFamily: HAND_FONT, fontSize: 20, color: "#a09b90", whiteSpace: "nowrap", lineHeight: 1 }}>{time}</span> : null}
+      </div>
+      <div style={{ fontFamily: HAND_FONT, fontSize: 24, lineHeight: 1.75, color: "#3d3a34", whiteSpace: "pre-wrap" }}>
+        {bodyParagraphs(entry).join("\n\n")}
+      </div>
+      {entry.tags?.length ? (
+        <div style={{ fontFamily: HAND_FONT, fontSize: 20, lineHeight: 1.8, color: "#8a8578", marginTop: 18 }}>
+          <span style={{ fontStyle: "italic", color: "#a09b90" }}>Tags: </span>
+          {entry.tags.map((tag, index) => {
+            const color = TAG_COLORS[index % 2 === 0 ? "skill" : "pattern"] || "#8a8578";
+            return (
+              <span key={`${entryKey(entry, index)}-tag-${index}`}>
+                <span style={{ color }}>{tag}</span>
+                {index < entry.tags!.length - 1 ? <span>, </span> : null}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }): ReactElement {
+  return <div style={{ textAlign: "center", color: "#8a8578", fontStyle: "italic", padding: "20px 0 40px", fontFamily: SERIF_FONT }}>{text}</div>;
+}
+
 export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelProps): ReactElement | null {
   const [tab, setTab] = useState<DiaryTab>("all");
+  const [skillsShut, setSkillsShut] = useState(false);
   const [stage, setStage] = useState<DiaryStage>("cover");
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
+  const [selectedContact, setSelectedContact] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState("");
   const [selectedPattern, setSelectedPattern] = useState("");
   const [selectedGrowth, setSelectedGrowth] = useState("");
-  const [selectedContact, setSelectedContact] = useState("");
 
   const diary = snapshot?.diary_entries ?? [];
   const facts = snapshot?.facts ?? [];
 
-  const contacts = useMemo(() => groupContacts(diary), [diary]);
-  const skillFacts = useMemo(() => {
-    const diaryFacts = aggregateDiaryTerms(diary, "skills");
-    return diaryFacts.length ? diaryFacts : fallbackFacts(facts, "skill");
+  const skillAggs = useMemo(() => {
+    const diaryAggs = aggregate(diary, "skills");
+    return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "skill");
   }, [diary, facts]);
-  const patternFacts = useMemo(() => {
-    const diaryFacts = aggregateDiaryTerms(diary, "patterns");
-    return diaryFacts.length ? diaryFacts : fallbackFacts(facts, "pattern");
+  const patternAggs = useMemo(() => {
+    const diaryAggs = aggregate(diary, "patterns");
+    return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "pattern");
   }, [diary, facts]);
-  const growthFacts = useMemo(() => {
-    const diaryFacts = aggregateDiaryTerms(diary, "growth");
-    return diaryFacts.length ? diaryFacts : fallbackFacts(facts, "growth");
+  const growthAggs = useMemo(() => {
+    const diaryAggs = aggregate(diary, "growth");
+    return diaryAggs.length ? diaryAggs : fallbackFacts(facts, "growth");
   }, [diary, facts]);
+  const contactAggs = useMemo(() => aggregateContacts(diary), [diary]);
 
-  const filteredDiary = useMemo(() => {
-    const contactMap = new Map(contacts.map((contact) => [contact.key, contact.label]));
+  const filteredEntries = useMemo(() => {
     return diary.filter((entry, index) => {
       const key = entryKey(entry, index);
-      if (selectedSkill && !skillFacts.find((fact) => fact.key === selectedSkill)?.entryKeys.includes(key)) return false;
-      if (selectedPattern && !patternFacts.find((fact) => fact.key === selectedPattern)?.entryKeys.includes(key)) return false;
-      if (selectedGrowth && !growthFacts.find((fact) => fact.key === selectedGrowth)?.entryKeys.includes(key)) return false;
-      if (selectedContact) {
-        const label = normalizeContactLabel(entry.contact);
-        if (contactMap.get(selectedContact) !== label) return false;
+      if (selectedContact && normalizeContact(entry.contact).toLowerCase() !== selectedContact) return false;
+      if (selectedSkill) {
+        const source = skillAggs.find((item) => item.key === selectedSkill);
+        if (source && source.entryKeys.length && !source.entryKeys.includes(key)) return false;
+      }
+      if (selectedPattern) {
+        const source = patternAggs.find((item) => item.key === selectedPattern);
+        if (source && source.entryKeys.length && !source.entryKeys.includes(key)) return false;
+      }
+      if (selectedGrowth) {
+        const source = growthAggs.find((item) => item.key === selectedGrowth);
+        if (source && source.entryKeys.length && !source.entryKeys.includes(key)) return false;
       }
       return true;
     });
-  }, [contacts, diary, growthFacts, patternFacts, selectedContact, selectedGrowth, selectedPattern, selectedSkill, skillFacts]);
+  }, [diary, growthAggs, patternAggs, selectedContact, selectedGrowth, selectedPattern, selectedSkill, skillAggs]);
 
-  const groups = useMemo(() => groupEntriesByDate(filteredDiary), [filteredDiary]);
+  const groups = useMemo(() => groupByDay(filteredEntries), [filteredEntries]);
 
   useEffect(() => {
     if (!open) {
@@ -554,6 +440,14 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
     const id = window.setTimeout(() => setStage("open"), 650);
     return () => window.clearTimeout(id);
   }, [stage]);
+
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    groups.forEach((group) => {
+      next[group.date] = true;
+    });
+    setOpenDays(next);
+  }, [groups]);
 
   if (!open) return null;
 
@@ -644,18 +538,13 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
         <div>
           <div style={{ color: "rgba(215,194,154,.72)", fontSize: 12, letterSpacing: ".5em", textTransform: "uppercase" }}>ANIMUS</div>
           <div style={{ marginTop: 62, borderTop: "1px solid rgba(214,183,130,.18)", width: 84 }} />
-          <div style={{ marginTop: 36, fontFamily: SERIF_FONT, fontSize: 54, lineHeight: 1.02, color: "#efe2c6" }}>
-            Diary
-          </div>
+          <div style={{ marginTop: 36, fontFamily: SERIF_FONT, fontSize: 54, lineHeight: 1.02, color: "#efe2c6" }}>Diary</div>
           <div style={{ marginTop: 22, color: "rgba(227,206,169,.72)", fontFamily: SERIF_FONT, fontSize: 23, fontStyle: "italic", lineHeight: 1.45 }}>
             Private reflections, lessons, patterns, and shifts in how ANIMUS thinks.
           </div>
         </div>
-
         <div>
-          <div style={{ color: "rgba(215,194,154,.58)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>
-            {diary.length} entries
-          </div>
+          <div style={{ color: "rgba(215,194,154,.58)", fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase" }}>{diary.length} entries</div>
           <div style={{ marginTop: 10, color: "rgba(215,194,154,.42)", fontFamily: SERIF_FONT, fontSize: 17, fontStyle: "italic" }}>
             tap to open the next layer of learning
           </div>
@@ -663,153 +552,144 @@ export function DiaryPanel({ open, snapshot, onClose, onRefresh }: DiaryPanelPro
       </section>
 
       <section style={PAGE}>
-        <header style={{ padding: "26px 36px 18px", borderBottom: "1px solid rgba(141,119,93,.16)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
-            <div>
-              <div style={{ color: "rgba(74,58,41,.44)", fontSize: 12, letterSpacing: ".38em", textTransform: "uppercase" }}>Diary</div>
-              <div style={{ marginTop: 12, fontFamily: SERIF_FONT, fontSize: 56, lineHeight: 1.02 }}>ANIMUS&apos; Diary</div>
-              <div style={{ marginTop: 10, color: "rgba(74,58,41,.54)", fontFamily: SERIF_FONT, fontSize: 24, fontStyle: "italic" }}>
-                What I learned, what I noticed, what I would do differently.
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {onRefresh ? <DiaryTabButton active={false} label="Refresh" onClick={onRefresh} /> : null}
-              <button
-                onClick={onClose}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: "#6c5841", fontSize: 26, lineHeight: 1 }}
-              >
-                ×
-              </button>
-            </div>
+        <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 40px 80px", width: "100%" }}>
+          <div style={{ textAlign: "center", marginBottom: 30 }}>
+            <div style={{ color: "#85764d", fontSize: 11, letterSpacing: 4, textTransform: "uppercase", marginBottom: 16 }}>Diary</div>
+            <h1 style={{ fontFamily: SERIF_FONT, fontSize: 42, fontWeight: 400, color: "#2c2a25", margin: "0 0 8px" }}>ANIMUS&apos; Diary</h1>
+            <p style={{ fontStyle: "italic", fontSize: 17, color: "#8a8578", margin: "0 0 14px", fontFamily: SERIF_FONT }}>
+              What I learned, what I noticed, what I would do differently.
+            </p>
+            <p style={{ fontSize: 12, color: "#a09b90", letterSpacing: 2, textTransform: "uppercase" }}>{diary.length} entries</p>
           </div>
+
+          <div style={{ width: 50, height: 1, background: "#d4cfc4", margin: "0 auto 32px" }} />
+
           <div
             style={{
-              marginTop: 24,
+              marginBottom: 34,
               borderRadius: 24,
               overflow: "hidden",
               border: "1px solid rgba(141,119,93,.18)",
               boxShadow: "0 14px 40px rgba(60,46,28,.12)",
             }}
           >
-            <img
-              src={DIARY_OPEN}
-              alt="Geoeffnetes ANIMUS Diary"
-              style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover", objectPosition: "center 56%" }}
-            />
+            <img src={DIARY_OPEN} alt="Geoeffnetes ANIMUS Diary" style={{ width: "100%", display: "block", maxHeight: 230, objectFit: "cover", objectPosition: "center 56%" }} />
           </div>
-        </header>
 
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            padding: "16px 36px 16px",
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            alignItems: "center",
-            borderBottom: "1px solid rgba(141,119,93,.12)",
-            background: "linear-gradient(180deg, rgba(246,239,223,.98), rgba(241,232,215,.94))",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          {TABS.map((entry) => (
-            <DiaryTabButton key={entry.key} label={entry.label} active={tab === entry.key} onClick={() => setTab(entry.key)} />
-          ))}
-        </div>
-
-        <div style={{ padding: "26px 36px 48px", display: "grid", gap: 28, alignContent: "start" }}>
-          {(tab === "all" || tab === "skills") && skillFacts.length ? (
-            <SkillConstellation title="Evolved Skills" items={skillFacts} selectedKey={selectedSkill} onSelect={setSelectedSkill} />
+          {contactAggs.length > 1 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
+              <ContactPill active={selectedContact === null} label={`All (${diary.length})`} onClick={() => setSelectedContact(null)} />
+              {contactAggs.map((contact) => (
+                <ContactPill
+                  key={contact.key}
+                  active={selectedContact === contact.key}
+                  label={`${contact.label} (${contact.count})`}
+                  onClick={() => setSelectedContact(selectedContact === contact.key ? null : contact.key)}
+                />
+              ))}
+            </div>
           ) : null}
 
-          {(tab === "all" || tab === "patterns") && patternFacts.length ? (
-            <CompactFacetSection title="Patterns" items={patternFacts} selectedKey={selectedPattern} onSelect={setSelectedPattern} />
+          <SkillBox items={skillAggs} shut={skillsShut} onToggle={() => setSkillsShut((value) => !value)} selectedKey={selectedSkill} onSelect={setSelectedSkill} />
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {TABS.map((item) => (
+              <DiaryTabButton key={item.key} active={tab === item.key} label={item.label} onClick={() => setTab(item.key)} />
+            ))}
+            {onRefresh ? <DiaryTabButton active={false} label="Refresh" onClick={onRefresh} /> : null}
+          </div>
+
+          {groups.length > 1 && tab === "all" ? (
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "4px 2px 14px", marginBottom: 30 }}>
+              {groups.map((group) => (
+                <button
+                  key={group.date}
+                  onClick={() => setOpenDays((prev) => ({ ...prev, [group.date]: !prev[group.date] }))}
+                  style={{
+                    flex: "0 0 auto",
+                    padding: "5px 14px",
+                    borderRadius: 999,
+                    border: `0.5px solid ${openDays[group.date] ? "#2c2a25" : "#d4cfc4"}`,
+                    background: openDays[group.date] ? "#2c2a25" : "transparent",
+                    color: openDays[group.date] ? "#f6f1e9" : "#8a8578",
+                    fontFamily: SERIF_FONT,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  {formatPillDate(group.date)}
+                </button>
+              ))}
+            </div>
           ) : null}
 
-          {(tab === "all" || tab === "growth") && growthFacts.length ? (
-            <CompactFacetSection title="Growth" items={growthFacts} selectedKey={selectedGrowth} onSelect={setSelectedGrowth} />
+          {tab === "patterns" && patternAggs.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 30 }}>
+              {patternAggs.map((pattern) => (
+                <ContactPill
+                  key={pattern.key}
+                  active={selectedPattern === pattern.key}
+                  label={`${pattern.label} (${pattern.count})`}
+                  onClick={() => setSelectedPattern(selectedPattern === pattern.key ? "" : pattern.key)}
+                />
+              ))}
+            </div>
           ) : null}
 
-          {(tab === "all" || tab === "contacts") && contacts.length > 1 ? (
-            <CompactFacetSection title="Contacts" items={contacts} selectedKey={selectedContact} onSelect={setSelectedContact} />
+          {tab === "growth" && growthAggs.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 30 }}>
+              {growthAggs.map((growth) => (
+                <ContactPill
+                  key={growth.key}
+                  active={selectedGrowth === growth.key}
+                  label={`${growth.label} (${growth.count})`}
+                  onClick={() => setSelectedGrowth(selectedGrowth === growth.key ? "" : growth.key)}
+                />
+              ))}
+            </div>
           ) : null}
 
-          {tab === "all" ? (
-            groups.length ? (
-              <div style={{ display: "grid", gap: 32 }}>
-                {groups.map((group) => (
-                  <section key={group.date} style={{ display: "grid", gap: 18 }}>
-                    <div
-                      style={{
-                        maxWidth: 1040,
-                        width: "100%",
-                        justifySelf: "center",
-                        display: "grid",
-                        gridTemplateColumns: "auto 1fr auto",
-                        gap: 18,
-                        alignItems: "center",
-                        color: "rgba(74,58,41,.46)",
-                        fontSize: 13,
-                        letterSpacing: ".24em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      <span>{group.date}</span>
-                      <span style={{ borderTop: "1px solid rgba(141,119,93,.18)" }} />
-                      <span>{group.entries.length} Eintraege</span>
-                    </div>
-                    <div style={{ display: "grid", gap: 24 }}>
-                      {group.entries.map((entry, index) => (
-                        <JournalEntry key={entryKey(entry, index)} entry={entry} index={index} total={diary.length} />
-                      ))}
-                    </div>
-                  </section>
-                ))}
+          {tab === "contacts" && contactAggs.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 30 }}>
+              {contactAggs.map((contact) => (
+                <ContactPill
+                  key={contact.key}
+                  active={selectedContact === contact.key}
+                  label={`${contact.label} (${contact.count})`}
+                  onClick={() => setSelectedContact(selectedContact === contact.key ? null : contact.key)}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {!filteredEntries.length ? (
+            <Empty text="No entries yet." />
+          ) : (
+            groups.map((group) => (
+              <div key={group.date} style={{ marginBottom: 45 }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", padding: "8px 0", marginBottom: 30, userSelect: "none" }}
+                  onClick={() => setOpenDays((prev) => ({ ...prev, [group.date]: !prev[group.date] }))}
+                >
+                  <span style={{ fontSize: 13, color: "#a09b90", letterSpacing: 2, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                    {formatLongDate(group.date)}
+                  </span>
+                  <span style={{ flex: 1, height: 0.5, background: "#d4cfc4" }} />
+                  <span style={{ fontSize: 11, color: "#a09b90", letterSpacing: 1 }}>
+                    {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}
+                  </span>
+                  <span style={{ color: "#a09b90", fontSize: 12, transform: openDays[group.date] ? "none" : "rotate(-90deg)", transition: "transform .25s" }}>▼</span>
+                </div>
+                {openDays[group.date] ? (
+                  <div>
+                    {group.entries.map((entry, index) => (
+                      <EntryView key={entryKey(entry, index)} entry={entry} />
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <Empty text="Noch keine Diary-Einträge vorhanden." />
-            )
-          ) : null}
-
-          {tab === "skills" ? (
-            groups.length ? (
-              <div style={{ display: "grid", gap: 24 }}>
-                {filteredDiary.map((entry, index) => (
-                  <JournalEntry key={entryKey(entry, index)} entry={entry} index={index} total={diary.length} />
-                ))}
-              </div>
-            ) : (
-              <Empty text="Noch keine Skill-gebundenen Einträge vorhanden." />
-            )
-          ) : null}
-
-          {tab === "patterns" ? (
-            groups.length ? (
-              <div style={{ display: "grid", gap: 24 }}>
-                {filteredDiary.map((entry, index) => (
-                  <JournalEntry key={entryKey(entry, index)} entry={entry} index={index} total={diary.length} />
-                ))}
-              </div>
-            ) : (
-              <Empty text="Noch keine Pattern-Einträge vorhanden." />
-            )
-          ) : null}
-
-          {tab === "growth" ? (
-            groups.length ? (
-              <div style={{ display: "grid", gap: 24 }}>
-                {filteredDiary.map((entry, index) => (
-                  <JournalEntry key={entryKey(entry, index)} entry={entry} index={index} total={diary.length} />
-                ))}
-              </div>
-            ) : (
-              <Empty text="Noch keine Growth-Einträge vorhanden." />
-            )
-          ) : null}
-
-          {tab === "contacts" ? <ContactsBoard contacts={contacts} selectedKey={selectedContact} onSelect={setSelectedContact} /> : null}
+            ))
+          )}
         </div>
       </section>
     </div>
