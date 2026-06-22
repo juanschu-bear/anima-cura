@@ -297,6 +297,8 @@ export function AnamneseForm({ patientId }: Props) {
   const [stepName, setStepName] = useState<StepName>("versicherung");
   const [done, setDone] = useState(false);
   const [fehlen, setFehlen] = useState<string[]>([]);
+  const [account, setAccount] = useState<{ login_email: string; password: string } | null>(null);
+  const [showGuide, setShowGuide] = useState<"de" | "en" | "es" | "ru" | "tr">("de");
   const [gruende, setGruende] = useState<Record<string, string>>({});
 
   const sig1 = useRef<HTMLCanvasElement | null>(null);
@@ -418,11 +420,16 @@ export function AnamneseForm({ patientId }: Props) {
       ],
       consents: CONSENTS.map((c) => ({ key: c.key, label: c.label, pflicht: c.pflicht })),
     };
-    void fetch("/api/anima-sign/submit", {
+    fetch("/api/anima-sign/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ patientId, answers: payload, schema }),
-    }).catch((error) => console.error("Anamnese-Übermittlung fehlgeschlagen:", error));
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.account) setAccount(res.account);
+      })
+      .catch((error) => console.error("Anamnese-Übermittlung fehlgeschlagen:", error));
     setDone(true);
     scrollTop();
   };
@@ -707,7 +714,67 @@ export function AnamneseForm({ patientId }: Props) {
               <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
               <h2>Vielen Dank!</h2>
               <p>Ihr Bogen ist eingegangen. Sie erhalten Ihre unterschriebenen Unterlagen per E-Mail, und unsere Praxis hat alles vorliegen.</p>
-              <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
+
+              {account && (
+                <div style={{ textAlign: "left", background: "var(--card-2)", border: "1px solid var(--line)", borderRadius: 13, padding: "18px 20px", margin: "18px 0" }}>
+                  <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, margin: "0 0 6px" }}>Ihr Anima Cura Zugang</h3>
+                  <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 14px" }}>
+                    Alle Ihre Rechnungen, Dokumente, Behandlungsphasen und Raten finden Sie ab sofort in Ihrer persönlichen App.
+                  </p>
+                  <div style={{ background: "var(--field)", border: "1px solid var(--line-strong)", borderRadius: 11, padding: "14px 16px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Login-E-Mail</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "monospace", wordBreak: "break-all" }}>{account.login_email}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4, marginTop: 12 }}>Passwort</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "monospace" }}>{account.password}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Sie können das Passwort jederzeit in der App ändern.</div>
+                  </div>
+                  <a
+                    href="https://anima-cura.vercel.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn primary"
+                    style={{ display: "block", textAlign: "center", textDecoration: "none", marginBottom: 14 }}
+                  >
+                    Anima Cura App öffnen
+                  </a>
+
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" }}>App auf dem Homescreen installieren</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                      {(["de", "en", "es", "ru", "tr"] as const).map((lang) => (
+                        <button key={lang} type="button" className={"btn" + (showGuide === lang ? " primary" : "")} style={{ padding: "6px 12px", fontSize: 12 }}
+                          onClick={() => setShowGuide(lang)}>
+                          {{ de: "Deutsch", en: "English", es: "Español", ru: "Русский", tr: "Türkçe" }[lang]}
+                        </button>
+                      ))}
+                    </div>
+                    {showGuide === "de" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <b>iPhone (Safari):</b> Tippen Sie auf das Teilen-Symbol (Quadrat mit Pfeil) → „Zum Home-Bildschirm" → „Hinzufügen".<br />
+                      <b>Android (Chrome):</b> Tippen Sie auf die drei Punkte oben rechts → „Zum Startbildschirm hinzufügen" → „Hinzufügen".
+                    </div>}
+                    {showGuide === "en" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <b>iPhone (Safari):</b> Tap the Share icon (square with arrow) → "Add to Home Screen" → "Add".<br />
+                      <b>Android (Chrome):</b> Tap the three dots in the top right → "Add to Home screen" → "Add".
+                    </div>}
+                    {showGuide === "es" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <b>iPhone (Safari):</b> Pulse el icono de compartir (cuadrado con flecha) → "Añadir a la pantalla de inicio" → "Añadir".<br />
+                      <b>Android (Chrome):</b> Pulse los tres puntos arriba a la derecha → "Añadir a pantalla de inicio" → "Añadir".
+                    </div>}
+                    {showGuide === "ru" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <b>iPhone (Safari):</b> Нажмите на значок «Поделиться» (квадрат со стрелкой) → «На экран Домой» → «Добавить».<br />
+                      <b>Android (Chrome):</b> Нажмите три точки вверху справа → «Добавить на главный экран» → «Добавить».
+                    </div>}
+                    {showGuide === "tr" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <b>iPhone (Safari):</b> Paylaş simgesine dokunun (oklu kare) → "Ana Ekrana Ekle" → "Ekle".<br />
+                      <b>Android (Chrome):</b> Sağ üstteki üç noktaya dokunun → "Ana ekrana ekle" → "Ekle".
+                    </div>}
+                  </div>
+                </div>
+              )}
+
+              {!account && (
+                <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
+              )}
             </div>
           ) : (
             <>
