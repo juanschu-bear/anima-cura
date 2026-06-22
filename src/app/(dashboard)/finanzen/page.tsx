@@ -32,8 +32,8 @@ interface Messwerte {
 const ACC_LABELS: Record<number, string> = { 31760549: "Hauptkonto", 31760546: "Betrieb", 31760547: "Privat" };
 const ACC_SHORT: Record<number, string> = { 31760549: "...950", 31760546: "...976", 31760547: "...206" };
 
-function euro(v: number): string { return v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "\u00A0\u20AC"; }
-function euroK(v: number): string { return Math.round(v).toLocaleString("de-DE") + " \u20AC"; }
+function euro(v: number): string { return v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
+function euroK(v: number): string { return Math.round(v).toLocaleString("de-DE") + " €"; }
 function datDE(iso: string): string {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -67,7 +67,7 @@ function FinCard({ label, value, sub, tone }: { label: string; value: string; su
   return (<div className="rounded-lg border px-4 py-3"><div className="text-xs text-praxis-400">{label}</div><div className={`mt-1 text-xl font-semibold tabular-nums ${c}`}>{value}</div>{sub && <div className="mt-0.5 text-xs text-praxis-400">{sub}</div>}</div>);
 }
 function Abschnitt({ icon: Icon, titel, hinweis, children }: { icon: typeof Landmark; titel: string; hinweis?: string; children: React.ReactNode }) {
-  return (<section className="space-y-3"><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-praxis-400" /><h2 className="text-sm font-semibold">{titel}</h2>{hinweis && <span className="text-xs text-praxis-400">\u00B7 {hinweis}</span>}</div><div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>);
+  return (<section className="space-y-3"><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-praxis-400" /><h2 className="text-sm font-semibold">{titel}</h2>{hinweis && <span className="text-xs text-praxis-400">· {hinweis}</span>}</div><div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>);
 }
 
 // ═══════════════════════════════════════════════
@@ -328,10 +328,10 @@ export default function FinanzenPage() {
       {tab === "konten" ? (
         <div className="af">
           {tabBar}
-          {loading ? <div className="loading">Wird geladen\u2026</div> : error ? <div className="error-box">{error}</div> : (<>
+          {loading ? <div className="loading">Wird geladen…</div> : error ? <div className="error-box">{error}</div> : (<>
             <header className="hdr">
-              <div className="hdr-lock">{"\uD83D\uDD12"} Nur Dr. Schubert</div>
-              <div className="hdr-sub">Gesamtverm\u00F6gen</div>
+              <div className="hdr-lock">{"🔒"} Nur Dr. Schubert</div>
+              <div className="hdr-sub">Gesamtvermögen</div>
               <div className="hdr-val serif">{euroK(totalBal)}</div>
               <div className="hdr-date">Letzter Sync: {datDE(enriched[0]?.date ?? "")}</div>
             </header>
@@ -354,7 +354,7 @@ export default function FinanzenPage() {
               <div className="cats">
                 <div className="cats-h">
                   <span className="cats-title">Ausgaben nach Kategorie{unassignedOut > 0 ? ` (${unassignedOut} nicht zugeordnet)` : ""}</span>
-                  {catF ? <span className="cats-hint" onClick={() => { setCatF(null); setTxPage(0); }}>Filter zur\u00FCcksetzen</span> : <span className="cats-hint">Tippen filtert</span>}
+                  {catF ? <span className="cats-hint" onClick={() => { setCatF(null); setTxPage(0); }}>Filter zurücksetzen</span> : <span className="cats-hint">Tippen filtert</span>}
                 </div>
                 {(showAllCats ? catEntries : catEntries.slice(0, 5)).map(c => {
                   const pct = catTotal > 0 ? Math.round((c.amount / catTotal) * 100) : 0;
@@ -362,7 +362,7 @@ export default function FinanzenPage() {
                     <div key={c.id} className={`cat${catF && catF !== c.id ? " dim" : ""}`} onClick={() => { setCatF(catF === c.id ? null : c.id); setTxPage(0); }}>
                       <div className="cat-top">
                         <span className="cat-nm"><span className="cat-dot" style={{ background: c.color }} />{c.name}</span>
-                        <span className="cat-val">-{euroK(c.amount)} \u00B7 {pct}%</span>
+                        <span className="cat-val">-{euroK(c.amount)} · {pct}%</span>
                       </div>
                       <div className="cat-track"><div className="cat-fill" style={{ width: `${pct}%`, background: c.color }} /></div>
                     </div>
@@ -378,7 +378,7 @@ export default function FinanzenPage() {
 
             {/* Income / Expenses */}
             <div className="ios">
-              <div className="io inc"><div className="io-l">Eing\u00E4nge (90 Tage)</div><div className="io-v">+{euroK(incTotal)}</div><div className="io-sub">{incCount} Buchungen</div></div>
+              <div className="io inc"><div className="io-l">Eingänge (90 Tage)</div><div className="io-v">+{euroK(incTotal)}</div><div className="io-sub">{incCount} Buchungen</div></div>
               <div className="io out"><div className="io-l">Ausgaben (90 Tage)</div><div className="io-v">-{euroK(outTotal)}</div><div className="io-sub">{outCount} Buchungen</div></div>
             </div>
 
@@ -386,7 +386,7 @@ export default function FinanzenPage() {
             <div className="filters">
               {(["all", "inc", "out"] as const).map(d => (
                 <button key={d} className={`fl${dirF === d ? " on" : ""}`} onClick={() => { setDirF(d); setTxPage(0); }}>
-                  {d === "all" ? "Alle" : d === "inc" ? "\u2193 Eing\u00E4nge" : "\u2191 Ausgaben"}
+                  {d === "all" ? "Alle" : d === "inc" ? "↓ Eingänge" : "↑ Ausgaben"}
                 </button>
               ))}
             </div>
@@ -407,7 +407,7 @@ export default function FinanzenPage() {
                         <div className="tx-nm">{tx.counterpart}</div>
                         <div className="tx-mt">
                           <span className="mono" style={{ fontSize: 11 }}>{datShort(tx.date)}</span>
-                          <span>\u00B7</span>
+                          <span>·</span>
                           <span>{tx.ibanShort}</span>
                           {/* Category tag — klickbar zum Zuordnen */}
                           <span style={{ position: "relative" }}>
@@ -428,7 +428,7 @@ export default function FinanzenPage() {
                                 <div className="dropdown-sep" />
                                 <input
                                   className="dropdown-input"
-                                  placeholder="Neue Kategorie\u2026"
+                                  placeholder="Neue Kategorie…"
                                   value={newCatName}
                                   onChange={e => setNewCatName(e.target.value)}
                                   onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) createCategory(newCatName); }}
@@ -451,9 +451,9 @@ export default function FinanzenPage() {
 
             {totalPages > 1 && (
               <div className="pager">
-                <button className="pg" disabled={safePage === 0} onClick={() => setTxPage(safePage - 1)}>{"\u2039"}</button>
+                <button className="pg" disabled={safePage === 0} onClick={() => setTxPage(safePage - 1)}>{"‹"}</button>
                 <span className="pg-info">{safePage + 1} / {totalPages}</span>
-                <button className="pg" disabled={safePage >= totalPages - 1} onClick={() => setTxPage(safePage + 1)}>{"\u203A"}</button>
+                <button className="pg" disabled={safePage >= totalPages - 1} onClick={() => setTxPage(safePage + 1)}>{"›"}</button>
               </div>
             )}
           </>)}
