@@ -7,6 +7,19 @@ import { pruefeName, pruefeEmail, pruefeTelefon, pruefePlz, pruefeHausnummer, pr
 // CSS unter .aab gekapselt, damit es nicht mit dem Rest der App kollidiert.
 
 const AAB_CSS = `
+
+.aab .shimmer-bar{height:4px;border-radius:999px;overflow:hidden;margin:20px 0;background:var(--line);}
+.aab .shimmer-track{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-lighter),var(--gold-bright),var(--primary-bright),var(--primary));background-size:300% 100%;animation:aabShimmer 2s ease-in-out infinite;}
+@keyframes aabShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.aab .shimmer-text{text-align:center;font-size:13px;color:var(--muted);animation:aabFadeInOut 2s ease-in-out infinite;}
+@keyframes aabFadeInOut{0%,100%{opacity:.5}50%{opacity:1}}
+.aab .account-reveal{animation:aabSlideUp .6s cubic-bezier(.2,.7,.2,1);}
+@keyframes aabSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.aab .success-flash{text-align:center;margin-bottom:20px;animation:aabSlideUp .5s ease;}
+.aab .success-badge{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(150deg,rgba(15,138,114,0.12),rgba(95,208,168,0.06));border:1.5px solid rgba(35,176,143,0.4);border-radius:14px;padding:14px 22px;box-shadow:0 0 30px rgba(35,176,143,0.2),0 0 60px rgba(35,176,143,0.1);}
+.aab .success-badge .check-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 16px rgba(35,176,143,0.4);}
+.aab .success-badge .check-circle svg{width:16px;height:16px;color:#fff;}
+.aab .success-badge span{font-family:"Fraunces",serif;font-size:17px;font-weight:600;color:var(--primary);}
 .aab .done-lang-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:16px 0 8px;}
 .aab .done-lang-btn{font-family:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line-strong);background:var(--card);color:var(--muted);cursor:pointer;transition:all .16s;}
 .aab .done-lang-btn:hover{border-color:var(--primary);color:var(--ink);}
@@ -443,80 +456,145 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
   guideOpen: boolean; setGuideOpen: (v: boolean) => void;
   vorname: string;
 }) {
+  const [loading, setLoading] = useState(true);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (!account) return;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setTimeout(() => setRevealed(true), 300);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [account]);
+
   const t = T[lang];
   const name = vorname || "Patient";
   const langs: Array<{ code: "de"|"en"|"es"|"ru"|"tr"; flag: string; label: string }> = [
-    { code: "de", flag: "🇩🇪", label: "Deutsch" }, { code: "en", flag: "🇬🇧", label: "English" },
-    { code: "es", flag: "🇪🇸", label: "Español" }, { code: "ru", flag: "🇷🇺", label: "Русский" },
-    { code: "tr", flag: "🇹🇷", label: "Türkçe" },
+    { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
+    { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
+    { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Espa\u00f1ol" },
+    { code: "ru", flag: "\u{1F1F7}\u{1F1FA}", label: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439" },
+    { code: "tr", flag: "\u{1F1F9}\u{1F1F7}", label: "T\u00fcrk\u00e7e" },
   ];
+
+  const loadingTexts: Record<string, string[]> = {
+    de: ["Dein Account wird erstellt...", "Zugangsdaten werden generiert...", "Fast fertig..."],
+    en: ["Creating your account...", "Generating login credentials...", "Almost done..."],
+    es: ["Creando tu cuenta...", "Generando datos de acceso...", "Casi listo..."],
+    ru: ["\u0421\u043e\u0437\u0434\u0430\u0451\u043c \u0442\u0432\u043e\u0439 \u0430\u043a\u043a\u0430\u0443\u043d\u0442...", "\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u0443\u0435\u043c \u0434\u0430\u043d\u043d\u044b\u0435...", "\u041f\u043e\u0447\u0442\u0438 \u0433\u043e\u0442\u043e\u0432\u043e..."],
+    tr: ["Hesab\u0131n olu\u015fturuluyor...", "Giri\u015f bilgileri \u00fcretiliyor...", "Neredeyse bitti..."],
+  };
+
+  const [loadTextIdx, setLoadTextIdx] = useState(0);
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => setLoadTextIdx((i) => (i + 1) % 3), 2000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const successTexts: Record<string, string> = {
+    de: "Dein Account ist erstellt!",
+    en: "Your account is ready!",
+    es: "\u00a1Tu cuenta est\u00e1 lista!",
+    ru: "\u0422\u0432\u043e\u0439 \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u0433\u043e\u0442\u043e\u0432!",
+    tr: "Hesab\u0131n haz\u0131r!",
+  };
+
   return (
     <div className="done-screen show">
       <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
-      <div className="done-lang-bar">
-        {langs.map((l) => (<button key={l.code} type="button" className={"done-lang-btn" + (lang === l.code ? " on" : "")} onClick={() => setLang(l.code)}>{l.flag} {l.label}</button>))}
-      </div>
       <h2>{t.thanks}, {name}!</h2>
       <p>{t.received}</p>
 
-      {account && (<>
-        <div className="done-divider" />
-        <div className="done-slabel">{t.next}</div>
-        <div className="glow-box" style={{ textAlign: "left" }}>
-          <h3>{t.appTitle}</h3>
-          <p>{t.appDesc}</p>
-          <ul>{[t.f1, t.f2, t.f3, t.f4, t.f5].map((f, i) => (<li key={i}><span className="gdot" />{f}</li>))}</ul>
-        </div>
+      <div className="done-lang-bar">
+        {langs.map((l) => (<button key={l.code} type="button" className={"done-lang-btn" + (lang === l.code ? " on" : "")} onClick={() => setLang(l.code)}>{l.flag} {l.label}</button>))}
+      </div>
 
-        <div className="done-divider" />
-        <div className="done-slabel">{t.credLabel}</div>
-        <div className="cred-card" style={{ textAlign: "left" }}>
-          <div className="cred-title">🔑 {t.credTitle}</div>
-          <div className="cred-row"><span className="cred-label">{t.emailLabel}</span><span className="cred-val">{account.login_email}</span></div>
-          <div className="cred-row"><span className="cred-label">{t.pwLabel}</span>
-            <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
-              {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">••••••••••</span>}
-              <span className="pw-reveal">👆 {showPw ? "✓" : t.pwTap}</span>
+      {account && loading && (
+        <div style={{ marginTop: 20 }}>
+          <div className="shimmer-bar"><div className="shimmer-track" /></div>
+          <div className="shimmer-text">{(loadingTexts[lang] || loadingTexts.de)[loadTextIdx]}</div>
+        </div>
+      )}
+
+      {account && !loading && !revealed && (
+        <div className="success-flash">
+          <div className="success-badge">
+            <div className="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
+            <span>{successTexts[lang]}</span>
+          </div>
+        </div>
+      )}
+
+      {account && revealed && (
+        <div className="account-reveal">
+          <div className="success-flash">
+            <div className="success-badge">
+              <div className="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
+              <span>{successTexts[lang]}</span>
             </div>
           </div>
-          <div className="cred-note" style={{ marginBottom: 10 }}><span>🔒</span><div>{t.secNote}</div></div>
-          <div className="cred-note"><span>📸</span><div>{t.screenshot}</div></div>
-        </div>
 
-        <div className="done-divider" />
-        <div className="done-slabel">{t.openLabel}</div>
-        <div className="access-split">
-          <div className="access-side">
-            <h4>📱 {t.qrTitle}</h4><p>{t.qrDesc}</p>
-            <img src={QR_URL} alt="QR Code" width="160" height="160" style={{ borderRadius: 8 }} />
-            <div style={{ fontSize: "11.5px", color: "var(--muted-2)", marginTop: 10 }}>{t.qrHint}</div>
+          <div className="done-divider" />
+          <div className="done-slabel">{t.next}</div>
+          <div className="glow-box" style={{ textAlign: "left" }}>
+            <h3>{t.appTitle}</h3>
+            <p>{t.appDesc}</p>
+            <ul>{[t.f1, t.f2, t.f3, t.f4, t.f5].map((f, i) => (<li key={i}><span className="gdot" />{f}</li>))}</ul>
           </div>
-          <div className="access-side">
-            <h4>👆 {t.btnTitle}</h4><p>{t.btnDesc}</p>
-            <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} →</a>
+
+          <div className="done-divider" />
+          <div className="done-slabel">{t.credLabel}</div>
+          <div className="cred-card" style={{ textAlign: "left" }}>
+            <div className="cred-title">{t.credTitle}</div>
+            <div className="cred-row"><span className="cred-label">{t.emailLabel}</span><span className="cred-val">{account.login_email}</span></div>
+            <div className="cred-row"><span className="cred-label">{t.pwLabel}</span>
+              <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
+                {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>}
+                <span className="pw-reveal">{showPw ? "\u2713" : "\u{1F446} " + t.pwTap}</span>
+              </div>
+            </div>
+            <div className="cred-note" style={{ marginBottom: 10 }}><span>\u{1F512}</span><div>{t.secNote}</div></div>
+            <div className="cred-note"><span>\u{1F4F8}</span><div>{t.screenshot}</div></div>
           </div>
-        </div>
 
-        <div className="done-divider" />
-        <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>👇 {t.tapHint}</div>
-        <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
-          <div><div className="gtitle">{t.guideTitle}</div><div className="gsub">{t.guideSub}</div></div>
-          <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div>
-        </div>
-        <div className={"guide-body" + (guideOpen ? " open" : "")}>
-          <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{t.guideIntro}</p>
-          <div className="gplatform"><h5>🍎 iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> 🎉</li></ol></div>
-          <div className="gplatform"><h5>🤖 Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> 🎉</li></ol></div>
-        </div>
-        <div className="app-note">📌 {t.appNote}</div>
-      </>)}
+          <div className="done-divider" />
+          <div className="done-slabel">{t.openLabel}</div>
+          <div className="access-split">
+            <div className="access-side">
+              <h4>\u{1F4F1} {t.qrTitle}</h4><p>{t.qrDesc}</p>
+              <img src={QR_URL} alt="QR" width="160" height="160" style={{ borderRadius: 8 }} />
+              <div style={{ fontSize: "11.5px", color: "var(--muted-2)", marginTop: 10 }}>{t.qrHint}</div>
+            </div>
+            <div className="access-side">
+              <h4>\u{1F446} {t.btnTitle}</h4><p>{t.btnDesc}</p>
+              <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} \u2192</a>
+            </div>
+          </div>
 
-      {!account && (
+          <div className="done-divider" />
+          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>\u{1F447} {t.tapHint}</div>
+          <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
+            <div><div className="gtitle">{t.guideTitle}</div><div className="gsub">{t.guideSub}</div></div>
+            <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div>
+          </div>
+          <div className={"guide-body" + (guideOpen ? " open" : "")}>
+            <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{t.guideIntro}</p>
+            <div className="gplatform"><h5>\u{1F34E} iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> \u{1F389}</li></ol></div>
+            <div className="gplatform"><h5>\u{1F916} Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> \u{1F389}</li></ol></div>
+          </div>
+          <div className="app-note">\u{1F4CC} {t.appNote}</div>
+        </div>
+      )}
+
+      {!account && !loading && (
         <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
       )}
     </div>
   );
 }
+
 
 export function AnamneseForm({ patientId }: Props) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
