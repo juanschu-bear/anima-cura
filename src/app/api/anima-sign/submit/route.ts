@@ -25,8 +25,8 @@ function asString(value: unknown): string | null {
 function normalizeForEmail(name: string): string {
   return name
     .toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "") // remove accents
     .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9.-]/g, "")
     .replace(/\.{2,}/g, ".");
 }
@@ -43,26 +43,17 @@ async function createPatientAccount(
   patientEmail: string | null,
 ): Promise<{ login_email: string; password: string } | null> {
   if (!vorname || !nachname) return null;
-  
-  const supabase = createServerClient();
+
+  const admin = createAdminClient();
   const base = normalizeForEmail(vorname) + "." + normalizeForEmail(nachname);
-  let loginEmail = base + "@animacura.de";
-  
-  // Check for duplicates
-  const { count } = await supabase
-    .from("patients")
-    .select("id", { count: "exact", head: true })
-    .ilike("email", loginEmail);
-  
-  if (count && count > 0) {
-    loginEmail = base + (count + 1) + "@animacura.de";
-  }
-  
   const password = generatePassword(10);
-  
-  // Create Supabase auth user
-  try {
-    const admin = createAdminClient();
+
+  // Try base email, append number if duplicate
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const loginEmail = attempt === 0
+      ? base + "@animacura.de"
+      : base + (attempt + 1) + "@animacura.de";
+
     const { error } = await admin.auth.admin.createUser({
       email: loginEmail,
       password: password,
@@ -74,17 +65,21 @@ async function createPatientAccount(
         role: "patient",
       },
     });
-    
-    if (error) {
+
+    if (!error) {
+      return { login_email: loginEmail, password };
+    }
+
+    // If error is NOT a duplicate, stop trying
+    if (!error.message?.includes("already") && !error.message?.includes("exists")) {
       console.error("Account creation failed:", error.message);
       return null;
     }
-    
-    return { login_email: loginEmail, password };
-  } catch (err) {
-    console.error("Account creation error:", err);
-    return null;
+    // Duplicate: try next number
   }
+
+  console.error("Account creation: 10 attempts exhausted");
+  return null;
 }
 
 // Seitenzahl aus dem PDF zaehlen (WeasyPrint liefert klassische Seitenobjekte).
