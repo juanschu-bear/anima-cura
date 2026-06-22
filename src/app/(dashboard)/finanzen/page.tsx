@@ -33,10 +33,13 @@ interface Messwerte {
 // ── Helpers ──
 const ACC_LABELS: Record<number, string> = { 31760549: "Hauptkonto", 31760546: "Betrieb", 31760547: "Privat" };
 const ACC_SHORT: Record<number, string> = { 31760549: "...950", 31760546: "...976", 31760547: "...206" };
-const CAT_COLORS: Record<string, string> = {
-  honorar: "#2d7a4f", material: "#b83333", personal: "#d4881e",
-  miete: "#7a5e3e", software: "#6050a0", sonstige: "#888",
-};
+const COLOR_PALETTE = [
+  "#c0392b", "#d4881e", "#2d7a4f", "#7a5e3e", "#6050a0",
+  "#3060a0", "#b85c8a", "#4a8080", "#8a6030", "#607030",
+];
+function getCatColor(cat: string, index: number): string {
+  return COLOR_PALETTE[index % COLOR_PALETTE.length];
+}
 
 function euro(v: number): string {
   return `${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`;
@@ -66,7 +69,13 @@ function Abschnitt({ icon: Icon, titel, hinweis, children }: { icon: typeof Land
 const KONTEN_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 .af{--bg:#f8f5ef;--card:#fff;--card2:#f2ede4;--t1:#1a1815;--t2:#6a6050;--t3:#a09888;--t4:#c8c0b0;--bdr:#e8e2d8;--bdr2:#d8d0c4;--gold:#b8860b;--gold-bg:rgba(184,134,11,.06);--gold-bdr:rgba(184,134,11,.18);--grn:#2d7a4f;--grn-bg:#e8f5ee;--grn-bdr:#b8e0c8;--red:#b83333;--red-bg:#fceaea;--red-bdr:#e8c0c0;--blue-bg:#eef4fc;--blue-bdr:#c0d4e8;--blue:#3060a0;
-  background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;border-radius:16px;padding:20px 18px 40px;max-width:560px;margin:0 auto}
+  background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;border-radius:16px;padding:20px 18px 40px;max-width:100%;margin:0 auto}
+@media(min-width:768px){.af{padding:28px 32px 48px}}
+@media(min-width:1024px){.af{padding:32px 48px 48px}}
+@media(min-width:768px){.af .hdr-val{font-size:48px}}
+@media(min-width:768px){.af .ios{gap:12px}}
+@media(min-width:768px){.af .tx{padding:16px 20px}}
+@media(min-width:768px){.af .chips{justify-content:center}}
 .af *{box-sizing:border-box}
 .af .serif{font-family:'Lora',serif}
 .af .mono{font-family:'JetBrains Mono',monospace}
@@ -165,6 +174,7 @@ export default function FinanzenPage() {
   const [dirFilter, setDirFilter] = useState<"all" | "inc" | "out">("all");
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [txPage, setTxPage] = useState(0);
+  const [showAllCats, setShowAllCats] = useState(false);
   const [werte, setWerte] = useState<Messwerte | null>(null);
   const [messFehler, setMessFehler] = useState<string | null>(null);
 
@@ -270,18 +280,26 @@ export default function FinanzenPage() {
                     <span className="cats-title">Ausgaben nach Kategorie</span>
                     {catFilter ? <span className="cats-hint" onClick={() => { setCatFilter(null); setTxPage(0); }}>Filter zurücksetzen</span> : <span className="cats-hint">Tippen filtert</span>}
                   </div>
-                  {catEntries.map(([cat, amount]) => {
+                  {(showAllCats ? catEntries : catEntries.slice(0, 5)).map(([cat, amount], idx) => {
                     const pct = catTotal > 0 ? Math.round((amount / catTotal) * 100) : 0;
+                    const color = getCatColor(cat, idx);
                     return (
                       <div key={cat} className={`cat${catFilter && catFilter !== cat ? " dim" : ""}`} onClick={() => { setCatFilter(catFilter === cat ? null : cat); setTxPage(0); }}>
                         <div className="cat-top">
-                          <span className="cat-nm"><span className="cat-dot" style={{ background: CAT_COLORS[cat] ?? "#888" }} />{cat}</span>
+                          <span className="cat-nm"><span className="cat-dot" style={{ background: color }} />{cat}</span>
                           <span className="cat-val">-{euroShort(amount)} · {pct}%</span>
                         </div>
-                        <div className="cat-track"><div className="cat-fill" style={{ width: `${pct}%`, background: CAT_COLORS[cat] ?? "#888" }} /></div>
+                        <div className="cat-track"><div className="cat-fill" style={{ width: `${pct}%`, background: color }} /></div>
                       </div>
                     );
                   })}
+                  {catEntries.length > 5 && (
+                    <div style={{ textAlign: "center", paddingTop: 10 }}>
+                      <button onClick={() => setShowAllCats(!showAllCats)} style={{ fontSize: 11, color: "#a09888", background: "none", border: "1px solid #e8e2d8", padding: "5px 16px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                        {showAllCats ? "Weniger anzeigen" : `+ ${catEntries.length - 5} weitere Kategorien`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -369,7 +387,7 @@ export default function FinanzenPage() {
         </div>
       ) : (
         <div>
-          <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 18px" }}>
+          <div style={{ maxWidth: "100%", margin: "0 auto", padding: "20px 18px" }}>
             {tabBar}
           </div>
           <div className="space-y-8">
