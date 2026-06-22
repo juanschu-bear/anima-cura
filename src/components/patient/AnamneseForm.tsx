@@ -6,7 +6,55 @@ import { pruefeName, pruefeEmail, pruefeTelefon, pruefePlz, pruefeHausnummer, pr
 // Anamnesebogen der KFO-Praxis Dr. Schubert, eigene Komponente (Weg B), 1:1 aus Mockup Variante A.
 // CSS unter .aab gekapselt, damit es nicht mit dem Rest der App kollidiert.
 
-const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
+const AAB_CSS = `
+.aab .done-lang-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:16px 0 8px;}
+.aab .done-lang-btn{font-family:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line-strong);background:var(--card);color:var(--muted);cursor:pointer;transition:all .16s;}
+.aab .done-lang-btn:hover{border-color:var(--primary);color:var(--ink);}
+.aab .done-lang-btn.on{background:linear-gradient(150deg,var(--primary-soft),transparent);border-color:var(--primary);color:var(--primary-bright);}
+.aab .glow-box{position:relative;border-radius:16px;padding:24px;margin-bottom:24px;overflow:hidden;background:linear-gradient(160deg,rgba(15,138,114,0.08),rgba(95,208,168,0.04),transparent);border:1.5px solid rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.2),0 0 40px rgba(35,176,143,0.1);animation:aabBorderGlow 3s ease-in-out infinite alternate;}
+@keyframes aabBorderGlow{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.15),0 0 40px rgba(35,176,143,0.08)}to{border-color:rgba(35,176,143,0.5);box-shadow:0 0 28px rgba(35,176,143,0.3),0 0 56px rgba(35,176,143,0.15)}}
+.aab .glow-box h3{font-family:"Fraunces",serif;font-size:20px;font-weight:500;margin:0 0 12px;}
+.aab .glow-box p{font-size:14px;margin:0 0 8px;}
+.aab .glow-box ul{list-style:none;padding:0;margin:14px 0 0;}
+.aab .glow-box li{font-size:13.5px;padding:7px 0;display:flex;gap:10px;align-items:flex-start;}
+.aab .glow-box li .gdot{width:8px;height:8px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));flex-shrink:0;margin-top:6px;box-shadow:0 0 8px rgba(35,176,143,0.35);}
+.aab .done-divider{height:1px;background:var(--line);margin:24px 0;position:relative;}
+.aab .done-divider::after{content:"\2726";position:absolute;left:50%;top:-10px;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--primary);font-size:14px;}
+.aab .done-slabel{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 16px;}
+.aab .cred-card{background:var(--field);border:1.5px solid var(--line-strong);border-radius:14px;padding:22px;margin-bottom:20px;}
+.aab .cred-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;}
+.aab .cred-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+.aab .cred-row:last-of-type{border-bottom:none;}
+.aab .cred-label{font-size:13px;color:var(--muted);font-weight:500;}
+.aab .cred-val{font-size:17px;font-weight:700;word-break:break-all;text-align:right;letter-spacing:.02em;}
+.aab .pw-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 12px;border-radius:11px;border:1.5px solid rgba(35,176,143,0.3);background:rgba(35,176,143,0.04);animation:aabPwGlow 2s ease-in-out infinite alternate;transition:all .2s;}
+@keyframes aabPwGlow{from{box-shadow:0 0 8px rgba(35,176,143,0.1)}to{box-shadow:0 0 18px rgba(35,176,143,0.3),0 0 36px rgba(35,176,143,0.1)}}
+.aab .pw-dots{font-size:22px;letter-spacing:4px;color:var(--muted-2);}
+.aab .pw-reveal{font-size:12px;color:#fff;font-weight:700;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));border:none;border-radius:10px;padding:6px 14px;white-space:nowrap;box-shadow:0 4px 14px -4px var(--primary);cursor:pointer;}
+.aab .cred-note{font-size:12.5px;color:var(--muted);margin-top:12px;padding:10px 14px;background:var(--primary-soft);border-radius:10px;display:flex;gap:8px;align-items:flex-start;}
+.aab .access-split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+@media(max-width:560px){.aab .access-split{grid-template-columns:1fr;}}
+.aab .access-side{background:var(--field);border:1px solid var(--line-strong);border-radius:14px;padding:22px;text-align:center;}
+.aab .access-side h4{font-family:"Fraunces",serif;font-size:15px;margin:0 0 8px;}
+.aab .access-side p{font-size:13px;color:var(--muted);margin:0 0 14px;}
+.aab .guide-trigger{display:flex;align-items:center;justify-content:center;gap:14px;cursor:pointer;padding:22px 24px;margin-bottom:16px;border-radius:16px;background:linear-gradient(150deg,rgba(15,138,114,0.08),rgba(95,208,168,0.05));border:1.5px solid rgba(35,176,143,0.3);animation:aabGuideGlow 2.5s ease-in-out infinite alternate;}
+@keyframes aabGuideGlow{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 14px rgba(35,176,143,0.12),0 0 30px rgba(35,176,143,0.06)}to{border-color:rgba(35,176,143,0.55);box-shadow:0 0 24px rgba(35,176,143,0.3),0 0 50px rgba(35,176,143,0.12)}}
+.aab .guide-trigger .garrow{width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 18px rgba(35,176,143,0.35);transition:transform .3s;flex-shrink:0;animation:aabArrowBounce 1.5s ease-in-out infinite;}
+@keyframes aabArrowBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@keyframes aabHintPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.aab .guide-trigger .garrow svg{width:16px;height:16px;color:#fff;}
+.aab .guide-trigger.open .garrow{animation:none;transform:rotate(180deg);}
+.aab .guide-trigger .gtitle{font-family:"Fraunces",serif;font-size:20px;font-weight:600;}
+.aab .guide-trigger .gsub{font-size:13px;color:var(--muted);}
+.aab .guide-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.2,.7,.2,1);}
+.aab .guide-body.open{max-height:2000px;}
+.aab .gplatform{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:10px;}
+.aab .gplatform h5{font-size:14px;font-weight:700;margin:0 0 8px;}
+.aab .gplatform ol{padding-left:20px;font-size:13.5px;}
+.aab .gplatform ol li{padding:4px 0;}
+.aab .gplatform ol li b{color:var(--primary);}
+.aab .app-note{text-align:center;font-size:12.5px;color:var(--muted);margin-top:20px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--field);}
+.aab[data-theme="light"]{color-scheme:light;
     --bg:#f5f2ec; --bg-tint-1:rgba(35,176,143,0.06); --bg-tint-2:rgba(95,208,168,0.05);
     --fade-1:rgba(35,176,143,0); --fade-2:rgba(95,208,168,0);
     --card:#fdfbf7; --card-2:#f8f5ef;
@@ -290,6 +338,185 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { fehlt?: boolean; onSign?: (
     </>
   );
 });
+
+
+const T: Record<string, Record<string, string>> = {
+  de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Du erhältst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
+    next: "Was kommt als Nächstes?", appTitle: "Deine persönliche Anima Cura App",
+    appDesc: "Ab sofort steht dir ein eigener, geschützter Bereich zur Verfügung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
+    f1: "Alle Rechnungen und Zahlungspläne übersichtlich an einem Ort", f2: "Deine Dokumente: Befunde, Röntgenbilder, Behandlungspläne",
+    f3: "Überblick über deine Behandlungsphasen und den aktuellen Stand", f4: "Deine Ratenzahlungen: was bezahlt wurde, was noch offen ist", f5: "Nachrichten von der Praxis direkt in der App",
+    credLabel: "Deine Zugangsdaten", credTitle: "Deine Login-Daten", emailLabel: "Login-E-Mail", pwLabel: "Passwort", pwTap: "Tippen zum Anzeigen",
+    secNote: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein dafür, damit du sicher und geschützt auf deine persönliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unberührt.",
+    screenshot: "Mach am besten einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App ändern.",
+    openLabel: "App öffnen", qrTitle: "Vom Handy scannen", qrDesc: "Du füllst den Bogen gerade am Tablet oder Computer aus? Scanne den QR-Code mit deinem Handy.",
+    qrHint: "Öffne die Kamera-App und halte sie auf den Code.", btnTitle: "Direkt öffnen", btnDesc: "Du bist bereits am Handy? Tippe auf den Button und logge dich mit deinen neuen Zugangsdaten ein.", btnText: "Anima Cura öffnen",
+    tapHint: "Hier drücken", guideTitle: "So geht\'s los!", guideSub: "App auf deinem Homescreen installieren, Schritt für Schritt",
+    guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen. Danach öffnet sie sich mit einem einzigen Tipp.",
+    ios1: "Öffne die App in Safari (nicht Chrome oder andere Browser)", ios2: "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)",
+    ios3: 'Scrolle nach unten und tippe auf „Zum Home-Bildschirm"', ios4: 'Tippe auf „Hinzufügen"',
+    and1: "Öffne die App in Chrome", and2: "Tippe auf die drei Punkte oben rechts (⋮)",
+    and3: '„Zum Startbildschirm hinzufügen"', and4: 'Bestätige mit „Hinzufügen"',
+    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
+    footer: "Bei Fragen sind wir für dich da." },
+  en: { thanks: "Thank you", received: "Your medical history form has been received. You will receive your signed documents by email. Our practice already has everything on file.",
+    next: "What happens next?", appTitle: "Your personal Anima Cura App",
+    appDesc: "From now on, you have your own secure space where you can find everything about your treatment. No paper clutter, no lost letters, everything in one place, accessible anytime from your phone.",
+    f1: "All your invoices and payment plans in one place", f2: "Your documents: findings, X-rays, treatment plans",
+    f3: "Overview of your treatment phases and current status", f4: "Your installment payments: what\'s been paid, what\'s still open", f5: "Messages from the practice directly in the app",
+    credLabel: "Your login credentials", credTitle: "Your login details", emailLabel: "Login email", pwLabel: "Password", pwTap: "Tap to reveal",
+    secNote: "The @animacura.de login email is an internal practice system. We create this access solely so you can securely access your personal app. Your private email address remains unaffected.",
+    screenshot: "Take a screenshot of these details. You can change your password anytime after your first login.",
+    openLabel: "Open the app", qrTitle: "Scan from your phone", qrDesc: "Filling out the form on a tablet or computer? Scan the QR code with your phone.",
+    qrHint: "Open the Camera app and point it at the code.", btnTitle: "Open directly", btnDesc: "Already on your phone? Tap the button and log in with your new credentials.", btnText: "Open Anima Cura",
+    tapHint: "Tap here", guideTitle: "Let\'s get started!", guideSub: "Install the app on your home screen, step by step",
+    guideIntro: "Anima Cura is a web app. You don\'t need to download anything from the App Store. But you can add it to your home screen just like a regular app. After that, it opens with a single tap.",
+    ios1: "Open the app in Safari (not Chrome or other browsers)", ios2: "Tap the Share button at the bottom (the square with an upward arrow)",
+    ios3: '"Add to Home Screen"', ios4: 'Tap "Add"',
+    and1: "Open the app in Chrome", and2: "Tap the three dots in the top right (⋮)",
+    and3: '"Add to Home screen"', and4: 'Confirm with "Add"',
+    appNote: "The app is currently available in German, English and Spanish. More languages coming soon.",
+    footer: "Questions? We\'re here for you." },
+  es: { thanks: "Gracias", received: "Hemos recibido tu formulario. Recibirás tus documentos firmados por correo electrónico. Nuestra consulta ya tiene todo archivado.",
+    next: "¿Qué viene ahora?", appTitle: "Tu app personal Anima Cura",
+    appDesc: "A partir de ahora tienes tu propio espacio seguro donde encontrarás todo sobre tu tratamiento. Sin papeles perdidos, sin cartas extraviadas, todo en un solo lugar, accesible en cualquier momento desde tu móvil.",
+    f1: "Todas tus facturas y planes de pago en un solo lugar", f2: "Tus documentos: diagnósticos, radiografías, planes de tratamiento",
+    f3: "Vista general de tus fases de tratamiento y estado actual", f4: "Tus pagos a plazos: lo que se ha pagado, lo que queda pendiente", f5: "Mensajes de la consulta directamente en la app",
+    credLabel: "Tus datos de acceso", credTitle: "Tus datos de inicio de sesión", emailLabel: "E-mail de acceso", pwLabel: "Contraseña", pwTap: "Pulsa para ver",
+    secNote: "El correo @animacura.de es un sistema interno de la consulta. Creamos este acceso únicamente para que puedas acceder de forma segura a tu app personal. Tu correo privado no se ve afectado.",
+    screenshot: "Haz una captura de pantalla de estos datos. Puedes cambiar tu contraseña en cualquier momento después de iniciar sesión.",
+    openLabel: "Abrir la app", qrTitle: "Escanear desde el móvil", qrDesc: "¿Estás rellenando el formulario en una tablet o un ordenador? Escanea el código QR con tu móvil.",
+    qrHint: "Abre la cámara y apunta al código.", btnTitle: "Abrir directamente", btnDesc: "¿Ya estás en el móvil? Pulsa el botón e inicia sesión con tus nuevos datos.", btnText: "Abrir Anima Cura",
+    tapHint: "Pulsa aquí", guideTitle: "¡Empezamos!", guideSub: "Instala la app en tu pantalla de inicio, paso a paso",
+    guideIntro: "Anima Cura es una web app. No necesitas descargar nada de la App Store. Pero puedes añadirla a tu pantalla de inicio como una app normal. Después se abre con un solo toque.",
+    ios1: "Abre la app en Safari (no Chrome u otros navegadores)", ios2: "Pulsa el botón de compartir en la parte inferior (el cuadrado con una flecha)",
+    ios3: '"Añadir a la pantalla de inicio"', ios4: 'Pulsa "Añadir"',
+    and1: "Abre la app en Chrome", and2: "Pulsa los tres puntos arriba a la derecha (⋮)",
+    and3: '"Añadir a pantalla de inicio"', and4: 'Confirma con "Añadir"',
+    appNote: "La app está disponible de momento en alemán, inglés y español. Más idiomas próximamente.",
+    footer: "¿Preguntas? Estamos aquí para ti." },
+  ru: { thanks: "Спасибо", received: "Твоя анкета получена. Подписанные документы придут тебе на электронную почту. Наша практика уже всё зарегистрировала.",
+    next: "Что дальше?", appTitle: "Твоё персональное приложение Anima Cura",
+    appDesc: "Теперь у тебя есть собственное защищённое пространство, где ты найдёшь всё о своём лечении. Никакого бумажного хаоса, никаких потерянных писем, всё в одном месте, доступно в любое время с телефона.",
+    f1: "Все счета и платёжные планы в одном месте", f2: "Твои документы: диагнозы, рентгеновские снимки, планы лечения",
+    f3: "Обзор этапов лечения и текущий статус", f4: "Твои рассрочки: что оплачено, что ещё открыто", f5: "Сообщения от клиники прямо в приложении",
+    credLabel: "Твои данные для входа", credTitle: "Твои логин-данные", emailLabel: "E-mail для входа", pwLabel: "Пароль", pwTap: "Нажми, чтобы показать",
+    secNote: "E-mail @animacura.de — это внутренняя система клиники. Мы создаём этот доступ исключительно для того, чтобы ты мог безопасно пользоваться своим персональным приложением. Твой личный e-mail не затрагивается.",
+    screenshot: "Лучше сделай скриншот этих данных. Пароль можно изменить в любое время после первого входа.",
+    openLabel: "Открыть приложение", qrTitle: "Сканировать с телефона", qrDesc: "Заполняешь анкету на планшете или компьютере? Отсканируй QR-код телефоном.",
+    qrHint: "Открой камеру и наведи на код.", btnTitle: "Открыть напрямую", btnDesc: "Уже на телефоне? Нажми кнопку и войди с новыми данными.", btnText: "Открыть Anima Cura",
+    tapHint: "Нажми сюда", guideTitle: "Начинаем!", guideSub: "Установи приложение на домашний экран, шаг за шагом",
+    guideIntro: "Anima Cura — это веб-приложение. Ничего скачивать из App Store не нужно. Но ты можешь добавить его на домашний экран как обычное приложение. После этого оно открывается одним нажатием.",
+    ios1: "Открой приложение в Safari (не Chrome или другие браузеры)", ios2: "Нажми на кнопку «Поделиться» внизу (квадрат со стрелкой вверх)",
+    ios3: "«На экран Домой»", ios4: "Нажми «Добавить»",
+    and1: "Открой приложение в Chrome", and2: "Нажми на три точки в правом верхнем углу (⋮)",
+    and3: "«Добавить на главный экран»", and4: "Подтверди «Добавить»",
+    appNote: "Приложение пока доступно на немецком, английском и испанском. Другие языки скоро появятся.",
+    footer: "Вопросы? Мы рядом." },
+  tr: { thanks: "Teşekkürler", received: "Anamnez formun bize ulaştı. İmzalı belgelerini e-posta ile alacaksın. Muayenehanemiz her şeyi kayıt altına aldı.",
+    next: "Sırada ne var?", appTitle: "Kişisel Anima Cura Uygulamanız",
+    appDesc: "Artık tedavinle ilgili her şeyi bulabileceğin kendi güvenli alanın var. Kağıt karmaşası yok, kayıp mektuplar yok, her şey tek bir yerde, telefonundan her an erişilebilir.",
+    f1: "Tüm faturalar ve ödeme planları tek bir yerde", f2: "Belgelerin: teşhisler, röntgenler, tedavi planları",
+    f3: "Tedavi aşamalarına ve mevcut duruma genel bakış", f4: "Taksit ödemelerin: ne ödendi, ne açık kaldı", f5: "Muayenehaneden doğrudan uygulamada mesajlar",
+    credLabel: "Giriş bilgilerin", credTitle: "Giriş bilgilerin", emailLabel: "Giriş e-postası", pwLabel: "Şifre", pwTap: "Görmek için dokun",
+    secNote: "@animacura.de giriş e-postası dahili bir muayenehane sistemidir. Bu erişimi yalnızca kişisel uygulamana güvenle erişebilmen için oluşturuyoruz. Özel e-posta adresin bundan etkilenmez.",
+    screenshot: "Bu bilgilerin bir ekran görüntüsünü al. Şifreni ilk girişten sonra istediğin zaman değiştirebilirsin.",
+    openLabel: "Uygulamayı aç", qrTitle: "Telefonla tara", qrDesc: "Formu tablette veya bilgisayarda mı dolduruyorsun? QR kodu telefonunla tara.",
+    qrHint: "Kamerayı aç ve koda doğrult.", btnTitle: "Doğrudan aç", btnDesc: "Zaten telefondaysan? Düğmeye dokun ve yeni giriş bilgilerinle oturum aç.", btnText: "Anima Cura\'yı aç",
+    tapHint: "Buraya dokun", guideTitle: "Haydi başlayalım!", guideSub: "Uygulamayı ana ekranına kur, adım adım",
+    guideIntro: "Anima Cura bir web uygulamasıdır. App Store\'dan indirmen gerekmez. Ama ana ekranına normal bir uygulama gibi ekleyebilirsin. Sonra tek bir dokunuşla açılır.",
+    ios1: "Uygulamayı Safari\'de aç (Chrome veya diğer tarayıcılarla değil)", ios2: "Alttaki Paylaş düğmesine dokun (yukarı oklu kare)",
+    ios3: ""Ana Ekrana Ekle"", ios4: ""Ekle" düğmesine dokun",
+    and1: "Uygulamayı Chrome\'da aç", and2: "Sağ üst köşedeki üç noktaya dokun (⋮)",
+    and3: ""Ana ekrana ekle"", and4: ""Ekle" ile onayla",
+    appNote: "Uygulama şu an Almanca, İngilizce ve İspanyolca olarak mevcut. Diğer diller yakında eklenecek.",
+    footer: "Soruların mı var? Buradayız." },
+};
+
+const APP_URL = "https://anima-cura.vercel.app/patient/login";
+const QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(APP_URL)}&bgcolor=fdfbf7&color=1d2a27`;
+
+function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setGuideOpen, vorname }: {
+  account: { login_email: string; password: string } | null;
+  lang: "de"|"en"|"es"|"ru"|"tr"; setLang: (l: "de"|"en"|"es"|"ru"|"tr") => void;
+  showPw: boolean; setShowPw: (v: boolean) => void;
+  guideOpen: boolean; setGuideOpen: (v: boolean) => void;
+  vorname: string;
+}) {
+  const t = T[lang];
+  const name = vorname || "Patient";
+  const langs: Array<{ code: "de"|"en"|"es"|"ru"|"tr"; flag: string; label: string }> = [
+    { code: "de", flag: "🇩🇪", label: "Deutsch" }, { code: "en", flag: "🇬🇧", label: "English" },
+    { code: "es", flag: "🇪🇸", label: "Español" }, { code: "ru", flag: "🇷🇺", label: "Русский" },
+    { code: "tr", flag: "🇹🇷", label: "Türkçe" },
+  ];
+  return (
+    <div className="done-screen show">
+      <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
+      <div className="done-lang-bar">
+        {langs.map((l) => (<button key={l.code} type="button" className={"done-lang-btn" + (lang === l.code ? " on" : "")} onClick={() => setLang(l.code)}>{l.flag} {l.label}</button>))}
+      </div>
+      <h2>{t.thanks}, {name}!</h2>
+      <p>{t.received}</p>
+
+      {account && (<>
+        <div className="done-divider" />
+        <div className="done-slabel">{t.next}</div>
+        <div className="glow-box" style={{ textAlign: "left" }}>
+          <h3>{t.appTitle}</h3>
+          <p>{t.appDesc}</p>
+          <ul>{[t.f1, t.f2, t.f3, t.f4, t.f5].map((f, i) => (<li key={i}><span className="gdot" />{f}</li>))}</ul>
+        </div>
+
+        <div className="done-divider" />
+        <div className="done-slabel">{t.credLabel}</div>
+        <div className="cred-card" style={{ textAlign: "left" }}>
+          <div className="cred-title">🔑 {t.credTitle}</div>
+          <div className="cred-row"><span className="cred-label">{t.emailLabel}</span><span className="cred-val">{account.login_email}</span></div>
+          <div className="cred-row"><span className="cred-label">{t.pwLabel}</span>
+            <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
+              {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">••••••••••</span>}
+              <span className="pw-reveal">👆 {showPw ? "✓" : t.pwTap}</span>
+            </div>
+          </div>
+          <div className="cred-note" style={{ marginBottom: 10 }}><span>🔒</span><div>{t.secNote}</div></div>
+          <div className="cred-note"><span>📸</span><div>{t.screenshot}</div></div>
+        </div>
+
+        <div className="done-divider" />
+        <div className="done-slabel">{t.openLabel}</div>
+        <div className="access-split">
+          <div className="access-side">
+            <h4>📱 {t.qrTitle}</h4><p>{t.qrDesc}</p>
+            <img src={QR_URL} alt="QR Code" width="160" height="160" style={{ borderRadius: 8 }} />
+            <div style={{ fontSize: "11.5px", color: "var(--muted-2)", marginTop: 10 }}>{t.qrHint}</div>
+          </div>
+          <div className="access-side">
+            <h4>👆 {t.btnTitle}</h4><p>{t.btnDesc}</p>
+            <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} →</a>
+          </div>
+        </div>
+
+        <div className="done-divider" />
+        <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>👇 {t.tapHint}</div>
+        <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
+          <div><div className="gtitle">{t.guideTitle}</div><div className="gsub">{t.guideSub}</div></div>
+          <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div>
+        </div>
+        <div className={"guide-body" + (guideOpen ? " open" : "")}>
+          <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{t.guideIntro}</p>
+          <div className="gplatform"><h5>🍎 iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> 🎉</li></ol></div>
+          <div className="gplatform"><h5>🤖 Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> 🎉</li></ol></div>
+        </div>
+        <div className="app-note">📌 {t.appNote}</div>
+      </>)}
+
+      {!account && (
+        <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
+      )}
+    </div>
+  );
+}
 
 export function AnamneseForm({ patientId }: Props) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -710,67 +937,16 @@ export function AnamneseForm({ patientId }: Props) {
 
         <div className="card">
           {done ? (
-            <div className="done-screen show">
-              <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
-              <h2>Vielen Dank!</h2>
-              <p>Ihr Bogen ist eingegangen. Sie erhalten Ihre unterschriebenen Unterlagen per E-Mail, und unsere Praxis hat alles vorliegen.</p>
-
-              {account && (
-                <div style={{ textAlign: "left", background: "var(--card-2)", border: "1px solid var(--line)", borderRadius: 13, padding: "18px 20px", margin: "18px 0" }}>
-                  <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, margin: "0 0 6px" }}>Ihr Anima Cura Zugang</h3>
-                  <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 14px" }}>
-                    Alle Ihre Rechnungen, Dokumente, Behandlungsphasen und Raten finden Sie ab sofort in Ihrer persönlichen App.
-                  </p>
-                  <div style={{ background: "var(--field)", border: "1px solid var(--line-strong)", borderRadius: 11, padding: "14px 16px", marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Login-E-Mail</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "monospace", wordBreak: "break-all" }}>{account.login_email}</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4, marginTop: 12 }}>Passwort</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "monospace" }}>{account.password}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Sie können das Passwort jederzeit in der App ändern.</div>
-                  </div>
-                  <a
-                    href="https://anima-cura.vercel.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn primary"
-                    style={{ display: "block", textAlign: "center", textDecoration: "none", marginBottom: 14 }}
-                  >
-                    Anima Cura App öffnen
-                  </a>
-
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" }}>App auf dem Homescreen installieren</div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                      {(["de", "en", "es", "ru", "tr"] as const).map((lang) => (
-                        <button key={lang} type="button" className={"btn" + (showGuide === lang ? " primary" : "")} style={{ padding: "6px 12px", fontSize: 12 }}
-                          onClick={() => setShowGuide(lang)}>
-                          {{ de: "Deutsch", en: "English", es: "Español", ru: "Русский", tr: "Türkçe" }[lang]}
-                        </button>
-                      ))}
-                    </div>
-                    {showGuide === "de" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <b>iPhone (Safari):</b> Tippen Sie auf das Teilen-Symbol (Quadrat mit Pfeil) → „Zum Home-Bildschirm" → „Hinzufügen".<br />
-                      <b>Android (Chrome):</b> Tippen Sie auf die drei Punkte oben rechts → „Zum Startbildschirm hinzufügen" → „Hinzufügen".
-                    </div>}
-                    {showGuide === "en" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <b>iPhone (Safari):</b> Tap the Share icon (square with arrow) → "Add to Home Screen" → "Add".<br />
-                      <b>Android (Chrome):</b> Tap the three dots in the top right → "Add to Home screen" → "Add".
-                    </div>}
-                    {showGuide === "es" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <b>iPhone (Safari):</b> Pulse el icono de compartir (cuadrado con flecha) → "Añadir a la pantalla de inicio" → "Añadir".<br />
-                      <b>Android (Chrome):</b> Pulse los tres puntos arriba a la derecha → "Añadir a pantalla de inicio" → "Añadir".
-                    </div>}
-                    {showGuide === "ru" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <b>iPhone (Safari):</b> Нажмите на значок «Поделиться» (квадрат со стрелкой) → «На экран Домой» → «Добавить».<br />
-                      <b>Android (Chrome):</b> Нажмите три точки вверху справа → «Добавить на главный экран» → «Добавить».
-                    </div>}
-                    {showGuide === "tr" && <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <b>iPhone (Safari):</b> Paylaş simgesine dokunun (oklu kare) → "Ana Ekrana Ekle" → "Ekle".<br />
-                      <b>Android (Chrome):</b> Sağ üstteki üç noktaya dokunun → "Ana ekrana ekle" → "Ekle".
-                    </div>}
-                  </div>
-                </div>
-              )}
+            <DoneScreen
+              account={account}
+              lang={lang}
+              setLang={setLang}
+              showPw={showPw}
+              setShowPw={setShowPw}
+              guideOpen={guideOpen}
+              setGuideOpen={setGuideOpen}
+              vorname={txt("patient_vorname")}
+            />}
 
               {!account && (
                 <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
