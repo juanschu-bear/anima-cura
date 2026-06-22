@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/db/supabase";
+import { createServerClient, createAdminClient } from "@/lib/db/supabase";
+import crypto from "crypto";
 import {
   createAndDistribute,
   type DocumensoField,
@@ -19,6 +20,71 @@ type SubmitBody = {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+function normalizeForEmail(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // remove accents
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^a-z0-9.-]/g, "")
+    .replace(/\.{2,}/g, ".");
+}
+
+function generatePassword(length = 10): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes).map(b => chars[b % chars.length]).join("");
+}
+
+async function createPatientAccount(
+  vorname: string | null,
+  nachname: string | null,
+  patientEmail: string | null,
+): Promise<{ login_email: string; password: string } | null> {
+  if (!vorname || !nachname) return null;
+  
+  const supabase = createServerClient();
+  const base = normalizeForEmail(vorname) + "." + normalizeForEmail(nachname);
+  let loginEmail = base + "@animacura.de";
+  
+  // Check for duplicates
+  const { count } = await supabase
+    .from("patients")
+    .select("id", { count: "exact", head: true })
+    .ilike("email", loginEmail);
+  
+  if (count && count > 0) {
+    loginEmail = base + (count + 1) + "@animacura.de";
+  }
+  
+  const password = generatePassword(10);
+  
+  // Create Supabase auth user
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.createUser({
+      email: loginEmail,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        vorname,
+        nachname,
+        patient_email: patientEmail,
+        role: "patient",
+      },
+    });
+    
+    if (error) {
+      console.error("Account creation failed:", error.message);
+      return null;
+    }
+    
+    return { login_email: loginEmail, password };
+  } catch (err) {
+    console.error("Account creation error:", err);
+    return null;
+  }
 }
 
 // Seitenzahl aus dem PDF zaehlen (WeasyPrint liefert klassische Seitenobjekte).
@@ -89,6 +155,9 @@ export async function POST(request: Request) {
       "abgleich_patient_aus_submission",
       { p_submission_id: submissionId }
     );
+
+    // 1c) Patienten-Account erstellen (für AnimaCura App-Zugang)
+    const account = await createPatientAccount(vorname, nachname, email);
 
     // 2) PDF beim PDF-Dienst rendern lassen
     const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
@@ -200,6 +269,7 @@ export async function POST(request: Request) {
         token: signing.token,
         host: documensoHost,
         abgleich: abgleich ?? null,
+        account: account ?? null,
       });
     } catch (documensoError) {
       // Daten sind gespeichert. Ohne Signier-Link faellt das Frontend auf die
