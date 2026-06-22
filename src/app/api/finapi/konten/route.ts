@@ -67,7 +67,7 @@ export async function GET(request: Request) {
         date: tx.bankBookingDate || tx.valueDate,
         counterpart: tx.counterpartName || tx.purpose?.slice(0, 40) || "Unbekannt",
         purpose: tx.purpose || "",
-        category: tx.category || null,
+        category: tx.category?.name || null,
       })),
       totalCount: txResult.paging?.totalCount ?? txResult.transactions.length,
     });
