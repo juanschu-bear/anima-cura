@@ -196,6 +196,7 @@ export interface FinAPIToken {
 
 export interface FinAPITransaction {
   id: number;
+  accountId?: number;
   amount: number;
   counterpartName: string | null;
   counterpartIban: string | null;
@@ -207,6 +208,7 @@ export interface FinAPITransaction {
 
 export interface FinAPIBankConnection {
   id: number;
+  accountId?: number;
   bankId: number;
   name: string;
   status: string;
