@@ -367,9 +367,9 @@ const T: Record<string, Record<string, string>> = {
     tapHint: "Hier drücken", guideTitle: "So geht\'s los!", guideSub: "App auf deinem Homescreen installieren, Schritt für Schritt",
     guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen. Danach öffnet sie sich mit einem einzigen Tipp.",
     ios1: "Öffne die App in Safari (nicht Chrome oder andere Browser)", ios2: "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)",
-    ios3: 'Scrolle nach unten und tippe auf „Zum Home-Bildschirm"', ios4: 'Tippe auf „Hinzufügen"',
+    ios3: 'Scrolle nach unten und tippe auf \"Zum Home-Bildschirm"', ios4: 'Tippe auf \"Hinzufügen"',
     and1: "Öffne die App in Chrome", and2: "Tippe auf die drei Punkte oben rechts (⋮)",
-    and3: '„Zum Startbildschirm hinzufügen"', and4: 'Bestätige mit „Hinzufügen"',
+    and3: '\"Zum Startbildschirm hinzufügen"', and4: 'Bestätige mit \"Hinzufügen"',
     appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
     footer: "Bei Fragen sind wir für dich da." },
   en: { thanks: "Thank you", received: "Your medical history form has been received. You will receive your signed documents by email. Our practice already has everything on file.",
@@ -923,7 +923,7 @@ export function AnamneseForm({ patientId }: Props) {
         return (
           <section className="step active">
             <h2>Gesundheitsfragen</h2>
-            <p className="sub">Bitte für jede Frage Ja oder Nein wählen. Ehrliche Angaben helfen uns, sicher und richtig zu behandeln. Bei „Ja" erscheint manchmal ein kurzes Zusatzfeld.</p>
+            <p className="sub">Bitte für jede Frage Ja oder Nein wählen. Ehrliche Angaben helfen uns, sicher und richtig zu behandeln. Bei \"Ja" erscheint manchmal ein kurzes Zusatzfeld.</p>
             <div id="medlist">
               {MEDS.map((m) => (
                 <div className="qrow" key={m.key}>
