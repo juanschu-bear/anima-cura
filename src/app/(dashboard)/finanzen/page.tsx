@@ -45,6 +45,18 @@ function euro(v: number): string {
   return `${v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`;
 }
 function euroShort(v: number): string { return `${Math.round(v).toLocaleString("de-DE")} €`; }
+function datDE(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  return `${dayNames[date.getDay()]}, ${d}.${m}.${y}`;
+}
+function datShort(iso: string): string {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return `${d}.${m}.`;
+}
 function zahl(v: number): string { return v.toLocaleString("de-DE"); }
 function guessCategory(cp: string, p: string): string {
   const x = `${cp} ${p}`.toLowerCase();
@@ -200,7 +212,7 @@ export default function FinanzenPage() {
     cat: tx.category ?? guessCategory(tx.counterpart, tx.purpose),
     dir: (tx.amount >= 0 ? "inc" : "out") as "inc" | "out",
     ibanShort: ACC_SHORT[tx.accountId] ?? `#${tx.accountId}`,
-  }));
+  })).sort((a, b) => b.date.localeCompare(a.date));
 
   const filteredTx = transactions.filter((tx) => {
     if (selectedAcc !== "all" && tx.accountId !== selectedAcc) return false;
@@ -224,7 +236,6 @@ export default function FinanzenPage() {
   const outCount = transactions.filter((tx) => tx.dir === "out").length;
 
   const resetFilters = useCallback(() => { setDirFilter("all"); setCatFilter(null); setTxPage(0); }, []);
-  const showInsights = safePage === 0 && dirFilter === "all" && !catFilter && selectedAcc === "all";
 
   // Tab bar shared between both views
   const tabBar = (
@@ -316,23 +327,6 @@ export default function FinanzenPage() {
                 </div>
               </div>
 
-              {showInsights && incTotal > 0 && (
-                <div className="insights-sec">
-                  <div className="insight positive">
-                    <div className="insight-head"><span className="insight-icon">📈</span><span className="insight-label">Trend</span></div>
-                    <div className="insight-title">Netto-Zufluss im Betrachtungszeitraum</div>
-                    <div className="insight-desc">Eingänge übersteigen Ausgaben um {euroShort(Math.abs(incTotal - outTotal))}. Dr. Cashy empfiehlt, einen Teil der Überschüsse in die Rücklage zu verschieben.</div>
-                  </div>
-                  {catEntries.length > 0 && catEntries[0][1] > catTotal * 0.3 && (
-                    <div className="insight warning">
-                      <div className="insight-head"><span className="insight-icon">⚠️</span><span className="insight-label">Hinweis</span></div>
-                      <div className="insight-title">{catEntries[0][0]} macht {Math.round((catEntries[0][1] / catTotal) * 100)}% aller Ausgaben</div>
-                      <div className="insight-desc">{euroShort(catEntries[0][1])} für {catEntries[0][0]} — prüfe ob das im Rahmen liegt.</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="filters">
                 {(["all", "inc", "out"] as const).map((d) => (
                   <button key={d} className={`fl${dirFilter === d ? " on" : ""}`} onClick={() => { setDirFilter(d); setTxPage(0); }}>
@@ -352,13 +346,13 @@ export default function FinanzenPage() {
                       if (dayChanged) lastDay = tx.date;
                       return (
                         <div key={tx.id}>
-                          {dayChanged && <div className="day-label">{tx.date}</div>}
+                          {dayChanged && <div className="day-label">{datDE(tx.date)}</div>}
                           <div className="tx">
                             <div className={`tx-bar ${tx.dir}`} />
                             <div className="tx-bd">
                               <div className="tx-nm">{tx.counterpart}</div>
                               <div className="tx-mt">
-                                <span className="mono" style={{ fontSize: 11 }}>{tx.date}</span> · <span>{tx.ibanShort}</span>
+                                <span className="mono" style={{ fontSize: 11 }}>{datShort(tx.date)}</span> · <span>{tx.ibanShort}</span>
                                 <span className="tx-tg">{tx.cat}</span>
                               </div>
                             </div>
