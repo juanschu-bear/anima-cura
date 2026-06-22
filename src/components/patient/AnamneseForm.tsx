@@ -32,7 +32,7 @@ const AAB_CSS = `
 .aab .glow-box li{font-size:13.5px;padding:7px 0;display:flex;gap:10px;align-items:flex-start;}
 .aab .glow-box li .gdot{width:8px;height:8px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));flex-shrink:0;margin-top:6px;box-shadow:0 0 8px rgba(35,176,143,0.35);}
 .aab .done-divider{height:1px;background:var(--line);margin:24px 0;position:relative;}
-.aab .done-divider::after{content:"\2726";position:absolute;left:50%;top:-10px;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--primary);font-size:14px;}
+.aab .done-divider::after{content:"\\2726";position:absolute;left:50%;top:-10px;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--primary);font-size:14px;}
 .aab .done-slabel{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 16px;}
 .aab .cred-card{background:var(--field);border:1.5px solid var(--line-strong);border-radius:14px;padding:22px;margin-bottom:20px;}
 .aab .cred-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;}
