@@ -150,6 +150,7 @@ const KONTEN_CSS = `
 .af .fl.on{background:var(--t1);color:var(--bg);border-color:transparent}
 .af .fl:hover:not(.on){border-color:var(--t3);color:var(--t2)}
 .af .day-label{font-size:10px;font-weight:600;color:var(--t4);letter-spacing:1px;text-transform:uppercase;padding:14px 0 6px}
+.af .tx.tx-inc{background:#f0f9f4;border-color:#b8e0c8}
 .af .tx{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:14px;margin-bottom:6px;cursor:pointer;border:1px solid transparent;transition:border-color .15s}
 .af .tx:hover{border-color:var(--bdr)}
 .af .tx-bar{width:3px;height:36px;border-radius:2px;flex-shrink:0}
@@ -174,7 +175,7 @@ const KONTEN_CSS = `
 .af .error-box{background:var(--red-bg);border:1px solid var(--red-bdr);border-radius:14px;padding:16px;color:var(--red);font-size:13px}
 `;
 
-const PER_PAGE = 8;
+const PER_PAGE = 20;
 
 export default function FinanzenPage() {
   const { locale } = useAppStore();
@@ -347,7 +348,7 @@ export default function FinanzenPage() {
                       return (
                         <div key={tx.id}>
                           {dayChanged && <div className="day-label">{datDE(tx.date)}</div>}
-                          <div className="tx">
+                          <div className={`tx ${tx.dir === "inc" ? "tx-inc" : ""}`}>
                             <div className={`tx-bar ${tx.dir}`} />
                             <div className="tx-bd">
                               <div className="tx-nm">{tx.counterpart}</div>
