@@ -7,9 +7,7 @@ import { t } from "@/lib/i18n";
 import { CardSkeleton } from "@/components/ui";
 import { Landmark, CreditCard, Users, Receipt, ShieldAlert, ArrowLeftRight, Wallet } from "lucide-react";
 
-// ═══════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════
+// ═══════ TYPES ═══════
 
 type TabId = "konten" | "messstation";
 interface KAccount { id: number; name: string; iban: string; balance: number }
@@ -25,12 +23,11 @@ interface Messwerte {
   ausgaben?: { buik: Zaehler; meta: Zaehler; kontofuehrung: Zaehler; align: Zaehler; mittwald: Zaehler };
 }
 
-// ═══════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════
+// ═══════ HELPERS ═══════
 
 const ACC_LABELS: Record<number, string> = { 31760549: "Hauptkonto", 31760546: "Betrieb", 31760547: "Privat" };
 const ACC_SHORT: Record<number, string> = { 31760549: "...950", 31760546: "...976", 31760547: "...206" };
+const ACC_COLORS: Record<number, string> = { 31760549: "#b8860b", 31760546: "#3060a0", 31760547: "#6050a0" };
 
 function euro(v: number): string { return v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
 function euroK(v: number): string { return Math.round(v).toLocaleString("de-DE") + " €"; }
@@ -47,7 +44,6 @@ function datShort(iso: string): string {
 }
 function zahl(v: number): string { return v.toLocaleString("de-DE"); }
 
-// Match counterpart gegen Kategorie-Muster
 function matchKategorie(counterpart: string, kategorien: Kategorie[]): Kategorie | null {
   const lc = counterpart.toLowerCase();
   for (const k of kategorien) {
@@ -58,9 +54,7 @@ function matchKategorie(counterpart: string, kategorien: Kategorie[]): Kategorie
   return null;
 }
 
-// ═══════════════════════════════════════════════
-// MESSSTATION COMPONENTS (unchanged)
-// ═══════════════════════════════════════════════
+// ═══════ MESSSTATION COMPONENTS ═══════
 
 function FinCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "green" | "amber" | "red" | "blue" }) {
   const c = tone === "green" ? "text-accent-emerald" : tone === "amber" ? "text-accent-amber" : tone === "red" ? "text-accent-coral" : tone === "blue" ? "text-accent-blue" : "";
@@ -70,33 +64,37 @@ function Abschnitt({ icon: Icon, titel, hinweis, children }: { icon: typeof Land
   return (<section className="space-y-3"><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-praxis-400" /><h2 className="text-sm font-semibold">{titel}</h2>{hinweis && <span className="text-xs text-praxis-400">· {hinweis}</span>}</div><div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>);
 }
 
-// ═══════════════════════════════════════════════
-// SCOPED CSS
-// ═══════════════════════════════════════════════
+// ═══════ SCOPED CSS ═══════
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 .af{--bg:#f8f5ef;--card:#fff;--card2:#f2ede4;--t1:#1a1815;--t2:#6a6050;--t3:#a09888;--t4:#c8c0b0;--bdr:#e8e2d8;--bdr2:#d8d0c4;--gold:#b8860b;--grn:#2d7a4f;--grn-bg:#e8f5ee;--grn-bdr:#b8e0c8;--red:#b83333;--red-bg:#fceaea;--red-bdr:#e8c0c0;
-  background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;border-radius:16px;padding:20px 18px 40px}
-@media(min-width:768px){.af{padding:28px 32px 48px}}
+  background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;border-radius:16px;padding:20px 18px 40px;max-width:820px;margin:0 auto}
+@media(min-width:768px){.af{padding:28px 36px 48px}}
 .af *{box-sizing:border-box}
 .af .serif{font-family:'Lora',serif}
 .af .mono{font-family:'JetBrains Mono',monospace}
+
 .af .hdr{text-align:center;padding:16px 0 28px;border-bottom:1px solid var(--bdr);margin-bottom:24px}
 .af .hdr-lock{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gold);background:rgba(184,134,11,.06);border:1px solid rgba(184,134,11,.18);padding:3px 12px;border-radius:12px;font-weight:500;margin-bottom:12px}
+.af .hdr-sub{font-size:11px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
 .af .hdr-val{font-family:'Lora',serif;font-size:40px;font-weight:400;color:var(--gold);letter-spacing:-1px}
 @media(min-width:768px){.af .hdr-val{font-size:48px}}
 .af .hdr-val span{font-size:28px;color:var(--t4)}
-.af .hdr-sub{font-size:11px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
 .af .hdr-date{font-size:11px;color:var(--t4);margin-top:8px}
+.af .hdr-note{font-size:11px;color:var(--t3);margin-top:12px;line-height:1.5;max-width:440px;margin-left:auto;margin-right:auto;font-style:italic}
+
 .af .chips{display:flex;gap:8px;overflow-x:auto;padding:0 0 4px;margin-bottom:20px;scrollbar-width:none}
 .af .chips::-webkit-scrollbar{display:none}
 @media(min-width:768px){.af .chips{justify-content:center}}
-.af .chip{flex-shrink:0;padding:10px 18px;border-radius:24px;border:1.5px solid var(--bdr2);background:var(--card);cursor:pointer;transition:all .2s;text-align:center}
+.af .chip{flex-shrink:0;padding:10px 18px;border-radius:24px;border:1.5px solid var(--bdr2);background:var(--card);cursor:pointer;transition:all .2s;text-align:center;display:flex;align-items:center;gap:10px}
 .af .chip.on{background:var(--t1);color:var(--bg);border-color:transparent}
+.af .chip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.2)}
+.af .chip-text{text-align:left}
 .af .chip-nm{font-size:11px;font-weight:500}
-.af .chip-bal{font-size:15px;font-weight:600;margin-top:2px}
+.af .chip-bal{font-size:15px;font-weight:600;margin-top:1px}
 .af .chip.on .chip-nm{color:rgba(248,245,239,.5)}
+
 .af .cats{background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:18px 20px;margin-bottom:16px}
 .af .cats-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .af .cats-title{font-size:12px;font-weight:600;color:var(--t2)}
@@ -110,6 +108,16 @@ const CSS = `
 .af .cat-val{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
 .af .cat-track{height:5px;background:var(--card2);border-radius:3px;overflow:hidden}
 .af .cat-fill{height:100%;border-radius:3px}
+
+.af .saldo-strip{background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:14px 18px;margin-bottom:16px}
+.af .saldo-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.af .saldo-t{font-size:11px;color:var(--t3);font-weight:500}
+.af .saldo-pills{display:flex;gap:2px}
+.af .saldo-p{font-size:10px;padding:3px 10px;border-radius:10px;background:transparent;color:var(--t4);border:none;cursor:pointer;font-family:inherit;font-weight:500}
+.af .saldo-p.on{background:var(--t1);color:var(--bg)}
+.af .saldo-labels{display:flex;justify-content:space-between;margin-top:4px}
+.af .saldo-labels span{font-size:9px;color:var(--t4);font-family:'JetBrains Mono',monospace}
+
 .af .ios{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
 .af .io{border-radius:14px;padding:14px 16px;border:1px solid}
 .af .io.inc{background:var(--grn-bg);border-color:var(--grn-bdr)}
@@ -120,11 +128,14 @@ const CSS = `
 .af .io.inc .io-v{color:var(--grn)}.af .io.out .io-v{color:var(--red)}
 .af .io-sub{font-size:11px;margin-top:3px}
 .af .io.inc .io-sub{color:rgba(45,122,79,.4)}.af .io.out .io-sub{color:rgba(184,51,51,.4)}
+
 .af .filters{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
 .af .fl{font-size:11px;padding:7px 14px;border-radius:18px;border:1.5px solid var(--bdr2);background:transparent;color:var(--t3);cursor:pointer;font-family:inherit;font-weight:500;transition:all .2s}
 .af .fl.on{background:var(--t1);color:var(--bg);border-color:transparent}
+.af .fl-sep{width:1px;height:24px;background:var(--bdr);align-self:center;margin:0 2px}
+
 .af .day-label{font-size:10px;font-weight:600;color:var(--t4);letter-spacing:1px;text-transform:uppercase;padding:14px 0 6px}
-.af .tx{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:14px;margin-bottom:6px;cursor:pointer;border:1px solid transparent;transition:border-color .15s}
+.af .tx{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:14px;margin-bottom:6px;border:1px solid transparent;transition:border-color .15s}
 .af .tx:hover{border-color:var(--bdr)}
 .af .tx.tx-inc{background:#f0f9f4;border-color:var(--grn-bdr)}
 .af .tx-bar{width:3px;height:36px;border-radius:2px;flex-shrink:0}
@@ -135,6 +146,7 @@ const CSS = `
 .af .tx-tg{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;cursor:pointer;border:1px solid var(--bdr);transition:all .15s;position:relative}
 .af .tx-tg:hover{border-color:var(--t3)}
 .af .tx-tg-unset{border-style:dashed;color:var(--t4)}
+.af .tx-tg-suggest{border-style:dashed;font-style:italic}
 .af .tx-rt{text-align:right;flex-shrink:0}
 .af .tx-am{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace}
 .af .tx-am.pos{color:var(--grn)}.af .tx-am.neg{color:var(--red)}
@@ -147,48 +159,35 @@ const CSS = `
 .af .dropdown-item:hover{background:var(--card2)}
 .af .dropdown-sep{height:1px;background:var(--bdr);margin:4px 0}
 .af .dropdown-input{width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg);margin-top:4px}
-.af .loading{text-align:center;padding:48px 0;color:var(--t4);font-size:13px}
+.af .loading{text-align:center;padding:48px 0;color:var(--t4)}
 .af .error-box{background:var(--red-bg);border:1px solid var(--red-bdr);border-radius:14px;padding:16px;color:var(--red);font-size:13px}
 .af .more-btn{display:block;text-align:center;padding:10px;font-size:11px;color:var(--t4);background:none;border:1px solid var(--bdr);border-radius:12px;cursor:pointer;font-family:inherit;margin-top:4px;width:100%}
 `;
 
-// ═══════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════
+// ═══════ MAIN ═══════
 
 const PER_PAGE = 20;
 
 export default function FinanzenPage() {
   const { locale } = useAppStore();
   const [tab, setTab] = useState<TabId>("konten");
-
-  // Konten data
   const [accounts, setAccounts] = useState<KAccount[]>([]);
   const [rawTx, setRawTx] = useState<KTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Eigene Kategorien
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [txMap, setTxMap] = useState<Record<string, string>>({});
-
-  // Filters
   const [selAcc, setSelAcc] = useState<number | "all">("all");
   const [dirF, setDirF] = useState<"all" | "inc" | "out">("all");
   const [catF, setCatF] = useState<string | null>(null);
   const [txPage, setTxPage] = useState(0);
   const [showAllCats, setShowAllCats] = useState(false);
-
-  // Category assignment UI
   const [editTxId, setEditTxId] = useState<number | null>(null);
   const [newCatName, setNewCatName] = useState("");
   const dropRef = useRef<HTMLDivElement>(null);
-
-  // Messstation
   const [werte, setWerte] = useState<Messwerte | null>(null);
   const [messFehler, setMessFehler] = useState<string | null>(null);
 
-  // ── Fetch Konten + Kategorien ──
   useEffect(() => {
     Promise.all([
       fetch("/api/finapi/konten?days=90").then(r => r.json()),
@@ -200,7 +199,6 @@ export default function FinanzenPage() {
     }).catch(e => setError(String(e))).finally(() => setLoading(false));
   }, []);
 
-  // Fetch Messstation
   useEffect(() => {
     if (tab !== "messstation") return;
     createBrowserClient().rpc("ac_finanz_messwerte").then(({ data, error: e }) => {
@@ -208,29 +206,23 @@ export default function FinanzenPage() {
     });
   }, [tab]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const h = (e: MouseEvent) => { if (dropRef.current && !dropRef.current.contains(e.target as Node)) setEditTxId(null); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // ── Resolve category for a transaction ──
-  function resolveCat(tx: KTransaction): { name: string; color: string; id: string | null } {
-    // 1. Manual assignment
+  function resolveCat(tx: KTransaction): { name: string; color: string; id: string | null; isSuggestion: boolean } {
     const manualId = txMap[String(tx.id)];
     if (manualId) {
       const k = kategorien.find(k => k.id === manualId);
-      if (k) return { name: k.name, color: k.color, id: k.id };
+      if (k) return { name: k.name, color: k.color, id: k.id, isSuggestion: false };
     }
-    // 2. Muster-matching on counterpart
     const match = matchKategorie(tx.counterpart, kategorien);
-    if (match) return { name: match.name, color: match.color, id: match.id };
-    // 3. Not assigned
-    return { name: "", color: "#ccc", id: null };
+    if (match) return { name: match.name, color: match.color, id: match.id, isSuggestion: true };
+    return { name: "", color: "#ccc", id: null, isSuggestion: false };
   }
 
-  // ── Assign category to transaction ──
   async function assignCategory(txId: number, katId: string, counterpart: string) {
     setEditTxId(null);
     setTxMap(prev => ({ ...prev, [String(txId)]: katId }));
@@ -241,27 +233,20 @@ export default function FinanzenPage() {
     });
   }
 
-  // ── Create new category ──
   async function createCategory(name: string) {
     if (!name.trim()) return;
     const colors = ["#c0392b", "#d4881e", "#2d7a4f", "#7a5e3e", "#6050a0", "#3060a0", "#b85c8a", "#4a8080"];
-    const color = colors[kategorien.length % colors.length];
     const res = await fetch("/api/finapi/kategorien", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "erstellen", name: name.trim(), color }),
+      body: JSON.stringify({ action: "erstellen", name: name.trim(), color: colors[kategorien.length % colors.length] }),
     });
     const d = await res.json();
-    if (d.ok && d.kategorie) {
-      setKategorien(prev => [...prev, d.kategorie]);
-      setNewCatName("");
-    }
+    if (d.ok && d.kategorie) { setKategorien(prev => [...prev, d.kategorie]); setNewCatName(""); }
   }
 
-  // ── Derived data ──
+  // ── Derived ──
   const totalBal = accounts.reduce((s, a) => s + a.balance, 0);
-
-  // Enrich + sort: income first within same date, then by date desc
   const enriched = rawTx.map(tx => ({
     ...tx,
     dir: (tx.amount >= 0 ? "inc" : "out") as "inc" | "out",
@@ -270,7 +255,6 @@ export default function FinanzenPage() {
   })).sort((a, b) => {
     const dc = b.date.localeCompare(a.date);
     if (dc !== 0) return dc;
-    // Same date: income first
     if (a.dir === "inc" && b.dir !== "inc") return -1;
     if (a.dir !== "inc" && b.dir === "inc") return 1;
     return 0;
@@ -288,19 +272,16 @@ export default function FinanzenPage() {
   const safePage = Math.min(txPage, totalPages - 1);
   const pageTx = filtered.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
 
-  // Category breakdown from OUR categories (not finAPI)
   const catBreakdown: Record<string, { name: string; color: string; amount: number; id: string }> = {};
   for (const tx of enriched) {
-    if (tx.dir !== "out") continue;
+    if (tx.dir !== "out" || !tx.resolved.id) continue;
     const r = tx.resolved;
-    if (!r.id) continue;
-    if (!catBreakdown[r.id]) catBreakdown[r.id] = { name: r.name, color: r.color, amount: 0, id: r.id };
-    catBreakdown[r.id].amount += Math.abs(tx.amount);
+    if (!catBreakdown[r.id!]) catBreakdown[r.id!] = { name: r.name, color: r.color, amount: 0, id: r.id! };
+    catBreakdown[r.id!].amount += Math.abs(tx.amount);
   }
   const catEntries = Object.values(catBreakdown).sort((a, b) => b.amount - a.amount);
   const catTotal = catEntries.reduce((s, c) => s + c.amount, 0);
   const unassignedOut = enriched.filter(tx => tx.dir === "out" && !tx.resolved.id).length;
-
   const incTotal = enriched.filter(tx => tx.dir === "inc").reduce((s, tx) => s + tx.amount, 0);
   const outTotal = enriched.filter(tx => tx.dir === "out").reduce((s, tx) => s + Math.abs(tx.amount), 0);
   const incCount = enriched.filter(tx => tx.dir === "inc").length;
@@ -308,15 +289,36 @@ export default function FinanzenPage() {
 
   const reset = useCallback(() => { setDirF("all"); setCatF(null); setTxPage(0); }, []);
 
-  // Tab bar
+  // Saldo chart data
+  const saldoPoints = (() => {
+    const sorted = [...enriched].sort((a, b) => a.date.localeCompare(b.date));
+    let running = totalBal - sorted.reduce((s, tx) => s + tx.amount, 0);
+    return sorted.map(tx => { running += tx.amount; return { date: tx.date, bal: running }; });
+  })();
+  const saldoSvg = (() => {
+    if (saldoPoints.length < 2) return "";
+    const vals = saldoPoints.map(p => p.bal);
+    const mn = Math.min(...vals) * 0.99, mx = Math.max(...vals) * 1.01, rng = mx - mn || 1;
+    const W = 460, H = 64;
+    const pts = saldoPoints.map((p, i) => {
+      const x = (i / (saldoPoints.length - 1)) * W;
+      const y = H - 4 - ((p.bal - mn) / rng) * (H - 8);
+      return `${x},${y}`;
+    });
+    const line = "M" + pts.join(" L");
+    const area = line + ` L${W},${H} L0,${H} Z`;
+    const last = pts[pts.length - 1].split(",");
+    return `<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8860b" stop-opacity=".1"/><stop offset="1" stop-color="#b8860b" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#sg)"/><path d="${line}" stroke="#b8860b" stroke-width="1.5" fill="none"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="#b8860b" stroke="#f8f5ef" stroke-width="2"/>`;
+  })();
+
   const tabBar = (
     <div style={{ display: "flex", gap: 4, marginBottom: 20 }}>
-      {(["konten", "messstation"] as const).map(t => (
-        <button key={t} onClick={() => setTab(t)} style={{
+      {(["konten", "messstation"] as const).map(ti => (
+        <button key={ti} onClick={() => setTab(ti)} style={{
           flex: 1, padding: "10px 16px", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500,
           cursor: "pointer", fontFamily: "inherit", transition: "all .2s",
-          background: tab === t ? "#1a1815" : "#e8e2d8", color: tab === t ? "#f8f5ef" : "#6a6050",
-        }}>{t === "konten" ? "Konten" : "Messstation"}</button>
+          background: tab === ti ? "#1a1815" : "#e8e2d8", color: tab === ti ? "#f8f5ef" : "#6a6050",
+        }}>{ti === "konten" ? "Konten" : "Messstation"}</button>
       ))}
     </div>
   );
@@ -329,31 +331,57 @@ export default function FinanzenPage() {
         <div className="af">
           {tabBar}
           {loading ? <div className="loading">Wird geladen…</div> : error ? <div className="error-box">{error}</div> : (<>
+
+            {/* HEADER */}
             <header className="hdr">
-              <div className="hdr-lock">{"🔒"} Nur Dr. Schubert</div>
+              <div className="hdr-lock">🔒 Nur Dr. Schubert</div>
               <div className="hdr-sub">Gesamtvermögen</div>
               <div className="hdr-val serif">{euroK(totalBal)}</div>
               <div className="hdr-date">Letzter Sync: {datDE(enriched[0]?.date ?? "")}</div>
+              <div className="hdr-note">Der Saldo zeigt den aktuellen Kontostand über die gesamte Laufzeit. Eingänge und Ausgaben weiter unten beziehen sich nur auf die letzten 90 Tage.</div>
             </header>
 
-            {/* Account chips */}
+            {/* ACCOUNT CHIPS with color dots */}
             <div className="chips">
               <div className={`chip${selAcc === "all" ? " on" : ""}`} onClick={() => { setSelAcc("all"); reset(); }}>
-                <div className="chip-nm">Alle Konten</div><div className="chip-bal">{euroK(totalBal)}</div>
+                <div className="chip-text"><div className="chip-nm">Alle Konten</div><div className="chip-bal">{euroK(totalBal)}</div></div>
               </div>
               {accounts.map(a => (
                 <div key={a.id} className={`chip${selAcc === a.id ? " on" : ""}`} onClick={() => { setSelAcc(a.id); reset(); }}>
-                  <div className="chip-nm">{ACC_LABELS[a.id] ?? a.name} {ACC_SHORT[a.id]}</div>
-                  <div className="chip-bal">{euroK(a.balance)}</div>
+                  <div className="chip-dot" style={{ background: ACC_COLORS[a.id] ?? "#888", borderColor: selAcc === a.id ? "rgba(248,245,239,.3)" : "transparent" }} />
+                  <div className="chip-text">
+                    <div className="chip-nm">{ACC_LABELS[a.id] ?? a.name} {ACC_SHORT[a.id]}</div>
+                    <div className="chip-bal">{euroK(a.balance)}</div>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Category breakdown (OUR categories, not finAPI) */}
+            {/* SALDO CHART */}
+            {saldoSvg && (
+              <div className="saldo-strip">
+                <div className="saldo-h">
+                  <span className="saldo-t">Saldo-Verlauf</span>
+                  <div className="saldo-pills">
+                    <button className="saldo-p">7T</button>
+                    <button className="saldo-p on">30T</button>
+                    <button className="saldo-p">90T</button>
+                  </div>
+                </div>
+                <svg style={{ width: "100%", height: 64, display: "block" }} viewBox="0 0 460 64" preserveAspectRatio="none" dangerouslySetInnerHTML={{ __html: saldoSvg }} />
+                <div className="saldo-labels">
+                  <span>{datShort(saldoPoints[0]?.date ?? "")}</span>
+                  <span>{datShort(saldoPoints[Math.floor(saldoPoints.length / 2)]?.date ?? "")}</span>
+                  <span>{datShort(saldoPoints[saldoPoints.length - 1]?.date ?? "")}</span>
+                </div>
+              </div>
+            )}
+
+            {/* CATEGORY BREAKDOWN */}
             {catEntries.length > 0 && (
               <div className="cats">
                 <div className="cats-h">
-                  <span className="cats-title">Ausgaben nach Kategorie{unassignedOut > 0 ? ` (${unassignedOut} nicht zugeordnet)` : ""}</span>
+                  <span className="cats-title">Ausgaben nach Kategorie{unassignedOut > 0 ? ` · ${unassignedOut} nicht zugeordnet` : ""}</span>
                   {catF ? <span className="cats-hint" onClick={() => { setCatF(null); setTxPage(0); }}>Filter zurücksetzen</span> : <span className="cats-hint">Tippen filtert</span>}
                 </div>
                 {(showAllCats ? catEntries : catEntries.slice(0, 5)).map(c => {
@@ -368,31 +396,44 @@ export default function FinanzenPage() {
                     </div>
                   );
                 })}
-                {catEntries.length > 5 && (
-                  <button className="more-btn" onClick={() => setShowAllCats(!showAllCats)}>
-                    {showAllCats ? "Weniger" : `+ ${catEntries.length - 5} weitere`}
-                  </button>
-                )}
+                {catEntries.length > 5 && <button className="more-btn" onClick={() => setShowAllCats(!showAllCats)}>{showAllCats ? "Weniger" : `+ ${catEntries.length - 5} weitere`}</button>}
               </div>
             )}
 
-            {/* Income / Expenses */}
+            {/* INCOME / EXPENSES */}
             <div className="ios">
               <div className="io inc"><div className="io-l">Eingänge (90 Tage)</div><div className="io-v">+{euroK(incTotal)}</div><div className="io-sub">{incCount} Buchungen</div></div>
               <div className="io out"><div className="io-l">Ausgaben (90 Tage)</div><div className="io-v">-{euroK(outTotal)}</div><div className="io-sub">{outCount} Buchungen</div></div>
             </div>
 
-            {/* Filter bar */}
+            {/* FILTERS: direction + separator + accounts + separator + category shortcuts */}
             <div className="filters">
               {(["all", "inc", "out"] as const).map(d => (
                 <button key={d} className={`fl${dirF === d ? " on" : ""}`} onClick={() => { setDirF(d); setTxPage(0); }}>
                   {d === "all" ? "Alle" : d === "inc" ? "↓ Eingänge" : "↑ Ausgaben"}
                 </button>
               ))}
+              <div className="fl-sep" />
+              {accounts.map(a => (
+                <button key={a.id} className={`fl${selAcc === a.id ? " on" : ""}`} onClick={() => { setSelAcc(selAcc === a.id ? "all" : a.id); setTxPage(0); }}>
+                  <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: ACC_COLORS[a.id], marginRight: 4, verticalAlign: "1px" }} />
+                  {ACC_SHORT[a.id]}
+                </button>
+              ))}
+              {catEntries.length > 0 && <>
+                <div className="fl-sep" />
+                {catEntries.slice(0, 4).map(c => (
+                  <button key={c.id} className={`fl${catF === c.id ? " on" : ""}`} onClick={() => { setCatF(catF === c.id ? null : c.id); setTxPage(0); }}>
+                    {c.name}
+                  </button>
+                ))}
+              </>}
             </div>
 
-            {/* Transaction list */}
-            {pageTx.length === 0 ? <div style={{ textAlign: "center", padding: 32, color: "#c8c0b0", fontStyle: "italic" }}>Keine Buchungen</div> : (() => {
+            {/* TRANSACTIONS */}
+            {pageTx.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 32, color: "#c8c0b0", fontStyle: "italic" }}>Keine Buchungen für diesen Filter</div>
+            ) : (() => {
               let lastDay = "";
               return pageTx.map(tx => {
                 const dayChanged = tx.date !== lastDay;
@@ -408,15 +449,17 @@ export default function FinanzenPage() {
                         <div className="tx-mt">
                           <span className="mono" style={{ fontSize: 11 }}>{datShort(tx.date)}</span>
                           <span>·</span>
-                          <span>{tx.ibanShort}</span>
-                          {/* Category tag — klickbar zum Zuordnen */}
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                            <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: ACC_COLORS[tx.accountId] ?? "#888" }} />
+                            {tx.ibanShort}
+                          </span>
                           <span style={{ position: "relative" }}>
                             <span
-                              className={`tx-tg${!r.id ? " tx-tg-unset" : ""}`}
+                              className={`tx-tg${!r.id ? " tx-tg-unset" : r.isSuggestion ? " tx-tg-suggest" : ""}`}
                               style={r.id ? { background: r.color + "18", color: r.color, borderColor: r.color + "30" } : undefined}
                               onClick={(e) => { e.stopPropagation(); setEditTxId(editTxId === tx.id ? null : tx.id); }}
                             >
-                              {r.name || "Zuordnen"}
+                              {r.id ? (r.isSuggestion ? `Vorschlag: ${r.name}` : r.name) : "✎ Zuordnen"}
                             </span>
                             {editTxId === tx.id && (
                               <div className="dropdown" ref={dropRef} onClick={e => e.stopPropagation()}>
@@ -426,13 +469,9 @@ export default function FinanzenPage() {
                                   </div>
                                 ))}
                                 <div className="dropdown-sep" />
-                                <input
-                                  className="dropdown-input"
-                                  placeholder="Neue Kategorie…"
-                                  value={newCatName}
+                                <input className="dropdown-input" placeholder="Neue Kategorie…" value={newCatName}
                                   onChange={e => setNewCatName(e.target.value)}
-                                  onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) createCategory(newCatName); }}
-                                />
+                                  onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) createCategory(newCatName); }} />
                               </div>
                             )}
                           </span>
@@ -451,17 +490,16 @@ export default function FinanzenPage() {
 
             {totalPages > 1 && (
               <div className="pager">
-                <button className="pg" disabled={safePage === 0} onClick={() => setTxPage(safePage - 1)}>{"‹"}</button>
+                <button className="pg" disabled={safePage === 0} onClick={() => setTxPage(safePage - 1)}>‹</button>
                 <span className="pg-info">{safePage + 1} / {totalPages}</span>
-                <button className="pg" disabled={safePage >= totalPages - 1} onClick={() => setTxPage(safePage + 1)}>{"›"}</button>
+                <button className="pg" disabled={safePage >= totalPages - 1} onClick={() => setTxPage(safePage + 1)}>›</button>
               </div>
             )}
           </>)}
         </div>
       ) : (
-        /* ═══════ MESSSTATION TAB ═══════ */
         <div>
-          <div style={{ maxWidth: "100%", margin: "0 auto", padding: "20px 18px" }}>{tabBar}</div>
+          <div style={{ maxWidth: 820, margin: "0 auto", padding: "20px 18px" }}>{tabBar}</div>
           <div className="space-y-8">
             {messFehler ? <div className="rounded-lg border px-4 py-3 text-sm text-accent-coral">{messFehler}</div> : !werte ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)}</div>
