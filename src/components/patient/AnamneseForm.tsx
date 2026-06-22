@@ -471,19 +471,19 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
   const t = T[lang];
   const name = vorname || "Patient";
   const langs: Array<{ code: "de"|"en"|"es"|"ru"|"tr"; flag: string; label: string }> = [
-    { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
-    { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
-    { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Espa\u00f1ol" },
-    { code: "ru", flag: "\u{1F1F7}\u{1F1FA}", label: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439" },
-    { code: "tr", flag: "\u{1F1F9}\u{1F1F7}", label: "T\u00fcrk\u00e7e" },
+    { code: "de", flag: "🇩🇪", label: "Deutsch" },
+    { code: "en", flag: "🇬🇧", label: "English" },
+    { code: "es", flag: "🇪🇸", label: "Español" },
+    { code: "ru", flag: "🇷🇺", label: "Русский" },
+    { code: "tr", flag: "🇹🇷", label: "Türkçe" },
   ];
 
   const loadingTexts: Record<string, string[]> = {
     de: ["Dein Account wird erstellt...", "Zugangsdaten werden generiert...", "Fast fertig..."],
     en: ["Creating your account...", "Generating login credentials...", "Almost done..."],
     es: ["Creando tu cuenta...", "Generando datos de acceso...", "Casi listo..."],
-    ru: ["\u0421\u043e\u0437\u0434\u0430\u0451\u043c \u0442\u0432\u043e\u0439 \u0430\u043a\u043a\u0430\u0443\u043d\u0442...", "\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u0443\u0435\u043c \u0434\u0430\u043d\u043d\u044b\u0435...", "\u041f\u043e\u0447\u0442\u0438 \u0433\u043e\u0442\u043e\u0432\u043e..."],
-    tr: ["Hesab\u0131n olu\u015fturuluyor...", "Giri\u015f bilgileri \u00fcretiliyor...", "Neredeyse bitti..."],
+    ru: ["Создаём твой аккаунт...", "Генерируем данные...", "Почти готово..."],
+    tr: ["Hesabın oluşturuluyor...", "Giriş bilgileri üretiliyor...", "Neredeyse bitti..."],
   };
 
   const [loadTextIdx, setLoadTextIdx] = useState(0);
@@ -496,9 +496,9 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
   const successTexts: Record<string, string> = {
     de: "Dein Account ist erstellt!",
     en: "Your account is ready!",
-    es: "\u00a1Tu cuenta est\u00e1 lista!",
-    ru: "\u0422\u0432\u043e\u0439 \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u0433\u043e\u0442\u043e\u0432!",
-    tr: "Hesab\u0131n haz\u0131r!",
+    es: "¡Tu cuenta está lista!",
+    ru: "Твой аккаунт готов!",
+    tr: "Hesabın hazır!",
   };
 
   return (
@@ -551,40 +551,40 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
             <div className="cred-row"><span className="cred-label">{t.emailLabel}</span><span className="cred-val">{account.login_email}</span></div>
             <div className="cred-row"><span className="cred-label">{t.pwLabel}</span>
               <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
-                {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>}
-                <span className="pw-reveal">{showPw ? "\u2713" : "\u{1F446} " + t.pwTap}</span>
+                {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">••••••••••</span>}
+                <span className="pw-reveal">{showPw ? "✓" : "👆 " + t.pwTap}</span>
               </div>
             </div>
-            <div className="cred-note" style={{ marginBottom: 10 }}><span>\u{1F512}</span><div>{t.secNote}</div></div>
-            <div className="cred-note"><span>\u{1F4F8}</span><div>{t.screenshot}</div></div>
+            <div className="cred-note" style={{ marginBottom: 10 }}><span>🔒</span><div>{t.secNote}</div></div>
+            <div className="cred-note"><span>📸</span><div>{t.screenshot}</div></div>
           </div>
 
           <div className="done-divider" />
           <div className="done-slabel">{t.openLabel}</div>
           <div className="access-split">
             <div className="access-side">
-              <h4>\u{1F4F1} {t.qrTitle}</h4><p>{t.qrDesc}</p>
+              <h4>📱 {t.qrTitle}</h4><p>{t.qrDesc}</p>
               <img src={QR_URL} alt="QR" width="160" height="160" style={{ borderRadius: 8 }} />
               <div style={{ fontSize: "11.5px", color: "var(--muted-2)", marginTop: 10 }}>{t.qrHint}</div>
             </div>
             <div className="access-side">
-              <h4>\u{1F446} {t.btnTitle}</h4><p>{t.btnDesc}</p>
-              <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} \u2192</a>
+              <h4>👆 {t.btnTitle}</h4><p>{t.btnDesc}</p>
+              <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} →</a>
             </div>
           </div>
 
           <div className="done-divider" />
-          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>\u{1F447} {t.tapHint}</div>
+          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>👇 {t.tapHint}</div>
           <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
             <div><div className="gtitle">{t.guideTitle}</div><div className="gsub">{t.guideSub}</div></div>
             <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div>
           </div>
           <div className={"guide-body" + (guideOpen ? " open" : "")}>
             <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{t.guideIntro}</p>
-            <div className="gplatform"><h5>\u{1F34E} iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> \u{1F389}</li></ol></div>
-            <div className="gplatform"><h5>\u{1F916} Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> \u{1F389}</li></ol></div>
+            <div className="gplatform"><h5>🍎 iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> 🎉</li></ol></div>
+            <div className="gplatform"><h5>🤖 Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> 🎉</li></ol></div>
           </div>
-          <div className="app-note">\u{1F4CC} {t.appNote}</div>
+          <div className="app-note">📌 {t.appNote}</div>
         </div>
       )}
 
