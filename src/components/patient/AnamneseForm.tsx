@@ -6,68 +6,7 @@ import { pruefeName, pruefeEmail, pruefeTelefon, pruefePlz, pruefeHausnummer, pr
 // Anamnesebogen der KFO-Praxis Dr. Schubert, eigene Komponente (Weg B), 1:1 aus Mockup Variante A.
 // CSS unter .aab gekapselt, damit es nicht mit dem Rest der App kollidiert.
 
-const AAB_CSS = `
-
-.aab .shimmer-bar{height:4px;border-radius:999px;overflow:hidden;margin:20px 0;background:var(--line);}
-.aab .shimmer-track{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-lighter),var(--gold-bright),var(--primary-bright),var(--primary));background-size:300% 100%;animation:aabShimmer 2s ease-in-out infinite;}
-@keyframes aabShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
-.aab .shimmer-text{text-align:center;font-size:13px;color:var(--muted);animation:aabFadeInOut 2s ease-in-out infinite;}
-@keyframes aabFadeInOut{0%,100%{opacity:.5}50%{opacity:1}}
-.aab .account-reveal{animation:aabSlideUp .6s cubic-bezier(.2,.7,.2,1);}
-@keyframes aabSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-.aab .success-flash{text-align:center;margin-bottom:20px;animation:aabSlideUp .5s ease;}
-.aab .success-badge{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(150deg,rgba(15,138,114,0.12),rgba(95,208,168,0.06));border:1.5px solid rgba(35,176,143,0.4);border-radius:14px;padding:14px 22px;box-shadow:0 0 30px rgba(35,176,143,0.2),0 0 60px rgba(35,176,143,0.1);}
-.aab .success-badge .check-circle{width:32px;height:32px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 16px rgba(35,176,143,0.4);}
-.aab .success-badge .check-circle svg{width:16px;height:16px;color:#fff;}
-.aab .success-badge span{font-family:"Fraunces",serif;font-size:17px;font-weight:600;color:var(--primary);}
-.aab .done-lang-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:16px 0 8px;}
-.aab .done-lang-btn{font-family:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line-strong);background:var(--card);color:var(--muted);cursor:pointer;transition:all .16s;}
-.aab .done-lang-btn:hover{border-color:var(--primary);color:var(--ink);}
-.aab .done-lang-btn.on{background:linear-gradient(150deg,var(--primary-soft),transparent);border-color:var(--primary);color:var(--primary-bright);}
-.aab .glow-box{position:relative;border-radius:16px;padding:24px;margin-bottom:24px;overflow:hidden;background:linear-gradient(160deg,rgba(15,138,114,0.08),rgba(95,208,168,0.04),transparent);border:1.5px solid rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.2),0 0 40px rgba(35,176,143,0.1);animation:aabBorderGlow 3s ease-in-out infinite alternate;}
-@keyframes aabBorderGlow{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.15),0 0 40px rgba(35,176,143,0.08)}to{border-color:rgba(35,176,143,0.5);box-shadow:0 0 28px rgba(35,176,143,0.3),0 0 56px rgba(35,176,143,0.15)}}
-.aab .glow-box h3{font-family:"Fraunces",serif;font-size:20px;font-weight:500;margin:0 0 12px;}
-.aab .glow-box p{font-size:14px;margin:0 0 8px;}
-.aab .glow-box ul{list-style:none;padding:0;margin:14px 0 0;}
-.aab .glow-box li{font-size:13.5px;padding:7px 0;display:flex;gap:10px;align-items:flex-start;}
-.aab .glow-box li .gdot{width:8px;height:8px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));flex-shrink:0;margin-top:6px;box-shadow:0 0 8px rgba(35,176,143,0.35);}
-.aab .done-divider{height:1px;background:var(--line);margin:24px 0;position:relative;}
-.aab .done-divider::after{content:"\\2726";position:absolute;left:50%;top:-10px;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--primary);font-size:14px;}
-.aab .done-slabel{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 16px;}
-.aab .cred-card{background:var(--field);border:1.5px solid var(--line-strong);border-radius:14px;padding:22px;margin-bottom:20px;}
-.aab .cred-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;}
-.aab .cred-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
-.aab .cred-row:last-of-type{border-bottom:none;}
-.aab .cred-label{font-size:13px;color:var(--muted);font-weight:500;}
-.aab .cred-val{font-size:17px;font-weight:700;word-break:break-all;text-align:right;letter-spacing:.02em;}
-.aab .pw-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 12px;border-radius:11px;border:1.5px solid rgba(35,176,143,0.3);background:rgba(35,176,143,0.04);animation:aabPwGlow 2s ease-in-out infinite alternate;transition:all .2s;}
-@keyframes aabPwGlow{from{box-shadow:0 0 8px rgba(35,176,143,0.1)}to{box-shadow:0 0 18px rgba(35,176,143,0.3),0 0 36px rgba(35,176,143,0.1)}}
-.aab .pw-dots{font-size:22px;letter-spacing:4px;color:var(--muted-2);}
-.aab .pw-reveal{font-size:12px;color:#fff;font-weight:700;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));border:none;border-radius:10px;padding:6px 14px;white-space:nowrap;box-shadow:0 4px 14px -4px var(--primary);cursor:pointer;}
-.aab .cred-note{font-size:12.5px;color:var(--muted);margin-top:12px;padding:10px 14px;background:var(--primary-soft);border-radius:10px;display:flex;gap:8px;align-items:flex-start;}
-.aab .access-split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
-@media(max-width:560px){.aab .access-split{grid-template-columns:1fr;}}
-.aab .access-side{background:var(--field);border:1px solid var(--line-strong);border-radius:14px;padding:22px;text-align:center;}
-.aab .access-side h4{font-family:"Fraunces",serif;font-size:15px;margin:0 0 8px;}
-.aab .access-side p{font-size:13px;color:var(--muted);margin:0 0 14px;}
-.aab .guide-trigger{display:flex;align-items:center;justify-content:center;gap:14px;cursor:pointer;padding:22px 24px;margin-bottom:16px;border-radius:16px;background:linear-gradient(150deg,rgba(15,138,114,0.08),rgba(95,208,168,0.05));border:1.5px solid rgba(35,176,143,0.3);animation:aabGuideGlow 2.5s ease-in-out infinite alternate;}
-@keyframes aabGuideGlow{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 14px rgba(35,176,143,0.12),0 0 30px rgba(35,176,143,0.06)}to{border-color:rgba(35,176,143,0.55);box-shadow:0 0 24px rgba(35,176,143,0.3),0 0 50px rgba(35,176,143,0.12)}}
-.aab .guide-trigger .garrow{width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 18px rgba(35,176,143,0.35);transition:transform .3s;flex-shrink:0;animation:aabArrowBounce 1.5s ease-in-out infinite;}
-@keyframes aabArrowBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
-@keyframes aabHintPulse{0%,100%{opacity:1}50%{opacity:.4}}
-.aab .guide-trigger .garrow svg{width:16px;height:16px;color:#fff;}
-.aab .guide-trigger.open .garrow{animation:none;transform:rotate(180deg);}
-.aab .guide-trigger .gtitle{font-family:"Fraunces",serif;font-size:20px;font-weight:600;}
-.aab .guide-trigger .gsub{font-size:13px;color:var(--muted);}
-.aab .guide-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.2,.7,.2,1);}
-.aab .guide-body.open{max-height:2000px;}
-.aab .gplatform{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:10px;}
-.aab .gplatform h5{font-size:14px;font-weight:700;margin:0 0 8px;}
-.aab .gplatform ol{padding-left:20px;font-size:13.5px;}
-.aab .gplatform ol li{padding:4px 0;}
-.aab .gplatform ol li b{color:var(--primary);}
-.aab .app-note{text-align:center;font-size:12.5px;color:var(--muted);margin-top:20px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--field);}
-.aab[data-theme="light"]{color-scheme:light;
+const AAB_CSS = `.aab[data-theme="light"]{color-scheme:light;
     --bg:#f5f2ec; --bg-tint-1:rgba(35,176,143,0.06); --bg-tint-2:rgba(95,208,168,0.05);
     --fade-1:rgba(35,176,143,0); --fade-2:rgba(95,208,168,0);
     --card:#fdfbf7; --card-2:#f8f5ef;
@@ -204,7 +143,62 @@ const AAB_CSS = `
 .aab .sigpad.fehlt{border-color:var(--fehlt);box-shadow:0 0 16px var(--fehlt-glow);}
 .aab .fehlt-hinweis{display:flex;align-items:center;gap:9px;background:var(--fehlt-bg);border:1px solid var(--fehlt-line);color:var(--fehlt-ink);border-radius:11px;padding:11px 14px;font-size:13px;font-weight:500;margin-bottom:18px;}
 .aab .fehlt-hinweis .pkt{width:9px;height:9px;border-radius:50%;background:var(--fehlt);flex:none;box-shadow:0 0 9px var(--fehlt-glow);}
-.aab .fehlt-grund{display:block;font-size:11.5px;color:var(--fehlt-ink);margin-top:5px;font-weight:500;}`;
+.aab .fehlt-grund{display:block;font-size:11.5px;color:var(--fehlt-ink);margin-top:5px;font-weight:500;}
+.aab .done-lang-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:18px 0 8px;}
+.aab .done-lang-btn{font-family:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line-strong);background:var(--card);color:var(--muted);cursor:pointer;transition:all .16s;}
+.aab .done-lang-btn:hover{border-color:var(--primary);color:var(--ink);}
+.aab .done-lang-btn.on{background:linear-gradient(150deg,var(--primary-soft),transparent);border-color:var(--primary);color:var(--primary-bright);}
+.aab .shimmer-bar{height:4px;border-radius:999px;overflow:hidden;margin:24px 0 12px;background:var(--line);}
+.aab .shimmer-track{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-lighter),var(--gold-bright),var(--primary-bright),var(--primary));background-size:300% 100%;animation:aabShimmer 2s ease-in-out infinite;}
+@keyframes aabShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.aab .shimmer-text{text-align:center;font-size:13px;color:var(--muted);animation:aabPulse 2s ease-in-out infinite;}
+@keyframes aabPulse{0%,100%{opacity:.5}50%{opacity:1}}
+.aab .account-reveal{animation:aabSlide .6s cubic-bezier(.2,.7,.2,1);}
+@keyframes aabSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.aab .success-flash{text-align:center;margin:20px 0;}
+.aab .success-badge{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(150deg,rgba(15,138,114,0.12),rgba(95,208,168,0.06));border:1.5px solid rgba(35,176,143,0.4);border-radius:14px;padding:14px 22px;box-shadow:0 0 30px rgba(35,176,143,0.2),0 0 60px rgba(35,176,143,0.1);}
+.aab .success-badge .schk{width:32px;height:32px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 16px rgba(35,176,143,0.4);}
+.aab .success-badge .schk svg{width:16px;height:16px;color:#fff;}
+.aab .success-badge span{font-family:"Fraunces",serif;font-size:17px;font-weight:600;color:var(--primary);}
+.aab .done-divider{height:1px;background:var(--line);margin:24px 0;}
+.aab .done-slabel{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 16px;}
+.aab .glow-box{position:relative;border-radius:16px;padding:20px;margin-bottom:24px;overflow:hidden;background:linear-gradient(160deg,rgba(15,138,114,0.08),rgba(95,208,168,0.04),transparent);border:1.5px solid rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.2),0 0 40px rgba(35,176,143,0.1);animation:aabGlow 3s ease-in-out infinite alternate;}
+@keyframes aabGlow{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 20px rgba(35,176,143,0.15)}to{border-color:rgba(35,176,143,0.5);box-shadow:0 0 28px rgba(35,176,143,0.3),0 0 56px rgba(35,176,143,0.15)}}
+.aab .glow-box h3{font-family:"Fraunces",serif;font-size:20px;font-weight:500;margin:0 0 12px;}
+.aab .glow-box p{font-size:14px;margin:0 0 8px;}
+.aab .glow-box ul{list-style:none;padding:0;margin:14px 0 0;}
+.aab .glow-box li{font-size:13.5px;padding:7px 0 7px 20px;position:relative;line-height:1.6;}
+.aab .glow-box li .gdot{width:8px;height:8px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));box-shadow:0 0 8px rgba(35,176,143,0.35);position:absolute;left:0;top:13px;}
+.aab .cred-card{background:var(--field);border:1.5px solid var(--line-strong);border-radius:14px;padding:16px;margin-bottom:20px;text-align:left;}
+.aab .cred-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;}
+.aab .cred-row{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px 0;border-bottom:1px solid var(--line);}
+.aab .cred-row:last-of-type{border-bottom:none;}
+.aab .cred-label{font-size:12px;color:var(--muted);font-weight:500;}
+.aab .cred-val{font-size:16px;font-weight:700;word-break:break-all;letter-spacing:.02em;}
+.aab .pw-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;border-radius:11px;border:1.5px solid rgba(35,176,143,0.3);background:rgba(35,176,143,0.04);animation:aabPwG 2s ease-in-out infinite alternate;width:100%;flex-wrap:wrap;justify-content:space-between;}
+@keyframes aabPwG{from{box-shadow:0 0 8px rgba(35,176,143,0.1)}to{box-shadow:0 0 18px rgba(35,176,143,0.3),0 0 36px rgba(35,176,143,0.1)}}
+.aab .pw-dots{font-size:22px;letter-spacing:4px;color:var(--muted-2);}
+.aab .pw-reveal{font-size:12px;color:#fff;font-weight:700;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));border:none;border-radius:10px;padding:6px 14px;white-space:nowrap;box-shadow:0 4px 14px -4px var(--primary);cursor:pointer;}
+.aab .cred-note{font-size:12.5px;color:var(--muted);margin-top:12px;padding:10px 14px;background:var(--primary-soft);border-radius:10px;display:flex;gap:8px;align-items:flex-start;}
+.aab .access-split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+@media(max-width:560px){.aab .access-split{grid-template-columns:1fr;}}
+.aab .access-side{background:var(--field);border:1px solid var(--line-strong);border-radius:14px;padding:22px;text-align:center;}
+.aab .access-side h4{font-family:"Fraunces",serif;font-size:15px;margin:0 0 8px;}
+.aab .access-side p{font-size:13px;color:var(--muted);margin:0 0 14px;}
+.aab .guide-trigger{display:flex;align-items:center;justify-content:center;gap:14px;cursor:pointer;padding:22px 24px;margin-bottom:16px;border-radius:16px;background:linear-gradient(150deg,rgba(15,138,114,0.08),rgba(95,208,168,0.05));border:1.5px solid rgba(35,176,143,0.3);animation:aabGuideG 2.5s ease-in-out infinite alternate;}
+@keyframes aabGuideG{from{border-color:rgba(35,176,143,0.25);box-shadow:0 0 14px rgba(35,176,143,0.12)}to{border-color:rgba(35,176,143,0.55);box-shadow:0 0 24px rgba(35,176,143,0.3),0 0 50px rgba(35,176,143,0.12)}}
+.aab .guide-trigger .garrow{width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,var(--primary-lighter),var(--primary));display:grid;place-items:center;box-shadow:0 0 18px rgba(35,176,143,0.35);transition:transform .3s;flex-shrink:0;animation:aabBounce 1.5s ease-in-out infinite;}
+@keyframes aabBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@keyframes aabHint{0%,100%{opacity:1}50%{opacity:.4}}
+.aab .guide-trigger .garrow svg{width:16px;height:16px;color:#fff;}
+.aab .guide-trigger.open .garrow{animation:none;transform:rotate(180deg);}
+.aab .guide-trigger .gtitle{font-family:"Fraunces",serif;font-size:20px;font-weight:600;}
+.aab .guide-trigger .gsub{font-size:13px;color:var(--muted);}
+.aab .guide-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.2,.7,.2,1);}.aab .guide-body.open{max-height:2000px;}
+.aab .gplatform{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:10px;}
+.aab .gplatform h5{font-size:14px;font-weight:700;margin:0 0 8px;}
+.aab .gplatform ol{padding-left:20px;font-size:13.5px;}.aab .gplatform ol li{padding:4px 0;}.aab .gplatform ol li b{color:var(--primary);}
+.aab .app-note{text-align:center;font-size:12.5px;color:var(--muted);margin-top:20px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--field);}`;
 
 interface Props {
   patientId: string;
@@ -352,102 +346,83 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { fehlt?: boolean; onSign?: (
   );
 });
 
-
-const T: Record<string, Record<string, string>> = {
-  de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Du erhältst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
-    next: "Was kommt als Nächstes?", appTitle: "Deine persönliche Anima Cura App",
-    appDesc: "Ab sofort steht dir ein eigener, geschützter Bereich zur Verfügung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
-    f1: "Alle Rechnungen und Zahlungspläne übersichtlich an einem Ort", f2: "Deine Dokumente: Befunde, Röntgenbilder, Behandlungspläne",
-    f3: "Überblick über deine Behandlungsphasen und den aktuellen Stand", f4: "Deine Ratenzahlungen: was bezahlt wurde, was noch offen ist", f5: "Nachrichten von der Praxis direkt in der App",
-    credLabel: "Deine Zugangsdaten", credTitle: "Deine Login-Daten", emailLabel: "Login-E-Mail", pwLabel: "Passwort", pwTap: "Tippen zum Anzeigen",
-    secNote: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein dafür, damit du sicher und geschützt auf deine persönliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unberührt.",
-    screenshot: "Mach am besten einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App ändern.",
-    openLabel: "App öffnen", qrTitle: "Vom Handy scannen", qrDesc: "Du füllst den Bogen gerade am Tablet oder Computer aus? Scanne den QR-Code mit deinem Handy.",
-    qrHint: "Öffne die Kamera-App und halte sie auf den Code.", btnTitle: "Direkt öffnen", btnDesc: "Du bist bereits am Handy? Tippe auf den Button und logge dich mit deinen neuen Zugangsdaten ein.", btnText: "Anima Cura öffnen",
-    tapHint: "Hier drücken", guideTitle: "So geht\'s los!", guideSub: "App auf deinem Homescreen installieren, Schritt für Schritt",
-    guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen. Danach öffnet sie sich mit einem einzigen Tipp.",
-    ios1: "Öffne die App in Safari (nicht Chrome oder andere Browser)", ios2: "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)",
-    ios3: 'Scrolle nach unten und tippe auf \"Zum Home-Bildschirm"', ios4: 'Tippe auf \"Hinzufügen"',
-    and1: "Öffne die App in Chrome", and2: "Tippe auf die drei Punkte oben rechts (⋮)",
-    and3: '\"Zum Startbildschirm hinzufügen"', and4: 'Bestätige mit \"Hinzufügen"',
-    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
-    footer: "Bei Fragen sind wir für dich da." },
+const DONE_T: Record<string, Record<string, string>> = {
+  de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Du erh\u00e4ltst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
+    next: "Was kommt als N\u00e4chstes?", appTitle: "Deine pers\u00f6nliche Anima Cura App",
+    appDesc: "Ab sofort steht dir ein eigener, gesch\u00fctzter Bereich zur Verf\u00fcgung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
+    f1: "Alle Rechnungen und Zahlungspl\u00e4ne \u00fcbersichtlich an einem Ort", f2: "Deine Dokumente: Befunde, R\u00f6ntgenbilder, Behandlungspl\u00e4ne",
+    f3: "\u00dcberblick \u00fcber deine Behandlungsphasen und den aktuellen Stand", f4: "Deine Ratenzahlungen: was bezahlt wurde, was noch offen ist", f5: "Nachrichten von der Praxis direkt in der App",
+    credLabel: "Deine Zugangsdaten", credTitle: "Deine Login-Daten", emailLabel: "Login-E-Mail", pwLabel: "Passwort", pwTap: "Tippen zum Anzeigen", pwHide: "Verbergen",
+    secNote: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein daf\u00fcr, damit du sicher und gesch\u00fctzt auf deine pers\u00f6nliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unber\u00fchrt.",
+    screenshot: "Mach am besten einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App \u00e4ndern.",
+    openLabel: "App \u00f6ffnen", qrTitle: "Vom Handy scannen", qrDesc: "Du f\u00fcllst den Bogen gerade am Tablet oder Computer aus? Scanne den QR-Code mit deinem Handy.",
+    qrHint: "\u00d6ffne die Kamera-App und halte sie auf den Code.", btnTitle: "Direkt \u00f6ffnen", btnDesc: "Du bist bereits am Handy? Tippe auf den Button und logge dich mit deinen neuen Zugangsdaten ein.", btnText: "Anima Cura \u00f6ffnen",
+    tapHint: "Hier dr\u00fccken", guideTitle: "So gehts los!", guideSub: "App auf deinem Homescreen installieren, Schritt f\u00fcr Schritt",
+    guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen. Danach \u00f6ffnet sie sich mit einem einzigen Tipp.",
+    ios: ["\u00d6ffne die App in Safari (nicht Chrome oder andere Browser)", "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)", "Scrolle nach unten und tippe auf Zum Home-Bildschirm", "Tippe auf Hinzuf\u00fcgen"],
+    and: ["\u00d6ffne die App in Chrome", "Tippe auf die drei Punkte oben rechts", "Zum Startbildschirm hinzuf\u00fcgen", "Best\u00e4tige mit Hinzuf\u00fcgen"],
+    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verf\u00fcgbar. Weitere Sprachen folgen.",
+    loading: ["Dein Account wird erstellt...", "Zugangsdaten werden generiert...", "Fast fertig..."], success: "Dein Account ist erstellt!", footer: "Bei Fragen sind wir f\u00fcr dich da." },
   en: { thanks: "Thank you", received: "Your medical history form has been received. You will receive your signed documents by email. Our practice already has everything on file.",
     next: "What happens next?", appTitle: "Your personal Anima Cura App",
     appDesc: "From now on, you have your own secure space where you can find everything about your treatment. No paper clutter, no lost letters, everything in one place, accessible anytime from your phone.",
     f1: "All your invoices and payment plans in one place", f2: "Your documents: findings, X-rays, treatment plans",
-    f3: "Overview of your treatment phases and current status", f4: "Your installment payments: what\'s been paid, what\'s still open", f5: "Messages from the practice directly in the app",
-    credLabel: "Your login credentials", credTitle: "Your login details", emailLabel: "Login email", pwLabel: "Password", pwTap: "Tap to reveal",
+    f3: "Overview of your treatment phases and current status", f4: "Your installment payments: what has been paid, what is still open", f5: "Messages from the practice directly in the app",
+    credLabel: "Your login credentials", credTitle: "Your login details", emailLabel: "Login email", pwLabel: "Password", pwTap: "Tap to reveal", pwHide: "Hide",
     secNote: "The @animacura.de login email is an internal practice system. We create this access solely so you can securely access your personal app. Your private email address remains unaffected.",
     screenshot: "Take a screenshot of these details. You can change your password anytime after your first login.",
     openLabel: "Open the app", qrTitle: "Scan from your phone", qrDesc: "Filling out the form on a tablet or computer? Scan the QR code with your phone.",
     qrHint: "Open the Camera app and point it at the code.", btnTitle: "Open directly", btnDesc: "Already on your phone? Tap the button and log in with your new credentials.", btnText: "Open Anima Cura",
-    tapHint: "Tap here", guideTitle: "Let\'s get started!", guideSub: "Install the app on your home screen, step by step",
-    guideIntro: "Anima Cura is a web app. You don\'t need to download anything from the App Store. But you can add it to your home screen just like a regular app. After that, it opens with a single tap.",
-    ios1: "Open the app in Safari (not Chrome or other browsers)", ios2: "Tap the Share button at the bottom (the square with an upward arrow)",
-    ios3: '"Add to Home Screen"', ios4: 'Tap "Add"',
-    and1: "Open the app in Chrome", and2: "Tap the three dots in the top right (⋮)",
-    and3: '"Add to Home screen"', and4: 'Confirm with "Add"',
+    tapHint: "Tap here", guideTitle: "Lets get started!", guideSub: "Install the app on your home screen, step by step",
+    guideIntro: "Anima Cura is a web app. You do not need to download anything from the App Store. But you can add it to your home screen just like a regular app. After that, it opens with a single tap.",
+    ios: ["Open the app in Safari (not Chrome or other browsers)", "Tap the Share button at the bottom (the square with an upward arrow)", "Scroll down and tap Add to Home Screen", "Tap Add"],
+    and: ["Open the app in Chrome", "Tap the three dots in the top right", "Add to Home screen", "Confirm with Add"],
     appNote: "The app is currently available in German, English and Spanish. More languages coming soon.",
-    footer: "Questions? We\'re here for you." },
-  es: { thanks: "Gracias", received: "Hemos recibido tu formulario. Recibirás tus documentos firmados por correo electrónico. Nuestra consulta ya tiene todo archivado.",
-    next: "¿Qué viene ahora?", appTitle: "Tu app personal Anima Cura",
-    appDesc: "A partir de ahora tienes tu propio espacio seguro donde encontrarás todo sobre tu tratamiento. Sin papeles perdidos, sin cartas extraviadas, todo en un solo lugar, accesible en cualquier momento desde tu móvil.",
-    f1: "Todas tus facturas y planes de pago en un solo lugar", f2: "Tus documentos: diagnósticos, radiografías, planes de tratamiento",
+    loading: ["Creating your account...", "Generating login credentials...", "Almost done..."], success: "Your account is ready!", footer: "Questions? We are here for you." },
+  es: { thanks: "Gracias", received: "Hemos recibido tu formulario. Recibir\u00e1s tus documentos firmados por correo electr\u00f3nico. Nuestra consulta ya tiene todo archivado.",
+    next: "Que viene ahora?", appTitle: "Tu app personal Anima Cura",
+    appDesc: "A partir de ahora tienes tu propio espacio seguro donde encontrar\u00e1s todo sobre tu tratamiento. Sin papeles perdidos, sin cartas extraviadas, todo en un solo lugar, accesible en cualquier momento desde tu m\u00f3vil.",
+    f1: "Todas tus facturas y planes de pago en un solo lugar", f2: "Tus documentos: diagn\u00f3sticos, radiograf\u00edas, planes de tratamiento",
     f3: "Vista general de tus fases de tratamiento y estado actual", f4: "Tus pagos a plazos: lo que se ha pagado, lo que queda pendiente", f5: "Mensajes de la consulta directamente en la app",
-    credLabel: "Tus datos de acceso", credTitle: "Tus datos de inicio de sesión", emailLabel: "E-mail de acceso", pwLabel: "Contraseña", pwTap: "Pulsa para ver",
-    secNote: "El correo @animacura.de es un sistema interno de la consulta. Creamos este acceso únicamente para que puedas acceder de forma segura a tu app personal. Tu correo privado no se ve afectado.",
-    screenshot: "Haz una captura de pantalla de estos datos. Puedes cambiar tu contraseña en cualquier momento después de iniciar sesión.",
-    openLabel: "Abrir la app", qrTitle: "Escanear desde el móvil", qrDesc: "¿Estás rellenando el formulario en una tablet o un ordenador? Escanea el código QR con tu móvil.",
-    qrHint: "Abre la cámara y apunta al código.", btnTitle: "Abrir directamente", btnDesc: "¿Ya estás en el móvil? Pulsa el botón e inicia sesión con tus nuevos datos.", btnText: "Abrir Anima Cura",
-    tapHint: "Pulsa aquí", guideTitle: "¡Empezamos!", guideSub: "Instala la app en tu pantalla de inicio, paso a paso",
-    guideIntro: "Anima Cura es una web app. No necesitas descargar nada de la App Store. Pero puedes añadirla a tu pantalla de inicio como una app normal. Después se abre con un solo toque.",
-    ios1: "Abre la app en Safari (no Chrome u otros navegadores)", ios2: "Pulsa el botón de compartir en la parte inferior (el cuadrado con una flecha)",
-    ios3: '"Añadir a la pantalla de inicio"', ios4: 'Pulsa "Añadir"',
-    and1: "Abre la app en Chrome", and2: "Pulsa los tres puntos arriba a la derecha (⋮)",
-    and3: '"Añadir a pantalla de inicio"', and4: 'Confirma con "Añadir"',
-    appNote: "La app está disponible de momento en alemán, inglés y español. Más idiomas próximamente.",
-    footer: "¿Preguntas? Estamos aquí para ti." },
-  ru: { thanks: "Спасибо", received: "Твоя анкета получена. Подписанные документы придут тебе на электронную почту. Наша практика уже всё зарегистрировала.",
-    next: "Что дальше?", appTitle: "Твоё персональное приложение Anima Cura",
-    appDesc: "Теперь у тебя есть собственное защищённое пространство, где ты найдёшь всё о своём лечении. Никакого бумажного хаоса, никаких потерянных писем, всё в одном месте, доступно в любое время с телефона.",
-    f1: "Все счета и платёжные планы в одном месте", f2: "Твои документы: диагнозы, рентгеновские снимки, планы лечения",
-    f3: "Обзор этапов лечения и текущий статус", f4: "Твои рассрочки: что оплачено, что ещё открыто", f5: "Сообщения от клиники прямо в приложении",
-    credLabel: "Твои данные для входа", credTitle: "Твои логин-данные", emailLabel: "E-mail для входа", pwLabel: "Пароль", pwTap: "Нажми, чтобы показать",
-    secNote: "E-mail @animacura.de — это внутренняя система клиники. Мы создаём этот доступ исключительно для того, чтобы ты мог безопасно пользоваться своим персональным приложением. Твой личный e-mail не затрагивается.",
-    screenshot: "Лучше сделай скриншот этих данных. Пароль можно изменить в любое время после первого входа.",
-    openLabel: "Открыть приложение", qrTitle: "Сканировать с телефона", qrDesc: "Заполняешь анкету на планшете или компьютере? Отсканируй QR-код телефоном.",
-    qrHint: "Открой камеру и наведи на код.", btnTitle: "Открыть напрямую", btnDesc: "Уже на телефоне? Нажми кнопку и войди с новыми данными.", btnText: "Открыть Anima Cura",
-    tapHint: "Нажми сюда", guideTitle: "Начинаем!", guideSub: "Установи приложение на домашний экран, шаг за шагом",
-    guideIntro: "Anima Cura — это веб-приложение. Ничего скачивать из App Store не нужно. Но ты можешь добавить его на домашний экран как обычное приложение. После этого оно открывается одним нажатием.",
-    ios1: "Открой приложение в Safari (не Chrome или другие браузеры)", ios2: "Нажми на кнопку «Поделиться» внизу (квадрат со стрелкой вверх)",
-    ios3: "«На экран Домой»", ios4: "Нажми «Добавить»",
-    and1: "Открой приложение в Chrome", and2: "Нажми на три точки в правом верхнем углу (⋮)",
-    and3: "«Добавить на главный экран»", and4: "Подтверди «Добавить»",
-    appNote: "Приложение пока доступно на немецком, английском и испанском. Другие языки скоро появятся.",
-    footer: "Вопросы? Мы рядом." },
-  tr: { thanks: "Teşekkürler", received: "Anamnez formun bize ulaştı. İmzalı belgelerini e-posta ile alacaksın. Muayenehanemiz her şeyi kayıt altına aldı.",
-    next: "Sırada ne var?", appTitle: "Kişisel Anima Cura Uygulamanız",
-    appDesc: "Artık tedavinle ilgili her şeyi bulabileceğin kendi güvenli alanın var. Kağıt karmaşası yok, kayıp mektuplar yok, her şey tek bir yerde, telefonundan her an erişilebilir.",
-    f1: "Tüm faturalar ve ödeme planları tek bir yerde", f2: "Belgelerin: teşhisler, röntgenler, tedavi planları",
-    f3: "Tedavi aşamalarına ve mevcut duruma genel bakış", f4: "Taksit ödemelerin: ne ödendi, ne açık kaldı", f5: "Muayenehaneden doğrudan uygulamada mesajlar",
-    credLabel: "Giriş bilgilerin", credTitle: "Giriş bilgilerin", emailLabel: "Giriş e-postası", pwLabel: "Şifre", pwTap: "Görmek için dokun",
-    secNote: "@animacura.de giriş e-postası dahili bir muayenehane sistemidir. Bu erişimi yalnızca kişisel uygulamana güvenle erişebilmen için oluşturuyoruz. Özel e-posta adresin bundan etkilenmez.",
-    screenshot: "Bu bilgilerin bir ekran görüntüsünü al. Şifreni ilk girişten sonra istediğin zaman değiştirebilirsin.",
-    openLabel: "Uygulamayı aç", qrTitle: "Telefonla tara", qrDesc: "Formu tablette veya bilgisayarda mı dolduruyorsun? QR kodu telefonunla tara.",
-    qrHint: "Kamerayı aç ve koda doğrult.", btnTitle: "Doğrudan aç", btnDesc: "Zaten telefondaysan? Düğmeye dokun ve yeni giriş bilgilerinle oturum aç.", btnText: "Anima Cura\'yı aç",
-    tapHint: "Buraya dokun", guideTitle: "Haydi başlayalım!", guideSub: "Uygulamayı ana ekranına kur, adım adım",
-    guideIntro: "Anima Cura bir web uygulamasıdır. App Store\'dan indirmen gerekmez. Ama ana ekranına normal bir uygulama gibi ekleyebilirsin. Sonra tek bir dokunuşla açılır.",
-    ios1: "Uygulamayı Safari\'de aç (Chrome veya diğer tarayıcılarla değil)", ios2: "Alttaki Paylaş düğmesine dokun (yukarı oklu kare)",
-    ios3: "'Ana Ekrana Ekle'", ios4: "'Ekle' düğmesine dokun",
-    and1: "Uygulamayı Chrome\'da aç", and2: "Sağ üst köşedeki üç noktaya dokun (⋮)",
-    and3: "'Ana ekrana ekle'", and4: "'Ekle' ile onayla",
-    appNote: "Uygulama şu an Almanca, İngilizce ve İspanyolca olarak mevcut. Diğer diller yakında eklenecek.",
-    footer: "Soruların mı var? Buradayız." },
+    credLabel: "Tus datos de acceso", credTitle: "Tus datos de inicio de sesi\u00f3n", emailLabel: "E-mail de acceso", pwLabel: "Contrase\u00f1a", pwTap: "Pulsa para ver", pwHide: "Ocultar",
+    secNote: "El correo @animacura.de es un sistema interno de la consulta. Creamos este acceso \u00fanicamente para que puedas acceder de forma segura a tu app personal. Tu correo privado no se ve afectado.",
+    screenshot: "Haz una captura de pantalla de estos datos. Puedes cambiar tu contrase\u00f1a en cualquier momento despu\u00e9s de iniciar sesi\u00f3n.",
+    openLabel: "Abrir la app", qrTitle: "Escanear desde el m\u00f3vil", qrDesc: "Est\u00e1s rellenando el formulario en una tablet o un ordenador? Escanea el c\u00f3digo QR con tu m\u00f3vil.",
+    qrHint: "Abre la c\u00e1mara y apunta al c\u00f3digo.", btnTitle: "Abrir directamente", btnDesc: "Ya est\u00e1s en el m\u00f3vil? Pulsa el bot\u00f3n e inicia sesi\u00f3n con tus nuevos datos.", btnText: "Abrir Anima Cura",
+    tapHint: "Pulsa aqu\u00ed", guideTitle: "Empezamos!", guideSub: "Instala la app en tu pantalla de inicio, paso a paso",
+    guideIntro: "Anima Cura es una web app. No necesitas descargar nada de la App Store. Pero puedes a\u00f1adirla a tu pantalla de inicio como una app normal. Despu\u00e9s se abre con un solo toque.",
+    ios: ["Abre la app en Safari (no Chrome u otros navegadores)", "Pulsa el bot\u00f3n de compartir en la parte inferior", "A\u00f1adir a la pantalla de inicio", "Pulsa A\u00f1adir"],
+    and: ["Abre la app en Chrome", "Pulsa los tres puntos arriba a la derecha", "A\u00f1adir a pantalla de inicio", "Confirma con A\u00f1adir"],
+    appNote: "La app est\u00e1 disponible de momento en alem\u00e1n, ingl\u00e9s y espa\u00f1ol. M\u00e1s idiomas pr\u00f3ximamente.",
+    loading: ["Creando tu cuenta...", "Generando datos de acceso...", "Casi listo..."], success: "Tu cuenta est\u00e1 lista!", footer: "Preguntas? Estamos aqu\u00ed para ti." },
+  ru: { thanks: "\u0421\u043f\u0430\u0441\u0438\u0431\u043e", received: "\u0422\u0432\u043e\u044f \u0430\u043d\u043a\u0435\u0442\u0430 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0430. \u041f\u043e\u0434\u043f\u0438\u0441\u0430\u043d\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u043f\u0440\u0438\u0434\u0443\u0442 \u0442\u0435\u0431\u0435 \u043d\u0430 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u0443\u044e \u043f\u043e\u0447\u0442\u0443.",
+    next: "\u0427\u0442\u043e \u0434\u0430\u043b\u044c\u0448\u0435?", appTitle: "\u0422\u0432\u043e\u0451 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 Anima Cura", appDesc: "\u0422\u0435\u043f\u0435\u0440\u044c \u0443 \u0442\u0435\u0431\u044f \u0435\u0441\u0442\u044c \u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0435 \u0437\u0430\u0449\u0438\u0449\u0451\u043d\u043d\u043e\u0435 \u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0441\u0442\u0432\u043e.",
+    f1: "\u0412\u0441\u0435 \u0441\u0447\u0435\u0442\u0430 \u0438 \u043f\u043b\u0430\u0442\u0451\u0436\u043d\u044b\u0435 \u043f\u043b\u0430\u043d\u044b", f2: "\u0422\u0432\u043e\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b", f3: "\u041e\u0431\u0437\u043e\u0440 \u044d\u0442\u0430\u043f\u043e\u0432 \u043b\u0435\u0447\u0435\u043d\u0438\u044f", f4: "\u0422\u0432\u043e\u0438 \u0440\u0430\u0441\u0441\u0440\u043e\u0447\u043a\u0438", f5: "\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u043e\u0442 \u043a\u043b\u0438\u043d\u0438\u043a\u0438",
+    credLabel: "\u0422\u0432\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u0434\u043b\u044f \u0432\u0445\u043e\u0434\u0430", credTitle: "\u0422\u0432\u043e\u0438 \u043b\u043e\u0433\u0438\u043d-\u0434\u0430\u043d\u043d\u044b\u0435", emailLabel: "E-mail", pwLabel: "\u041f\u0430\u0440\u043e\u043b\u044c", pwTap: "\u041d\u0430\u0436\u043c\u0438", pwHide: "\u0421\u043a\u0440\u044b\u0442\u044c",
+    secNote: "@animacura.de \u2014 \u0432\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u044f\u044f \u0441\u0438\u0441\u0442\u0435\u043c\u0430 \u043a\u043b\u0438\u043d\u0438\u043a\u0438.", screenshot: "\u0421\u0434\u0435\u043b\u0430\u0439 \u0441\u043a\u0440\u0438\u043d\u0448\u043e\u0442.",
+    openLabel: "\u041e\u0442\u043a\u0440\u044b\u0442\u044c", qrTitle: "\u0421\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c", qrDesc: "\u041e\u0442\u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439 QR-\u043a\u043e\u0434.", qrHint: "\u041e\u0442\u043a\u0440\u043e\u0439 \u043a\u0430\u043c\u0435\u0440\u0443.", btnTitle: "\u041e\u0442\u043a\u0440\u044b\u0442\u044c", btnDesc: "\u0423\u0436\u0435 \u043d\u0430 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0435?", btnText: "\u041e\u0442\u043a\u0440\u044b\u0442\u044c Anima Cura",
+    tapHint: "\u041d\u0430\u0436\u043c\u0438 \u0441\u044e\u0434\u0430", guideTitle: "\u041d\u0430\u0447\u0438\u043d\u0430\u0435\u043c!", guideSub: "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u043d\u0430 \u0434\u043e\u043c\u0430\u0448\u043d\u0438\u0439 \u044d\u043a\u0440\u0430\u043d",
+    guideIntro: "Anima Cura \u2014 \u044d\u0442\u043e \u0432\u0435\u0431-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435.",
+    ios: ["\u041e\u0442\u043a\u0440\u043e\u0439 \u0432 Safari", "\u041d\u0430\u0436\u043c\u0438 \u041f\u043e\u0434\u0435\u043b\u0438\u0442\u044c\u0441\u044f", "\u041d\u0430 \u044d\u043a\u0440\u0430\u043d \u0414\u043e\u043c\u043e\u0439", "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c"],
+    and: ["\u041e\u0442\u043a\u0440\u043e\u0439 \u0432 Chrome", "\u0422\u0440\u0438 \u0442\u043e\u0447\u043a\u0438 \u0432\u0432\u0435\u0440\u0445\u0443", "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430 \u0433\u043b\u0430\u0432\u043d\u044b\u0439 \u044d\u043a\u0440\u0430\u043d", "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c"],
+    appNote: "\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u043d\u0430 \u043d\u0435\u043c\u0435\u0446\u043a\u043e\u043c, \u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u043e\u043c \u0438 \u0438\u0441\u043f\u0430\u043d\u0441\u043a\u043e\u043c.",
+    loading: ["\u0421\u043e\u0437\u0434\u0430\u0451\u043c \u0430\u043a\u043a\u0430\u0443\u043d\u0442...", "\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u0443\u0435\u043c \u0434\u0430\u043d\u043d\u044b\u0435...", "\u041f\u043e\u0447\u0442\u0438 \u0433\u043e\u0442\u043e\u0432\u043e..."], success: "\u0410\u043a\u043a\u0430\u0443\u043d\u0442 \u0433\u043e\u0442\u043e\u0432!", footer: "\u0412\u043e\u043f\u0440\u043e\u0441\u044b? \u041c\u044b \u0440\u044f\u0434\u043e\u043c." },
+  tr: { thanks: "Te\u015fekk\u00fcrler", received: "Anamnez formun bize ula\u015ft\u0131. Muayenehanemiz her \u015feyi kay\u0131t alt\u0131na ald\u0131.",
+    next: "S\u0131rada ne var?", appTitle: "Anima Cura Uygulaman", appDesc: "Art\u0131k tedavinle ilgili her \u015feyi bulabilece\u011fin kendi g\u00fcvenli alan\u0131n var.",
+    f1: "T\u00fcm faturalar ve \u00f6deme planlar\u0131", f2: "Belgelerin", f3: "Tedavi a\u015famalar\u0131", f4: "Taksit \u00f6demelerin", f5: "Mesajlar",
+    credLabel: "Giri\u015f bilgilerin", credTitle: "Giri\u015f bilgilerin", emailLabel: "Giri\u015f e-postas\u0131", pwLabel: "\u015eifre", pwTap: "G\u00f6rmek i\u00e7in dokun", pwHide: "Gizle",
+    secNote: "@animacura.de dahili bir muayenehane sistemidir.", screenshot: "Ekran g\u00f6r\u00fcnt\u00fcs\u00fc al.",
+    openLabel: "Uygulamay\u0131 a\u00e7", qrTitle: "Telefonla tara", qrDesc: "QR kodu telefonunla tara.", qrHint: "Kameray\u0131 a\u00e7.", btnTitle: "Do\u011frudan a\u00e7", btnDesc: "Zaten telefondaysan?", btnText: "Anima Cura a\u00e7",
+    tapHint: "Buraya dokun", guideTitle: "Haydi ba\u015flayal\u0131m!", guideSub: "Uygulamay\u0131 ana ekran\u0131na kur",
+    guideIntro: "Anima Cura bir web uygulamas\u0131d\u0131r.",
+    ios: ["Safari ile a\u00e7", "Payla\u015f d\u00fc\u011fmesine dokun", "Ana Ekrana Ekle", "Ekle"],
+    and: ["Chrome ile a\u00e7", "\u00dc\u00e7 noktaya dokun", "Ana ekrana ekle", "Ekle"],
+    appNote: "Uygulama \u015fu an Almanca, \u0130ngilizce ve \u0130spanyolca mevcut.",
+    loading: ["Hesab\u0131n olu\u015fturuluyor...", "Giri\u015f bilgileri \u00fcretiliyor...", "Neredeyse bitti..."], success: "Hesab\u0131n haz\u0131r!", footer: "Sorular\u0131n m\u0131 var? Buraday\u0131z." },
 };
 
-const APP_URL = "https://anima-cura.vercel.app/patient/login";
-const QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(APP_URL)}&bgcolor=fdfbf7&color=1d2a27`;
+const DONE_APP_URL = "https://anima-cura.vercel.app/patient/login";
+const DONE_QR_URL = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(DONE_APP_URL) + "&bgcolor=fdfbf7&color=1d2a27";
 
 function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setGuideOpen, vorname }: {
   account: { login_email: string; password: string } | null;
@@ -458,139 +433,78 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
 }) {
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
+  const [loadIdx, setLoadIdx] = useState(0);
 
   useEffect(() => {
     if (!account) return;
-    const timer = setTimeout(() => {
-      setLoading(false);
-      setTimeout(() => setRevealed(true), 300);
-    }, 6000);
+    const timer = setTimeout(() => { setLoading(false); setTimeout(() => setRevealed(true), 300); }, 6000);
     return () => clearTimeout(timer);
   }, [account]);
 
-  const t = T[lang];
-  const name = vorname || "Patient";
-  const langs: Array<{ code: "de"|"en"|"es"|"ru"|"tr"; flag: string; label: string }> = [
-    { code: "de", flag: "🇩🇪", label: "Deutsch" },
-    { code: "en", flag: "🇬🇧", label: "English" },
-    { code: "es", flag: "🇪🇸", label: "Español" },
-    { code: "ru", flag: "🇷🇺", label: "Русский" },
-    { code: "tr", flag: "🇹🇷", label: "Türkçe" },
-  ];
-
-  const loadingTexts: Record<string, string[]> = {
-    de: ["Dein Account wird erstellt...", "Zugangsdaten werden generiert...", "Fast fertig..."],
-    en: ["Creating your account...", "Generating login credentials...", "Almost done..."],
-    es: ["Creando tu cuenta...", "Generando datos de acceso...", "Casi listo..."],
-    ru: ["Создаём твой аккаунт...", "Генерируем данные...", "Почти готово..."],
-    tr: ["Hesabın oluşturuluyor...", "Giriş bilgileri üretiliyor...", "Neredeyse bitti..."],
-  };
-
-  const [loadTextIdx, setLoadTextIdx] = useState(0);
   useEffect(() => {
     if (!loading) return;
-    const interval = setInterval(() => setLoadTextIdx((i) => (i + 1) % 3), 2000);
-    return () => clearInterval(interval);
+    const iv = setInterval(() => setLoadIdx((i) => (i + 1) % 3), 2000);
+    return () => clearInterval(iv);
   }, [loading]);
 
-  const successTexts: Record<string, string> = {
-    de: "Dein Account ist erstellt!",
-    en: "Your account is ready!",
-    es: "¡Tu cuenta está lista!",
-    ru: "Твой аккаунт готов!",
-    tr: "Hesabın hazır!",
-  };
+  const t = DONE_T[lang] as Record<string, unknown>;
+  const ios = t.ios as string[];
+  const and = t.and as string[];
+  const loadingTxts = t.loading as string[];
+  const name = vorname || "Patient";
+  const check = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>;
 
   return (
     <div className="done-screen show">
-      <div className="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
-      <h2>{t.thanks}, {name}!</h2>
-      <p>{t.received}</p>
-
+      <div className="ring">{check}</div>
+      <h2>{t.thanks as string}, {name}!</h2>
+      <p>{t.received as string}</p>
       <div className="done-lang-bar">
-        {langs.map((l) => (<button key={l.code} type="button" className={"done-lang-btn" + (lang === l.code ? " on" : "")} onClick={() => setLang(l.code)}>{l.flag} {l.label}</button>))}
+        {(["de","en","es","ru","tr"] as const).map((c) => (
+          <button key={c} type="button" className={"done-lang-btn" + (lang === c ? " on" : "")} onClick={() => setLang(c)}>
+            {c === "de" ? "DE" : c === "en" ? "EN" : c === "es" ? "ES" : c === "ru" ? "RU" : "TR"}
+          </button>
+        ))}
       </div>
-
-      {account && loading && (
-        <div style={{ marginTop: 20 }}>
-          <div className="shimmer-bar"><div className="shimmer-track" /></div>
-          <div className="shimmer-text">{(loadingTexts[lang] || loadingTexts.de)[loadTextIdx]}</div>
-        </div>
-      )}
-
-      {account && !loading && !revealed && (
-        <div className="success-flash">
-          <div className="success-badge">
-            <div className="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
-            <span>{successTexts[lang]}</span>
-          </div>
-        </div>
-      )}
-
-      {account && revealed && (
-        <div className="account-reveal">
-          <div className="success-flash">
-            <div className="success-badge">
-              <div className="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg></div>
-              <span>{successTexts[lang]}</span>
-            </div>
-          </div>
-
-          <div className="done-divider" />
-          <div className="done-slabel">{t.next}</div>
-          <div className="glow-box" style={{ textAlign: "left" }}>
-            <h3>{t.appTitle}</h3>
-            <p>{t.appDesc}</p>
-            <ul>{[t.f1, t.f2, t.f3, t.f4, t.f5].map((f, i) => (<li key={i}><span className="gdot" />{f}</li>))}</ul>
-          </div>
-
-          <div className="done-divider" />
-          <div className="done-slabel">{t.credLabel}</div>
-          <div className="cred-card" style={{ textAlign: "left" }}>
-            <div className="cred-title">{t.credTitle}</div>
-            <div className="cred-row"><span className="cred-label">{t.emailLabel}</span><span className="cred-val">{account.login_email}</span></div>
-            <div className="cred-row"><span className="cred-label">{t.pwLabel}</span>
-              <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
-                {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">••••••••••</span>}
-                <span className="pw-reveal">{showPw ? "✓" : "👆 " + t.pwTap}</span>
-              </div>
-            </div>
-            <div className="cred-note" style={{ marginBottom: 10 }}><span>🔒</span><div>{t.secNote}</div></div>
-            <div className="cred-note"><span>📸</span><div>{t.screenshot}</div></div>
-          </div>
-
-          <div className="done-divider" />
-          <div className="done-slabel">{t.openLabel}</div>
-          <div className="access-split">
-            <div className="access-side">
-              <h4>📱 {t.qrTitle}</h4><p>{t.qrDesc}</p>
-              <img src={QR_URL} alt="QR" width="160" height="160" style={{ borderRadius: 8 }} />
-              <div style={{ fontSize: "11.5px", color: "var(--muted-2)", marginTop: 10 }}>{t.qrHint}</div>
-            </div>
-            <div className="access-side">
-              <h4>👆 {t.btnTitle}</h4><p>{t.btnDesc}</p>
-              <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>{t.btnText} →</a>
-            </div>
-          </div>
-
-          <div className="done-divider" />
-          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "var(--primary-bright)", fontWeight: 600, animation: "aabHintPulse 2s ease-in-out infinite" }}>👇 {t.tapHint}</div>
-          <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
-            <div><div className="gtitle">{t.guideTitle}</div><div className="gsub">{t.guideSub}</div></div>
-            <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div>
-          </div>
-          <div className={"guide-body" + (guideOpen ? " open" : "")}>
-            <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{t.guideIntro}</p>
-            <div className="gplatform"><h5>🍎 iPhone / iPad (Safari)</h5><ol><li>{t.ios1}</li><li>{t.ios2}</li><li><b>{t.ios3}</b></li><li><b>{t.ios4}</b> 🎉</li></ol></div>
-            <div className="gplatform"><h5>🤖 Android (Chrome)</h5><ol><li>{t.and1}</li><li>{t.and2}</li><li><b>{t.and3}</b></li><li><b>{t.and4}</b> 🎉</li></ol></div>
-          </div>
-          <div className="app-note">📌 {t.appNote}</div>
-        </div>
-      )}
-
-      {!account && !loading && (
-        <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
-      )}
+      {account && loading && (<div style={{marginTop:20}}><div className="shimmer-bar"><div className="shimmer-track" /></div><div className="shimmer-text">{loadingTxts[loadIdx]}</div></div>)}
+      {account && !loading && !revealed && (<div className="success-flash" style={{animation:"aabSlide .5s ease"}}><div className="success-badge"><div className="schk">{check}</div><span>{t.success as string}</span></div></div>)}
+      {account && revealed && (<div className="account-reveal">
+        <div className="success-flash"><div className="success-badge"><div className="schk">{check}</div><span>{t.success as string}</span></div></div>
+        <div className="done-divider" />
+        <div className="done-slabel">{t.next as string}</div>
+        <div className="glow-box" style={{textAlign:"left"}}><h3>{t.appTitle as string}</h3><p>{t.appDesc as string}</p>
+          <ul>{[t.f1,t.f2,t.f3,t.f4,t.f5].map((f,i) => <li key={i}><span className="gdot" />{f as string}</li>)}</ul></div>
+        <div className="done-divider" />
+        <div className="done-slabel">{t.credLabel as string}</div>
+        <div className="cred-card"><div className="cred-title">{t.credTitle as string}</div>
+          <div className="cred-row"><span className="cred-label">{t.emailLabel as string}</span><span className="cred-val">{account.login_email}</span></div>
+          <div className="cred-row"><span className="cred-label">{t.pwLabel as string}</span>
+            <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
+              {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">{"●".repeat(10)}</span>}
+              <span className="pw-reveal">{showPw ? (t.pwHide as string) : (t.pwTap as string)}</span>
+            </div></div>
+          <div className="cred-note" style={{marginBottom:10}}><span>{"🔒"}</span><div>{t.secNote as string}</div></div>
+          <div className="cred-note"><span>{"📸"}</span><div>{t.screenshot as string}</div></div></div>
+        <div className="done-divider" />
+        <div className="done-slabel">{t.openLabel as string}</div>
+        <div className="access-split">
+          <div className="access-side"><h4>{t.qrTitle as string}</h4><p>{t.qrDesc as string}</p>
+            <img src={DONE_QR_URL} alt="QR" width="160" height="160" style={{borderRadius:8}} />
+            <div style={{fontSize:"11.5px",color:"var(--muted-2)",marginTop:10}}>{t.qrHint as string}</div></div>
+          <div className="access-side"><h4>{t.btnTitle as string}</h4><p>{t.btnDesc as string}</p>
+            <a href={DONE_APP_URL} target="_blank" rel="noopener noreferrer" className="btn primary" style={{display:"block",textAlign:"center",textDecoration:"none"}}>{t.btnText as string}</a></div></div>
+        <div className="done-divider" />
+        <div style={{textAlign:"center",marginBottom:6,fontSize:12,color:"var(--primary-bright)",fontWeight:600,animation:"aabHint 2s ease-in-out infinite"}}>{t.tapHint as string}</div>
+        <div className={"guide-trigger" + (guideOpen ? " open" : "")} onClick={() => setGuideOpen(!guideOpen)}>
+          <div><div className="gtitle">{t.guideTitle as string}</div><div className="gsub">{t.guideSub as string}</div></div>
+          <div className="garrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></div></div>
+        <div className={"guide-body" + (guideOpen ? " open" : "")}>
+          <p style={{fontSize:14,color:"var(--muted)",marginBottom:16}}>{t.guideIntro as string}</p>
+          <div className="gplatform"><h5>iPhone / iPad (Safari)</h5><ol>{ios.map((s,i) => <li key={i}><b>{s}</b></li>)}</ol></div>
+          <div className="gplatform"><h5>Android (Chrome)</h5><ol>{and.map((s,i) => <li key={i}><b>{s}</b></li>)}</ol></div></div>
+        <div className="app-note">{t.appNote as string}</div>
+      </div>)}
+      {!account && !loading && (<span className="applink">In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>)}
     </div>
   );
 }
@@ -603,7 +517,9 @@ export function AnamneseForm({ patientId }: Props) {
   const [done, setDone] = useState(false);
   const [fehlen, setFehlen] = useState<string[]>([]);
   const [account, setAccount] = useState<{ login_email: string; password: string } | null>(null);
-  const [showGuide, setShowGuide] = useState<"de" | "en" | "es" | "ru" | "tr">("de");
+  const [lang, setLang] = useState<"de"|"en"|"es"|"ru"|"tr">("de");
+  const [showPw, setShowPw] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [gruende, setGruende] = useState<Record<string, string>>({});
 
   const sig1 = useRef<HTMLCanvasElement | null>(null);
@@ -731,9 +647,7 @@ export function AnamneseForm({ patientId }: Props) {
       body: JSON.stringify({ patientId, answers: payload, schema }),
     })
       .then((res) => res.json())
-      .then((res) => {
-        if (res.account) setAccount(res.account);
-      })
+      .then((res) => { if (res.account) setAccount(res.account); })
       .catch((error) => console.error("Anamnese-Übermittlung fehlgeschlagen:", error));
     setDone(true);
     scrollTop();
@@ -923,7 +837,7 @@ export function AnamneseForm({ patientId }: Props) {
         return (
           <section className="step active">
             <h2>Gesundheitsfragen</h2>
-            <p className="sub">Bitte für jede Frage Ja oder Nein wählen. Ehrliche Angaben helfen uns, sicher und richtig zu behandeln. Bei \"Ja" erscheint manchmal ein kurzes Zusatzfeld.</p>
+            <p className="sub">Bitte für jede Frage Ja oder Nein wählen. Ehrliche Angaben helfen uns, sicher und richtig zu behandeln. Bei 'Ja" erscheint manchmal ein kurzes Zusatzfeld.</p>
             <div id="medlist">
               {MEDS.map((m) => (
                 <div className="qrow" key={m.key}>
@@ -1015,21 +929,7 @@ export function AnamneseForm({ patientId }: Props) {
 
         <div className="card">
           {done ? (
-            <DoneScreen
-              account={account}
-              lang={lang}
-              setLang={setLang}
-              showPw={showPw}
-              setShowPw={setShowPw}
-              guideOpen={guideOpen}
-              setGuideOpen={setGuideOpen}
-              vorname={txt("patient_vorname")}
-            />}
-
-              {!account && (
-                <span className="applink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>In der Anima Cura App haben Sie alles jederzeit griffbereit.</span>
-              )}
-            </div>
+            <DoneScreen account={account} lang={lang} setLang={setLang} showPw={showPw} setShowPw={setShowPw} guideOpen={guideOpen} setGuideOpen={setGuideOpen} vorname={txt("patient_vorname")} />
           ) : (
             <>
               {fehlen.length > 0 && (
