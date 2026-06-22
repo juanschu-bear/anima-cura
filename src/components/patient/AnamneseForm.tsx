@@ -439,9 +439,9 @@ const T: Record<string, Record<string, string>> = {
     tapHint: "Buraya dokun", guideTitle: "Haydi başlayalım!", guideSub: "Uygulamayı ana ekranına kur, adım adım",
     guideIntro: "Anima Cura bir web uygulamasıdır. App Store\'dan indirmen gerekmez. Ama ana ekranına normal bir uygulama gibi ekleyebilirsin. Sonra tek bir dokunuşla açılır.",
     ios1: "Uygulamayı Safari\'de aç (Chrome veya diğer tarayıcılarla değil)", ios2: "Alttaki Paylaş düğmesine dokun (yukarı oklu kare)",
-    ios3: ""Ana Ekrana Ekle"", ios4: ""Ekle" düğmesine dokun",
+    ios3: "'Ana Ekrana Ekle'", ios4: "'Ekle' düğmesine dokun",
     and1: "Uygulamayı Chrome\'da aç", and2: "Sağ üst köşedeki üç noktaya dokun (⋮)",
-    and3: ""Ana ekrana ekle"", and4: ""Ekle" ile onayla",
+    and3: "'Ana ekrana ekle'", and4: "'Ekle' ile onayla",
     appNote: "Uygulama şu an Almanca, İngilizce ve İspanyolca olarak mevcut. Diğer diller yakında eklenecek.",
     footer: "Soruların mı var? Buradayız." },
 };
