@@ -51,6 +51,7 @@ async function fetchAllTransactions(
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result = await getTransactions(userToken, {
       direction: "all",
+      accountIds: [31760548],
       ...(minDate ? { minDate } : {}),
       perPage: 500,
       page,
@@ -140,6 +141,7 @@ export async function syncBankTransactions(options: { triggerUpdate?: boolean } 
           bank_connection_id: conn.id,
           date_from: minDate ?? null,
           direction: "all",
+      accountIds: [31760548],
           status: "running",
         })
         .select("id")

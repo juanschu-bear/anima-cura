@@ -58,6 +58,8 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/automatisierungen", roles: ["admin", "verwaltung"] },
   { path: "/import", roles: ["admin", "verwaltung"] },
   { path: "/einstellungen", roles: ["admin"] },
+  { path: "/finanzen", roles: ["admin"] },
+  { path: "/finanzen", roles: ["admin"] },
 ];
 
 export function extractAppRole(value: unknown): AppRole | null {
