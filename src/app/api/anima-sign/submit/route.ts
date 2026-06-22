@@ -84,6 +84,12 @@ export async function POST(request: Request) {
 
     const submissionId = sub.id as string;
 
+    // 1b) Bestandspatienten-Abgleich: prüfen ob Patient existiert, Daten updaten
+    const { data: abgleich } = await supabase.rpc(
+      "abgleich_patient_aus_submission",
+      { p_submission_id: submissionId }
+    );
+
     // 2) PDF beim PDF-Dienst rendern lassen
     const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
     const pdfKey = process.env.ANIMASIGN_PDF_KEY;
@@ -193,6 +199,7 @@ export async function POST(request: Request) {
         id: submissionId,
         token: signing.token,
         host: documensoHost,
+        abgleich: abgleich ?? null,
       });
     } catch (documensoError) {
       // Daten sind gespeichert. Ohne Signier-Link faellt das Frontend auf die
@@ -218,3 +225,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }
 }
+
