@@ -346,7 +346,7 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { fehlt?: boolean; onSign?: (
   );
 });
 
-const DONE_T: Record<string, Record<string, string>> = {
+const DONE_T: Record<string, Record<string, string | string[]>> = {
   de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Du erh\u00e4ltst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
     next: "Was kommt als N\u00e4chstes?", appTitle: "Deine pers\u00f6nliche Anima Cura App",
     appDesc: "Ab sofort steht dir ein eigener, gesch\u00fctzter Bereich zur Verf\u00fcgung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
