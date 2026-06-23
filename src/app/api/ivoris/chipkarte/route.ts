@@ -2,99 +2,55 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function buildIvorisUrl(path: string, params?: Record<string, string>) {
-  const linkname = process.env.IVORIS_LINKNAME;
-  const app = process.env.IVORIS_APP;
-  const appVersion = process.env.IVORIS_APP_VERSION;
-  const apiKey = process.env.IVORIS_API_KEY;
-  const relayHost = process.env.IVORIS_RELAY_HOST || "https://relay.computer-konkret.de";
-
-  if (!linkname || !app || !appVersion || !apiKey) {
-    throw new Error("IVORIS env vars missing");
-  }
-
-  const url = new URL(`${relayHost}/relay/${linkname}/webservice/api/${path}`);
-  url.searchParams.set("app", app);
-  url.searchParams.set("app_version", appVersion);
-  url.searchParams.set("api_key", apiKey);
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      url.searchParams.set(k, v);
-    }
-  }
+function buildUrl(path: string, params?: Record<string, string>) {
+  const lk = process.env.IVORIS_LINKNAME!;
+  const rh = process.env.IVORIS_RELAY_HOST || "https://relay.computer-konkret.de";
+  const url = new URL(`${rh}/relay/${lk}/webservice/api/${path}`);
+  url.searchParams.set("app", process.env.IVORIS_APP!);
+  url.searchParams.set("app_version", process.env.IVORIS_APP_VERSION!);
+  url.searchParams.set("api_key", process.env.IVORIS_API_KEY!);
+  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   return url.toString();
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const username = process.env.IVORIS_USERNAME;
-  const password = process.env.IVORIS_PASSWORD;
-  if (username && password) {
-    headers.Authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
-  }
-  return headers;
+function headers(): Record<string, string> {
+  const h: Record<string, string> = { Accept: "application/json" };
+  const u = process.env.IVORIS_USERNAME, p = process.env.IVORIS_PASSWORD;
+  if (u && p) h.Authorization = "Basic " + Buffer.from(u + ":" + p).toString("base64");
+  return h;
 }
 
-export async function GET() {
+async function tryFetch(label: string, path: string, params?: Record<string, string>) {
   try {
-    const headers = getAuthHeaders();
-    const results: Record<string, unknown> = {};
+    const url = buildUrl(path, params);
+    const res = await fetch(url, { headers: headers(), cache: "no-store" });
+    const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { /* not json */ }
+    return { label, status: res.status, data: parsed ?? text.slice(0, 3000) };
+  } catch (e) { return { label, error: String(e) }; }
+}
 
-    // 1. ChipReadDate endpoint
-    try {
-      const chipUrl = buildIvorisUrl("Patient/v1/ChipReadDate");
-      const chipRes = await fetch(chipUrl, { headers, cache: "no-store" });
-      const chipText = await chipRes.text();
-      results.chipReadDate = {
-        status: chipRes.status,
-        url: chipUrl.replace(process.env.IVORIS_API_KEY || "", "***"),
-        data: chipText.slice(0, 2000),
-      };
-    } catch (e) {
-      results.chipReadDate = { error: String(e) };
-    }
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const patientId = searchParams.get("patientId") || "ccd09c7e-3fac-47ae-8b00-7d942449c0a1";
 
-    // 2. Raw patient data (first 3 patients) to see HealthInsurance fields
-    try {
-      const patUrl = buildIvorisUrl("Patient/v1/AllPatients", { page: "0" });
-      const patRes = await fetch(patUrl, { headers, cache: "no-store" });
-      const patText = await patRes.text();
-      const patients = JSON.parse(patText);
-      
-      // Extract first 3 patients with ALL fields visible
-      const sample = (patients as unknown[]).slice(0, 3).map((p: unknown) => {
-        const pat = p as Record<string, unknown>;
-        return {
-          Id: pat.Id,
-          Firstname: pat.Firstname,
-          Lastname: pat.Lastname,
-          HealthInsurance: pat.HealthInsurance,
-          CurrentInsurance: pat.CurrentInsurance,
-          InsuranceType: pat.InsuranceType,
-          Insurance: pat.Insurance,
-          // Dump all top-level keys to see what exists
-          _allKeys: Object.keys(pat),
-        };
-      });
-      results.rawPatients = { status: patRes.status, sample };
-    } catch (e) {
-      results.rawPatients = { error: String(e) };
-    }
+  const results = await Promise.all([
+    // 1. ChipReadDate without params
+    tryFetch("ChipReadDate (no params)", "Patient/v1/ChipReadDate"),
+    // 2. ChipReadDate with patientId
+    tryFetch("ChipReadDate (with patientId)", "Patient/v1/ChipReadDate", { id: patientId }),
+    // 3. ChipReadDate with patientId as path
+    tryFetch("ChipReadDate (path style)", "Patient/v1/ChipReadDate/" + patientId),
+    // 4. Single Patient (might have more fields than AllPatients)
+    tryFetch("GetPatient (single)", "Patient/v1/Patient", { id: patientId }),
+    // 5. GetPatients (paginated, might differ from AllPatients)
+    tryFetch("GetPatients (paginated)", "Patient/v1/Patients", { page: "0" }),
+    // 6. Patient Characteristics (might store Krankenkasse as characteristic)
+    tryFetch("PatientCharacteristics", "PatientCharacteristic/v1/Patient/" + patientId + "/AllCharacteristics"),
+    // 7. All characteristic templates (to see what fields exist)
+    tryFetch("CharacteristicTemplates", "PatientCharacteristic/v1/AllTemplates"),
+  ]);
 
-    // 3. Single patient with FULL raw dump (first patient)
-    try {
-      const patUrl = buildIvorisUrl("Patient/v1/AllPatients", { page: "0" });
-      const patRes = await fetch(patUrl, { headers, cache: "no-store" });
-      const patients = await patRes.json();
-      if (Array.isArray(patients) && patients.length > 0) {
-        results.fullPatientDump = patients[0];
-      }
-    } catch (e) {
-      results.fullPatientDump = { error: String(e) };
-    }
-
-    return NextResponse.json(results, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+  return NextResponse.json({ patientId, results }, { status: 200 });
 }
