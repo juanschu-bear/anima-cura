@@ -554,6 +554,117 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     </nav>
   );
 
+
+  // ═══ NEW PATIENT DETECTION ═══
+  const isNewPatient = !loading && phasen.length === 0 && (!rp || !rp.plan);
+
+  // ═══ WELCOME TIMELINE (shown when no treatment data yet) ═══
+  const WelcomeTimeline = (
+    <div>
+      {Header}
+      <div style={{ padding: "16px 20px 0" }}>
+        <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
+        <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
+      </div>
+
+      {/* Glowy setup banner */}
+      <div style={{
+        margin: "16px 20px", padding: 18, borderRadius: 16,
+        background: dk ? "rgba(34,197,94,0.06)" : "rgba(46,122,90,0.06)",
+        border: "1.5px solid " + (dk ? "rgba(34,197,94,0.3)" : "rgba(46,122,90,0.25)"),
+        display: "flex", gap: 14, alignItems: "flex-start",
+        animation: "welcomeGlow 2.5s ease-in-out infinite",
+      }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: dk ? "rgba(34,197,94,0.12)" : "rgba(46,122,90,0.1)", display: "grid", placeItems: "center", fontSize: 16 }}>{String.fromCodePoint(0x2699, 0xFE0F)}</div>
+        <div style={{ fontSize: 13, color: dk ? "rgba(255,255,255,0.65)" : "#4a4740", lineHeight: 1.7 }}>
+          {lang === "en" ? <>We are setting everything up for you. Your treatment plan, invoices, and all important documents will appear here in the <b style={{ color: grn, fontWeight: 600 }}>coming days</b>.</> :
+           lang === "es" ? <>Estamos preparando todo para ti. Tu plan de tratamiento, facturas y todos los documentos importantes aparecer\u00e1n aqu\u00ed en los <b style={{ color: grn, fontWeight: 600 }}>pr\u00f3ximos d\u00edas</b>.</> :
+           <>Wir richten gerade alles f\u00fcr dich ein. In den <b style={{ color: grn, fontWeight: 600 }}>kommenden Tagen</b> erscheinen hier dein Behandlungsplan, deine Rechnungen und alle wichtigen Dokumente.</>}
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <div style={{ position: "relative", paddingLeft: 34, margin: "22px 20px 28px" }}>
+        {/* Track line */}
+        <div style={{ position: "absolute", left: 12, top: 10, bottom: 10, width: 3, borderRadius: 3, background: dk ? "rgba(255,255,255,0.04)" : "#e0d8cc" }} />
+        {/* Animated beam overlay */}
+        <div style={{ position: "absolute", left: 12, top: 10, width: 3, borderRadius: 3, background: `linear-gradient(180deg, ${grn} 0%, ${dk ? "#4ade80" : "#52c48e"} 30%, ${warn} 56%, transparent 85%)`, animation: "beamFlow 2.2s cubic-bezier(0.25,0.46,0.45,0.94) forwards", height: 0 }} />
+
+        {[
+          { done: true, title: lang === "en" ? "Intake form completed" : lang === "es" ? "Formulario completado" : "Anamnesebogen ausgef\u00fcllt", desc: lang === "en" ? "Your form has been received and is being signed." : lang === "es" ? "Tu formulario ha sido recibido." : "Dein Bogen ist eingegangen und wird gerade signiert.", badge: lang === "en" ? "Done" : lang === "es" ? "Hecho" : "Erledigt" },
+          { done: true, title: lang === "en" ? "App access created" : lang === "es" ? "Acceso creado" : "App-Zugang erstellt", desc: lang === "en" ? "Your personal area is set up." : lang === "es" ? "Tu \u00e1rea personal est\u00e1 configurada." : "Dein pers\u00f6nlicher Bereich ist eingerichtet.", badge: lang === "en" ? "Active" : lang === "es" ? "Activo" : "Aktiv" },
+          { active: true, title: lang === "en" ? "Treatment plan" : lang === "es" ? "Plan de tratamiento" : "Behandlungsplan", desc: lang === "en" ? "Currently being assigned by the practice. Usually takes 1-3 days." : lang === "es" ? "Siendo asignado por la cl\u00ednica. Normalmente tarda 1-3 d\u00edas." : "Wird gerade von der Praxis zugeordnet. Dauert normalerweise 1 bis 3 Tage.", badge: lang === "en" ? "In progress" : lang === "es" ? "En proceso" : "In Bearbeitung" },
+          { wait: true, title: lang === "en" ? "Invoices & installments" : lang === "es" ? "Facturas y cuotas" : "Rechnungen und Raten", desc: lang === "en" ? "Will appear once your plan is ready." : lang === "es" ? "Aparecer\u00e1n cuando tu plan est\u00e9 listo." : "Erscheinen sobald dein Plan steht." },
+          { wait: true, title: lang === "en" ? "Messages" : lang === "es" ? "Mensajes" : "Nachrichten", desc: lang === "en" ? "Updates directly in the app." : lang === "es" ? "Actualizaciones directamente en la app." : "Updates direkt in der App." },
+        ].map((step, i) => (
+          <div key={i} style={{ position: "relative", paddingBottom: i < 4 ? 18 : 0 }}>
+            {/* Dot */}
+            <div style={{
+              position: "absolute", left: -34, top: 6, width: 22, height: 22, borderRadius: "50%",
+              display: "grid", placeItems: "center", zIndex: 2,
+              ...(step.done ? { background: grn, boxShadow: "0 0 12px " + (dk ? "rgba(34,197,94,0.35)" : "rgba(46,122,90,0.2)") } :
+                 step.active ? { border: "2px solid " + warn, background: dk ? "rgba(251,191,36,0.12)" : "rgba(176,138,34,0.1)", boxShadow: "0 0 12px " + (dk ? "rgba(251,191,36,0.2)" : "rgba(176,138,34,0.15)") } :
+                 { border: "2px solid " + (dk ? "rgba(255,255,255,0.06)" : "#e0d8cc"), background: dk ? "#0a0e0c" : "#f5f1eb" }),
+            }}>
+              {step.done && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
+              {step.active && <div style={{ width: 8, height: 8, borderRadius: "50%", background: warn, animation: "dotPulse 1.8s ease-in-out infinite" }} />}
+            </div>
+            {/* Card */}
+            <div style={{ ...card, margin: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: step.done ? grn : step.active ? warn : (dk ? "rgba(255,255,255,0.2)" : "#b0a99e") }}>{step.title}</div>
+              <div style={{ fontSize: 12, color: dk ? "rgba(255,255,255,0.3)" : "#8a847a", lineHeight: 1.55 }}>{step.desc}</div>
+              {step.badge && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: "4px 12px", borderRadius: 20, marginTop: 10, display: "inline-block",
+                  background: step.done ? (dk ? "rgba(34,197,94,0.12)" : "rgba(46,122,90,0.08)") : (dk ? "rgba(251,191,36,0.12)" : "rgba(176,138,34,0.08)"),
+                  color: step.done ? grn : warn,
+                }}>
+                  {step.done ? String.fromCharCode(10003) + " " : step.active ? String.fromCodePoint(0x23F3) + " " : ""}{step.badge}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Documents section */}
+      {docs.length > 0 && (
+        <div style={{ padding: "0 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
+            {lang === "en" ? "Your documents" : lang === "es" ? "Tus documentos" : "Deine Dokumente"}
+          </div>
+          {docs.map(d => (
+            <div key={d.id} onClick={() => { setDocDrawer(d); hapticLight(); }} style={{ ...card, margin: "0 0 10px", display: "flex", gap: 14, alignItems: "center", cursor: "pointer" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)", display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>{docIc[d.typ] || "\u{1F4C4}"}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", marginTop: 2 }}>{fmtDateL(d.hochgeladen_am, lang)}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: muted, paddingLeft: 2 }}>
+            {lang === "en" ? "All documents are also available under the \"More\" tab." : lang === "es" ? "Todos los documentos tambi\u00e9n est\u00e1n disponibles en \"M\u00e1s\"." : "Alle Dokumente findest du auch jederzeit unter dem Men\u00fcpunkt \u201eMehr\u201c."}
+          </div>
+        </div>
+      )}
+
+      <div style={{ textAlign: "center", color: dk ? "rgba(255,255,255,0.2)" : "#b0a99e", fontSize: 11, padding: "10px 20px 20px" }}>
+        {lang === "en" ? "Questions? Call 0341 246 67 40" : lang === "es" ? "\u00bfPreguntas? Llama al 0341 246 67 40" : "Bei Fragen: 0341 246 67 40"}
+      </div>
+
+      <style>
+        {`
+          @keyframes welcomeGlow {
+            0%,100% { border-color: ${dk ? "rgba(34,197,94,0.2)" : "rgba(46,122,90,0.15)"}; box-shadow: 0 0 8px ${dk ? "rgba(34,197,94,0.04)" : "rgba(46,122,90,0.03)"}; }
+            50% { border-color: ${dk ? "rgba(34,197,94,0.5)" : "rgba(46,122,90,0.35)"}; box-shadow: 0 0 16px ${dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)"}; }
+          }
+          @keyframes beamFlow { 0% { height: 0; opacity: 0; } 10% { opacity: 1; } 100% { height: 100%; opacity: 1; } }
+          @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.3); } }
+        `}
+      </style>
+    </div>
+  );
+
   // ═══ HOME TAB ═══
   const HomeTab = (
     <div>
@@ -648,6 +759,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <p style={{ fontSize: 13, color: muted, marginBottom: 22 }}>{t("journey.subtitle", lang)}</p>
       </div>
       <div style={{ position: "relative", paddingLeft: 36, margin: "0 20px" }}>
+        {phasen.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>{String.fromCodePoint(0x1F9B7)}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: fg, marginBottom: 8 }}>
+              {lang === "en" ? "Coming soon" : lang === "es" ? "Pr\u00f3ximamente" : "Wird bald freigeschaltet"}
+            </div>
+            <div style={{ fontSize: 13, color: muted, lineHeight: 1.6, maxWidth: "28ch", margin: "0 auto" }}>
+              {lang === "en" ? "Your treatment phases will appear here once your plan is set up." : lang === "es" ? "Tus fases de tratamiento aparecer\u00e1n aqu\u00ed cuando tu plan est\u00e9 configurado." : "Deine Behandlungsphasen erscheinen hier, sobald dein Plan eingerichtet ist."}
+            </div>
+          </div>
+        ) : (<>
         <div style={{ position: "absolute", left: 13, top: 8, bottom: 8, width: 2, borderRadius: 2, background: dk ? "#252525" : "#e0d8cc" }} />
         {phasen.map(ph => (
           <div key={ph.id} style={{ position: "relative", marginBottom: 20 }}>
@@ -664,6 +786,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
           </div>
         ))}
+        </>)}
       </div>
       {/* Tipps und Fokus für den Alltag */}
       {(activePhase || tipps.length > 0) && (
@@ -786,6 +909,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("progress.title", lang)}</h1>
         <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{t("progress.subtitle", lang)}</p>
       </div>
+      {isNewPatient && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>{String.fromCodePoint(0x1F4CA)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: fg, marginBottom: 8 }}>
+            {lang === "en" ? "Coming soon" : lang === "es" ? "Pr\u00f3ximamente" : "Wird bald freigeschaltet"}
+          </div>
+          <div style={{ fontSize: 13, color: muted, lineHeight: 1.6, maxWidth: "28ch", margin: "0 auto" }}>
+            {lang === "en" ? "Your payment progress and statistics will appear here once your treatment plan is set up." : lang === "es" ? "Tu progreso y estad\u00edsticas aparecer\u00e1n aqu\u00ed cuando tu plan est\u00e9 configurado." : "Dein Zahlungsfortschritt und deine Statistiken erscheinen hier, sobald dein Behandlungsplan eingerichtet ist."}
+          </div>
+        </div>
+      )}
       <div style={{ textAlign: "center", padding: "0 20px 8px" }}>
         <div style={{ position: "relative", width: 200, height: 200, margin: "0 auto" }}>
           <div style={{ position: "absolute", inset: 6, borderRadius: "50%", background: dk ? "radial-gradient(circle at 45% 40%, #1e1e1e, #0a0a0a)" : "radial-gradient(circle at 45% 40%, #fff, #f0ece4)", boxShadow: dk ? "inset 0 4px 16px rgba(0,0,0,0.6)" : "inset 0 4px 16px rgba(0,0,0,0.04)" }} />
@@ -1234,7 +1368,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         />
       </div>
       <div className="portal-content" style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
-        {tab === "home" && HomeTab}
+        {tab === "home" && (isNewPatient ? WelcomeTimeline : HomeTab)}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && (balanceView ? BalanceTab : ProgressTab)}
         {tab === "chat" && ChatTab}
