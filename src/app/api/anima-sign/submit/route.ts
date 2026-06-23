@@ -7,6 +7,10 @@ import {
   type DocumensoField,
 } from "@/lib/documenso/client";
 
+import signpdf from "@signpdf/signpdf";
+import { P12Signer } from "@signpdf/signer-p12";
+import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -279,7 +283,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3) Unsigniertes PDF im Storage ablegen (unser Beleg + Vorlage fuer Documenso)
+    // 2b) PDF digital signieren (X.509 Zertifikat)
+    const certBase64 = process.env.PDF_SIGNING_CERT;
+    const certPass = process.env.PDF_SIGNING_PASSPHRASE;
+    if (certBase64 && certPass) {
+      try {
+        const certBuffer = Buffer.from(certBase64, "base64");
+        const pdfWithPlaceholder = plainAddPlaceholder({
+          pdfBuffer,
+          reason: "Anamnesebogen digital signiert",
+          contactInfo: "praxis@praxis-schubert.de",
+          name: "AnimaSign / KFO-Praxis Dr. Maria Elena Schubert",
+          location: "Leipzig, Deutschland",
+        });
+        const signer = new P12Signer(certBuffer, { passphrase: certPass });
+        const signedResult = await signpdf.sign(pdfWithPlaceholder, signer);
+        pdfBuffer = Buffer.from(signedResult);
+        console.log("[ANIMASIGN] PDF erfolgreich digital signiert");
+      } catch (signError) {
+        console.error("[ANIMASIGN] PDF-Signierung fehlgeschlagen (nicht-blockierend):", signError);
+        // Nicht-blockierend: unsigniertes PDF wird trotzdem gespeichert
+      }
+    } else {
+      console.warn("[ANIMASIGN] PDF_SIGNING_CERT oder PDF_SIGNING_PASSPHRASE fehlt, PDF wird unsigniert gespeichert");
+    }
+
+    // 3) Signiertes PDF im Storage ablegen
     const unsignedPath = `${submissionId}/Anamnesebogen.pdf`;
     await supabase.storage
       .from("anamnese-dokumente")
