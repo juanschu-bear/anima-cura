@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient, createAdminClient } from "@/lib/db/supabase";
 import crypto from "crypto";
+import { updateIvorisPatient, createIvorisPatient } from "@/lib/api/ivoris-client";
 import {
   createAndDistribute,
   type DocumensoField,
@@ -151,7 +152,50 @@ export async function POST(request: Request) {
       { p_submission_id: submissionId }
     );
 
-    // 1c) Patienten-Account erstellen (für AnimaCura App-Zugang)
+    // 1c) Ivoris-Sync: Patientendaten sofort zu Ivoris pushen
+    try {
+      const ivorisData = {
+        Firstname: vorname || "",
+        Lastname: nachname || "",
+        Birthday: geburtsdatum || "",
+        Email: email || "",
+        Phone: (answers.patient_telefon as string) || "",
+        Mobile: (answers.patient_mobil as string) || "",
+        Address: {
+          Street: [answers.patient_strasse, answers.patient_hausnummer].filter(Boolean).join(" "),
+          Zip: (answers.patient_plz as string) || "",
+          City: (answers.patient_wohnort as string) || "",
+          Country: "D",
+        },
+      };
+
+      if (abgleich && !abgleich.is_new && abgleich.patient_id) {
+        // Bestandspatient: ivoris_id aus DB holen und updaten
+        const { data: pat } = await supabase
+          .from("patients")
+          .select("ivoris_id")
+          .eq("id", abgleich.patient_id)
+          .maybeSingle();
+        if (pat?.ivoris_id) {
+          await updateIvorisPatient(pat.ivoris_id, ivorisData);
+          console.log(`[IVORIS] Patient ${pat.ivoris_id} aktualisiert`);
+        }
+      } else {
+        // Neupatient: in Ivoris anlegen
+        const newIvorisId = await createIvorisPatient({
+          ...ivorisData,
+          Gender: (answers.patient_geschlecht as string) === "Weiblich" ? "Female" : (answers.patient_geschlecht as string) === "Männlich" ? "Male" : "Unknown",
+          HealthInsurance: (answers.versicherungsart as string)?.includes("Privat") ? "Private" : "Statutory",
+        });
+        console.log(`[IVORIS] Neuer Patient angelegt: ${newIvorisId}`);
+        // ivoris_id in unserer DB speichern falls abgleich einen neuen Patienten-Record erstellt hat
+      }
+    } catch (ivorisErr) {
+      console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
+      // Fehler ist nicht-blockierend: Submission geht trotzdem durch
+    }
+
+    // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
     const account = await createPatientAccount(vorname, nachname, email);
 
     // 2) PDF beim PDF-Dienst rendern lassen
