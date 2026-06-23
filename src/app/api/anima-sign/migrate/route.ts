@@ -1,120 +1,77 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@/lib/db/supabase";
 
 export async function GET() {
-  // Use service role key for DDL operations
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { 
-      auth: { persistSession: false },
-      db: { schema: "public" },
-    }
-  );
+  const supabase = createServerClient();
+  const results: Array<{ id: string; name: string; updates: Record<string, unknown> }> = [];
 
-  // First, create the exec_sql helper function if it doesn't exist
-  const createFnSQL = `
-    CREATE OR REPLACE FUNCTION exec_sql(query text)
-    RETURNS void
-    LANGUAGE plpgsql
-    SECURITY DEFINER
-    AS $$
-    BEGIN
-      EXECUTE query;
-    END;
-    $$;
-  `;
+  // Get all submissions that haven't been backfilled yet
+  const { data: subs } = await supabase
+    .from("anamnese_submissions")
+    .select("id, vorname, nachname, geburtsdatum, email, account_email, is_existing, ivoris_synced")
+    .order("created_at", { ascending: false });
 
-  // Use the postgrest RPC endpoint to run raw SQL
-  // Since we can't run DDL directly, we need the management API
-  // Let's try using the supabase management API instead
-  
-  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1];
-  
-  // Alternative: use the pg_net extension or create function via REST
-  // Actually, let's just try creating function via fetch to the SQL endpoint
-  const mgmtRes = await fetch(
-    `https://${projectRef}.supabase.co/rest/v1/rpc/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-      },
-    }
-  );
+  if (!subs) return NextResponse.json({ error: "No submissions found" });
 
-  // Simplest approach: just tell Juan to run the SQL manually in the Supabase dashboard
-  // and provide the exact SQL
-  
-  const sql = `
--- Run this in Supabase SQL Editor (Dashboard > SQL):
-ALTER TABLE anamnese_submissions
-  ADD COLUMN IF NOT EXISTS account_email text,
-  ADD COLUMN IF NOT EXISTS is_existing boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS matched_patient_id uuid REFERENCES patients(id),
-  ADD COLUMN IF NOT EXISTS ivoris_synced boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS ivoris_sync_error text,
-  ADD COLUMN IF NOT EXISTS ivoris_doc_synced boolean DEFAULT false;
+  for (const sub of subs) {
+    const updates: Record<string, unknown> = {};
 
--- Index for quick lookups
-CREATE INDEX IF NOT EXISTS idx_anamnese_ivoris_synced ON anamnese_submissions(ivoris_synced) WHERE NOT ivoris_synced;
-CREATE INDEX IF NOT EXISTS idx_anamnese_account ON anamnese_submissions(account_email) WHERE account_email IS NOT NULL;
-  `.trim();
+    // 1. Check if patient was matched (is_existing)
+    if (!sub.is_existing && sub.nachname && sub.geburtsdatum) {
+      const { data: match } = await supabase
+        .from("patients")
+        .select("id")
+        .ilike("nachname", sub.nachname)
+        .eq("geburtsdatum", sub.geburtsdatum)
+        .maybeSingle();
 
-  // But let's also try running it through the Supabase SQL API
-  try {
-    const sqlRes = await fetch(
-      `https://${projectRef}.supabase.co/pg/query`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-        },
-        body: JSON.stringify({ query: sql }),
+      if (match) {
+        updates.is_existing = true;
+        updates.matched_patient_id = match.id;
       }
-    );
-    
-    if (sqlRes.ok) {
-      const result = await sqlRes.json();
-      return NextResponse.json({ status: "migrated", result });
-    }
-    
-    // If that fails, try the management API endpoint
-    const sql2Res = await fetch(
-      `https://api.supabase.com/v1/projects/${projectRef}/database/query`,
-      {
-        method: "POST", 
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-        },
-        body: JSON.stringify({ query: sql }),
-      }
-    );
-
-    if (sql2Res.ok) {
-      const result2 = await sql2Res.json();
-      return NextResponse.json({ status: "migrated_v2", result: result2 });
     }
 
-    return NextResponse.json({ 
-      status: "manual_required",
-      message: "Bitte dieses SQL im Supabase Dashboard ausfuehren (SQL Editor):",
-      sql,
-      attempts: {
-        pg_query: sqlRes.status,
-        mgmt_api: sql2Res.status,
+    // 2. Check if account was created (look for @animacura.de user)
+    if (!sub.account_email && sub.vorname && sub.nachname) {
+      // Normalize name for email lookup
+      const normalize = (s: string) =>
+        s.toLowerCase()
+          .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, "");
+      const base = `${normalize(sub.vorname)}.${normalize(sub.nachname)}@animacura.de`;
+
+      // Check Supabase Auth for this email (or with number suffix)
+      const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const found = users?.find(u =>
+        u.email?.startsWith(`${normalize(sub.vorname)}.${normalize(sub.nachname)}`) &&
+        u.email?.endsWith("@animacura.de")
+      );
+
+      if (found?.email) {
+        updates.account_email = found.email;
       }
-    });
-  } catch (err) {
-    return NextResponse.json({ 
-      status: "manual_required",
-      message: "Bitte dieses SQL im Supabase Dashboard ausfuehren (SQL Editor):",
-      sql,
-      error: String(err),
-    });
+    }
+
+    // 3. Mark ivoris_synced based on whether the nachsync already ran
+    // (We can't verify Ivoris from here, but if the nachsync ran today, those are synced)
+
+    if (Object.keys(updates).length > 0) {
+      await supabase
+        .from("anamnese_submissions")
+        .update(updates)
+        .eq("id", sub.id);
+
+      results.push({ id: sub.id, name: `${sub.vorname} ${sub.nachname}`, updates });
+    }
+
+    // Small delay to not overload
+    await new Promise(r => setTimeout(r, 100));
   }
+
+  return NextResponse.json({
+    total: subs.length,
+    updated: results.length,
+    results,
+  });
 }
