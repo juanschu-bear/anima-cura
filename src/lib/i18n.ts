@@ -60,6 +60,7 @@ const translations: Record<string, { de: string; en: string }> = {
 
   "nav.patients": { de: "Patienten", en: "Patients" },
   "nav.treatments": { de: "Behandlungen", en: "Treatments" },
+  "nav.animasign": { de: "AnimaSign", en: "AnimaSign" },
   "nav.rateplans": { de: "Ratenpläne", en: "Installments" },
   "nav.dunning": { de: "Mahnwesen", en: "Dunning" },
   "nav.quarterly": { de: "Quartalsbericht", en: "Quarterly" },
