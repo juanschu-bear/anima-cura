@@ -10,11 +10,14 @@ type Submission = {
   id: string;
   vorname: string;
   nachname: string;
+  email: string | null;
   created_at: string;
+  status: string;
   is_existing: boolean;
   matched_patient_id: string | null;
   account_email: string | null;
-  signature_status: string | null;
+  ivoris_synced: boolean;
+  ivoris_sync_error: string | null;
 };
 
 type FilterTab = "today" | "week" | "all" | "open";
@@ -47,7 +50,7 @@ export default function AnimaSignPage() {
     // Fetch submissions
     let query = supabase
       .from("anamnese_submissions")
-      .select("id, vorname, nachname, created_at, is_existing, matched_patient_id, account_email, signature_status")
+      .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, ivoris_synced, ivoris_sync_error")
       .order("created_at", { ascending: false });
 
     if (filter === "today") {
@@ -55,7 +58,7 @@ export default function AnimaSignPage() {
     } else if (filter === "week") {
       query = query.gte("created_at", weekStart.toISOString());
     } else if (filter === "open") {
-      query = query.is("signature_status", null);
+      query = query.in("status", ["offen", "signatur_ausstehend"]);
     }
 
     if (search.trim().length >= 2) {
@@ -88,7 +91,7 @@ export default function AnimaSignPage() {
     const { count: pending } = await supabase
       .from("anamnese_submissions")
       .select("*", { count: "exact", head: true })
-      .is("signature_status", null);
+      .in("status", ["offen", "signatur_ausstehend"]);
     setPendingSignatures(pending || 0);
 
     // Count app registrations (patients with @animacura.de accounts)
@@ -98,11 +101,20 @@ export default function AnimaSignPage() {
       .not("account_email", "is", null);
     setAppRegistrations(regs || 0);
 
+    // Pending signatures count
+    const { count: pendSig } = await supabase
+      .from("anamnese_submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "signatur_ausstehend");
+    setPendingSignatures(pendSig || 0);
+
     setLoading(false);
   }, [supabase, search, filter]);
 
   useEffect(() => {
     void fetchData();
+    const interval = setInterval(() => { void fetchData(); }, 120_000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const handleSync = async () => {
@@ -274,9 +286,9 @@ export default function AnimaSignPage() {
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.signature_status === "signed" ? blue : gold, boxShadow: `0 0 6px ${s.signature_status === "signed" ? blueBg : goldBg}` }} />
-                <span style={{ fontSize: 12, color: s.signature_status === "signed" ? ink : muted }}>
-                  {s.signature_status === "signed" ? (locale === "en" ? "Signed" : "Signiert") : (locale === "en" ? "Pending" : "Ausstehend")}
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.status === "signiert" || s.status === "abgeschlossen" ? blue : gold, boxShadow: `0 0 6px ${s.status === "signiert" || s.status === "abgeschlossen" ? blueBg : goldBg}` }} />
+                <span style={{ fontSize: 12, color: s.status === "signiert" || s.status === "abgeschlossen" ? ink : muted }}>
+                  {s.status === "signiert" || s.status === "abgeschlossen" ? (locale === "en" ? "Signed" : "Signiert") : (locale === "en" ? "Pending" : "Ausstehend")}
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
