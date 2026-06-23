@@ -48,6 +48,7 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/kasse", roles: ["admin", "verwaltung"] },
   { path: "/patienten", roles: ["admin", "verwaltung", "lesezugriff"] },
   { path: "/behandlungen", roles: ["admin", "verwaltung"] },
+  { path: "/animasign", roles: ["admin", "verwaltung"] },
   { path: "/ratenplan", roles: ["admin", "verwaltung"] },
   { path: "/mahnwesen", roles: ["admin", "verwaltung"] },
   { path: "/quartal", roles: ["admin", "verwaltung", "lesezugriff"] },
@@ -138,3 +139,4 @@ export function getDefaultDashboardPath(role: AppRole): string {
 export function isReadOnlyRole(role: AppRole): boolean {
   return role === "lesezugriff";
 }
+
