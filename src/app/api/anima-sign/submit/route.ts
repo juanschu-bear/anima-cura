@@ -152,6 +152,17 @@ export async function POST(request: Request) {
       { p_submission_id: submissionId }
     );
 
+    // 1b-store) Abgleich-Ergebnis in Submission speichern
+    if (abgleich) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          is_existing: !abgleich.is_new,
+          matched_patient_id: abgleich.patient_id || null,
+        })
+        .eq("id", submissionId);
+    }
+
     // 1c) Ivoris-Sync: Patientendaten sofort zu Ivoris pushen
     try {
       const ivorisData = {
@@ -179,6 +190,7 @@ export async function POST(request: Request) {
         if (pat?.ivoris_id) {
           await updateIvorisPatient(pat.ivoris_id, ivorisData);
           console.log(`[IVORIS] Patient ${pat.ivoris_id} aktualisiert`);
+          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
         }
       } else {
         // Neupatient: in Ivoris anlegen
@@ -188,15 +200,25 @@ export async function POST(request: Request) {
           HealthInsurance: (answers.versicherungsart as string)?.includes("Privat") ? "Private" : "Statutory",
         });
         console.log(`[IVORIS] Neuer Patient angelegt: ${newIvorisId}`);
+        await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
         // ivoris_id in unserer DB speichern falls abgleich einen neuen Patienten-Record erstellt hat
       }
     } catch (ivorisErr) {
       console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
+      await supabase.from("anamnese_submissions").update({ ivoris_synced: false, ivoris_sync_error: String(ivorisErr) }).eq("id", submissionId);
       // Fehler ist nicht-blockierend: Submission geht trotzdem durch
     }
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
     const account = await createPatientAccount(vorname, nachname, email);
+
+    // 1e) Account-Email in Submission speichern
+    if (account?.login_email) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({ account_email: account.login_email })
+        .eq("id", submissionId);
+    }
 
     // 2) PDF beim PDF-Dienst rendern lassen
     const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
