@@ -18,6 +18,17 @@ type Submission = {
   account_email: string | null;
   ivoris_synced: boolean;
   ivoris_sync_error: string | null;
+  has_logged_in: boolean;
+  last_login: string | null;
+};
+
+type DashboardStats = {
+  total: number;
+  today: number;
+  matched: number;
+  stats.pendingSignatures: number;
+  registrations: number;
+  loggedIn: number;
 };
 
 type FilterTab = "today" | "week" | "all" | "open";
@@ -32,84 +43,22 @@ export default function AnimaSignPage() {
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("today");
-  const [totalBoegen, setTotalBoegen] = useState(0);
-  const [todayBoegen, setTodayBoegen] = useState(0);
-  const [appRegistrations, setAppRegistrations] = useState(0);
-  const [pendingSignatures, setPendingSignatures] = useState(0);
-  const [matchedCount, setMatchedCount] = useState(0);
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - 7);
-  weekStart.setHours(0, 0, 0, 0);
+  const [stats, setStats] = useState<DashboardStats>({ total: 0, today: 0, matched: 0, stats.pendingSignatures: 0, registrations: 0, loggedIn: 0 });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-
-    // Fetch submissions
-    let query = supabase
-      .from("anamnese_submissions")
-      .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, ivoris_synced, ivoris_sync_error")
-      .order("created_at", { ascending: false });
-
-    if (filter === "today") {
-      query = query.gte("created_at", todayStart.toISOString());
-    } else if (filter === "week") {
-      query = query.gte("created_at", weekStart.toISOString());
-    } else if (filter === "open") {
-      query = query.in("status", ["offen", "signatur_ausstehend"]);
+    try {
+      const params = new URLSearchParams({ filter });
+      if (search.trim().length >= 2) params.set("search", search.trim());
+      const res = await fetch(`/api/anima-sign/dashboard?${params}`);
+      const data = await res.json();
+      setSubmissions(data.submissions || []);
+      setStats(data.stats || { total: 0, today: 0, matched: 0, stats.pendingSignatures: 0, registrations: 0, loggedIn: 0 });
+    } catch (e) {
+      console.error("[AnimaSign] Fetch failed:", e);
     }
-
-    if (search.trim().length >= 2) {
-      query = query.or(
-        `nachname.ilike.%${search.trim()}%,vorname.ilike.%${search.trim()}%`
-      );
-    }
-
-    const { data } = await query.limit(200);
-    setSubmissions(data || []);
-
-    // Stats
-    const { count: total } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true });
-    setTotalBoegen(total || 0);
-
-    const { count: today } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", todayStart.toISOString());
-    setTodayBoegen(today || 0);
-
-    const { count: matched } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true })
-      .eq("is_existing", true);
-    setMatchedCount(matched || 0);
-
-    const { count: pending } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true })
-      .in("status", ["offen", "signatur_ausstehend"]);
-    setPendingSignatures(pending || 0);
-
-    // Count app registrations (patients with @animacura.de accounts)
-    const { count: regs } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true })
-      .not("account_email", "is", null);
-    setAppRegistrations(regs || 0);
-
-    // Pending signatures count
-    const { count: pendSig } = await supabase
-      .from("anamnese_submissions")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "signatur_ausstehend");
-    setPendingSignatures(pendSig || 0);
-
     setLoading(false);
-  }, [supabase, search, filter]);
+  }, [search, filter]);
 
   useEffect(() => {
     void fetchData();
@@ -130,9 +79,7 @@ export default function AnimaSignPage() {
     setSyncing(false);
   };
 
-  const conversionRate = todayBoegen > 0
-    ? Math.round((appRegistrations / totalBoegen) * 100)
-    : 0;
+  const conversionRate = stats.total > 0 ? Math.round((stats.registrations / stats.total) * 100) : 0;
 
   const fmtTime = (iso: string) => {
     const d = new Date(iso);
@@ -164,9 +111,9 @@ export default function AnimaSignPage() {
   const bg2 = isDark ? "#111820" : "#eee9e0";
 
   const filters: { key: FilterTab; label: string }[] = [
-    { key: "today", label: locale === "en" ? `Today (${todayBoegen})` : `Heute (${todayBoegen})` },
+    { key: "today", label: locale === "en" ? `Today (${stats.today})` : `Heute (${stats.today})` },
     { key: "week", label: locale === "en" ? "This Week" : "Diese Woche" },
-    { key: "all", label: locale === "en" ? `Total (${totalBoegen})` : `Gesamt (${totalBoegen})` },
+    { key: "all", label: locale === "en" ? `Total (${stats.total})` : `Gesamt (${stats.total})` },
     { key: "open", label: locale === "en" ? "Open only" : "Nur offene" },
   ];
 
@@ -196,12 +143,13 @@ export default function AnimaSignPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
-          { num: todayBoegen, label: locale === "en" ? "Forms today" : "Bögen heute", color: blue, accent: isDark ? "linear-gradient(90deg,#3a7ab0,#5ba4d9)" : "linear-gradient(90deg,#2d6a9e,#3b7fbf)", badge: `+${todayBoegen} neu` },
-          { num: appRegistrations, label: locale === "en" ? "App registrations" : "App-Anmeldungen", color: green, accent: isDark ? "linear-gradient(90deg,#3da67a,#52c48e)" : "linear-gradient(90deg,#2e7a5a,#3a9670)" },
-          { num: pendingSignatures, label: locale === "en" ? "Signature pending" : "Unterschrift ausstehend", color: gold, accent: isDark ? "linear-gradient(90deg,#a68428,#d4a73a)" : "linear-gradient(90deg,#8a6a18,#b08a22)" },
-          { num: matchedCount, label: locale === "en" ? "Existing patients matched" : "Bestandspatienten gematcht", color: matchC, accent: isDark ? "linear-gradient(90deg,#5a7a2a,#8aaa52)" : "linear-gradient(90deg,#4a6a20,#6a8a30)" },
+          { num: stats.today, label: locale === "en" ? "Forms today" : "Bögen heute", color: blue, accent: isDark ? "linear-gradient(90deg,#3a7ab0,#5ba4d9)" : "linear-gradient(90deg,#2d6a9e,#3b7fbf)", badge: `+${stats.today} neu` },
+          { num: stats.registrations, label: locale === "en" ? "Accounts created" : "Accounts erstellt", color: green, accent: isDark ? "linear-gradient(90deg,#3da67a,#52c48e)" : "linear-gradient(90deg,#2e7a5a,#3a9670)" },
+          { num: stats.loggedIn, label: locale === "en" ? "Logged in" : "Angemeldet", color: blue, accent: isDark ? "linear-gradient(90deg,#3a7ab0,#5ba4d9)" : "linear-gradient(90deg,#2d6a9e,#3b7fbf)" },
+          { num: stats.pendingSignatures, label: locale === "en" ? "Signature pending" : "Unterschrift ausstehend", color: gold, accent: isDark ? "linear-gradient(90deg,#a68428,#d4a73a)" : "linear-gradient(90deg,#8a6a18,#b08a22)" },
+          { num: stats.matched, label: locale === "en" ? "Existing patients matched" : "Bestandspatienten gematcht", color: matchC, accent: isDark ? "linear-gradient(90deg,#5a7a2a,#8aaa52)" : "linear-gradient(90deg,#4a6a20,#6a8a30)" },
         ].map((s, i) => (
           <div key={i} style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, padding: 20, position: "relative", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, borderRadius: "14px 14px 0 0", background: s.accent }} />
@@ -246,7 +194,7 @@ export default function AnimaSignPage() {
       {/* Table */}
       <div style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         {/* Header */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1.1fr 1.1fr 1.1fr 0.6fr", padding: "11px 20px", background: bg2, fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.7fr 0.5fr", padding: "11px 20px", background: bg2, fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           <span>Patient</span>
           <span>Bogen</span>
           <span>{locale === "en" ? "Signature" : "Unterschrift"}</span>
@@ -267,7 +215,7 @@ export default function AnimaSignPage() {
             <div
               key={s.id}
               style={{
-                display: "grid", gridTemplateColumns: "1.8fr 1.1fr 1.1fr 1.1fr 0.6fr",
+                display: "grid", gridTemplateColumns: "1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.7fr 0.5fr",
                 padding: "13px 20px", alignItems: "center",
                 borderBottom: `1px solid ${line}`,
               }}
@@ -295,6 +243,20 @@ export default function AnimaSignPage() {
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.account_email ? green : gold, boxShadow: `0 0 6px ${s.account_email ? greenBg : goldBg}` }} />
                 <span style={{ fontSize: 12, color: s.account_email ? ink : muted }}>
                   {s.account_email ? (locale === "en" ? "Registered" : "Registriert") : (locale === "en" ? "Pending" : "Ausstehend")}
+                </span>
+              </div>
+              {/* Angemeldet */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.has_logged_in ? green : (isDark ? "rgba(255,255,255,0.1)" : "#d4cbbf"), boxShadow: s.has_logged_in ? \`0 0 6px \${greenBg}\` : "none" }} />
+                <span style={{ fontSize: 12, color: s.has_logged_in ? ink : muted }}>
+                  {s.has_logged_in ? (locale === "en" ? "Yes" : "Ja") : (locale === "en" ? "No" : "Nein")}
+                </span>
+              </div>
+              {/* Ivoris */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.ivoris_synced ? green : gold, boxShadow: \`0 0 6px \${s.ivoris_synced ? greenBg : goldBg}\` }} />
+                <span style={{ fontSize: 12, color: s.ivoris_synced ? ink : muted }}>
+                  {s.ivoris_synced ? "OK" : (locale === "en" ? "Pending" : "Ausstehend")}
                 </span>
               </div>
               <div style={{ fontSize: 12, color: muted, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
