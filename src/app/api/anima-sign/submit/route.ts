@@ -222,6 +222,14 @@ export async function POST(request: Request) {
         .from("anamnese_submissions")
         .update({ account_email: account.login_email })
         .eq("id", submissionId);
+
+      // Portal-Zugang im Patienten-Record aktivieren
+      if (abgleich?.patient_id) {
+        await supabase
+          .from("patients")
+          .update({ portal_zugang: true })
+          .eq("id", abgleich.patient_id);
+      }
     }
 
     // 2) PDF beim PDF-Dienst rendern lassen
