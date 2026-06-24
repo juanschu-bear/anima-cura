@@ -1,34 +1,23 @@
 import { NextResponse } from "next/server";
-import { updateIvorisPatient, fetchIvorisPatientById } from "@/lib/api/ivoris-client";
-
-export const runtime = "nodejs";
+import { createServerClient } from "@/lib/db/supabase";
 
 export async function GET() {
-  // Test with just ONE patient to see the full error
-  const origId = "c6c7e9e0-136c-49b6-b441-c69f96894dc2"; // Lisa Werkmeister
+  const supabase = createServerClient();
 
-  // First, fetch the original patient to see what fields Ivoris expects
-  let original: unknown;
-  try {
-    original = await fetchIvorisPatientById(origId);
-  } catch (e) {
-    return NextResponse.json({ error: "Fetch failed: " + String(e) });
-  }
+  // Read the function definition from Supabase
+  const { data, error } = await supabase.rpc("abgleich_patient_aus_submission", {
+    p_submission_id: "00000000-0000-0000-0000-000000000000"
+  });
 
-  // Now try the update
-  let updateError: string | null = null;
-  try {
-    await updateIvorisPatient(origId, {
-      Email: "lisa_werkmeister@icloud.com",
-      Phone: "01759951117",
-      Mobile: "01759951117",
-    });
-  } catch (e) {
-    updateError = String(e);
-  }
+  // Also try to get the function source via pg_catalog
+  const { data: fnSrc, error: fnErr } = await supabase
+    .from("pg_catalog.pg_proc" as string)
+    .select("prosrc")
+    .eq("proname", "abgleich_patient_aus_submission")
+    .maybeSingle();
 
   return NextResponse.json({
-    originalPatient: original,
-    updateError,
+    testResult: { data, error: error?.message },
+    functionSource: fnSrc || fnErr?.message || "Could not read function source",
   });
 }
