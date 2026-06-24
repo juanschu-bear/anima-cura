@@ -26,7 +26,7 @@ type DashboardStats = {
   total: number;
   today: number;
   matched: number;
-  stats.pendingSignatures: number;
+  pendingSignatures: number;
   registrations: number;
   loggedIn: number;
 };
@@ -43,7 +43,9 @@ export default function AnimaSignPage() {
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("today");
-  const [stats, setStats] = useState<DashboardStats>({ total: 0, today: 0, matched: 0, stats.pendingSignatures: 0, registrations: 0, loggedIn: 0 });
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
+  const [stats, setStats] = useState<DashboardStats>({ total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -53,7 +55,7 @@ export default function AnimaSignPage() {
       const res = await fetch(`/api/anima-sign/dashboard?${params}`);
       const data = await res.json();
       setSubmissions(data.submissions || []);
-      setStats(data.stats || { total: 0, today: 0, matched: 0, stats.pendingSignatures: 0, registrations: 0, loggedIn: 0 });
+      setStats(data.stats || { total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
     } catch (e) {
       console.error("[AnimaSign] Fetch failed:", e);
     }
@@ -178,7 +180,7 @@ export default function AnimaSignPage() {
         {filters.map(f => (
           <button
             key={f.key}
-            onClick={() => setFilter(f.key)}
+            onClick={() => { setFilter(f.key); setPage(0); }}
             style={{
               background: filter === f.key ? blueBgS : cardBg,
               border: `1px solid ${filter === f.key ? blue : lineS}`,
@@ -202,6 +204,11 @@ export default function AnimaSignPage() {
           <span style={{ textAlign: "right" }}>{locale === "en" ? "Time" : "Uhrzeit"}</span>
         </div>
 
+        {/* Pagination */}
+        {(() => {
+          const paged = submissions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+          const totalPages = Math.ceil(submissions.length / PAGE_SIZE);
+          return (<>
         {loading ? (
           <div style={{ padding: 40, textAlign: "center", color: muted }}>
             {locale === "en" ? "Loading..." : "Wird geladen..."}
@@ -211,7 +218,7 @@ export default function AnimaSignPage() {
             {locale === "en" ? "No submissions found." : "Keine Einreichungen gefunden."}
           </div>
         ) : (
-          submissions.map((s) => (
+          paged.map((s) => (
             <div
               key={s.id}
               style={{
@@ -260,11 +267,24 @@ export default function AnimaSignPage() {
                 </span>
               </div>
               <div style={{ fontSize: 12, color: muted, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
-                {filter === "all" || filter === "open" ? fmtDate(s.created_at) : fmtTime(s.created_at)}
+                {filter === "today" ? fmtTime(s.created_at) : fmtDate(s.created_at) + " " + fmtTime(s.created_at)}
               </div>
             </div>
           ))
         )}
+      {/* Pagination controls */}
+      {!loading && submissions.length > PAGE_SIZE && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderTop: "1px solid " + line, background: cardBg }}>
+          <span style={{ fontSize: 12, color: muted }}>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, submissions.length)} von {submissions.length}
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + lineS, background: page === 0 ? "transparent" : cardBg, color: page === 0 ? muted : ink, cursor: page === 0 ? "default" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>←</button>
+            <button onClick={() => setPage(p => Math.min(Math.ceil(submissions.length / PAGE_SIZE) - 1, p + 1))} disabled={(page + 1) * PAGE_SIZE >= submissions.length} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + lineS, background: (page + 1) * PAGE_SIZE >= submissions.length ? "transparent" : cardBg, color: (page + 1) * PAGE_SIZE >= submissions.length ? muted : ink, cursor: (page + 1) * PAGE_SIZE >= submissions.length ? "default" : "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>→</button>
+          </div>
+        </div>
+      )}
+      </>); })()}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
