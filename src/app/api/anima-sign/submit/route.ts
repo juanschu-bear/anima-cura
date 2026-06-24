@@ -200,11 +200,19 @@ export async function POST(request: Request) {
           console.warn("[IVORIS] Bestandspatient ohne gueltige Ivoris-ID:", abgleich.patient_id, "ivoris_id:", pat?.ivoris_id);
           await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient: keine gueltige Ivoris-ID" }).eq("id", submissionId);
         }
+      } else if (abgleich && abgleich.is_new) {
+        // Genuiner Neupatient: in Ivoris anlegen
+        const newIvorisId = await createIvorisPatient({
+          ...ivorisData,
+          Gender: (answers.patient_geschlecht as string) === "Weiblich" ? "Female" : (answers.patient_geschlecht as string) === "Männlich" ? "Male" : "Unknown",
+          HealthInsurance: (answers.versicherungsart as string)?.includes("Privat") ? "Private" : "Statutory",
+        });
+        console.log(`[IVORIS] Neuer Patient angelegt: ${JSON.stringify(newIvorisId)}`);
+        await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
       } else {
-        // DEAKTIVIERT: Automatische Neuanlage in Ivoris verhindert Duplikate.
-        // Neupatienten werden manuell in Ivoris angelegt oder bei der naechsten Chipkarten-Einlesung automatisch erfasst.
-        console.warn("[IVORIS] Neupatient - NICHT automatisch angelegt (Duplikat-Schutz):", vorname, nachname);
-        await supabase.from("anamnese_submissions").update({ ivoris_synced: false, ivoris_sync_error: "Neupatient: Ivoris-Anlage deaktiviert (Duplikat-Schutz)" }).eq("id", submissionId);
+        // Bestandspatient ohne gueltige Ivoris-ID: NICHT anlegen (verhindert Duplikate)
+        console.warn("[IVORIS] Bestandspatient ohne Ivoris-ID, uebersprungen:", vorname, nachname);
+        await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient ohne Ivoris-ID" }).eq("id", submissionId);
       }
     } catch (ivorisErr) {
       console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
