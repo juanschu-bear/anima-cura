@@ -200,16 +200,14 @@ export async function POST(request: Request) {
           console.warn("[IVORIS] Bestandspatient ohne gueltige Ivoris-ID:", abgleich.patient_id, "ivoris_id:", pat?.ivoris_id);
           await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient: keine gueltige Ivoris-ID" }).eq("id", submissionId);
         }
-      } else if (abgleich && abgleich.is_new) {
-        // Genuiner Neupatient: in Ivoris anlegen
-        const newIvorisId = await createIvorisPatient({
-          ...ivorisData,
-          Gender: (answers.patient_geschlecht as string) === "Weiblich" ? "Female" : (answers.patient_geschlecht as string) === "Männlich" ? "Male" : "Unknown",
-          HealthInsurance: (answers.versicherungsart as string)?.includes("Privat") ? "Private" : "Statutory",
-        });
-        console.log(`[IVORIS] Neuer Patient angelegt: ${JSON.stringify(newIvorisId)}`);
-        await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
       } else {
+        // DEAKTIVIERT: Ivoris-Neuanlage pausiert bis Matching-Logik zuverlaessig ist.
+        // Daten sind sicher in unserer DB. Ivoris-Anlage erfolgt manuell oder nach Fix.
+        console.warn("[IVORIS] Neuanlage pausiert (Matching unzuverlaessig):", vorname, nachname);
+        await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Neuanlage pausiert bis Matching gefixt" }).eq("id", submissionId);
+      }
+      // Fallback fuer Edge-Cases:
+      if (false) {
         // Bestandspatient ohne gueltige Ivoris-ID: NICHT anlegen (verhindert Duplikate)
         console.warn("[IVORIS] Bestandspatient ohne Ivoris-ID, uebersprungen:", vorname, nachname);
         await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient ohne Ivoris-ID" }).eq("id", submissionId);
