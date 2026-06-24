@@ -231,13 +231,13 @@ export async function POST(request: Request) {
       }
 
       // Willkommens-Email mit Zugangsdaten senden (nicht-blockierend)
-      if (email && account.login_email && account.password) {
+      if (email && vorname && account.login_email && account.password) {
         void sendWelcomeEmail({
           to: email,
-          vorname,
+          vorname: vorname,
           loginEmail: account.login_email,
           password: account.password,
-          lang: (answers?.sprache as "de" | "en" | "es" | "ru" | "tr") || "de",
+          lang: ((answers?.sprache as string) === "en" || (answers?.sprache as string) === "es" || (answers?.sprache as string) === "ru" || (answers?.sprache as string) === "tr") ? (answers.sprache as "en" | "es" | "ru" | "tr") : "de",
         }).catch(err => console.error("[AnimaSign] Welcome email failed:", err));
       }
     }
