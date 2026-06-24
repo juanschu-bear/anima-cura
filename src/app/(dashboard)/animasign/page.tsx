@@ -72,7 +72,7 @@ export default function AnimaSignPage() {
 
   const paged = subs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(subs.length / PAGE_SIZE);
-  const rate = stats.total > 0 ? Math.round((stats.registrations / stats.total) * 100) : 0;
+  const rate = stats.total > 0 ? Math.round((stats.loggedIn / stats.total) * 100) : 0;
 
   const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
@@ -140,7 +140,7 @@ export default function AnimaSignPage() {
 
       {/* Conversion */}
       <div style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, padding: "18px 22px", marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ fontSize: 13, color: muted, whiteSpace: "nowrap", fontWeight: 500 }}>Bogen → App</div>
+        <div style={{ fontSize: 13, color: muted, whiteSpace: "nowrap", fontWeight: 500 }}>Bogen → Angemeldet</div>
         <div style={{ flex: 1, height: 10, background: bg2, borderRadius: 999, overflow: "hidden" }}>
           <div style={{ height: "100%", borderRadius: 999, background: `linear-gradient(90deg,${blue},${green})`, width: `${rate}%`, transition: "width .6s" }} />
         </div>
