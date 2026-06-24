@@ -8,6 +8,7 @@ import {
 } from "@/lib/documenso/client";
 
 import signpdf from "@signpdf/signpdf";
+import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
 import { P12Signer } from "@signpdf/signer-p12";
 import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 
@@ -229,6 +230,17 @@ export async function POST(request: Request) {
           .from("patients")
           .update({ portal_zugang: true })
           .eq("id", abgleich.patient_id);
+      }
+
+      // Willkommens-Email mit Zugangsdaten senden (nicht-blockierend)
+      if (email && account.login_email && account.password) {
+        void sendWelcomeEmail({
+          to: email,
+          vorname,
+          loginEmail: account.login_email,
+          password: account.password,
+          lang: (answers?.sprache as "de" | "en" | "es" | "ru" | "tr") || "de",
+        }).catch(err => console.error("[AnimaSign] Welcome email failed:", err));
       }
     }
 
