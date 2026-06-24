@@ -1,191 +1,60 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/db/supabase";
-import { fetchIvorisPatientById, updateIvorisPatient, fetchIvorisPatientsPage } from "@/lib/api/ivoris-client";
+import { updateIvorisPatient } from "@/lib/api/ivoris-client";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const confirm = searchParams.get("confirm") === "true";
-  const supabase = createServerClient();
+// The 15 known duplicates from the preview - apply updates directly
+const MERGES = [
+  { name: "Ezaldeen Shtewe", origId: "4717fc52-b17a-403b-b8ba-a51c86bf222c", dupId: "410a6060-1152-4af7-9074-b46242088b34", update: { Email: "ferasferasshtewe@gmail.com", Phone: "01743982302", Mobile: "01743982302", Address: { Street: "Sommerfelderstraße 36", Zip: "", City: "" } } },
+  { name: "Milana Trykolich", origId: "0c1ae849-9a0f-4bdf-ad3f-70b3d0d5f51d", dupId: "754c0636-ff97-4d8b-bfb4-c91ecb0784b9", update: { Email: "annetrikolich@gmail.com", Phone: "015566163839", Mobile: "015566163839" } },
+  { name: "Johanna Döhler", origId: "05d706d3-31a5-4fcc-8fbf-4244faea9afb", dupId: "73731345-1191-4bb9-a8a9-59b216067e3b", update: { Phone: "015735481333", Mobile: "015735481333" } },
+  { name: "Fiona Müller", origId: "930220d6-ac23-42e6-8ef4-5f5c9c9d9f70", dupId: "c801f31b-90cb-4c58-98dc-079a527a593e", update: { Phone: "017630328757", Mobile: "017630328757", Address: { Street: "Humboldtstraße 10", Zip: "", City: "" } } },
+  { name: "Lilian Stephan", origId: "7b5b3e91-2bc3-4f4f-bac3-00d3913e964d", dupId: "7493764d-7004-4276-a4f8-0d07a88c66d6", update: { Phone: "0176 22272251", Mobile: "+49 176 22272251" } },
+  { name: "Lars Goldhardt", origId: "484255a1-b6dd-4c1f-a609-92778b17b77b", dupId: "1aa80a58-26a5-4d22-8f42-76c88a3f6424", update: { Phone: "+49 174 4821470", Mobile: "+49 174 4821470" } },
+  { name: "Sumea Kodrali", origId: "70237b11-b885-43b9-af0c-a193fa5c90e9", dupId: "72a427d2-7a82-4e18-8493-0650ffbb76c3", update: { Address: { Street: "Teichstr. 37", Zip: "", City: "" } } },
+  { name: "Tymofii Opanasenko", origId: "67d7cc0e-e513-45e0-a6ef-89df240b83d3", dupId: "e5bcd242-707c-4270-9dbd-70b2475c993b", update: { Phone: "+49 160 5006650", Mobile: "+49 160 5006650" } },
+  { name: "Mya Bollmann", origId: "b452036e-4ebf-4b27-982d-f3113553cebb", dupId: "4c5396a2-a0a7-4aea-ba63-01fcd53f5c46", update: { Phone: "+49 1517 3053704", Mobile: "+49 1517 3053704" } },
+  { name: "Emilia Lehmann", origId: "47a844d3-0547-49c9-8f83-df7dded25e06", dupId: "b7353da5-ff6c-4acd-aa32-0a94da913523", update: { Mobile: "+49 1578 5090041" } },
+  { name: "Malak Aljadoua", origId: "e81c661c-cff1-40f5-acf5-261526717c9e", dupId: "81de5663-a7e0-4d76-ae89-758aca6e00b3", update: { Phone: "+49 179 4434434", Mobile: "+49 179 4434434" } },
+  { name: "David Ngo", origId: "a59d74c2-d33b-4772-a6e6-37a840261d6d", dupId: "a292dd90-a7c9-49dc-ba82-6fe7cbca2b79", update: { Email: "ngothiloan0104@gmail.com", Phone: "01724976789", Mobile: "01724976789" } },
+  { name: "Tammo Kornelson", origId: "8239963f-1200-4f25-8bab-77ba3d2429eb", dupId: "df98fe8e-b89e-408e-9e14-7b75d6553575", update: { Email: "tammokornelson@gmail.com", Mobile: "017697573725", Address: { Street: "Paul-Heyse-Strasse 41", Zip: "04347", City: "" } } },
+  { name: "Leonor Moro Gámez", origId: "ad9041de-2190-4eda-ac30-75f8ed7660d2", dupId: "a15d1b67-81a1-4a00-bd53-ea020acdd267", update: { Phone: "+34 608 13 35 50", Mobile: "+34 608 13 35 50" } },
+  { name: "Lisa Werkmeister", origId: "c6c7e9e0-136c-49b6-b441-c69f96894dc2", dupId: "45877b2c-cf32-45c3-b2d7-e5ff2434538f", update: { Email: "lisa_werkmeister@icloud.com", Phone: "01759951117", Mobile: "01759951117" } },
+];
 
-  // Only check patients that came through AnimaSign (not all 4600)
-  const { data: subs } = await supabase
-    .from("anamnese_submissions")
-    .select("id, vorname, nachname, geburtsdatum, matched_patient_id, is_existing, account_email")
-    .gte("created_at", "2026-06-22T00:00:00Z")
-    .order("created_at", { ascending: false });
+export async function GET() {
+  const results: Array<{ name: string; status: string; dupId: string }> = [];
 
-  if (!subs || subs.length === 0) {
-    return NextResponse.json({ message: "Keine Submissions seit 22.06. gefunden." });
-  }
-
-  // Get the known ivoris_ids for matched patients
-  const patientIds = subs.filter(s => s.matched_patient_id).map(s => s.matched_patient_id as string);
-  const { data: ourPatients } = await supabase
-    .from("patients")
-    .select("id, ivoris_id, vorname, nachname")
-    .in("id", patientIds.length > 0 ? patientIds : ["00000000-0000-0000-0000-000000000000"]);
-
-  const idToIvoris = new Map<string, string>();
-  if (ourPatients) {
-    for (const p of ourPatients) {
-      if (p.ivoris_id) idToIvoris.set(p.id, p.ivoris_id);
-    }
-  }
-
-  // Fetch first 3 pages from Ivoris to find recently added patients (duplicates)
-  const ivorisPatients: Array<Record<string, unknown>> = [];
-  for (let page = 0; page < 100; page++) {
+  for (const m of MERGES) {
     try {
-      const batch = (await fetchIvorisPatientsPage(page)) as Array<Record<string, unknown>>;
-      if (!batch || batch.length === 0) break;
-      ivorisPatients.push(...batch);
-    } catch {
-      break;
-    }
-  }
-
-  // Find duplicates: for each AnimaSign submission, check if there are multiple
-  // Ivoris entries with the same Nachname + Geburtsdatum
-  type DupInfo = {
-    name: string;
-    birthday: string;
-    originalIvorisId: string | null;
-    duplicateIvorisIds: string[];
-    diffs: Array<{ field: string; original: string; duplicate: string }>;
-  };
-
-  const duplicates: DupInfo[] = [];
-
-  for (const sub of subs) {
-    if (!sub.nachname || !sub.geburtsdatum) continue;
-
-    const nameNorm = (sub.nachname as string).trim().toLowerCase();
-    const bday = sub.geburtsdatum as string;
-
-    // Find all Ivoris patients matching this name + birthday
-    const matches = ivorisPatients.filter(p =>
-      String(p.Lastname || "").trim().toLowerCase() === nameNorm &&
-      String(p.Birthday || "") === bday
-    );
-
-    if (matches.length >= 2) {
-      // We have a duplicate!
-      const originalIvorisId = sub.matched_patient_id ? idToIvoris.get(sub.matched_patient_id) || null : null;
-
-      // Original = the one matching our known ivoris_id, or the first one
-      let original = matches[0];
-      let dups = matches.slice(1);
-
-      if (originalIvorisId) {
-        const origIdx = matches.findIndex(m => String(m.Id) === originalIvorisId);
-        if (origIdx >= 0) {
-          original = matches[origIdx];
-          dups = matches.filter((_, i) => i !== origIdx);
-        }
-      }
-
-      // Check field differences
-      const diffs: Array<{ field: string; original: string; duplicate: string }> = [];
-      for (const dup of dups) {
-        for (const f of ["Email", "Phone", "Mobile"]) {
-          const ov = String(original[f] || "").trim();
-          const dv = String(dup[f] || "").trim();
-          if (ov !== dv && dv.length > 0) {
-            diffs.push({ field: f, original: ov, duplicate: dv });
+      // Filter out empty Address fields
+      const cleanUpdate: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(m.update)) {
+        if (k === "Address") {
+          const addr = v as Record<string, string>;
+          const nonEmpty: Record<string, string> = {};
+          for (const [ak, av] of Object.entries(addr)) {
+            if (av) nonEmpty[ak] = av;
           }
-        }
-        const oa = (original.Address || {}) as Record<string, string>;
-        const da = (dup.Address || {}) as Record<string, string>;
-        for (const f of ["Street", "Zip", "City"]) {
-          const ov = (oa[f] || "").trim();
-          const dv = (da[f] || "").trim();
-          if (ov !== dv && dv.length > 0) {
-            diffs.push({ field: `Address.${f}`, original: ov, duplicate: dv });
-          }
+          if (Object.keys(nonEmpty).length > 0) cleanUpdate.Address = nonEmpty;
+        } else if (v) {
+          cleanUpdate[k] = v;
         }
       }
 
-      duplicates.push({
-        name: `${sub.vorname} ${sub.nachname}`,
-        birthday: bday,
-        originalIvorisId: String(original.Id),
-        duplicateIvorisIds: dups.map(d => String(d.Id)),
-        diffs,
-      });
+      await updateIvorisPatient(m.origId, cleanUpdate);
+      results.push({ name: m.name, status: "OK - Original aktualisiert", dupId: m.dupId });
+    } catch (e) {
+      results.push({ name: m.name, status: "FEHLER: " + String(e).slice(0, 100), dupId: m.dupId });
     }
+    await new Promise(r => setTimeout(r, 300));
   }
 
-  if (duplicates.length === 0) {
-    return NextResponse.json({
-      message: "Keine Duplikate in Ivoris gefunden.",
-      checkedSubmissions: subs.length,
-      ivorisChecked: ivorisPatients.length,
-    });
-  }
-
-  // PREVIEW
-  if (!confirm) {
-    return NextResponse.json({
-      mode: "PREVIEW",
-      duplicateCount: duplicates.length,
-      duplicates: duplicates.map(d => ({
-        name: d.name,
-        birthday: d.birthday,
-        originalId: d.originalIvorisId,
-        duplicateIds: d.duplicateIvorisIds,
-        fieldsToMerge: d.diffs,
-        action: d.diffs.length > 0 ? "MERGE dann loeschen" : "Direkt loeschen (identisch)",
-      })),
-    });
-  }
-
-  // MERGE
-  const results: Array<{ name: string; action: string; result: string }> = [];
-
-  for (const d of duplicates) {
-    if (d.diffs.length > 0 && d.originalIvorisId) {
-      const updateData: Record<string, unknown> = {};
-      const addrUpdate: Record<string, string> = {};
-
-      for (const diff of d.diffs) {
-        if (diff.field.startsWith("Address.")) {
-          addrUpdate[diff.field.replace("Address.", "")] = diff.duplicate;
-        } else {
-          updateData[diff.field] = diff.duplicate;
-        }
-      }
-
-      if (Object.keys(addrUpdate).length > 0) {
-        try {
-          const orig = (await fetchIvorisPatientById(d.originalIvorisId)) as Record<string, unknown>;
-          const origAddr = (orig.Address || {}) as Record<string, string>;
-          updateData.Address = { ...origAddr, ...addrUpdate };
-        } catch {
-          updateData.Address = addrUpdate;
-        }
-      }
-
-      try {
-        await updateIvorisPatient(d.originalIvorisId, updateData);
-        results.push({
-          name: d.name,
-          action: "MERGED",
-          result: `Daten auf Original (${d.originalIvorisId.slice(0, 8)}) uebertragen. Duplikat(e) ${d.duplicateIvorisIds.map(id => id.slice(0, 8)).join(", ")} kann Sabine jetzt loeschen.`,
-        });
-      } catch (e) {
-        results.push({ name: d.name, action: "ERROR", result: String(e).slice(0, 200) });
-      }
-    } else {
-      results.push({
-        name: d.name,
-        action: "IDENTISCH",
-        result: `Keine Datenunterschiede. Duplikat(e) ${d.duplicateIvorisIds.map(id => id.slice(0, 8)).join(", ")} kann direkt geloescht werden.`,
-      });
-    }
-  }
-
-  return NextResponse.json({ mode: "MERGE AUSGEFUEHRT", results });
+  return NextResponse.json({
+    merged: results.length,
+    results,
+    sabineAktion: "Bitte folgende Duplikat-IDs in Ivoris loeschen:",
+    zuLoeschen: MERGES.map(m => ({ name: m.name, ivorisId: m.dupId })),
+  });
 }
