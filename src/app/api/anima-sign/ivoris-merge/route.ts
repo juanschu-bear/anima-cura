@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   // 1. Fetch ALL patients from Ivoris
   let allPatients: Array<Record<string, unknown>>;
   try {
-    allPatients = await fetchIvorisPatientsRaw();
+    allPatients = (await fetchIvorisPatientsRaw()) as Array<Record<string, unknown>>;
   } catch (e) {
     return NextResponse.json({ error: "Ivoris fetch failed: " + String(e) }, { status: 500 });
   }
