@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     .not("ivoris_id", "is", null);
   const knownIds = new Set((ourPatients || []).map(p => p.ivoris_id));
 
-  for (const [key, patients] of groups) {
+  for (const [key, patients] of Array.from(groups.entries())) {
     if (patients.length < 2) continue;
 
     // Determine which is original: the one we have in our DB, or the older one
