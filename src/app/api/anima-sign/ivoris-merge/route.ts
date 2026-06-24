@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { fetchIvorisPatientById, updateIvorisPatient, fetchIvorisPatientsPage } from "@/lib/api/ivoris-client";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
   // Fetch first 3 pages from Ivoris to find recently added patients (duplicates)
   const ivorisPatients: Array<Record<string, unknown>> = [];
-  for (let page = 0; page < 3; page++) {
+  for (let page = 0; page < 100; page++) {
     try {
       const batch = (await fetchIvorisPatientsPage(page)) as Array<Record<string, unknown>>;
       if (!batch || batch.length === 0) break;
@@ -120,7 +120,7 @@ export async function GET(req: Request) {
 
   if (duplicates.length === 0) {
     return NextResponse.json({
-      message: "Keine Duplikate in den ersten 3 Seiten von Ivoris gefunden.",
+      message: "Keine Duplikate in Ivoris gefunden.",
       checkedSubmissions: subs.length,
       ivorisChecked: ivorisPatients.length,
     });
