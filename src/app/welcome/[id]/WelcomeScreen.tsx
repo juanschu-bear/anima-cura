@@ -17,18 +17,18 @@ const T: Record<string, Record<string, string | string[]>> = {
     f4: "Deine Ratenzahlungen: was bezahlt wurde, was noch offen ist",
     f5: "Nachrichten von der Praxis direkt in der App",
     cred: "Deine Zugangsdaten",
-    credTitle: "Deine Login-Daten",
+    credTitle: "\ud83d\udd11 Deine Login-Daten",
     email: "Login-E-Mail",
     pw: "Passwort",
-    pwTap: "Tippen zum Anzeigen",
+    pwTap: "\ud83d\udc46 Tippen zum Anzeigen",
     pwHide: "Verbergen",
     sec: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein dafür, damit du sicher und geschützt auf deine persönliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unberührt.",
     screenshot: "Speichere diese Seite oder mach einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App ändern.",
     open: "App öffnen",
-    qrTitle: "Vom Handy scannen",
+    qrTitle: "\ud83d\udcf1 Vom Handy scannen",
     qrDesc: "Du öffnest diese Seite gerade am Computer? Scanne den QR-Code mit deinem Handy.",
     qrHint: "Öffne die Kamera-App und halte sie auf den Code.",
-    btnTitle: "Direkt öffnen",
+    btnTitle: "\ud83d\udc46 Direkt öffnen",
     btnDesc: "Du bist bereits am Handy? Tippe auf den Button und logge dich mit deinen neuen Zugangsdaten ein.",
     btnText: "Anima Cura öffnen",
     guideTitle: "So geht's los!",
@@ -36,7 +36,7 @@ const T: Record<string, Record<string, string | string[]>> = {
     guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen.",
     ios: ["Öffne die App in Safari (nicht Chrome oder andere Browser)", "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)", "Scrolle nach unten und tippe auf Zum Home-Bildschirm", "Tippe auf Hinzufügen"],
     and: ["Öffne die App in Chrome", "Tippe auf die drei Punkte oben rechts", "Zum Startbildschirm hinzufuegen", "Bestätige mit Hinzufügen"],
-    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
+    appNote: "\ud83d\udccc Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
     success: "Dein Account ist erstellt!",
     copy: "Kopieren",
     copied: "Kopiert!",
@@ -53,18 +53,18 @@ const T: Record<string, Record<string, string | string[]>> = {
     f4: "Your installment payments: what has been paid, what is still open",
     f5: "Messages from the practice directly in the app",
     cred: "Your login credentials",
-    credTitle: "Your login details",
+    credTitle: "\ud83d\udd11 Your login details",
     email: "Login email",
     pw: "Password",
-    pwTap: "Tap to reveal",
+    pwTap: "\ud83d\udc46 Tap to reveal",
     pwHide: "Hide",
     sec: "The @animacura.de login email is an internal practice system. We create this access solely so you can securely access your personal app.",
     screenshot: "Save this page or take a screenshot. You can change your password anytime after your first login.",
     open: "Open the app",
-    qrTitle: "Scan from your phone",
+    qrTitle: "\ud83d\udcf1 Scan from your phone",
     qrDesc: "Opening this on a computer? Scan the QR code with your phone.",
     qrHint: "Open the Camera app and point it at the code.",
-    btnTitle: "Open directly",
+    btnTitle: "\ud83d\udc46 Open directly",
     btnDesc: "Already on your phone? Tap the button and log in with your new credentials.",
     btnText: "Open Anima Cura",
     guideTitle: "Get started!",
@@ -72,7 +72,7 @@ const T: Record<string, Record<string, string | string[]>> = {
     guideIntro: "Anima Cura is a web app. You do not need to download anything from the App Store. But you can add it to your home screen just like a regular app.",
     ios: ["Open in Safari (not Chrome)", "Tap the Share button at the bottom", "Scroll down and tap Add to Home Screen", "Tap Add"],
     and: ["Open in Chrome", "Tap the three dots in the top right", "Add to Home screen", "Confirm with Add"],
-    appNote: "The app is currently available in German, English and Spanish.",
+    appNote: "\ud83d\udccc The app is currently available in German, English and Spanish.",
     success: "Your account is ready!",
     copy: "Copy",
     copied: "Copied!",
@@ -89,18 +89,18 @@ const T: Record<string, Record<string, string | string[]>> = {
     f4: "Tus pagos a plazos",
     f5: "Mensajes de la consulta",
     cred: "Tus datos de acceso",
-    credTitle: "Tus datos",
+    credTitle: "\ud83d\udd11 Tus datos",
     email: "E-mail de acceso",
     pw: "Contraseña",
-    pwTap: "Pulsa para ver",
+    pwTap: "\ud83d\udc46 Pulsa para ver",
     pwHide: "Ocultar",
     sec: "El correo @animacura.de es un sistema interno de la consulta.",
     screenshot: "Guarda esta página o haz una captura de pantalla.",
     open: "Abrir la app",
-    qrTitle: "Escanear",
+    qrTitle: "\ud83d\udcf1 Escanear",
     qrDesc: "Escanea el código QR con tu móvil.",
     qrHint: "Abre la cámara y apunta al código.",
-    btnTitle: "Abrir",
+    btnTitle: "\ud83d\udc46 Abrir",
     btnDesc: "¿Ya estás en el móvil?",
     btnText: "Abrir Anima Cura",
     guideTitle: "¡Empezamos!",
@@ -108,7 +108,7 @@ const T: Record<string, Record<string, string | string[]>> = {
     guideIntro: "Anima Cura es una web app. No necesitas descargar nada.",
     ios: ["Abre en Safari", "Pulsa Compartir", "A pantalla de inicio", "Pulsa Agregar"],
     and: ["Abre en Chrome", "Pulsa los tres puntos", "A pantalla de inicio", "Confirma con Agregar"],
-    appNote: "Disponible en alemán, inglés y español.",
+    appNote: "\ud83d\udccc Disponible en alemán, inglés y español.",
     success: "Tu cuenta está lista!",
     copy: "Copiar",
     copied: "Copiado!",
@@ -154,7 +154,7 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             <p style={{ color: "#5f6d67", fontSize: 14.5, maxWidth: "48ch", margin: "0 auto" }}>{s("received")}</p>
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap", margin: "18px 0 8px" }}>
-            {([["de", "DE Deutsch"], ["en", "EN English"], ["es", "ES Espanol"]] as const).map(([l, label]) => (
+            {([["de", "\ud83c\udde9\ud83c\uddea Deutsch"], ["en", "\ud83c\uddec\ud83c\udde7 English"], ["es", "\ud83c\uddea\ud83c\uddf8 Espa\u00f1ol"]] as const).map(([l, label]) => (
               <button key={l} onClick={() => setLang(l)} style={{ fontFamily: "inherit", fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 999, border: lang === l ? "1.5px solid #0f8a72" : "1.5px solid rgba(29,42,39,0.16)", background: lang === l ? "linear-gradient(150deg,rgba(15,138,114,0.10),transparent)" : "#fdfbf7", color: lang === l ? "#23b08f" : "#5f6d67", cursor: "pointer" }}>{label}</button>
             ))}
           </div>
@@ -199,8 +199,8 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
                 </span>
               </div>
             </div>
-            <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 12, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>{s("sec")}</div>
-            <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 8, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>{s("screenshot")}</div>
+            <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 12, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>\ud83d\udd12 {s("sec")}</div>
+            <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 8, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>\ud83d\udcf8 {s("screenshot")}</div>
           </div>
           {divider}
           <div style={{ fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: "#0f8a72", fontWeight: 600, margin: "0 0 16px" }}>{s("open")}</div>
@@ -218,7 +218,7 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             </div>
           </div>
           {divider}
-          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "#23b08f", fontWeight: 600, animation: "hintPulse 2s ease-in-out infinite" }}>Hier klicken</div>
+          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "#23b08f", fontWeight: 600, animation: "hintPulse 2s ease-in-out infinite" }}>\ud83d\udc47 Hier klicken</div>
           <style>{"@keyframes hintPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }"}</style>
           <div onClick={() => setGuideOpen(!guideOpen)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, cursor: "pointer", padding: "22px 24px", marginBottom: 16, borderRadius: 16, background: "linear-gradient(150deg,rgba(15,138,114,0.08),rgba(95,208,168,0.05))", border: "1.5px solid rgba(35,176,143,0.3)" }}>
             <div>
@@ -233,11 +233,11 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             <div>
               <p style={{ fontSize: 14, color: "#5f6d67", marginBottom: 16 }}>{s("guideIntro")}</p>
               <div style={{ background: "#fff", border: "1px solid rgba(29,42,39,0.10)", borderRadius: 12, padding: "16px 18px", marginBottom: 10 }}>
-                <h5 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>iPhone / iPad (Safari)</h5>
+                <h5 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>\ud83c\udf4e iPhone / iPad (Safari)</h5>
                 <ol style={{ paddingLeft: 20, fontSize: 13.5, margin: 0 }}>{ios.map((step, i) => <li key={i} style={{ padding: "4px 0" }}>{step}</li>)}</ol>
               </div>
               <div style={{ background: "#fff", border: "1px solid rgba(29,42,39,0.10)", borderRadius: 12, padding: "16px 18px" }}>
-                <h5 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>Android (Chrome)</h5>
+                <h5 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>\ud83e\udd16 Android (Chrome)</h5>
                 <ol style={{ paddingLeft: 20, fontSize: 13.5, margin: 0 }}>{and.map((step, i) => <li key={i} style={{ padding: "4px 0" }}>{step}</li>)}</ol>
               </div>
             </div>
