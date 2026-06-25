@@ -7,13 +7,13 @@ type Props = { vorname: string; loginEmail: string; password: string; lang?: str
 const T: Record<string, Record<string, string | string[]>> = {
   de: {
     thanks: "Vielen Dank",
-    received: "Dein Anamnesebogen ist bei uns eingegangen. Du erhaeltst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
-    next: "Was kommt als Naechstes?",
-    appTitle: "Deine persoenliche Anima Cura App",
-    appDesc: "Ab sofort steht dir ein eigener, geschuetzter Bereich zur Verfuegung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
-    f1: "Alle Rechnungen und Zahlungsplaene uebersichtlich an einem Ort",
-    f2: "Deine Dokumente: Befunde, Roentgenbilder, Behandlungsplaene",
-    f3: "Ueberblick ueber deine Behandlungsphasen und den aktuellen Stand",
+    received: "Dein Anamnesebogen ist bei uns eingegangen. Du erhältst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
+    next: "Was kommt als Nächstes?",
+    appTitle: "Deine persönliche Anima Cura App",
+    appDesc: "Ab sofort steht dir ein eigener, geschützter Bereich zur Verfügung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
+    f1: "Alle Rechnungen und Zahlungspläne übersichtlich an einem Ort",
+    f2: "Deine Dokumente: Befunde, Röntgenbilder, Behandlungspläne",
+    f3: "Überblick über deine Behandlungsphasen und den aktuellen Stand",
     f4: "Deine Ratenzahlungen: was bezahlt wurde, was noch offen ist",
     f5: "Nachrichten von der Praxis direkt in der App",
     cred: "Deine Zugangsdaten",
@@ -22,21 +22,21 @@ const T: Record<string, Record<string, string | string[]>> = {
     pw: "Passwort",
     pwTap: "Tippen zum Anzeigen",
     pwHide: "Verbergen",
-    sec: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein dafuer, damit du sicher und geschuetzt auf deine persoenliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unberuehrt.",
-    screenshot: "Speichere diese Seite oder mach einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App aendern.",
-    open: "App oeffnen",
+    sec: "Die Login-E-Mail @animacura.de ist ein internes Praxis-System. Wir erstellen diesen Zugang einzig und allein dafür, damit du sicher und geschützt auf deine persönliche App zugreifen kannst. Deine private E-Mail-Adresse bleibt davon unberührt.",
+    screenshot: "Speichere diese Seite oder mach einen Screenshot von diesen Daten. Du kannst das Passwort nach dem ersten Login jederzeit in der App ändern.",
+    open: "App öffnen",
     qrTitle: "Vom Handy scannen",
-    qrDesc: "Du oeffnest diese Seite gerade am Computer? Scanne den QR-Code mit deinem Handy.",
-    qrHint: "Oeffne die Kamera-App und halte sie auf den Code.",
-    btnTitle: "Direkt oeffnen",
+    qrDesc: "Du öffnest diese Seite gerade am Computer? Scanne den QR-Code mit deinem Handy.",
+    qrHint: "Öffne die Kamera-App und halte sie auf den Code.",
+    btnTitle: "Direkt öffnen",
     btnDesc: "Du bist bereits am Handy? Tippe auf den Button und logge dich mit deinen neuen Zugangsdaten ein.",
-    btnText: "Anima Cura oeffnen",
-    guideTitle: "So gehts los!",
-    guideSub: "App auf deinem Homescreen installieren, Schritt fuer Schritt",
+    btnText: "Anima Cura öffnen",
+    guideTitle: "So geht's los!",
+    guideSub: "App auf deinem Homescreen installieren, Schritt für Schritt",
     guideIntro: "Anima Cura ist eine Web-App. Du brauchst nichts aus dem App Store herunterladen. Du kannst sie aber wie eine normale App auf deinem Startbildschirm ablegen.",
-    ios: ["Oeffne die App in Safari (nicht Chrome oder andere Browser)", "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)", "Scrolle nach unten und tippe auf Zum Home-Bildschirm", "Tippe auf Hinzufuegen"],
-    and: ["Oeffne die App in Chrome", "Tippe auf die drei Punkte oben rechts", "Zum Startbildschirm hinzufuegen", "Bestaetige mit Hinzufuegen"],
-    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfuegbar. Weitere Sprachen folgen.",
+    ios: ["Öffne die App in Safari (nicht Chrome oder andere Browser)", "Tippe unten auf das Teilen-Symbol (das Quadrat mit dem Pfeil nach oben)", "Scrolle nach unten und tippe auf Zum Home-Bildschirm", "Tippe auf Hinzufügen"],
+    and: ["Öffne die App in Chrome", "Tippe auf die drei Punkte oben rechts", "Zum Startbildschirm hinzufuegen", "Bestätige mit Hinzufügen"],
+    appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verfügbar. Weitere Sprachen folgen.",
     success: "Dein Account ist erstellt!",
     copy: "Kopieren",
     copied: "Kopiert!",
@@ -79,37 +79,37 @@ const T: Record<string, Record<string, string | string[]>> = {
   },
   es: {
     thanks: "Gracias",
-    received: "Hemos recibido tu formulario. Recibiras tus documentos firmados por correo electronico.",
-    next: "Que viene ahora?",
+    received: "Hemos recibido tu formulario. Recibirás tus documentos firmados por correo electrónico.",
+    next: "¿Qué viene ahora?",
     appTitle: "Tu app personal Anima Cura",
     appDesc: "A partir de ahora tienes tu propio espacio seguro.",
     f1: "Todas tus facturas y planes de pago",
-    f2: "Tus documentos: diagnosticos, radiografias",
+    f2: "Tus documentos: diagnósticos, radiografías",
     f3: "Vista general de tus fases de tratamiento",
     f4: "Tus pagos a plazos",
     f5: "Mensajes de la consulta",
     cred: "Tus datos de acceso",
     credTitle: "Tus datos",
     email: "E-mail de acceso",
-    pw: "Contrasena",
+    pw: "Contraseña",
     pwTap: "Pulsa para ver",
     pwHide: "Ocultar",
     sec: "El correo @animacura.de es un sistema interno de la consulta.",
-    screenshot: "Guarda esta pagina o haz una captura de pantalla.",
+    screenshot: "Guarda esta página o haz una captura de pantalla.",
     open: "Abrir la app",
     qrTitle: "Escanear",
-    qrDesc: "Escanea el codigo QR con tu movil.",
-    qrHint: "Abre la camara y apunta al codigo.",
+    qrDesc: "Escanea el código QR con tu móvil.",
+    qrHint: "Abre la cámara y apunta al código.",
     btnTitle: "Abrir",
-    btnDesc: "Ya estas en el movil?",
+    btnDesc: "¿Ya estás en el móvil?",
     btnText: "Abrir Anima Cura",
-    guideTitle: "Empezamos!",
+    guideTitle: "¡Empezamos!",
     guideSub: "Instala la app paso a paso",
     guideIntro: "Anima Cura es una web app. No necesitas descargar nada.",
     ios: ["Abre en Safari", "Pulsa Compartir", "A pantalla de inicio", "Pulsa Agregar"],
     and: ["Abre en Chrome", "Pulsa los tres puntos", "A pantalla de inicio", "Confirma con Agregar"],
-    appNote: "Disponible en aleman, ingles y espanol.",
-    success: "Tu cuenta esta lista!",
+    appNote: "Disponible en alemán, inglés y español.",
+    success: "Tu cuenta está lista!",
     copy: "Copiar",
     copied: "Copiado!",
   },
@@ -141,7 +141,7 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
       <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 22px 0", display: "flex", alignItems: "center", gap: 11 }}>
         <div style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "linear-gradient(145deg,#5fd0a8,#0f8a72)", color: "#fff", fontFamily: "'Fraunces',serif", fontWeight: 600, fontSize: 17, boxShadow: "0 8px 22px -8px #0f8a72" }}>S</div>
-        <div style={{ lineHeight: 1.15 }}><b style={{ fontFamily: "'Fraunces',serif", fontWeight: 600, fontSize: 15.5 }}>KFO-Praxis Dr. Schubert</b><br /><small style={{ fontSize: 11, color: "#5f6d67" }}>Kieferorthopaedie</small></div>
+        <div style={{ lineHeight: 1.15 }}><b style={{ fontFamily: "'Fraunces',serif", fontWeight: 600, fontSize: 15.5 }}>KFO-Praxis Dr. Schubert</b><br /><small style={{ fontSize: 11, color: "#5f6d67" }}>Kieferorthopädie</small></div>
       </div>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "14px 22px 60px" }}>
         <div style={{ position: "relative", background: "linear-gradient(180deg,#fdfbf7,#f8f5ef)", border: "1px solid rgba(29,42,39,0.10)", borderRadius: 16, padding: "32px 28px", boxShadow: "0 26px 60px -34px rgba(40,55,50,0.4)", overflow: "hidden" }}>
@@ -208,7 +208,7 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             <div style={{ background: "#fff", border: "1px solid rgba(29,42,39,0.16)", borderRadius: 14, padding: 22, textAlign: "center" }}>
               <h4 style={{ fontFamily: "'Fraunces',serif", fontSize: 15, margin: "0 0 8px" }}>{s("qrTitle")}</h4>
               <p style={{ fontSize: 13, color: "#5f6d67", margin: "0 0 14px" }}>{s("qrDesc")}</p>
-              <img src={qrUrl} alt="QR Code" width={160} height={160} style={{ borderRadius: 8 }} />
+              <img src={qrUrl} alt="QR Code" width={160} height={160} style={{ borderRadius: 8, display: "block", margin: "0 auto" }} />
               <div style={{ fontSize: 11.5, color: "#94a09a", marginTop: 10 }}>{s("qrHint")}</div>
             </div>
             <div style={{ background: "#fff", border: "1px solid rgba(29,42,39,0.16)", borderRadius: 14, padding: 22, textAlign: "center" }}>
@@ -218,6 +218,8 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             </div>
           </div>
           {divider}
+          <div style={{ textAlign: "center", marginBottom: 6, fontSize: 12, color: "#23b08f", fontWeight: 600, animation: "hintPulse 2s ease-in-out infinite" }}>Hier klicken</div>
+          <style>{"@keyframes hintPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }"}</style>
           <div onClick={() => setGuideOpen(!guideOpen)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, cursor: "pointer", padding: "22px 24px", marginBottom: 16, borderRadius: 16, background: "linear-gradient(150deg,rgba(15,138,114,0.08),rgba(95,208,168,0.05))", border: "1.5px solid rgba(35,176,143,0.3)" }}>
             <div>
               <div style={{ fontFamily: "'Fraunces',serif", fontSize: 20, fontWeight: 600 }}>{s("guideTitle")}</div>
