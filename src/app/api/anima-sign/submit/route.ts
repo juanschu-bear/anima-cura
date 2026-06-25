@@ -212,12 +212,11 @@ export async function POST(request: Request) {
         }
       } else {
         // Neupatient: in Ivoris anlegen
-        const newPatient = await createIvorisPatient(ivorisData);
-        console.log("[IVORIS] Neupatient angelegt:", vorname, nachname, newPatient?.Id);
-        if (newPatient?.Id) {
-          // ivoris_id in patients-Tabelle speichern
+        const newPatientId = await createIvorisPatient(ivorisData);
+        console.log("[IVORIS] Neupatient angelegt:", vorname, nachname, newPatientId);
+        if (newPatientId) {
           if (abgleich?.patient_id) {
-            await supabase.from("patients").update({ ivoris_id: newPatient.Id }).eq("id", abgleich.patient_id);
+            await supabase.from("patients").update({ ivoris_id: newPatientId }).eq("id", abgleich.patient_id);
           }
           await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
         }
