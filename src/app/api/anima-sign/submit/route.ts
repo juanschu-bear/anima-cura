@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         email,
         geburtsdatum,
         answers,
-        status: "offen",
+        status: "signiert",
       })
       .select("id")
       .single();
