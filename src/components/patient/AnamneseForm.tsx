@@ -421,7 +421,7 @@ const DONE_T: Record<string, Record<string, string | string[]>> = {
     loading: ["Hesab\u0131n olu\u015fturuluyor...", "Giri\u015f bilgileri \u00fcretiliyor...", "Neredeyse bitti..."], success: "Hesab\u0131n haz\u0131r!", footer: "Sorular\u0131n m\u0131 var? Buraday\u0131z." },
 };
 
-const DONE_APP_URL = "https://anima-cura.vercel.app/patient/login";
+const DONE_APP_URL = "https://animacura.io/patient/login";
 const DONE_QR_URL = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(DONE_APP_URL) + "&bgcolor=fdfbf7&color=1d2a27";
 
 function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setGuideOpen, vorname }: {
