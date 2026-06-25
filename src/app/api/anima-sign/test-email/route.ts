@@ -12,8 +12,7 @@ export async function GET(req: Request) {
 
   const { subject, html } = buildWelcomeEmail({
     vorname: "Juan",
-    loginEmail: "juan.schubert@animacura.de",
-    password: "Tf9#xKp4Ln",
+    welcomeUrl: "https://animacura.io/welcome/test-preview",
     lang: "de",
   });
 
