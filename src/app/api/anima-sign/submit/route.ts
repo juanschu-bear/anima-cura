@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     if (account?.login_email) {
       await supabase
         .from("anamnese_submissions")
-        .update({ account_email: account.login_email })
+        .update({ account_email: account.login_email, account_password: account.password })
         .eq("id", submissionId);
 
       // Portal-Zugang im Patienten-Record aktivieren
