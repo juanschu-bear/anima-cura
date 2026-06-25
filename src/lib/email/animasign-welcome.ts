@@ -90,6 +90,7 @@ export function buildWelcomeEmail({vorname,loginEmail,password,lang="de"}:P):{su
     <div style="font-size:12px;color:#5f6d67;font-weight:500;margin-bottom:6px;">${s("pw")}</div>
     <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:11px;border:1.5px solid rgba(35,176,143,0.3);background:rgba(35,176,143,0.04);flex-wrap:wrap;justify-content:space-between;">
       <span style="font-size:16px;font-weight:700;color:#c2922f;font-family:monospace;letter-spacing:.02em;">${password}</span>
+      <span style="font-size:12px;color:#fff;font-weight:700;background:linear-gradient(145deg,#5fd0a8,#0f8a72);border:none;border-radius:10px;padding:6px 14px;white-space:nowrap;box-shadow:0 4px 14px -4px #0f8a72;">&#128203; Kopieren</span>
     </div>
   </div>
   <div style="font-size:12.5px;color:#5f6d67;margin-top:12px;padding:10px 14px;background:rgba(15,138,114,0.10);border-radius:10px;display:flex;gap:8px;align-items:flex-start;"><span>\ud83d\udd12</span><div>${s("sec")}</div></div>
