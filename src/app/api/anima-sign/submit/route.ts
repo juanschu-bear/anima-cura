@@ -256,13 +256,13 @@ export async function POST(request: Request) {
         console.log("[ANIMASIGN] user_profiles gesetzt: role=patient, patient_id=" + (abgleich?.patient_id || "null"));
       }
 
-      // Willkommens-Email mit Zugangsdaten senden (nicht-blockierend)
-      if (email && vorname && account.login_email && account.password) {
+      // Willkommens-Email senden (nicht-blockierend)
+      if (email && vorname) {
+        const welcomeUrl = `https://animacura.io/welcome/${submissionId}`;
         void sendWelcomeEmail({
           to: email,
           vorname: vorname,
-          loginEmail: account.login_email,
-          password: account.password,
+          welcomeUrl,
           lang: ((answers?.sprache as string) === "en" || (answers?.sprache as string) === "es" || (answers?.sprache as string) === "ru" || (answers?.sprache as string) === "tr") ? (answers.sprache as "en" | "es" | "ru" | "tr") : "de",
         }).catch(err => console.error("[AnimaSign] Welcome email failed:", err));
       }
