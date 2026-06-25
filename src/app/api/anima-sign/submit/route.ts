@@ -70,6 +70,9 @@ async function createPatientAccount(
         patient_email: patientEmail,
         role: "patient",
       },
+      app_metadata: {
+        role: "patient",
+      },
     });
 
     if (!error) {
@@ -234,6 +237,23 @@ export async function POST(request: Request) {
           .from("patients")
           .update({ portal_zugang: true })
           .eq("id", abgleich.patient_id);
+      }
+
+      // user_profiles: role=patient + patient_id setzen (noetig fuer Patient-Login)
+      const { data: { users: allUsers } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const authUser = allUsers?.find(u => u.email === account.login_email);
+      if (authUser) {
+        await supabase
+          .from("user_profiles")
+          .upsert({
+            id: authUser.id,
+            email: account.login_email,
+            display_name: vorname || "",
+            full_name: (vorname || "") + " " + (nachname || ""),
+            role: "patient",
+            patient_id: abgleich?.patient_id || null,
+          }, { onConflict: "id" });
+        console.log("[ANIMASIGN] user_profiles gesetzt: role=patient, patient_id=" + (abgleich?.patient_id || "null"));
       }
 
       // Willkommens-Email mit Zugangsdaten senden (nicht-blockierend)
