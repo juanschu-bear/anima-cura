@@ -583,7 +583,7 @@ export function AnamneseForm({ patientId }: Props) {
     zahler_geburtsdatum: (v) => pruefeDatum(v, { geburt: true }),
     abschluss_datum: (v) => pruefeDatum(v),
     krankenkasse: (v) => pruefeText(v, 2),
-    patient_strasse: (v) => pruefeText(v, 2),
+    patient_strasse: (v) => pruefeText(v, 2, false),
     patient_wohnort: (v) => pruefeText(v, 2),
     abschluss_ort: (v) => pruefeText(v, 2),
     besuchsgrund: (v) => pruefeText(v, 3, false),
