@@ -95,7 +95,7 @@ const C = {
   line: "#e0d8cc", lineStrong: "#c8bfb0", field: "#f0ece4",
 };
 
-export function buildWelcomeEmail({ vorname, loginEmail, password, lang = "de", appUrl = "https://anima-cura.vercel.app/patient/login" }: WelcomeEmailParams): { subject: string; html: string } {
+export function buildWelcomeEmail({ vorname, loginEmail, password, lang = "de", appUrl = "https://animacura.io/patient/login" }: WelcomeEmailParams): { subject: string; html: string } {
   const t = DONE_T[lang] || DONE_T.de;
   const S = (k: string) => String(t[k] || "");
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(appUrl)}&bgcolor=fdfbf7&color=1d2a27`;
