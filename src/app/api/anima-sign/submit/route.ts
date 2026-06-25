@@ -196,7 +196,14 @@ export async function POST(request: Request) {
           .eq("id", abgleich.patient_id)
           .maybeSingle();
         if (pat?.ivoris_id && typeof pat.ivoris_id === "string" && pat.ivoris_id.length > 10) {
-          await updateIvorisPatient(pat.ivoris_id, ivorisData);
+          // Bestandspatient: NUR Kontaktdaten updaten (nicht Name/Geburtstag, Ivoris erlaubt nur 1 Feld davon pro Request)
+          const contactUpdate = {
+            Email: ivorisData.Email,
+            Phone: ivorisData.Phone,
+            Mobile: ivorisData.Mobile,
+            Address: ivorisData.Address,
+          };
+          await updateIvorisPatient(pat.ivoris_id, contactUpdate);
           console.log(`[IVORIS] Patient ${pat.ivoris_id} aktualisiert`);
           await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
         } else {
@@ -204,10 +211,16 @@ export async function POST(request: Request) {
           await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient: keine gueltige Ivoris-ID" }).eq("id", submissionId);
         }
       } else {
-        // DEAKTIVIERT: Ivoris-Neuanlage pausiert bis Matching-Logik zuverlaessig ist.
-        // Daten sind sicher in unserer DB. Ivoris-Anlage erfolgt manuell oder nach Fix.
-        console.warn("[IVORIS] Neuanlage pausiert (Matching unzuverlaessig):", vorname, nachname);
-        await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Neuanlage pausiert bis Matching gefixt" }).eq("id", submissionId);
+        // Neupatient: in Ivoris anlegen
+        const newPatient = await createIvorisPatient(ivorisData);
+        console.log("[IVORIS] Neupatient angelegt:", vorname, nachname, newPatient?.Id);
+        if (newPatient?.Id) {
+          // ivoris_id in patients-Tabelle speichern
+          if (abgleich?.patient_id) {
+            await supabase.from("patients").update({ ivoris_id: newPatient.Id }).eq("id", abgleich.patient_id);
+          }
+          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
+        }
       }
       // Fallback fuer Edge-Cases:
       if (false) {
