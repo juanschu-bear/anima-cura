@@ -522,6 +522,39 @@ export function AnamneseForm({ patientId }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [gruende, setGruende] = useState<Record<string, string>>({});
 
+  // Photon Adress-Autocomplete (OpenStreetMap, kein API Key noetig)
+  const [addrSuggestions, setAddrSuggestions] = useState<Array<{street:string;house:string;zip:string;city:string;display:string}>>([]);
+  const [addrTimer, setAddrTimer] = useState<ReturnType<typeof setTimeout>|null>(null);
+  const handleAddrInput = (val: string) => {
+    set("patient_strasse", val);
+    if (addrTimer) clearTimeout(addrTimer);
+    if (val.length < 3) { setAddrSuggestions([]); return; }
+    setAddrTimer(setTimeout(async () => {
+      try {
+        const res = await fetch("https://photon.komoot.io/api/?q=" + encodeURIComponent(val) + "&lang=de&limit=5&lat=51.34&lon=12.37&layer=street,house");
+        const data = await res.json();
+        const items = (data.features || []).map((f: { properties: Record<string, string> }) => {
+          const p = f.properties || {};
+          return {
+            street: p.street || p.name || "",
+            house: p.housenumber || "",
+            zip: p.postcode || "",
+            city: p.city || p.town || p.village || "",
+            display: [p.street || p.name, p.housenumber, p.postcode, p.city || p.town || p.village].filter(Boolean).join(", "),
+          };
+        }).filter((item: { street: string }) => item.street);
+        setAddrSuggestions(items);
+      } catch { setAddrSuggestions([]); }
+    }, 350));
+  };
+  const selectAddr = (item: {street:string;house:string;zip:string;city:string}) => {
+    set("patient_strasse", item.street);
+    if (item.house) set("patient_hausnummer", item.house);
+    if (item.zip) set("patient_plz", item.zip);
+    if (item.city) set("patient_wohnort", item.city);
+    setAddrSuggestions([]);
+  };
+
   const sig1 = useRef<HTMLCanvasElement | null>(null);
   const sig2 = useRef<HTMLCanvasElement | null>(null);
 
