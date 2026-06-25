@@ -531,9 +531,9 @@ export function AnamneseForm({ patientId }: Props) {
     if (val.length < 3) { setAddrSuggestions([]); return; }
     setAddrTimer(setTimeout(async () => {
       try {
-        const res = await fetch("https://photon.komoot.io/api/?q=" + encodeURIComponent(val) + "&lang=de&limit=5&lat=51.34&lon=12.37&layer=street,house");
-        const data = await res.json();
-        const items = (data.features || []).map((f: { properties: Record<string, string> }) => {
+        const res = await fetch("https://photon.komoot.io/api/?q=" + encodeURIComponent(val) + "&lang=de&limit=5&lat=51.34&lon=12.37");
+        const photonRes = await res.json();
+        const items = (photonRes.features || []).map((f: { properties: Record<string, string> }) => {
           const p = f.properties || {};
           return {
             street: p.street || p.name || "",
