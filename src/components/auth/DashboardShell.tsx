@@ -67,6 +67,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
   {
     key: "navGroup.practice",
     items: [
+      { href: "/tagesplan", icon: CalendarRange, key: "nav.tagesplan" },
       { href: "/patienten", icon: Users, key: "nav.patients" },
       { href: "/behandlungen", icon: Stethoscope, key: "nav.treatments" },
       { href: "/animasign", icon: FileSignature, key: "nav.animasign" },

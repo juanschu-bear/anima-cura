@@ -58,6 +58,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "fin.footer": { de: "Einzige Datenquelle: ac_finanz_messwerte(). Frontend und SQL zeigen dieselben Zahlen.", en: "Single data source: ac_finanz_messwerte(). Frontend and SQL show identical numbers." },
   "fin.loadError": { de: "Messwerte konnten nicht geladen werden", en: "Could not load metrics" },
 
+  "nav.tagesplan": { de: "Tagesplan", en: "Daily Schedule" },
   "nav.patients": { de: "Patienten", en: "Patients" },
   "nav.treatments": { de: "Behandlungen", en: "Treatments" },
   "nav.animasign": { de: "AnimaSign", en: "AnimaSign" },

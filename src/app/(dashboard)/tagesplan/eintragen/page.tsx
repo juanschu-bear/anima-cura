@@ -283,7 +283,7 @@ export default function TerminEintragen() {
         {saved && (
           <div style={styles.success}>
             Termin gespeichert. Nächsten Termin eingeben oder{" "}
-            <a href="/dashboard/tagesplan" style={styles.link}>
+            <a href="/tagesplan" style={styles.link}>
               zum Tagesplan
             </a>
             .
@@ -303,7 +303,7 @@ export default function TerminEintragen() {
         </button>
 
         {/* Link zum Tagesplan */}
-        <a href="/dashboard/tagesplan" style={styles.backLink}>
+        <a href="/tagesplan" style={styles.backLink}>
           Zum Tagesplan
         </a>
       </div>
