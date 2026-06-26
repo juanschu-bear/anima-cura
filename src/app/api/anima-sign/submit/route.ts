@@ -256,7 +256,7 @@ export async function POST(request: Request) {
     }
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const account = await createPatientAccount(vorname, nachname, email);
+    const account = await createPatientAccount(vorname, nachname, email, abgleich?.patient_id || null);
 
     // 1e) Account-Email in Submission speichern
     if (account?.login_email) {
