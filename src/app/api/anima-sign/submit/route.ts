@@ -77,9 +77,6 @@ async function createPatientAccount(
         role: "patient",
         patient_id: patientId,
       },
-      app_metadata: {
-        role: "patient",
-      },
     });
 
     if (!error && authData.user) {
