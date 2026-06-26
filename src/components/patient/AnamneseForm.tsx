@@ -421,7 +421,7 @@ const DONE_T: Record<string, Record<string, string | string[]>> = {
     loading: ["Hesab\u0131n olu\u015fturuluyor...", "Giri\u015f bilgileri \u00fcretiliyor...", "Neredeyse bitti..."], success: "Hesab\u0131n haz\u0131r!", footer: "Sorular\u0131n m\u0131 var? Buraday\u0131z." },
 };
 
-const DONE_APP_URL = "https://anima-cura.vercel.app/patient/login";
+const DONE_APP_URL = "https://animacura.io/patient/login";
 const DONE_QR_URL = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(DONE_APP_URL) + "&bgcolor=fdfbf7&color=1d2a27";
 
 function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setGuideOpen, vorname }: {
@@ -522,6 +522,39 @@ export function AnamneseForm({ patientId }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [gruende, setGruende] = useState<Record<string, string>>({});
 
+  // Photon Adress-Autocomplete (OpenStreetMap, kein API Key noetig)
+  const [addrSuggestions, setAddrSuggestions] = useState<Array<{street:string;house:string;zip:string;city:string;display:string}>>([]);
+  const [addrTimer, setAddrTimer] = useState<ReturnType<typeof setTimeout>|null>(null);
+  const handleAddrInput = (val: string) => {
+    set("patient_strasse", val);
+    if (addrTimer) clearTimeout(addrTimer);
+    if (val.length < 3) { setAddrSuggestions([]); return; }
+    setAddrTimer(setTimeout(async () => {
+      try {
+        const res = await fetch("https://photon.komoot.io/api/?q=" + encodeURIComponent(val) + "&lang=de&limit=5&lat=51.34&lon=12.37");
+        const photonRes = await res.json();
+        const items = (photonRes.features || []).map((f: { properties: Record<string, string> }) => {
+          const p = f.properties || {};
+          return {
+            street: p.street || p.name || "",
+            house: p.housenumber || "",
+            zip: p.postcode || "",
+            city: p.city || p.town || p.village || "",
+            display: [p.street || p.name, p.housenumber, p.postcode, p.city || p.town || p.village].filter(Boolean).join(", "),
+          };
+        }).filter((item: { street: string }) => item.street);
+        setAddrSuggestions(items);
+      } catch { setAddrSuggestions([]); }
+    }, 350));
+  };
+  const selectAddr = (item: {street:string;house:string;zip:string;city:string}) => {
+    set("patient_strasse", item.street);
+    if (item.house) set("patient_hausnummer", item.house);
+    if (item.zip) set("patient_plz", item.zip);
+    if (item.city) set("patient_wohnort", item.city);
+    setAddrSuggestions([]);
+  };
+
   const sig1 = useRef<HTMLCanvasElement | null>(null);
   const sig2 = useRef<HTMLCanvasElement | null>(null);
 
@@ -583,7 +616,7 @@ export function AnamneseForm({ patientId }: Props) {
     zahler_geburtsdatum: (v) => pruefeDatum(v, { geburt: true }),
     abschluss_datum: (v) => pruefeDatum(v),
     krankenkasse: (v) => pruefeText(v, 2),
-    patient_strasse: (v) => pruefeText(v, 2),
+    patient_strasse: (v) => pruefeText(v, 2, false),
     patient_wohnort: (v) => pruefeText(v, 2),
     abschluss_ort: (v) => pruefeText(v, 2),
     besuchsgrund: (v) => pruefeText(v, 3, false),
@@ -747,7 +780,7 @@ export function AnamneseForm({ patientId }: Props) {
               <div className="field col-2"><label>Geburtsdatum <span className="req">*</span></label><input type="date" className={ff("patient_geburtsdatum").trim()} value={txt("patient_geburtsdatum")} onChange={(e) => set("patient_geburtsdatum", e.target.value)} />{gruende["patient_geburtsdatum"] ? <span className="fehlt-grund">{gruende["patient_geburtsdatum"]}</span> : null}<span className="hint">Daraus richten wir den Bogen automatisch passend für Sie ein.</span></div>
               <div className="field"><label>Geschlecht <span className="req">*</span></label><select className={ff("patient_geschlecht").trim()} value={txt("patient_geschlecht")} onChange={(e) => set("patient_geschlecht", e.target.value)}><option value="">Bitte wählen</option><option>Männlich</option><option>Weiblich</option><option>Divers</option></select></div>
               <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("patient_telefon").trim()} value={txt("patient_telefon")} onChange={(e) => set("patient_telefon", e.target.value)} />{gruende["patient_telefon"] ? <span className="fehlt-grund">{gruende["patient_telefon"]}</span> : null}</div>
-              <div className="field"><label>Straße <span className="req">*</span></label><input type="text" className={ff("patient_strasse").trim()} value={txt("patient_strasse")} onChange={(e) => set("patient_strasse", e.target.value)} />{gruende["patient_strasse"] ? <span className="fehlt-grund">{gruende["patient_strasse"]}</span> : null}</div>
+              <div className="field"><label>Straße <span className="req">*</span></label><div style={{position:"relative"}}><input type="text" autoComplete="off" className={ff("patient_strasse").trim()} value={txt("patient_strasse")} onChange={(e) => handleAddrInput(e.target.value)} onBlur={() => setTimeout(() => setAddrSuggestions([]), 200)} placeholder="Straßenname eingeben..." />{addrSuggestions.length > 0 && <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:"#fdfbf7",border:"1.5px solid rgba(29,42,39,0.16)",borderRadius:10,boxShadow:"0 12px 30px -10px rgba(40,55,50,0.25)",maxHeight:200,overflowY:"auto"}}>{addrSuggestions.map((item,i) => <div key={i} onMouseDown={() => selectAddr(item)} style={{padding:"10px 14px",fontSize:13.5,cursor:"pointer",borderBottom:"1px solid rgba(29,42,39,0.06)",color:"#1d2a27"}}>{item.display}</div>)}</div>}</div></div>
               <div className="field"><label>Hausnummer <span className="req">*</span></label><input type="text" className={ff("patient_hausnummer").trim()} value={txt("patient_hausnummer")} onChange={(e) => set("patient_hausnummer", e.target.value)} />{gruende["patient_hausnummer"] ? <span className="fehlt-grund">{gruende["patient_hausnummer"]}</span> : null}</div>
               <div className="field"><label>PLZ <span className="req">*</span></label><input type="text" inputMode="numeric" className={ff("patient_plz").trim()} value={txt("patient_plz")} onChange={(e) => set("patient_plz", e.target.value)} />{gruende["patient_plz"] ? <span className="fehlt-grund">{gruende["patient_plz"]}</span> : null}</div>
               <div className="field"><label>Wohnort <span className="req">*</span></label><input type="text" className={ff("patient_wohnort").trim()} value={txt("patient_wohnort")} onChange={(e) => set("patient_wohnort", e.target.value)} />{gruende["patient_wohnort"] ? <span className="fehlt-grund">{gruende["patient_wohnort"]}</span> : null}</div>

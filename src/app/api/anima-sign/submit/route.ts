@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { createServerClient, createAdminClient } from "@/lib/db/supabase";
 import crypto from "crypto";
+import { updateIvorisPatient, createIvorisPatient } from "@/lib/api/ivoris-client";
 import {
   createAndDistribute,
   type DocumensoField,
 } from "@/lib/documenso/client";
+
+import signpdf from "@signpdf/signpdf";
+import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
+import { P12Signer } from "@signpdf/signer-p12";
+import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -70,6 +76,9 @@ async function createPatientAccount(
         patient_email: patientEmail,
         role: "patient",
         patient_id: patientId,
+      },
+      app_metadata: {
+        role: "patient",
       },
     });
 
@@ -153,7 +162,7 @@ export async function POST(request: Request) {
         email,
         geburtsdatum,
         answers,
-        status: "offen",
+        status: "signiert",
       })
       .select("id")
       .single();
@@ -176,19 +185,125 @@ export async function POST(request: Request) {
       { p_submission_id: submissionId }
     );
 
-    // 1c) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const { data: linkedSubmission } = await supabase
-      .from("anamnese_submissions")
-      .select("patient_id")
-      .eq("id", submissionId)
-      .single();
+    // 1b-store) Abgleich-Ergebnis in Submission speichern
+    if (abgleich) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          is_existing: !abgleich.is_new,
+          matched_patient_id: abgleich.patient_id || null,
+        })
+        .eq("id", submissionId);
+    }
 
-    const linkedPatientId =
-      typeof linkedSubmission?.patient_id === "string" && UUID_RE.test(linkedSubmission.patient_id)
-        ? linkedSubmission.patient_id
-        : patientId;
+    // 1c) Ivoris-Sync: Patientendaten sofort zu Ivoris pushen
+    try {
+      const ivorisData = {
+        Firstname: vorname || "",
+        Lastname: nachname || "",
+        Birthday: geburtsdatum || "",
+        Email: email || "",
+        Phone: (answers.patient_telefon as string) || "",
+        Mobile: (answers.patient_mobil as string) || "",
+        Address: {
+          Street: [answers.patient_strasse, answers.patient_hausnummer].filter(Boolean).join(" "),
+          Zip: (answers.patient_plz as string) || "",
+          City: (answers.patient_wohnort as string) || "",
+          Country: "D",
+        },
+      };
 
-    const account = await createPatientAccount(vorname, nachname, email, linkedPatientId);
+      if (abgleich && !abgleich.is_new && abgleich.patient_id) {
+        // Bestandspatient: ivoris_id aus DB holen und updaten
+        const { data: pat } = await supabase
+          .from("patients")
+          .select("ivoris_id")
+          .eq("id", abgleich.patient_id)
+          .maybeSingle();
+        if (pat?.ivoris_id && typeof pat.ivoris_id === "string" && pat.ivoris_id.length > 10) {
+          // Bestandspatient: NUR Kontaktdaten updaten (nicht Name/Geburtstag, Ivoris erlaubt nur 1 Feld davon pro Request)
+          const contactUpdate = {
+            Email: ivorisData.Email,
+            Phone: ivorisData.Phone,
+            Mobile: ivorisData.Mobile,
+            Address: ivorisData.Address,
+          };
+          await updateIvorisPatient(pat.ivoris_id, contactUpdate);
+          console.log(`[IVORIS] Patient ${pat.ivoris_id} aktualisiert`);
+          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
+        } else {
+          console.warn("[IVORIS] Bestandspatient ohne gueltige Ivoris-ID:", abgleich.patient_id, "ivoris_id:", pat?.ivoris_id);
+          await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient: keine gueltige Ivoris-ID" }).eq("id", submissionId);
+        }
+      } else {
+        // Neupatient: in Ivoris anlegen
+        const newPatientId = await createIvorisPatient(ivorisData);
+        console.log("[IVORIS] Neupatient angelegt:", vorname, nachname, newPatientId);
+        if (newPatientId) {
+          if (abgleich?.patient_id) {
+            await supabase.from("patients").update({ ivoris_id: newPatientId }).eq("id", abgleich.patient_id);
+          }
+          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
+        }
+      }
+      // Fallback fuer Edge-Cases:
+      if (false) {
+        // Bestandspatient ohne gueltige Ivoris-ID: NICHT anlegen (verhindert Duplikate)
+        console.warn("[IVORIS] Bestandspatient ohne Ivoris-ID, uebersprungen:", vorname, nachname);
+        await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient ohne Ivoris-ID" }).eq("id", submissionId);
+      }
+    } catch (ivorisErr) {
+      console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
+      await supabase.from("anamnese_submissions").update({ ivoris_synced: false, ivoris_sync_error: String(ivorisErr) }).eq("id", submissionId);
+      // Fehler ist nicht-blockierend: Submission geht trotzdem durch
+    }
+
+    // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
+    const account = await createPatientAccount(vorname, nachname, email);
+
+    // 1e) Account-Email in Submission speichern
+    if (account?.login_email) {
+      await supabase
+        .from("anamnese_submissions")
+        .update({ account_email: account.login_email, account_password: account.password })
+        .eq("id", submissionId);
+
+      // Portal-Zugang im Patienten-Record aktivieren
+      if (abgleich?.patient_id) {
+        await supabase
+          .from("patients")
+          .update({ portal_zugang: true })
+          .eq("id", abgleich.patient_id);
+      }
+
+      // user_profiles: role=patient + patient_id setzen (noetig fuer Patient-Login)
+      const { data: { users: allUsers } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const authUser = allUsers?.find(u => u.email === account.login_email);
+      if (authUser) {
+        await supabase
+          .from("user_profiles")
+          .upsert({
+            id: authUser.id,
+            email: account.login_email,
+            display_name: vorname || "",
+            full_name: (vorname || "") + " " + (nachname || ""),
+            role: "patient",
+            patient_id: abgleich?.patient_id || null,
+          }, { onConflict: "id" });
+        console.log("[ANIMASIGN] user_profiles gesetzt: role=patient, patient_id=" + (abgleich?.patient_id || "null"));
+      }
+
+      // Willkommens-Email senden (nicht-blockierend)
+      if (email && vorname) {
+        const welcomeUrl = `https://animacura.io/welcome/${submissionId}`;
+        void sendWelcomeEmail({
+          to: email,
+          vorname: vorname,
+          welcomeUrl,
+          lang: ((answers?.sprache as string) === "en" || (answers?.sprache as string) === "es" || (answers?.sprache as string) === "ru" || (answers?.sprache as string) === "tr") ? (answers.sprache as "en" | "es" | "ru" | "tr") : "de",
+        }).catch(err => console.error("[AnimaSign] Welcome email failed:", err));
+      }
+    }
 
     // 2) PDF beim PDF-Dienst rendern lassen
     const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
@@ -249,7 +364,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3) Unsigniertes PDF im Storage ablegen (unser Beleg + Vorlage fuer Documenso)
+    // 2b) PDF digital signieren (X.509 Zertifikat)
+    const certBase64 = process.env.PDF_SIGNING_CERT;
+    const certPass = process.env.PDF_SIGNING_PASSPHRASE;
+    if (certBase64 && certPass) {
+      try {
+        const certBuffer = Buffer.from(certBase64, "base64");
+        const pdfWithPlaceholder = plainAddPlaceholder({
+          pdfBuffer,
+          reason: "Anamnesebogen digital signiert",
+          contactInfo: "praxis@praxis-schubert.de",
+          name: "AnimaSign / KFO-Praxis Dr. Maria Elena Schubert",
+          location: "Leipzig, Deutschland",
+        });
+        const signer = new P12Signer(certBuffer, { passphrase: certPass });
+        const signedResult = await signpdf.sign(pdfWithPlaceholder, signer);
+        pdfBuffer = Buffer.from(signedResult);
+        console.log("[ANIMASIGN] PDF erfolgreich digital signiert");
+      } catch (signError) {
+        console.error("[ANIMASIGN] PDF-Signierung fehlgeschlagen (nicht-blockierend):", signError);
+        // Nicht-blockierend: unsigniertes PDF wird trotzdem gespeichert
+      }
+    } else {
+      console.warn("[ANIMASIGN] PDF_SIGNING_CERT oder PDF_SIGNING_PASSPHRASE fehlt, PDF wird unsigniert gespeichert");
+    }
+
+    // 3) Signiertes PDF im Storage ablegen
     const unsignedPath = `${submissionId}/Anamnesebogen.pdf`;
     await supabase.storage
       .from("anamnese-dokumente")

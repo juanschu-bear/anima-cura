@@ -23,7 +23,7 @@ import { AlertTriangle,
   Sun,
   Upload,
   Users,
-  Zap, Coins, Banknote } from "lucide-react";
+  Zap, Coins, Banknote, Stethoscope, FileSignature } from "lucide-react";
 import type { AuthenticatedAppUser } from "@/lib/auth";
 import {
   canAccessPath,
@@ -68,6 +68,8 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
     key: "navGroup.practice",
     items: [
       { href: "/patienten", icon: Users, key: "nav.patients" },
+      { href: "/behandlungen", icon: Stethoscope, key: "nav.treatments" },
+      { href: "/animasign", icon: FileSignature, key: "nav.animasign" },
       { href: "/nachrichten", icon: MessageSquare, key: "nav.messages" },
     ],
   },

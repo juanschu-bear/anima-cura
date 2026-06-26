@@ -42,7 +42,7 @@ function hatAlphabetfolge(s: string): boolean {
     const d = t.charCodeAt(i) - t.charCodeAt(i - 1);
     vor = d === 1 ? vor + 1 : 1;
     rueck = d === -1 ? rueck + 1 : 1;
-    if (vor >= 3 || rueck >= 3) return true;
+    if (vor >= 4 || rueck >= 4) return true;
   }
   return false;
 }

@@ -1,62 +1,45 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
-import { isCallAgentAuthorized } from "@/lib/anima-sign/call-agent";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-type CallStatusBody = {
-  submission_id?: string;
-  status?: string;
-  duration_seconds?: number;
-};
-
-const ALLOWED_STATUSES = new Set(["pending", "reached", "not_reached", "failed", "skipped"]);
-
-export async function POST(request: Request) {
-  if (!isCallAgentAuthorized(request)) {
+/**
+ * POST /api/anima-sign/call-status
+ * Called by the Pipecat agent after each call attempt.
+ * Body: { submission_id, status: "reached"|"voicemail"|"not_reached", duration_seconds, transcript? }
+ */
+export async function POST(req: Request) {
+  const token = req.headers.get("x-api-token");
+  if (token !== process.env.CALL_AGENT_TOKEN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as CallStatusBody;
-  const submissionId = typeof body.submission_id === "string" ? body.submission_id.trim() : "";
-  const status = typeof body.status === "string" ? body.status.trim().toLowerCase() : "";
-  const durationSeconds = Number.isFinite(body.duration_seconds)
-    ? Math.max(0, Math.floor(Number(body.duration_seconds)))
-    : 0;
+  const body = await req.json();
+  const { submission_id, status, duration_seconds, transcript } = body;
 
-  if (!submissionId || !status || !ALLOWED_STATUSES.has(status)) {
-    return NextResponse.json({ error: "submission_id oder status ungültig" }, { status: 400 });
+  if (!submission_id || !status) {
+    return NextResponse.json({ error: "submission_id and status required" }, { status: 400 });
   }
 
   const supabase = createServerClient();
 
-  const { data: current, error: loadError } = await supabase
+  const { data: current } = await supabase
     .from("anamnese_submissions")
     .select("call_attempts")
-    .eq("id", submissionId)
+    .eq("id", submission_id)
     .single();
 
-  if (loadError || !current) {
-    return NextResponse.json({ error: loadError?.message ?? "Submission nicht gefunden" }, { status: 404 });
-  }
-
-  const now = new Date().toISOString();
-  const { error: updateError } = await supabase
+  const { error } = await supabase
     .from("anamnese_submissions")
     .update({
       call_status: status,
-      call_attempts: (current.call_attempts ?? 0) + 1,
-      call_attempted_at: now,
-      call_completed_at: now,
-      call_duration_seconds: durationSeconds,
-      updated_at: now,
+      last_call_at: new Date().toISOString(),
+      call_attempts: (current?.call_attempts || 0) + 1,
     })
-    .eq("id", submissionId);
+    .eq("id", submission_id);
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  console.log(`[CallAgent] ${submission_id}: ${status} (${duration_seconds}s)`);
+  return NextResponse.json({ ok: true, status });
 }

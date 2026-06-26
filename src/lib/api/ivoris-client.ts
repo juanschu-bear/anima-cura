@@ -204,3 +204,100 @@ export async function fetchIvorisPatientById(id: string) {
   }
   return payload;
 }
+
+
+// === Ivoris Patient Write Operations ===
+
+export type IvorisPatientInput = {
+  Firstname: string;
+  Lastname: string;
+  Birthday: string;
+  Gender?: string;
+  Email?: string;
+  Phone?: string;
+  Mobile?: string;
+  Address?: {
+    Street?: string;
+    Zip?: string;
+    City?: string;
+    Country?: string;
+  };
+  HealthInsurance?: string;
+  CurrentInsurance?: {
+    InsuranceStatus?: string;
+    InsuranceNumber?: string;
+    validFrom?: string;
+  };
+  mandantIndex?: string;
+};
+
+/** PUT /Patient/v1/Patient — Update an existing patient in Ivoris */
+export async function updateIvorisPatient(
+  ivorisId: string,
+  data: Partial<IvorisPatientInput>
+): Promise<void> {
+  const creds = getIvorisCredentials();
+  const baseUrl = buildBaseUrl(creds.linkname);
+  const url = new URL(`${baseUrl}/Patient/v1/Patient`);
+  withAuthParams(url, creds);
+
+  const body = {
+    patient: {
+      Id: ivorisId,
+      ...data,
+    },
+  };
+
+  const response = await fetch(url.toString(), {
+    method: "PUT",
+    headers: buildHeaders(creds),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const payload = await parseBestEffortResponse(response);
+    throw new Error(
+      `IVORIS UpdatePatient ${ivorisId} fehlgeschlagen (${response.status}): ${formatPayload(payload)}`
+    );
+  }
+}
+
+/** POST /Patient/v1/Patient — Create a new patient in Ivoris. Returns the new ivoris UUID. */
+export async function createIvorisPatient(
+  data: IvorisPatientInput
+): Promise<string> {
+  const creds = getIvorisCredentials();
+  const baseUrl = buildBaseUrl(creds.linkname);
+  const mandantIndex = process.env.IVORIS_MANDANT_INDEX;
+  const url = new URL(`${baseUrl}/Patient/v1/Patient`);
+  withAuthParams(url, creds);
+
+  const body = {
+    patient: {
+      ...data,
+      mandantIndex: data.mandantIndex || mandantIndex || "0",
+    },
+  };
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: buildHeaders(creds),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const payload = await parseBestEffortResponse(response);
+  if (!response.ok) {
+    throw new Error(
+      `IVORIS AddPatient fehlgeschlagen (${response.status}): ${formatPayload(payload)}`
+    );
+  }
+
+  // AddPatient returns the new patient UUID as a string
+  const newId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
+  if (!newId || newId === "null") {
+    throw new Error(`IVORIS AddPatient: keine ID in Antwort: ${formatPayload(payload)}`);
+  }
+  return newId;
+}

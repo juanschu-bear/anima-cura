@@ -145,3 +145,54 @@ export async function fetchIvorisKarteiEintraege(patientIvorisId: string): Promi
 
   return Array.isArray(payload) ? payload : [];
 }
+
+
+// === Document Upload to Ivoris Karteikarte ===
+
+export type IvorisDocumentInput = {
+  patientIvorisId: string;
+  /** Dateiname mit Endung, z.B. "Anamnesebogen_Nachname_2026-06-22.pdf" */
+  name: string;
+  /** ISO-Datum YYYY-MM-DD */
+  date: string;
+  /** PDF als base64-encoded string */
+  contentBase64: string;
+};
+
+/**
+ * Laedt ein Dokument (z.B. signiertes PDF) in die Ivoris-Patientenakte hoch.
+ * POST /Documentation/v1/Document
+ */
+export async function addIvorisDocument(
+  input: IvorisDocumentInput
+): Promise<string> {
+  const creds = getCredentials();
+  const url = buildUrl(creds, "/Documentation/v1/Document");
+
+  const body = {
+    document: {
+      ProfileId: creds.profileId,
+      PatientId: input.patientIvorisId,
+      Name: input.name,
+      Date: input.date,
+      Content: input.contentBase64,
+    },
+  };
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: buildHeaders(creds),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const payload = await parseBestEffort(response);
+  if (!response.ok) {
+    throw new Error(
+      `IVORIS AddDocument fehlgeschlagen (${response.status}): ${typeof payload === "string" ? payload : JSON.stringify(payload)}`
+    );
+  }
+
+  const docId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
+  return docId;
+}
