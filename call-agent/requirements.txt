@@ -1,0 +1,3 @@
+pipecat-ai[daily,deepgram,elevenlabs,anthropic]
+aiohttp
+python-dotenv

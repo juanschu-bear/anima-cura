@@ -41,7 +41,8 @@ async function createPatientAccount(
   vorname: string | null,
   nachname: string | null,
   patientEmail: string | null,
-): Promise<{ login_email: string; password: string } | null> {
+  patientId: string | null,
+): Promise<{ login_email: string; password: string; user_id: string } | null> {
   if (!vorname || !nachname) return null;
 
   const admin = createAdminClient();
@@ -54,25 +55,49 @@ async function createPatientAccount(
       ? base + "@animacura.de"
       : base + (attempt + 1) + "@animacura.de";
 
-    const { error } = await admin.auth.admin.createUser({
+    const { data: authData, error } = await admin.auth.admin.createUser({
       email: loginEmail,
       password: password,
       email_confirm: true,
+      app_metadata: {
+        role: "patient",
+      },
       user_metadata: {
+        display_name: `${vorname} ${nachname}`,
+        full_name: `${vorname} ${nachname}`,
         vorname,
         nachname,
         patient_email: patientEmail,
         role: "patient",
+        patient_id: patientId,
       },
     });
 
-    if (!error) {
-      return { login_email: loginEmail, password };
+    if (!error && authData.user) {
+      const profilePayload = {
+        id: authData.user.id,
+        email: loginEmail,
+        display_name: `${vorname} ${nachname}`,
+        full_name: `${vorname} ${nachname}`,
+        role: "patient",
+        patient_id: patientId,
+      };
+
+      const { error: profileError } = await admin
+        .from("user_profiles")
+        .upsert(profilePayload, { onConflict: "id" });
+
+      if (profileError) {
+        console.error("Patient profile linkage failed:", profileError.message);
+      }
+
+      return { login_email: loginEmail, password, user_id: authData.user.id };
     }
 
     // If error is NOT a duplicate, stop trying
-    if (!error.message?.includes("already") && !error.message?.includes("exists")) {
-      console.error("Account creation failed:", error.message);
+    const errorMessage = error?.message ?? "Unbekannter Fehler";
+    if (!errorMessage.includes("already") && !errorMessage.includes("exists")) {
+      console.error("Account creation failed:", errorMessage);
       return null;
     }
     // Duplicate: try next number
@@ -152,7 +177,18 @@ export async function POST(request: Request) {
     );
 
     // 1c) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const account = await createPatientAccount(vorname, nachname, email);
+    const { data: linkedSubmission } = await supabase
+      .from("anamnese_submissions")
+      .select("patient_id")
+      .eq("id", submissionId)
+      .single();
+
+    const linkedPatientId =
+      typeof linkedSubmission?.patient_id === "string" && UUID_RE.test(linkedSubmission.patient_id)
+        ? linkedSubmission.patient_id
+        : patientId;
+
+    const account = await createPatientAccount(vorname, nachname, email, linkedPatientId);
 
     // 2) PDF beim PDF-Dienst rendern lassen
     const pdfBaseUrl = process.env.ANIMASIGN_PDF_URL;
@@ -290,4 +326,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }
 }
-
