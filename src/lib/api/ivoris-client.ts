@@ -1,4 +1,6 @@
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type IvorisCredentials = {
   app: string;
@@ -57,6 +59,43 @@ function formatPayload(payload: unknown) {
   } catch {
     return String(payload);
   }
+}
+
+function extractIvorisId(payload: unknown): string | null {
+  if (typeof payload === "string") {
+    const candidate = payload.replace(/"/g, "").trim();
+    return UUID_RE.test(candidate) ? candidate : null;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractIvorisId(item);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const directKeys = ["Id", "id", "PatientId", "patientId", "Uuid", "uuid"];
+
+  for (const key of directKeys) {
+    const value = candidate[key];
+    if (typeof value === "string" && UUID_RE.test(value.trim())) {
+      return value.trim();
+    }
+  }
+
+  const nestedKeys = ["patient", "data", "result", "document"];
+  for (const key of nestedKeys) {
+    const nested = extractIvorisId(candidate[key]);
+    if (nested) return nested;
+  }
+
+  return null;
 }
 
 function buildHeaders(creds: IvorisCredentials) {
@@ -311,9 +350,8 @@ export async function createIvorisPatient(
     `[IVORIS] AddPatient response: status=${response.status} payload=${formatPayload(payload)}`
   );
 
-  // AddPatient returns the new patient UUID as a string
-  const newId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
-  if (!newId || newId === "null") {
+  const newId = extractIvorisId(payload);
+  if (!newId) {
     throw new Error(`IVORIS AddPatient: keine ID in Antwort: ${formatPayload(payload)}`);
   }
   return newId;

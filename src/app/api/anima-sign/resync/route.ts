@@ -13,9 +13,13 @@ export async function POST(req: Request) {
 
   const { data: failed } = await supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, signed_pdf_path, ivoris_synced, ivoris_doc_synced")
+    .select("id, vorname, nachname, signed_pdf_path, ivoris_synced, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently")
+    .not("ivoris_sync_failed_permanently", "is", true)
+    .not("ivoris_doc_failed_permanently", "is", true)
     .or("ivoris_synced.eq.false,ivoris_doc_synced.eq.false")
-    .order("created_at", { ascending: true }).limit(limit);
+    .order("ivoris_synced", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(limit);
 
   if (!failed || failed.length === 0) {
     return NextResponse.json({ message: "Keine fehlgeschlagenen Syncs", results: [] });

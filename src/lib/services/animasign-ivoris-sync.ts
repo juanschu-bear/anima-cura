@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import {
   createIvorisPatient,
   fetchIvorisPatientById,
+  fetchIvorisPatientsRaw,
   type IvorisPatientInput,
   updateIvorisPatient,
 } from "@/lib/api/ivoris-client";
@@ -9,6 +10,8 @@ import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
 
 const MAX_SYNC_ATTEMPTS = 3;
 const BASE_BACKOFF_MINUTES = 30;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type DbClient = ReturnType<typeof createServerClient>;
 type SyncStage = "patient" | "document";
@@ -82,6 +85,21 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function normalizeIvorisId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "[object Object]") return null;
+  return UUID_RE.test(trimmed) ? trimmed : null;
+}
+
+function normalizeMatchValue(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function sanitizeFilenamePart(value: string | null | undefined): string {
   return (value ?? "Patient")
     .trim()
@@ -94,6 +112,13 @@ function formatIsoDate(value: string | null | undefined): string {
   if (!value) return new Date().toISOString().slice(0, 10);
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function toIsoDateOrNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
 }
 
@@ -212,6 +237,33 @@ function extractCurrentContacts(payload: unknown): IvorisContactSnapshot {
         }
       : {}),
   };
+}
+
+function extractCandidateBirthday(payload: Record<string, unknown>) {
+  return (
+    asString(payload.Birthday) ??
+    asString(payload.birthDate) ??
+    asString(payload.dateOfBirth) ??
+    asString(payload.dob)
+  );
+}
+
+function extractCandidateFirstname(payload: Record<string, unknown>) {
+  return (
+    asString(payload.Firstname) ??
+    asString(payload.firstname) ??
+    asString(payload.firstName) ??
+    asString(payload.vorname)
+  );
+}
+
+function extractCandidateLastname(payload: Record<string, unknown>) {
+  return (
+    asString(payload.Lastname) ??
+    asString(payload.lastname) ??
+    asString(payload.lastName) ??
+    asString(payload.nachname)
+  );
 }
 
 function sameValue(left: string | undefined, right: string | undefined) {
@@ -416,6 +468,93 @@ async function loadResolvedPatient(
   return (data as PatientRow | null) ?? null;
 }
 
+async function patchSubmissionIvorisPatientId(
+  db: DbClient,
+  submissionId: string,
+  ivorisId: string
+) {
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update({ ivoris_patient_id: ivorisId })
+    .eq("id", submissionId);
+
+  if (error) {
+    console.error("[ANIMASIGN][IVORIS] failed to patch submission ivoris_patient_id:", error.message);
+  }
+}
+
+async function recoverIvorisPatientIdFromDirectory(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<string | null> {
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+
+  if (!firstname || !lastname || !birthday) {
+    return null;
+  }
+
+  const payload = await fetchIvorisPatientsRaw();
+  const candidates = (Array.isArray(payload) ? payload : []).filter((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const candidate = entry as Record<string, unknown>;
+    return (
+      normalizeIvorisId(candidate.Id) &&
+      normalizeMatchValue(extractCandidateFirstname(candidate)) === firstname &&
+      normalizeMatchValue(extractCandidateLastname(candidate)) === lastname &&
+      toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday
+    );
+  }) as Array<Record<string, unknown>>;
+
+  if (candidates.length !== 1) {
+    console.warn(
+      `[ANIMASIGN][IVORIS] directory recovery for submission=${submission.id} found ${candidates.length} candidates`
+    );
+    return null;
+  }
+
+  const recoveredId = normalizeIvorisId(candidates[0].Id);
+  if (!recoveredId) {
+    return null;
+  }
+
+  console.log(
+    `[ANIMASIGN][IVORIS] recovered patientId=${recoveredId} from directory for submission=${submission.id}`
+  );
+  await patchSubmissionIvorisPatientId(db, submission.id, recoveredId);
+  return recoveredId;
+}
+
+async function resolveSubmissionPatientIvorisId(
+  db: DbClient,
+  submission: SubmissionRow,
+  preferredPatientIvorisId?: string | null
+): Promise<string | null> {
+  const preferred = normalizeIvorisId(preferredPatientIvorisId);
+  if (preferred) return preferred;
+
+  const resolvedPatient = await loadResolvedPatient(db, submission);
+  const localPatientId = normalizeIvorisId(resolvedPatient?.ivoris_id);
+  if (localPatientId) {
+    await patchSubmissionIvorisPatientId(db, submission.id, localPatientId);
+    return localPatientId;
+  }
+
+  const submissionPatientId = normalizeIvorisId(submission.ivoris_patient_id);
+  if (submissionPatientId) {
+    return submissionPatientId;
+  }
+
+  if (submission.ivoris_patient_id) {
+    console.warn(
+      `[ANIMASIGN][IVORIS] invalid stored ivoris_patient_id for submission=${submission.id}: ${submission.ivoris_patient_id}`
+    );
+  }
+
+  return recoverIvorisPatientIdFromDirectory(db, submission);
+}
+
 async function syncExistingPatient(
   db: DbClient,
   submission: SubmissionRow
@@ -474,6 +613,7 @@ async function syncNewPatient(
     }
   }
 
+  await patchSubmissionIvorisPatientId(db, submission.id, ivorisId);
   return { status: "success", ivorisId, requestPayload: payload };
 }
 
@@ -519,11 +659,7 @@ async function syncDocumentStage(
   const attemptNo = (await fetchAttemptNumber(db, submission.id, "document")) + 1;
 
   try {
-    const patient =
-      preferredPatientIvorisId ||
-      (await loadResolvedPatient(db, submission))?.ivoris_id ||
-      submission.ivoris_patient_id ||
-      null;
+    const patient = await resolveSubmissionPatientIvorisId(db, submission, preferredPatientIvorisId);
 
     if (!patient) {
       throw new Error("Dokument-Sync ohne gueltige ivoris PatientId nicht moeglich");
@@ -538,10 +674,17 @@ async function syncDocumentStage(
       throw new Error(`PDF konnte nicht geladen werden: ${fileError?.message ?? pdfPath}`);
     }
 
-    const pdfBuffer = Buffer.from(await fileData.arrayBuffer());
-    const base64 = pdfBuffer.toString("base64");
+    const fileBuffer = await fileData.arrayBuffer();
+    const fileBytes = new Uint8Array(fileBuffer);
+    const base64 = Buffer.from(fileBytes).toString("base64");
     const docDate = formatIsoDate(submission.signiert_am ?? submission.created_at);
     const docName = `Anamnesebogen_${sanitizeFilenamePart(submission.nachname)}_${docDate}.pdf`;
+
+    console.log(
+      `[ANIMASIGN][IVORIS] doc sync submission=${submission.id} patient=${patient} blobType=${
+        fileData.constructor?.name ?? typeof fileData
+      } bytes=${fileBytes.byteLength} base64Type=${typeof base64} base64Length=${base64.length}`
+    );
 
     const documentId = await addIvorisDocument({
       patientIvorisId: patient,
@@ -556,6 +699,8 @@ async function syncDocumentStage(
         name: docName,
         date: docDate,
         pdfPath,
+        fileBytes: fileBytes.byteLength,
+        base64Length: base64.length,
       },
       responsePayload: { documentId },
     });

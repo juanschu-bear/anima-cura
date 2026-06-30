@@ -3,6 +3,8 @@
 // Benoetigt zusaetzlich zur bestehenden IVORIS_*-Konfiguration: IVORIS_PROFILE_ID (Mandant).
 
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type IvorisDokuCredentials = {
   app: string;
@@ -62,6 +64,61 @@ async function parseBestEffort(response: Response): Promise<unknown> {
   }
 }
 
+function assertNonEmptyString(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`IVORIS ${field} ungueltig: erwartete nicht-leeren String`);
+  }
+  return value.trim();
+}
+
+function normalizePatientIvorisId(value: unknown): string {
+  const patientId = assertNonEmptyString(value, "PatientId");
+  if (patientId === "[object Object]" || !UUID_RE.test(patientId)) {
+    throw new Error(`IVORIS PatientId ungueltig: ${patientId}`);
+  }
+  return patientId;
+}
+
+function extractResponseId(payload: unknown, keys: string[]): string | null {
+  if (typeof payload === "string") {
+    const direct = payload.replace(/"/g, "").trim();
+    return direct || null;
+  }
+
+  if (typeof payload === "number" || typeof payload === "bigint") {
+    return String(payload);
+  }
+
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      const nested = extractResponseId(entry, keys);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = candidate[key];
+    if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
+      const direct = String(value).trim();
+      if (direct) return direct;
+    }
+  }
+
+  for (const nestedKey of ["entry", "document", "data", "result"]) {
+    const nested = extractResponseId(candidate[nestedKey], keys);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
 export type IvorisKarteiEintragInput = {
   patientIvorisId: string;
   /** ISO-Datum YYYY-MM-DD */
@@ -115,7 +172,7 @@ export async function addIvorisKarteiEintrag(
   }
 
   // AddEntry liefert die Entry-Id als nackten JSON-String zurueck (verifiziert am 2026-06-10).
-  const entryId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
+  const entryId = extractResponseId(payload, ["EntryId", "entryId", "Id", "id"]);
   if (!entryId || entryId === "null") {
     throw new Error(`IVORIS AddEntry: keine Entry-Id in der Antwort: ${JSON.stringify(payload)}`);
   }
@@ -168,15 +225,13 @@ export async function addIvorisDocument(
 ): Promise<string> {
   const creds = getCredentials();
   const url = buildUrl(creds, "/Documentation/v1/Document");
-  const content =
-    typeof input.contentBase64 === "string"
-      ? input.contentBase64
-      : String(input.contentBase64);
+  const patientId = normalizePatientIvorisId(input.patientIvorisId);
+  const content = assertNonEmptyString(input.contentBase64, "Document.Content");
 
   const body = {
     document: {
       ProfileId: creds.profileId,
-      PatientId: input.patientIvorisId,
+      PatientId: patientId,
       Name: input.name,
       Date: input.date,
       Content: content,
@@ -201,7 +256,7 @@ export async function addIvorisDocument(
   });
 
   console.log(
-    `[IVORIS] AddDocument request patient=${input.patientIvorisId}: ${JSON.stringify({
+    `[IVORIS] AddDocument request patient=${patientId}: ${JSON.stringify({
       document: {
         ...body.document,
         Content: `<base64:${content.length} chars; type=${typeof parsedRequestBody.document?.Content}>`,
@@ -211,7 +266,7 @@ export async function addIvorisDocument(
   const payload = await parseBestEffort(response);
   if (!response.ok) {
     console.error(
-      `[IVORIS] AddDocument response patient=${input.patientIvorisId}: status=${response.status} payload=${
+      `[IVORIS] AddDocument response patient=${patientId}: status=${response.status} payload=${
         typeof payload === "string" ? payload : JSON.stringify(payload)
       }`
     );
@@ -221,11 +276,14 @@ export async function addIvorisDocument(
   }
 
   console.log(
-    `[IVORIS] AddDocument response patient=${input.patientIvorisId}: status=${response.status} payload=${
+    `[IVORIS] AddDocument response patient=${patientId}: status=${response.status} payload=${
       typeof payload === "string" ? payload : JSON.stringify(payload)
     }`
   );
 
-  const docId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
+  const docId = extractResponseId(payload, ["DocumentId", "documentId", "Id", "id"]);
+  if (!docId || docId === "null") {
+    throw new Error(`IVORIS AddDocument: keine Dokument-Id in der Antwort: ${JSON.stringify(payload)}`);
+  }
   return docId;
 }
