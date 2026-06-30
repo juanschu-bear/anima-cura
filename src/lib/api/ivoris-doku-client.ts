@@ -168,6 +168,10 @@ export async function addIvorisDocument(
 ): Promise<string> {
   const creds = getCredentials();
   const url = buildUrl(creds, "/Documentation/v1/Document");
+  const content =
+    typeof input.contentBase64 === "string"
+      ? input.contentBase64
+      : String(input.contentBase64);
 
   const body = {
     document: {
@@ -175,14 +179,24 @@ export async function addIvorisDocument(
       PatientId: input.patientIvorisId,
       Name: input.name,
       Date: input.date,
-      Content: input.contentBase64,
+      Content: content,
     },
   };
+  const requestBody = JSON.stringify(body);
+  const parsedRequestBody = JSON.parse(requestBody) as {
+    document?: { Content?: unknown };
+  };
+
+  if (typeof parsedRequestBody.document?.Content !== "string") {
+    throw new Error(
+      `IVORIS AddDocument Request ungueltig: Content ist kein String (${typeof parsedRequestBody.document?.Content})`
+    );
+  }
 
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: buildHeaders(creds),
-    body: JSON.stringify(body),
+    body: requestBody,
     cache: "no-store",
   });
 
@@ -190,7 +204,7 @@ export async function addIvorisDocument(
     `[IVORIS] AddDocument request patient=${input.patientIvorisId}: ${JSON.stringify({
       document: {
         ...body.document,
-        Content: `<base64:${input.contentBase64.length} chars>`,
+        Content: `<base64:${content.length} chars; type=${typeof parsedRequestBody.document?.Content}>`,
       },
     })}`
   );
