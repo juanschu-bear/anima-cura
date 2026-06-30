@@ -48,12 +48,6 @@ type PatientRow = {
   ivoris_id: string | null;
 };
 
-type IvorisIdentity = {
-  Firstname: string;
-  Lastname: string;
-  Birthday: string;
-};
-
 type IvorisContactSnapshot = {
   Email?: string;
   Phone?: string;
@@ -111,6 +105,30 @@ function normalizeMatchValue(value: string | null | undefined) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeEmailValue(value: unknown): string | null {
+  const email = asString(value);
+  return email ? email.toLowerCase() : null;
+}
+
+function normalizePhoneValue(value: unknown): string | null {
+  const raw = asString(value);
+  if (!raw) return null;
+
+  const compact = raw.replace(/\s+/g, "");
+  if (compact.startsWith("+")) {
+    const digits = compact.slice(1).replace(/\D/g, "");
+    return digits ? `+${digits}` : null;
+  }
+
+  const digits = compact.replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("00") && digits.length > 2) {
+    return `+${digits.slice(2)}`;
+  }
+
+  return digits;
 }
 
 function sanitizeFilenamePart(value: string | null | undefined): string {
@@ -207,25 +225,6 @@ function extractPatientPayload(payload: unknown): Record<string, unknown> {
   return {};
 }
 
-function extractIdentity(payload: unknown): IvorisIdentity {
-  const patient = extractPatientPayload(payload);
-  const firstname = asString(patient.Firstname);
-  const lastname = asString(patient.Lastname);
-  const birthday = asString(patient.Birthday);
-
-  if (!firstname || !lastname || !birthday) {
-    throw new Error(
-      `IVORIS GetPatient lieferte keine stabilen Identitaetsfelder: ${JSON.stringify(patient)}`
-    );
-  }
-
-  return {
-    Firstname: firstname,
-    Lastname: lastname,
-    Birthday: birthday,
-  };
-}
-
 function extractCurrentContacts(payload: unknown): IvorisContactSnapshot {
   const patient = extractPatientPayload(payload);
   const address =
@@ -279,8 +278,43 @@ function extractCandidateLastname(payload: Record<string, unknown>) {
   );
 }
 
+function extractCandidateEmail(payload: Record<string, unknown>) {
+  return (
+    normalizeEmailValue(payload.Email) ??
+    normalizeEmailValue(payload.email) ??
+    normalizeEmailValue(payload.mail)
+  );
+}
+
+function extractCandidatePhones(payload: Record<string, unknown>) {
+  const values = [
+    normalizePhoneValue(payload.Phone),
+    normalizePhoneValue(payload.Mobile),
+    normalizePhoneValue(payload.telefon),
+    normalizePhoneValue(payload.phone),
+    normalizePhoneValue(payload.mobile),
+    normalizePhoneValue(payload.tel),
+  ].filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(values));
+}
+
+function extractSubmissionPhoneCandidates(submission: SubmissionRow) {
+  const answers = submission.answers ?? {};
+  const values = [
+    normalizePhoneValue(answers.patient_telefon),
+    normalizePhoneValue(answers.patient_mobil),
+  ].filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(values));
+}
+
 function sameValue(left: string | undefined, right: string | undefined) {
   return (left ?? "").trim() === (right ?? "").trim();
+}
+
+function samePhoneValue(left: string | undefined, right: string | undefined) {
+  return normalizePhoneValue(left) === normalizePhoneValue(right);
 }
 
 function sameAddress(
@@ -296,23 +330,22 @@ function sameAddress(
 }
 
 function buildSingleFieldOperations(
-  identity: IvorisIdentity,
   nextData: Partial<IvorisPatientInput>,
   currentData: IvorisContactSnapshot
 ) {
   const operations: Array<Partial<IvorisPatientInput>> = [];
 
   if (nextData.Email && !sameValue(nextData.Email, currentData.Email)) {
-    operations.push({ ...identity, Email: nextData.Email });
+    operations.push({ Email: nextData.Email });
   }
-  if (nextData.Phone && !sameValue(nextData.Phone, currentData.Phone)) {
-    operations.push({ ...identity, Phone: nextData.Phone });
+  if (nextData.Phone && !samePhoneValue(nextData.Phone, currentData.Phone)) {
+    operations.push({ Phone: nextData.Phone });
   }
-  if (nextData.Mobile && !sameValue(nextData.Mobile, currentData.Mobile)) {
-    operations.push({ ...identity, Mobile: nextData.Mobile });
+  if (nextData.Mobile && !samePhoneValue(nextData.Mobile, currentData.Mobile)) {
+    operations.push({ Mobile: nextData.Mobile });
   }
   if (nextData.Address && !sameAddress(nextData.Address, currentData.Address)) {
-    operations.push({ ...identity, Address: nextData.Address });
+    operations.push({ Address: nextData.Address });
   }
 
   return operations;
@@ -483,40 +516,72 @@ async function recoverIvorisPatientIdFromDirectory(
   const firstname = normalizeMatchValue(submission.vorname);
   const lastname = normalizeMatchValue(submission.nachname);
   const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  const email = normalizeEmailValue(submission.email);
+  const phoneCandidates = extractSubmissionPhoneCandidates(submission);
 
-  if (!firstname || !lastname || !birthday) {
+  if (!birthday) {
     return null;
   }
 
   const payload = await fetchIvorisPatientsRaw();
-  const candidates = (Array.isArray(payload) ? payload : []).filter((entry) => {
-    if (!entry || typeof entry !== "object") return false;
-    const candidate = entry as Record<string, unknown>;
-    return (
-      normalizeIvorisId(candidate.Id) &&
-      normalizeMatchValue(extractCandidateFirstname(candidate)) === firstname &&
-      normalizeMatchValue(extractCandidateLastname(candidate)) === lastname &&
-      toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday
-    );
-  }) as Array<Record<string, unknown>>;
-
-  if (candidates.length !== 1) {
-    console.warn(
-      `[ANIMASIGN][IVORIS] directory recovery for submission=${submission.id} found ${candidates.length} candidates`
-    );
-    return null;
-  }
-
-  const recoveredId = normalizeIvorisId(candidates[0].Id);
-  if (!recoveredId) {
-    return null;
-  }
-
-  console.log(
-    `[ANIMASIGN][IVORIS] recovered patientId=${recoveredId} from directory for submission=${submission.id}`
+  const directory = (Array.isArray(payload) ? payload : []).filter(
+    (entry): entry is Record<string, unknown> =>
+      Boolean(entry && typeof entry === "object" && normalizeIvorisId((entry as Record<string, unknown>).Id))
   );
-  await patchSubmissionIvorisPatientId(db, submission.id, recoveredId);
-  return recoveredId;
+
+  const strategies = [
+    {
+      label: "name+birthday",
+      enabled: Boolean(firstname && lastname),
+      matches: (candidate: Record<string, unknown>) =>
+        normalizeMatchValue(extractCandidateFirstname(candidate)) === firstname &&
+        normalizeMatchValue(extractCandidateLastname(candidate)) === lastname &&
+        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
+    },
+    {
+      label: "email+birthday",
+      enabled: Boolean(email),
+      matches: (candidate: Record<string, unknown>) =>
+        extractCandidateEmail(candidate) === email &&
+        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
+    },
+    {
+      label: "phone+birthday",
+      enabled: phoneCandidates.length > 0,
+      matches: (candidate: Record<string, unknown>) =>
+        extractCandidatePhones(candidate).some((phone) => phoneCandidates.includes(phone)) &&
+        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
+    },
+  ];
+
+  for (const strategy of strategies) {
+    if (!strategy.enabled) continue;
+
+    const matches = directory.filter(strategy.matches);
+    console.log(
+      `[ANIMASIGN][IVORIS] directory recovery submission=${submission.id} strategy=${strategy.label} candidates=${matches.length}`
+    );
+
+    if (matches.length !== 1) {
+      continue;
+    }
+
+    const recoveredId = normalizeIvorisId(matches[0].Id);
+    if (!recoveredId) {
+      continue;
+    }
+
+    console.log(
+      `[ANIMASIGN][IVORIS] recovered patientId=${recoveredId} from directory for submission=${submission.id} strategy=${strategy.label}`
+    );
+    await patchSubmissionIvorisPatientId(db, submission.id, recoveredId);
+    return recoveredId;
+  }
+
+  console.warn(
+    `[ANIMASIGN][IVORIS] directory recovery failed for submission=${submission.id} name=${submission.vorname ?? ""} ${submission.nachname ?? ""} birthday=${birthday} email=${email ?? "-"} phones=${phoneCandidates.join(",") || "-"}`
+  );
+  return null;
 }
 
 async function resolveSubmissionPatientIvorisId(
@@ -558,10 +623,9 @@ async function syncExistingPatient(
   }
 
   const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
-  const identity = extractIdentity(currentPatient);
   const currentContacts = extractCurrentContacts(currentPatient);
   const requestedContacts = buildContactUpdate(submission);
-  const operations = buildSingleFieldOperations(identity, requestedContacts, currentContacts);
+  const operations = buildSingleFieldOperations(requestedContacts, currentContacts);
 
   if (operations.length === 0) {
     console.log(
