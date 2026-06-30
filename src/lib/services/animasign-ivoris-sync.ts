@@ -1,0 +1,697 @@
+import { createServerClient } from "@/lib/db/supabase";
+import {
+  createIvorisPatient,
+  fetchIvorisPatientById,
+  type IvorisPatientInput,
+  updateIvorisPatient,
+} from "@/lib/api/ivoris-client";
+import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
+
+const MAX_SYNC_ATTEMPTS = 3;
+const BASE_BACKOFF_MINUTES = 30;
+
+type DbClient = ReturnType<typeof createServerClient>;
+type SyncStage = "patient" | "document";
+type SyncStatus = "success" | "error" | "skipped";
+
+type SubmissionRow = {
+  id: string;
+  patient_id: string | null;
+  matched_patient_id: string | null;
+  is_existing: boolean | null;
+  vorname: string | null;
+  nachname: string | null;
+  email: string | null;
+  geburtsdatum: string | null;
+  answers: Record<string, unknown> | null;
+  signed_pdf_path: string | null;
+  signiert_am: string | null;
+  created_at: string;
+  ivoris_synced: boolean | null;
+  ivoris_doc_synced: boolean | null;
+  ivoris_sync_error: string | null;
+  ivoris_patient_id?: string | null;
+  ivoris_document_id?: string | null;
+  ivoris_sync_retry_count?: number | null;
+  ivoris_doc_retry_count?: number | null;
+  ivoris_sync_next_retry_at?: string | null;
+  ivoris_doc_next_retry_at?: string | null;
+  ivoris_sync_failed_permanently?: boolean | null;
+  ivoris_doc_failed_permanently?: boolean | null;
+};
+
+type PatientRow = {
+  id: string;
+  ivoris_id: string | null;
+};
+
+type IvorisIdentity = {
+  Firstname: string;
+  Lastname: string;
+  Birthday: string;
+};
+
+type IvorisContactSnapshot = {
+  Email?: string;
+  Phone?: string;
+  Mobile?: string;
+  Address?: {
+    Street?: string;
+    Zip?: string;
+    City?: string;
+    Country?: string;
+  };
+};
+
+type SyncAttemptContext = {
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  metadata?: Record<string, unknown>;
+};
+
+export type SubmissionSyncResult = {
+  submissionId: string;
+  patient: SyncStatus;
+  document: SyncStatus;
+  patientIvorisId?: string | null;
+  documentId?: string | null;
+  errors: string[];
+};
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function sanitizeFilenamePart(value: string | null | undefined): string {
+  return (value ?? "Patient")
+    .trim()
+    .replace(/[^A-Za-z0-9\u00C0-\u017F_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "") || "Patient";
+}
+
+function formatIsoDate(value: string | null | undefined): string {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function buildAddress(answers: Record<string, unknown> | null | undefined) {
+  if (!answers) return undefined;
+
+  const street = [answers.patient_strasse, answers.patient_hausnummer]
+    .map(asString)
+    .filter(Boolean)
+    .join(" ");
+  const zip = asString(answers.patient_plz);
+  const city = asString(answers.patient_wohnort);
+  const country = "D";
+
+  if (!street && !zip && !city) {
+    return undefined;
+  }
+
+  return {
+    ...(street ? { Street: street } : {}),
+    ...(zip ? { Zip: zip } : {}),
+    ...(city ? { City: city } : {}),
+    Country: country,
+  };
+}
+
+function buildContactUpdate(submission: SubmissionRow): Partial<IvorisPatientInput> {
+  const answers = submission.answers ?? {};
+  const email = asString(submission.email);
+  const phone = asString(answers.patient_telefon);
+  const mobile = asString(answers.patient_mobil);
+  const address = buildAddress(answers);
+
+  return {
+    ...(email ? { Email: email } : {}),
+    ...(phone ? { Phone: phone } : {}),
+    ...(mobile ? { Mobile: mobile } : {}),
+    ...(address ? { Address: address } : {}),
+  };
+}
+
+function buildCreateInput(submission: SubmissionRow): IvorisPatientInput {
+  const answers = submission.answers ?? {};
+
+  return {
+    Firstname: submission.vorname ?? "",
+    Lastname: submission.nachname ?? "",
+    Birthday: submission.geburtsdatum ?? "",
+    Email: submission.email ?? "",
+    Phone: asString(answers.patient_telefon) ?? "",
+    Mobile: asString(answers.patient_mobil) ?? "",
+    Address: {
+      Street:
+        [answers.patient_strasse, answers.patient_hausnummer]
+          .map(asString)
+          .filter(Boolean)
+          .join(" ") || "",
+      Zip: asString(answers.patient_plz) ?? "",
+      City: asString(answers.patient_wohnort) ?? "",
+      Country: "D",
+    },
+  };
+}
+
+function extractPatientPayload(payload: unknown): Record<string, unknown> {
+  if (payload && typeof payload === "object") {
+    const candidate = payload as Record<string, unknown>;
+    if (candidate.patient && typeof candidate.patient === "object") {
+      return candidate.patient as Record<string, unknown>;
+    }
+    return candidate;
+  }
+  return {};
+}
+
+function extractIdentity(payload: unknown): IvorisIdentity {
+  const patient = extractPatientPayload(payload);
+  const firstname = asString(patient.Firstname);
+  const lastname = asString(patient.Lastname);
+  const birthday = asString(patient.Birthday);
+
+  if (!firstname || !lastname || !birthday) {
+    throw new Error(
+      `IVORIS GetPatient lieferte keine stabilen Identitaetsfelder: ${JSON.stringify(patient)}`
+    );
+  }
+
+  return {
+    Firstname: firstname,
+    Lastname: lastname,
+    Birthday: birthday,
+  };
+}
+
+function extractCurrentContacts(payload: unknown): IvorisContactSnapshot {
+  const patient = extractPatientPayload(payload);
+  const address =
+    patient.Address && typeof patient.Address === "object"
+      ? (patient.Address as Record<string, unknown>)
+      : null;
+
+  return {
+    ...(asString(patient.Email) ? { Email: asString(patient.Email) ?? undefined } : {}),
+    ...(asString(patient.Phone) ? { Phone: asString(patient.Phone) ?? undefined } : {}),
+    ...(asString(patient.Mobile) ? { Mobile: asString(patient.Mobile) ?? undefined } : {}),
+    ...(address
+      ? {
+          Address: {
+            ...(asString(address.Street) ? { Street: asString(address.Street) ?? undefined } : {}),
+            ...(asString(address.Zip) ? { Zip: asString(address.Zip) ?? undefined } : {}),
+            ...(asString(address.City) ? { City: asString(address.City) ?? undefined } : {}),
+            ...(asString(address.Country)
+              ? { Country: asString(address.Country) ?? undefined }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+function sameValue(left: string | undefined, right: string | undefined) {
+  return (left ?? "").trim() === (right ?? "").trim();
+}
+
+function sameAddress(
+  left: IvorisContactSnapshot["Address"] | undefined,
+  right: IvorisContactSnapshot["Address"] | undefined
+) {
+  return (
+    sameValue(left?.Street, right?.Street) &&
+    sameValue(left?.Zip, right?.Zip) &&
+    sameValue(left?.City, right?.City) &&
+    sameValue(left?.Country, right?.Country)
+  );
+}
+
+function buildSingleFieldOperations(
+  identity: IvorisIdentity,
+  nextData: Partial<IvorisPatientInput>,
+  currentData: IvorisContactSnapshot
+) {
+  const operations: Array<Partial<IvorisPatientInput>> = [];
+
+  if (nextData.Email && !sameValue(nextData.Email, currentData.Email)) {
+    operations.push({ ...identity, Email: nextData.Email });
+  }
+  if (nextData.Phone && !sameValue(nextData.Phone, currentData.Phone)) {
+    operations.push({ ...identity, Phone: nextData.Phone });
+  }
+  if (nextData.Mobile && !sameValue(nextData.Mobile, currentData.Mobile)) {
+    operations.push({ ...identity, Mobile: nextData.Mobile });
+  }
+  if (nextData.Address && !sameAddress(nextData.Address, currentData.Address)) {
+    operations.push({ ...identity, Address: nextData.Address });
+  }
+
+  return operations;
+}
+
+function retryColumn(stage: SyncStage) {
+  return stage === "patient" ? "ivoris_sync_retry_count" : "ivoris_doc_retry_count";
+}
+
+function nextRetryColumn(stage: SyncStage) {
+  return stage === "patient"
+    ? "ivoris_sync_next_retry_at"
+    : "ivoris_doc_next_retry_at";
+}
+
+function permanentFailureColumn(stage: SyncStage) {
+  return stage === "patient"
+    ? "ivoris_sync_failed_permanently"
+    : "ivoris_doc_failed_permanently";
+}
+
+function syncedColumn(stage: SyncStage) {
+  return stage === "patient" ? "ivoris_synced" : "ivoris_doc_synced";
+}
+
+function computeNextRetryAt(attemptNo: number) {
+  const minutes = BASE_BACKOFF_MINUTES * Math.pow(2, Math.max(0, attemptNo - 1));
+  return new Date(Date.now() + minutes * 60_000).toISOString();
+}
+
+async function fetchAttemptNumber(
+  db: DbClient,
+  submissionId: string,
+  stage: SyncStage
+): Promise<number> {
+  const { data, error } = await db
+    .from("animasign_sync_log")
+    .select("attempt_no")
+    .eq("submission_id", submissionId)
+    .eq("stage", stage)
+    .order("attempt_no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[ANIMASIGN][SYNC] attempt lookup failed:", error.message);
+    return 0;
+  }
+
+  return typeof data?.attempt_no === "number" ? data.attempt_no : 0;
+}
+
+async function writeSyncLog(
+  db: DbClient,
+  submissionId: string,
+  stage: SyncStage,
+  attemptNo: number,
+  status: SyncStatus,
+  errorText: string | null,
+  context: SyncAttemptContext = {}
+) {
+  const { error } = await db.from("animasign_sync_log").insert({
+    submission_id: submissionId,
+    stage,
+    attempt_no: attemptNo,
+    status,
+    error_text: errorText,
+    request_payload: context.requestPayload ?? null,
+    response_payload: context.responsePayload ?? null,
+    metadata: context.metadata ?? null,
+  });
+
+  if (error) {
+    console.error("[ANIMASIGN][SYNC] log insert failed:", error.message);
+  }
+}
+
+async function markStageSuccess(
+  db: DbClient,
+  submissionId: string,
+  stage: SyncStage,
+  attemptNo: number,
+  patch: Record<string, unknown> = {}
+) {
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update({
+      [syncedColumn(stage)]: true,
+      [retryColumn(stage)]: attemptNo,
+      [nextRetryColumn(stage)]: null,
+      [permanentFailureColumn(stage)]: false,
+      ivoris_sync_error: null,
+      ...patch,
+    })
+    .eq("id", submissionId);
+
+  if (error) {
+    console.error("[ANIMASIGN][SYNC] success update failed:", error.message);
+  }
+}
+
+async function markStageFailure(
+  db: DbClient,
+  submissionId: string,
+  stage: SyncStage,
+  attemptNo: number,
+  errorText: string
+) {
+  const permanentFailure = attemptNo >= MAX_SYNC_ATTEMPTS;
+  const patch = {
+    [syncedColumn(stage)]: false,
+    [retryColumn(stage)]: attemptNo,
+    [nextRetryColumn(stage)]: permanentFailure ? null : computeNextRetryAt(attemptNo),
+    [permanentFailureColumn(stage)]: permanentFailure,
+    ivoris_sync_error: errorText,
+  };
+
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update(patch)
+    .eq("id", submissionId);
+
+  if (error) {
+    console.error("[ANIMASIGN][SYNC] failure update failed:", error.message);
+  }
+}
+
+async function loadSubmission(
+  db: DbClient,
+  submissionId: string
+): Promise<SubmissionRow> {
+  const { data, error } = await db
+    .from("anamnese_submissions")
+    .select(
+      "id, patient_id, matched_patient_id, is_existing, vorname, nachname, email, geburtsdatum, answers, signed_pdf_path, signiert_am, created_at, ivoris_synced, ivoris_doc_synced, ivoris_sync_error, ivoris_patient_id, ivoris_document_id, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently"
+    )
+    .eq("id", submissionId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      `Submission ${submissionId} konnte nicht geladen werden: ${error?.message ?? "unbekannt"}`
+    );
+  }
+
+  return data as SubmissionRow;
+}
+
+async function loadResolvedPatient(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<PatientRow | null> {
+  const resolvedPatientId = submission.matched_patient_id ?? submission.patient_id;
+  if (!resolvedPatientId) return null;
+
+  const { data, error } = await db
+    .from("patients")
+    .select("id, ivoris_id")
+    .eq("id", resolvedPatientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Patient ${resolvedPatientId} konnte nicht geladen werden: ${error.message}`);
+  }
+
+  return (data as PatientRow | null) ?? null;
+}
+
+async function syncExistingPatient(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<{ status: SyncStatus; ivorisId: string | null; metadata?: Record<string, unknown> }> {
+  const patient = await loadResolvedPatient(db, submission);
+  if (!patient?.ivoris_id) {
+    throw new Error("Bestandspatient hat keine gueltige ivoris_id");
+  }
+
+  const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
+  const identity = extractIdentity(currentPatient);
+  const currentContacts = extractCurrentContacts(currentPatient);
+  const requestedContacts = buildContactUpdate(submission);
+  const operations = buildSingleFieldOperations(identity, requestedContacts, currentContacts);
+
+  if (operations.length === 0) {
+    console.log(
+      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} no contact delta`
+    );
+    return { status: "skipped", ivorisId: patient.ivoris_id, metadata: { operations: 0 } };
+  }
+
+  console.log(
+    `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} operations=${JSON.stringify(
+      operations
+    )}`
+  );
+
+  for (const operation of operations) {
+    await updateIvorisPatient(patient.ivoris_id, operation);
+  }
+
+  return {
+    status: "success",
+    ivorisId: patient.ivoris_id,
+    metadata: { operations: operations.length },
+  };
+}
+
+async function syncNewPatient(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<{ status: SyncStatus; ivorisId: string | null; requestPayload: IvorisPatientInput }> {
+  const payload = buildCreateInput(submission);
+  const ivorisId = await createIvorisPatient(payload);
+  const resolvedPatientId = submission.matched_patient_id ?? submission.patient_id;
+
+  if (resolvedPatientId) {
+    const { error } = await db
+      .from("patients")
+      .update({ ivoris_id: ivorisId })
+      .eq("id", resolvedPatientId);
+
+    if (error) {
+      throw new Error(`Lokaler Patient konnte nicht mit ivoris_id verknuepft werden: ${error.message}`);
+    }
+  }
+
+  return { status: "success", ivorisId, requestPayload: payload };
+}
+
+async function syncPatientStage(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<{ status: SyncStatus; ivorisId: string | null }> {
+  const attemptNo = (await fetchAttemptNumber(db, submission.id, "patient")) + 1;
+
+  try {
+    const result =
+      submission.is_existing === true
+        ? await syncExistingPatient(db, submission)
+        : await syncNewPatient(db, submission);
+
+    await writeSyncLog(db, submission.id, "patient", attemptNo, result.status, null, {
+      requestPayload:
+        "requestPayload" in result
+          ? result.requestPayload
+          : { mode: submission.is_existing ? "existing" : "create" },
+      metadata: "metadata" in result ? result.metadata : undefined,
+      responsePayload: result.ivorisId ? { ivorisId: result.ivorisId } : null,
+    });
+
+    await markStageSuccess(db, submission.id, "patient", attemptNo, {
+      ivoris_patient_id: result.ivorisId,
+    });
+
+    return { status: result.status, ivorisId: result.ivorisId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await writeSyncLog(db, submission.id, "patient", attemptNo, "error", message);
+    await markStageFailure(db, submission.id, "patient", attemptNo, message);
+    throw error;
+  }
+}
+
+async function syncDocumentStage(
+  db: DbClient,
+  submission: SubmissionRow,
+  preferredPatientIvorisId?: string | null
+): Promise<{ status: SyncStatus; documentId: string | null }> {
+  const attemptNo = (await fetchAttemptNumber(db, submission.id, "document")) + 1;
+
+  try {
+    const patient =
+      preferredPatientIvorisId ||
+      (await loadResolvedPatient(db, submission))?.ivoris_id ||
+      submission.ivoris_patient_id ||
+      null;
+
+    if (!patient) {
+      throw new Error("Dokument-Sync ohne gueltige ivoris PatientId nicht moeglich");
+    }
+
+    const pdfPath = submission.signed_pdf_path ?? `${submission.id}/Anamnesebogen.pdf`;
+    const { data: fileData, error: fileError } = await db.storage
+      .from("anamnese-dokumente")
+      .download(pdfPath);
+
+    if (fileError || !fileData) {
+      throw new Error(`PDF konnte nicht geladen werden: ${fileError?.message ?? pdfPath}`);
+    }
+
+    const pdfBuffer = Buffer.from(await fileData.arrayBuffer());
+    const base64 = pdfBuffer.toString("base64");
+    const docDate = formatIsoDate(submission.signiert_am ?? submission.created_at);
+    const docName = `Anamnesebogen_${sanitizeFilenamePart(submission.nachname)}_${docDate}.pdf`;
+
+    const documentId = await addIvorisDocument({
+      patientIvorisId: patient,
+      name: docName,
+      date: docDate,
+      contentBase64: base64,
+    });
+
+    await writeSyncLog(db, submission.id, "document", attemptNo, "success", null, {
+      requestPayload: {
+        patientIvorisId: patient,
+        name: docName,
+        date: docDate,
+        pdfPath,
+      },
+      responsePayload: { documentId },
+    });
+
+    await markStageSuccess(db, submission.id, "document", attemptNo, {
+      ivoris_document_id: documentId,
+    });
+
+    return { status: "success", documentId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await writeSyncLog(db, submission.id, "document", attemptNo, "error", message);
+    await markStageFailure(db, submission.id, "document", attemptNo, message);
+    throw error;
+  }
+}
+
+function isRetryDue(value: string | null | undefined) {
+  if (!value) return true;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return parsed.getTime() <= Date.now();
+}
+
+export async function syncAnimaSignSubmission(
+  submissionId: string,
+  options: {
+    stages?: SyncStage[];
+    db?: DbClient;
+  } = {}
+): Promise<SubmissionSyncResult> {
+  const db = options.db ?? createServerClient();
+  const submission = await loadSubmission(db, submissionId);
+  const requestedStages = options.stages ?? ["patient", "document"];
+  const result: SubmissionSyncResult = {
+    submissionId,
+    patient: "skipped",
+    document: "skipped",
+    errors: [],
+  };
+
+  let patientIvorisId: string | null | undefined = submission.ivoris_patient_id ?? null;
+
+  if (requestedStages.includes("patient")) {
+    try {
+      const patientResult = await syncPatientStage(db, submission);
+      result.patient = patientResult.status;
+      patientIvorisId = patientResult.ivorisId;
+      result.patientIvorisId = patientResult.ivorisId;
+    } catch (error) {
+      result.patient = "error";
+      result.errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  if (requestedStages.includes("document")) {
+    try {
+      const docResult = await syncDocumentStage(db, submission, patientIvorisId);
+      result.document = docResult.status;
+      result.documentId = docResult.documentId;
+    } catch (error) {
+      result.document = "error";
+      result.errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return result;
+}
+
+export async function retryPendingAnimaSignSyncs(
+  options: {
+    db?: DbClient;
+    limit?: number;
+  } = {}
+) {
+  const db = options.db ?? createServerClient();
+  const limit = options.limit ?? 25;
+  const { data, error } = await db
+    .from("anamnese_submissions")
+    .select(
+      "id, ivoris_synced, ivoris_doc_synced, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, signed_pdf_path"
+    )
+    .or("ivoris_synced.eq.false,ivoris_doc_synced.eq.false")
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Pending AnimaSign Syncs konnten nicht geladen werden: ${error.message}`);
+  }
+
+  const summaries: SubmissionSyncResult[] = [];
+
+  for (const row of (data ?? []) as Array<
+    Pick<
+      SubmissionRow,
+      | "id"
+      | "ivoris_synced"
+      | "ivoris_doc_synced"
+      | "ivoris_sync_next_retry_at"
+      | "ivoris_doc_next_retry_at"
+      | "ivoris_sync_failed_permanently"
+      | "ivoris_doc_failed_permanently"
+      | "signed_pdf_path"
+    >
+  >) {
+    const stages: SyncStage[] = [];
+
+    if (
+      row.ivoris_synced === false &&
+      row.ivoris_sync_failed_permanently !== true &&
+      isRetryDue(row.ivoris_sync_next_retry_at)
+    ) {
+      stages.push("patient");
+    }
+
+    if (
+      row.ivoris_doc_synced === false &&
+      row.ivoris_doc_failed_permanently !== true &&
+      Boolean(row.signed_pdf_path) &&
+      isRetryDue(row.ivoris_doc_next_retry_at)
+    ) {
+      stages.push("document");
+    }
+
+    if (!stages.length) {
+      continue;
+    }
+
+    summaries.push(await syncAnimaSignSubmission(row.id, { db, stages }));
+  }
+
+  return {
+    processed: summaries.length,
+    patientSuccess: summaries.filter((entry) => entry.patient === "success").length,
+    documentSuccess: summaries.filter((entry) => entry.document === "success").length,
+    failures: summaries.filter((entry) => entry.errors.length > 0).length,
+    results: summaries,
+  };
+}

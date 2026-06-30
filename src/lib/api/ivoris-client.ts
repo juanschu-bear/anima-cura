@@ -248,6 +248,8 @@ export async function updateIvorisPatient(
     },
   };
 
+  console.log(`[IVORIS] UpdatePatient request ${ivorisId}: ${JSON.stringify(body)}`);
+
   const response = await fetch(url.toString(), {
     method: "PUT",
     headers: buildHeaders(creds),
@@ -255,12 +257,19 @@ export async function updateIvorisPatient(
     cache: "no-store",
   });
 
+  const payload = await parseBestEffortResponse(response);
   if (!response.ok) {
-    const payload = await parseBestEffortResponse(response);
+    console.error(
+      `[IVORIS] UpdatePatient response ${ivorisId}: status=${response.status} payload=${formatPayload(payload)}`
+    );
     throw new Error(
       `IVORIS UpdatePatient ${ivorisId} fehlgeschlagen (${response.status}): ${formatPayload(payload)}`
     );
   }
+
+  console.log(
+    `[IVORIS] UpdatePatient response ${ivorisId}: status=${response.status} payload=${formatPayload(payload)}`
+  );
 }
 
 /** POST /Patient/v1/Patient — Create a new patient in Ivoris. Returns the new ivoris UUID. */
@@ -287,12 +296,20 @@ export async function createIvorisPatient(
     cache: "no-store",
   });
 
+  console.log(`[IVORIS] AddPatient request: ${JSON.stringify(body)}`);
   const payload = await parseBestEffortResponse(response);
   if (!response.ok) {
+    console.error(
+      `[IVORIS] AddPatient response: status=${response.status} payload=${formatPayload(payload)}`
+    );
     throw new Error(
       `IVORIS AddPatient fehlgeschlagen (${response.status}): ${formatPayload(payload)}`
     );
   }
+
+  console.log(
+    `[IVORIS] AddPatient response: status=${response.status} payload=${formatPayload(payload)}`
+  );
 
   // AddPatient returns the new patient UUID as a string
   const newId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);

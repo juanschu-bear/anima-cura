@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient, createAdminClient } from "@/lib/db/supabase";
 import crypto from "crypto";
-import { updateIvorisPatient, createIvorisPatient } from "@/lib/api/ivoris-client";
+import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 import {
   createAndDistribute,
   type DocumensoField,
@@ -195,63 +195,13 @@ export async function POST(request: Request) {
 
     // 1c) Ivoris-Sync: Patientendaten sofort zu Ivoris pushen
     try {
-      const ivorisData = {
-        Firstname: vorname || "",
-        Lastname: nachname || "",
-        Birthday: geburtsdatum || "",
-        Email: email || "",
-        Phone: (answers.patient_telefon as string) || "",
-        Mobile: (answers.patient_mobil as string) || "",
-        Address: {
-          Street: [answers.patient_strasse, answers.patient_hausnummer].filter(Boolean).join(" "),
-          Zip: (answers.patient_plz as string) || "",
-          City: (answers.patient_wohnort as string) || "",
-          Country: "D",
-        },
-      };
-
-      if (abgleich && !abgleich.is_new && abgleich.patient_id) {
-        // Bestandspatient: ivoris_id aus DB holen und updaten
-        const { data: pat } = await supabase
-          .from("patients")
-          .select("ivoris_id")
-          .eq("id", abgleich.patient_id)
-          .maybeSingle();
-        if (pat?.ivoris_id && typeof pat.ivoris_id === "string" && pat.ivoris_id.length > 10) {
-          // Bestandspatient: NUR Kontaktdaten updaten (nicht Name/Geburtstag, Ivoris erlaubt nur 1 Feld davon pro Request)
-          const contactUpdate = {
-            Email: ivorisData.Email,
-            Phone: ivorisData.Phone,
-            Mobile: ivorisData.Mobile,
-            Address: ivorisData.Address,
-          };
-          await updateIvorisPatient(pat.ivoris_id, contactUpdate);
-          console.log(`[IVORIS] Patient ${pat.ivoris_id} aktualisiert`);
-          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
-        } else {
-          console.warn("[IVORIS] Bestandspatient ohne gueltige Ivoris-ID:", abgleich.patient_id, "ivoris_id:", pat?.ivoris_id);
-          await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient: keine gueltige Ivoris-ID" }).eq("id", submissionId);
-        }
-      } else {
-        // Neupatient: in Ivoris anlegen
-        const newPatientId = await createIvorisPatient(ivorisData);
-        console.log("[IVORIS] Neupatient angelegt:", vorname, nachname, newPatientId);
-        if (newPatientId) {
-          if (abgleich?.patient_id) {
-            await supabase.from("patients").update({ ivoris_id: newPatientId }).eq("id", abgleich.patient_id);
-          }
-          await supabase.from("anamnese_submissions").update({ ivoris_synced: true }).eq("id", submissionId);
-        }
-      }
-      // Fallback fuer Edge-Cases:
-      if (false) {
-        // Bestandspatient ohne gueltige Ivoris-ID: NICHT anlegen (verhindert Duplikate)
-        console.warn("[IVORIS] Bestandspatient ohne Ivoris-ID, uebersprungen:", vorname, nachname);
-        await supabase.from("anamnese_submissions").update({ ivoris_sync_error: "Bestandspatient ohne Ivoris-ID" }).eq("id", submissionId);
-      }
+      const syncResult = await syncAnimaSignSubmission(submissionId, {
+        db: supabase,
+        stages: ["patient"],
+      });
+      console.log("[IVORIS] submit sync result:", syncResult);
     } catch (ivorisErr) {
       console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
-      await supabase.from("anamnese_submissions").update({ ivoris_synced: false, ivoris_sync_error: String(ivorisErr) }).eq("id", submissionId);
       // Fehler ist nicht-blockierend: Submission geht trotzdem durch
     }
 

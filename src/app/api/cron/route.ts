@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { retryPendingAnimaSignSyncs } from "@/lib/services/animasign-ivoris-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -26,6 +27,13 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       results.ivoris = { error: String(e) };
     }
+  }
+
+  try {
+    const db = createServerClient();
+    results.animasign = await retryPendingAnimaSignSyncs({ db, limit: 50 });
+  } catch (e) {
+    results.animasign = { error: String(e) };
   }
 
   try {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { downloadSignedPdf } from "@/lib/documenso/client";
-import { addIvorisDocument, addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
+import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -123,39 +123,11 @@ export async function POST(request: Request) {
 
     // Signiertes PDF in Ivoris-Karteikarte hochladen
     try {
-      const { data: sub } = await supabase
-        .from("anamnese_submissions")
-        .select("patient_id, nachname")
-        .eq("id", submissionId)
-        .maybeSingle();
-
-      if (sub?.patient_id) {
-        const { data: pat } = await supabase
-          .from("patients")
-          .select("ivoris_id")
-          .eq("id", sub.patient_id)
-          .maybeSingle();
-
-        if (pat?.ivoris_id) {
-          const today = new Date().toISOString().split("T")[0];
-          const pdfBase64 = Buffer.from(signedPdf).toString("base64");
-
-          const docId = await addIvorisDocument({
-            patientIvorisId: pat.ivoris_id,
-            name: `Anamnesebogen_${sub.nachname || "Patient"}_${today}.pdf`,
-            date: today,
-            contentBase64: pdfBase64,
-          });
-
-          await addIvorisKarteiEintrag({
-            patientIvorisId: pat.ivoris_id,
-            date: today,
-            text: "Anamnesebogen digital signiert und in Akte hinterlegt (AnimaSign)",
-          });
-
-          console.log(`[IVORIS] PDF + Karteieintrag fuer ${pat.ivoris_id}, docId=${docId}`);
-        }
-      }
+      const syncResult = await syncAnimaSignSubmission(submissionId, {
+        db: supabase,
+        stages: ["document"],
+      });
+      console.log("[IVORIS] webhook document sync result:", syncResult);
     } catch (ivorisErr) {
       console.error("[IVORIS] PDF-Upload fehlgeschlagen (nicht-blockierend):", ivorisErr);
     }

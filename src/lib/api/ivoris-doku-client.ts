@@ -186,12 +186,31 @@ export async function addIvorisDocument(
     cache: "no-store",
   });
 
+  console.log(
+    `[IVORIS] AddDocument request patient=${input.patientIvorisId}: ${JSON.stringify({
+      document: {
+        ...body.document,
+        Content: `<base64:${input.contentBase64.length} chars>`,
+      },
+    })}`
+  );
   const payload = await parseBestEffort(response);
   if (!response.ok) {
+    console.error(
+      `[IVORIS] AddDocument response patient=${input.patientIvorisId}: status=${response.status} payload=${
+        typeof payload === "string" ? payload : JSON.stringify(payload)
+      }`
+    );
     throw new Error(
       `IVORIS AddDocument fehlgeschlagen (${response.status}): ${typeof payload === "string" ? payload : JSON.stringify(payload)}`
     );
   }
+
+  console.log(
+    `[IVORIS] AddDocument response patient=${input.patientIvorisId}: status=${response.status} payload=${
+      typeof payload === "string" ? payload : JSON.stringify(payload)
+    }`
+  );
 
   const docId = typeof payload === "string" ? payload.replace(/"/g, "") : String(payload);
   return docId;
