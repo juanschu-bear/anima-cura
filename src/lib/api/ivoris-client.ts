@@ -219,6 +219,59 @@ export async function fetchIvorisPatientsPage(page = 0) {
   return payload;
 }
 
+export type IvorisPatientSearchParams = {
+  id?: string;
+  firstname?: string;
+  lastname?: string;
+  birthday?: string;
+  phone?: string;
+  mobile?: string;
+  email?: string;
+  gender?: string;
+  mandantIndex?: string;
+};
+
+export async function searchIvorisPatients(params: IvorisPatientSearchParams) {
+  const creds = getIvorisCredentials();
+  const baseUrl = buildBaseUrl(creds.linkname);
+  const defaultMandantIndex = process.env.IVORIS_MANDANT_INDEX;
+  const url = new URL(`${baseUrl}/Patient/v1/Patients`);
+  withAuthParams(url, creds);
+
+  const entries = Object.entries({
+    id: params.id,
+    firstname: params.firstname,
+    lastname: params.lastname,
+    birthday: params.birthday,
+    phone: params.phone,
+    mobile: params.mobile,
+    email: params.email,
+    gender: params.gender,
+    mandantIndex: params.mandantIndex ?? defaultMandantIndex,
+  });
+
+  for (const [key, value] of entries) {
+    if (typeof value === "string" && value.trim()) {
+      url.searchParams.set(key, value.trim());
+    }
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(creds),
+    cache: "no-store",
+  });
+
+  const payload = await parseBestEffortResponse(response);
+  if (!response.ok) {
+    throw new Error(
+      `IVORIS Patienten-Suche fehlgeschlagen (${response.status}): ${formatPayload(payload)}`
+    );
+  }
+
+  return payload;
+}
+
 // Fetch a single patient by ivoris UUID. Documented as GET /Patient/v1/Patient?id={uuid}.
 // The detail object often carries more fields than the AllPatients list entry.
 export async function fetchIvorisPatientById(id: string) {

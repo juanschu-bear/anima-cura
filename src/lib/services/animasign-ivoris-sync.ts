@@ -2,7 +2,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import {
   createIvorisPatient,
   fetchIvorisPatientById,
-  fetchIvorisPatientsRaw,
+  searchIvorisPatients,
   type IvorisPatientInput,
   updateIvorisPatient,
 } from "@/lib/api/ivoris-client";
@@ -523,59 +523,78 @@ async function recoverIvorisPatientIdFromDirectory(
     return null;
   }
 
-  const payload = await fetchIvorisPatientsRaw();
-  const directory = (Array.isArray(payload) ? payload : []).filter(
-    (entry): entry is Record<string, unknown> =>
-      Boolean(entry && typeof entry === "object" && normalizeIvorisId((entry as Record<string, unknown>).Id))
-  );
+  const pickRecoveredId = async (
+    label: string,
+    searchParams: Record<string, string | undefined>
+  ) => {
+    const payload = await searchIvorisPatients(searchParams);
+    const matches = (Array.isArray(payload) ? payload : []).filter(
+      (entry): entry is Record<string, unknown> =>
+        Boolean(
+          entry &&
+            typeof entry === "object" &&
+            normalizeIvorisId((entry as Record<string, unknown>).Id) &&
+            toIsoDateOrNull(extractCandidateBirthday(entry as Record<string, unknown>)) === birthday
+        )
+    );
 
-  const strategies = [
-    {
-      label: "name+birthday",
-      enabled: Boolean(firstname && lastname),
-      matches: (candidate: Record<string, unknown>) =>
-        normalizeMatchValue(extractCandidateFirstname(candidate)) === firstname &&
-        normalizeMatchValue(extractCandidateLastname(candidate)) === lastname &&
-        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
-    },
-    {
-      label: "email+birthday",
-      enabled: Boolean(email),
-      matches: (candidate: Record<string, unknown>) =>
-        extractCandidateEmail(candidate) === email &&
-        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
-    },
-    {
-      label: "phone+birthday",
-      enabled: phoneCandidates.length > 0,
-      matches: (candidate: Record<string, unknown>) =>
-        extractCandidatePhones(candidate).some((phone) => phoneCandidates.includes(phone)) &&
-        toIsoDateOrNull(extractCandidateBirthday(candidate)) === birthday,
-    },
-  ];
-
-  for (const strategy of strategies) {
-    if (!strategy.enabled) continue;
-
-    const matches = directory.filter(strategy.matches);
     console.log(
-      `[ANIMASIGN][IVORIS] directory recovery submission=${submission.id} strategy=${strategy.label} candidates=${matches.length}`
+      `[ANIMASIGN][IVORIS] directory recovery submission=${submission.id} strategy=${label} candidates=${matches.length}`
     );
 
     if (matches.length !== 1) {
-      continue;
+      return null;
     }
 
     const recoveredId = normalizeIvorisId(matches[0].Id);
     if (!recoveredId) {
-      continue;
+      return null;
     }
 
     console.log(
-      `[ANIMASIGN][IVORIS] recovered patientId=${recoveredId} from directory for submission=${submission.id} strategy=${strategy.label}`
+      `[ANIMASIGN][IVORIS] recovered patientId=${recoveredId} from directory for submission=${submission.id} strategy=${label}`
     );
     await patchSubmissionIvorisPatientId(db, submission.id, recoveredId);
     return recoveredId;
+  };
+
+  if (firstname && lastname) {
+    const recoveredId = await pickRecoveredId("name+birthday", {
+      firstname: submission.vorname ?? undefined,
+      lastname: submission.nachname ?? undefined,
+      birthday,
+    });
+    if (recoveredId) {
+      return recoveredId;
+    }
+  }
+
+  if (email) {
+    const recoveredId = await pickRecoveredId("email+birthday", {
+      email,
+      birthday,
+    });
+    if (recoveredId) {
+      return recoveredId;
+    }
+  }
+
+  for (const phone of phoneCandidates) {
+    const byPhone = await pickRecoveredId("phone+birthday", {
+      phone,
+      birthday,
+    });
+    if (byPhone) {
+      return byPhone;
+    }
+
+    const byMobile = await pickRecoveredId("mobile+birthday", {
+      mobile: phone,
+      birthday,
+    });
+    if (byMobile) {
+      return byMobile;
+    }
   }
 
   console.warn(
