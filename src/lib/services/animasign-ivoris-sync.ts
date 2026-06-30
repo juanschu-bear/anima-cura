@@ -8,8 +8,8 @@ import {
 } from "@/lib/api/ivoris-client";
 import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
 
-const MAX_SYNC_ATTEMPTS = 3;
-const BASE_BACKOFF_MINUTES = 30;
+const SYNC_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
+const MAX_SYNC_ATTEMPTS = SYNC_BACKOFF_MINUTES.length;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -72,6 +72,11 @@ type SyncAttemptContext = {
   metadata?: Record<string, unknown>;
 };
 
+type StageOverrides = {
+  attemptNo?: number;
+  retryCountOnFailure?: number;
+};
+
 export type SubmissionSyncResult = {
   submissionId: string;
   patient: SyncStatus;
@@ -79,6 +84,14 @@ export type SubmissionSyncResult = {
   patientIvorisId?: string | null;
   documentId?: string | null;
   errors: string[];
+};
+
+export type NextStageSyncResult = {
+  stage: SyncStage;
+  found: boolean;
+  submissionId?: string;
+  result?: SubmissionSyncResult;
+  reason?: string;
 };
 
 function asString(value: unknown): string | null {
@@ -325,31 +338,12 @@ function syncedColumn(stage: SyncStage) {
   return stage === "patient" ? "ivoris_synced" : "ivoris_doc_synced";
 }
 
-function computeNextRetryAt(attemptNo: number) {
-  const minutes = BASE_BACKOFF_MINUTES * Math.pow(2, Math.max(0, attemptNo - 1));
+function computeNextRetryAt(retryCount: number) {
+  const minutes =
+    SYNC_BACKOFF_MINUTES[
+      Math.min(Math.max(retryCount, 0), SYNC_BACKOFF_MINUTES.length - 1)
+    ];
   return new Date(Date.now() + minutes * 60_000).toISOString();
-}
-
-async function fetchAttemptNumber(
-  db: DbClient,
-  submissionId: string,
-  stage: SyncStage
-): Promise<number> {
-  const { data, error } = await db
-    .from("animasign_sync_log")
-    .select("attempt_no")
-    .eq("submission_id", submissionId)
-    .eq("stage", stage)
-    .order("attempt_no", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[ANIMASIGN][SYNC] attempt lookup failed:", error.message);
-    return 0;
-  }
-
-  return typeof data?.attempt_no === "number" ? data.attempt_no : 0;
 }
 
 async function writeSyncLog(
@@ -381,14 +375,13 @@ async function markStageSuccess(
   db: DbClient,
   submissionId: string,
   stage: SyncStage,
-  attemptNo: number,
   patch: Record<string, unknown> = {}
 ) {
   const { error } = await db
     .from("anamnese_submissions")
     .update({
       [syncedColumn(stage)]: true,
-      [retryColumn(stage)]: attemptNo,
+      [retryColumn(stage)]: 0,
       [nextRetryColumn(stage)]: null,
       [permanentFailureColumn(stage)]: false,
       ivoris_sync_error: null,
@@ -405,14 +398,14 @@ async function markStageFailure(
   db: DbClient,
   submissionId: string,
   stage: SyncStage,
-  attemptNo: number,
+  retryCount: number,
   errorText: string
 ) {
-  const permanentFailure = attemptNo >= MAX_SYNC_ATTEMPTS;
+  const permanentFailure = retryCount >= MAX_SYNC_ATTEMPTS;
   const patch = {
     [syncedColumn(stage)]: false,
-    [retryColumn(stage)]: attemptNo,
-    [nextRetryColumn(stage)]: permanentFailure ? null : computeNextRetryAt(attemptNo),
+    [retryColumn(stage)]: retryCount,
+    [nextRetryColumn(stage)]: permanentFailure ? null : computeNextRetryAt(retryCount),
     [permanentFailureColumn(stage)]: permanentFailure,
     ivoris_sync_error: errorText,
   };
@@ -619,9 +612,12 @@ async function syncNewPatient(
 
 async function syncPatientStage(
   db: DbClient,
-  submission: SubmissionRow
+  submission: SubmissionRow,
+  overrides: StageOverrides = {}
 ): Promise<{ status: SyncStatus; ivorisId: string | null }> {
-  const attemptNo = (await fetchAttemptNumber(db, submission.id, "patient")) + 1;
+  const retryCount = submission.ivoris_sync_retry_count ?? 0;
+  const attemptNo = overrides.attemptNo ?? retryCount + 1;
+  const retryCountOnFailure = overrides.retryCountOnFailure ?? attemptNo;
 
   try {
     const result =
@@ -638,7 +634,7 @@ async function syncPatientStage(
       responsePayload: result.ivorisId ? { ivorisId: result.ivorisId } : null,
     });
 
-    await markStageSuccess(db, submission.id, "patient", attemptNo, {
+    await markStageSuccess(db, submission.id, "patient", {
       ivoris_patient_id: result.ivorisId,
     });
 
@@ -646,7 +642,7 @@ async function syncPatientStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "patient", attemptNo, "error", message);
-    await markStageFailure(db, submission.id, "patient", attemptNo, message);
+    await markStageFailure(db, submission.id, "patient", retryCountOnFailure, message);
     throw error;
   }
 }
@@ -654,9 +650,12 @@ async function syncPatientStage(
 async function syncDocumentStage(
   db: DbClient,
   submission: SubmissionRow,
-  preferredPatientIvorisId?: string | null
+  preferredPatientIvorisId?: string | null,
+  overrides: StageOverrides = {}
 ): Promise<{ status: SyncStatus; documentId: string | null }> {
-  const attemptNo = (await fetchAttemptNumber(db, submission.id, "document")) + 1;
+  const retryCount = submission.ivoris_doc_retry_count ?? 0;
+  const attemptNo = overrides.attemptNo ?? retryCount + 1;
+  const retryCountOnFailure = overrides.retryCountOnFailure ?? attemptNo;
 
   try {
     const patient = await resolveSubmissionPatientIvorisId(db, submission, preferredPatientIvorisId);
@@ -705,7 +704,7 @@ async function syncDocumentStage(
       responsePayload: { documentId },
     });
 
-    await markStageSuccess(db, submission.id, "document", attemptNo, {
+    await markStageSuccess(db, submission.id, "document", {
       ivoris_document_id: documentId,
     });
 
@@ -713,7 +712,7 @@ async function syncDocumentStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "document", attemptNo, "error", message);
-    await markStageFailure(db, submission.id, "document", attemptNo, message);
+    await markStageFailure(db, submission.id, "document", retryCountOnFailure, message);
     throw error;
   }
 }
@@ -730,6 +729,7 @@ export async function syncAnimaSignSubmission(
   options: {
     stages?: SyncStage[];
     db?: DbClient;
+    stageOverrides?: Partial<Record<SyncStage, StageOverrides>>;
   } = {}
 ): Promise<SubmissionSyncResult> {
   const db = options.db ?? createServerClient();
@@ -746,7 +746,11 @@ export async function syncAnimaSignSubmission(
 
   if (requestedStages.includes("patient")) {
     try {
-      const patientResult = await syncPatientStage(db, submission);
+      const patientResult = await syncPatientStage(
+        db,
+        submission,
+        options.stageOverrides?.patient
+      );
       result.patient = patientResult.status;
       patientIvorisId = patientResult.ivorisId;
       result.patientIvorisId = patientResult.ivorisId;
@@ -758,7 +762,12 @@ export async function syncAnimaSignSubmission(
 
   if (requestedStages.includes("document")) {
     try {
-      const docResult = await syncDocumentStage(db, submission, patientIvorisId);
+      const docResult = await syncDocumentStage(
+        db,
+        submission,
+        patientIvorisId,
+        options.stageOverrides?.document
+      );
       result.document = docResult.status;
       result.documentId = docResult.documentId;
     } catch (error) {
@@ -768,6 +777,83 @@ export async function syncAnimaSignSubmission(
   }
 
   return result;
+}
+
+async function loadPendingStageCandidates(
+  db: DbClient,
+  stage: SyncStage,
+  excludeSubmissionIds: string[] = []
+) {
+  let query = db
+    .from("anamnese_submissions")
+    .select(
+      "id, signed_pdf_path, ivoris_synced, ivoris_doc_synced, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, created_at"
+    )
+    .eq(syncedColumn(stage), false)
+    .not(permanentFailureColumn(stage), "is", true)
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (stage === "document") {
+    query = query.not("signed_pdf_path", "is", null);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Pending ${stage} syncs konnten nicht geladen werden: ${error.message}`);
+  }
+
+  return ((data ?? []) as Array<
+    Pick<
+      SubmissionRow,
+      | "id"
+      | "signed_pdf_path"
+      | "ivoris_synced"
+      | "ivoris_doc_synced"
+      | "ivoris_sync_retry_count"
+      | "ivoris_doc_retry_count"
+      | "ivoris_sync_next_retry_at"
+      | "ivoris_doc_next_retry_at"
+      | "ivoris_sync_failed_permanently"
+      | "ivoris_doc_failed_permanently"
+    >
+  >).filter((row) => {
+    if (excludeSubmissionIds.includes(row.id)) {
+      return false;
+    }
+
+    return isRetryDue(row[nextRetryColumn(stage)]);
+  });
+}
+
+export async function runNextPendingAnimaSignStage(
+  stage: SyncStage,
+  options: {
+    db?: DbClient;
+    excludeSubmissionIds?: string[];
+  } = {}
+): Promise<NextStageSyncResult> {
+  const db = options.db ?? createServerClient();
+  const candidates = await loadPendingStageCandidates(
+    db,
+    stage,
+    options.excludeSubmissionIds ?? []
+  );
+  const next = candidates[0];
+
+  if (!next) {
+    return { stage, found: false, reason: "Keine faellige Submission" };
+  }
+
+  return {
+    stage,
+    found: true,
+    submissionId: next.id,
+    result: await syncAnimaSignSubmission(next.id, {
+      db,
+      stages: [stage],
+    }),
+  };
 }
 
 export async function retryPendingAnimaSignSyncs(

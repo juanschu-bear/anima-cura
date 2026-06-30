@@ -125,6 +125,10 @@ function countPdfPages(pdf: Buffer): number {
   }
 }
 
+function scheduleFastRetryAt() {
+  return new Date(Date.now() + 5 * 60_000).toISOString();
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SubmitBody;
@@ -198,10 +202,40 @@ export async function POST(request: Request) {
       const syncResult = await syncAnimaSignSubmission(submissionId, {
         db: supabase,
         stages: ["patient"],
+        stageOverrides: {
+          patient: {
+            attemptNo: 0,
+            retryCountOnFailure: 0,
+          },
+        },
       });
       console.log("[IVORIS] submit sync result:", syncResult);
+      if (syncResult.patient === "error") {
+        const errorText =
+          syncResult.errors.join(" | ").slice(0, 1000) ||
+          "Initialer Ivoris-Patientensync fehlgeschlagen";
+        await supabase
+          .from("anamnese_submissions")
+          .update({
+            ivoris_sync_error: errorText,
+            ivoris_sync_retry_count: 0,
+            ivoris_sync_next_retry_at: scheduleFastRetryAt(),
+            ivoris_sync_failed_permanently: false,
+          })
+          .eq("id", submissionId);
+      }
     } catch (ivorisErr) {
       console.error("[IVORIS] Sync fehlgeschlagen (nicht-blockierend):", ivorisErr);
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          ivoris_sync_error:
+            ivorisErr instanceof Error ? ivorisErr.message : String(ivorisErr),
+          ivoris_sync_retry_count: 0,
+          ivoris_sync_next_retry_at: scheduleFastRetryAt(),
+          ivoris_sync_failed_permanently: false,
+        })
+        .eq("id", submissionId);
       // Fehler ist nicht-blockierend: Submission geht trotzdem durch
     }
 

@@ -7,6 +7,10 @@ import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+function scheduleFastRetryAt() {
+  return new Date(Date.now() + 5 * 60_000).toISOString();
+}
+
 type WebhookRecipient = {
   email?: string;
   signingStatus?: string;
@@ -126,10 +130,40 @@ export async function POST(request: Request) {
       const syncResult = await syncAnimaSignSubmission(submissionId, {
         db: supabase,
         stages: ["document"],
+        stageOverrides: {
+          document: {
+            attemptNo: 0,
+            retryCountOnFailure: 0,
+          },
+        },
       });
       console.log("[IVORIS] webhook document sync result:", syncResult);
+      if (syncResult.document === "error") {
+        const errorText =
+          syncResult.errors.join(" | ").slice(0, 1000) ||
+          "Initialer Ivoris-Dokumentsync fehlgeschlagen";
+        await supabase
+          .from("anamnese_submissions")
+          .update({
+            ivoris_sync_error: errorText,
+            ivoris_doc_retry_count: 0,
+            ivoris_doc_next_retry_at: scheduleFastRetryAt(),
+            ivoris_doc_failed_permanently: false,
+          })
+          .eq("id", submissionId);
+      }
     } catch (ivorisErr) {
       console.error("[IVORIS] PDF-Upload fehlgeschlagen (nicht-blockierend):", ivorisErr);
+      await supabase
+        .from("anamnese_submissions")
+        .update({
+          ivoris_sync_error:
+            ivorisErr instanceof Error ? ivorisErr.message : String(ivorisErr),
+          ivoris_doc_retry_count: 0,
+          ivoris_doc_next_retry_at: scheduleFastRetryAt(),
+          ivoris_doc_failed_permanently: false,
+        })
+        .eq("id", submissionId);
     }
 
     return NextResponse.json({ received: true });
