@@ -1,0 +1,46 @@
+name: AnimaSign Sync Worker
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: animasign-sync-worker
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      IVORIS_APP: ${{ secrets.IVORIS_APP }}
+      IVORIS_APP_VERSION: ${{ secrets.IVORIS_APP_VERSION }}
+      IVORIS_API_KEY: ${{ secrets.IVORIS_API_KEY }}
+      IVORIS_LINKNAME: ${{ secrets.IVORIS_LINKNAME }}
+      IVORIS_PROFILE_ID: ${{ secrets.IVORIS_PROFILE_ID }}
+      IVORIS_USERNAME: ${{ secrets.IVORIS_USERNAME }}
+      IVORIS_PASSWORD: ${{ secrets.IVORIS_PASSWORD }}
+      IVORIS_RELAY_HOST: ${{ secrets.IVORIS_RELAY_HOST }}
+      IVORIS_PATIENTS_PATH: ${{ secrets.IVORIS_PATIENTS_PATH }}
+      IVORIS_PATIENTS_METHOD: ${{ secrets.IVORIS_PATIENTS_METHOD }}
+      IVORIS_MANDANT_INDEX: ${{ secrets.IVORIS_MANDANT_INDEX }}
+      ANIMASIGN_SYNC_WORKER_PATIENT_LIMIT: "3"
+      ANIMASIGN_SYNC_WORKER_DOCUMENT_LIMIT: "5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AnimaSign sync worker
+        run: npx tsx scripts/animasign-sync-worker.ts

@@ -15,10 +15,11 @@ export async function GET(req: NextRequest) {
   const db = createServerClient();
 
   const patient = await runNextPendingAnimaSignStage("patient", { db });
-  const document = await runNextPendingAnimaSignStage("document", {
-    db,
-    excludeSubmissionIds: patient.submissionId ? [patient.submissionId] : [],
-  });
+  const document = {
+    stage: "document" as const,
+    found: false,
+    reason: "Handled by GitHub Actions sync worker to avoid Vercel timeout on large PDFs",
+  };
 
   return NextResponse.json({
     success: true,
