@@ -14,6 +14,7 @@ interface Submission {
   is_existing: boolean;
   matched_patient_id: string | null;
   account_email: string | null;
+  signed_pdf_path: string | null;
   ivoris_synced: boolean;
   ivoris_doc_synced: boolean;
   ivoris_sync_error: string | null;
@@ -113,7 +114,7 @@ export default function AnimaSignPage() {
     { k: "open", l: "Nur offene" },
   ];
 
-  const cols = "1.5fr 0.85fr 0.85fr 0.85fr 0.75fr 0.65fr 0.6fr";
+  const cols = "1.45fr 0.82fr 0.82fr 0.82fr 0.72fr 0.7fr 0.82fr 0.6fr";
 
   const dot = (color: string, glow: string) => ({ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${glow}`, flexShrink: 0 } as const);
 
@@ -181,7 +182,7 @@ export default function AnimaSignPage() {
       <div style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, overflow: "hidden" }}>
         {/* Header */}
         <div style={{ display: "grid", gridTemplateColumns: cols, padding: "11px 20px", background: bg2, fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          <span>Patient</span><span>Bogen</span><span>Unterschrift</span><span>App-Status</span><span>Angemeldet</span><span>Ivoris</span><span style={{ textAlign: "right" }}>Zeit</span>
+          <span>Patient</span><span>Bogen</span><span>Unterschrift</span><span>App-Status</span><span>Angemeldet</span><span>Ivoris</span><span>PDF</span><span style={{ textAlign: "right" }}>Zeit</span>
         </div>
 
         {loading ? (
@@ -237,6 +238,34 @@ export default function AnimaSignPage() {
                   </>
                 );
               })()}
+            </div>
+            {/* PDF */}
+            <div>
+              {s.signed_pdf_path ? (
+                <a
+                  href={`/api/anima-sign/submission/${s.id}/signed-pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 78,
+                    padding: "6px 10px",
+                    borderRadius: 9,
+                    border: `1px solid ${blue}`,
+                    background: blueBg,
+                    color: blue,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                >
+                  Oeffnen
+                </a>
+              ) : (
+                <span style={{ fontSize: 12, color: muted }}>Noch nicht da</span>
+              )}
             </div>
             {/* Zeit */}
             <div style={{ fontSize: 12, color: muted, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>

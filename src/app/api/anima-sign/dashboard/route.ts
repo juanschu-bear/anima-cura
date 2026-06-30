@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { isManualReviewErrorText, stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
 
 export async function GET(req: Request) {
+  const authClient = createServerComponentClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+
   const supabase = createServerClient();
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || !["admin", "verwaltung"].includes(profile.role)) {
+    return NextResponse.json({ error: "Nur fuer Praxis-Mitarbeiter" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const filter = searchParams.get("filter") || "today";
   const search = searchParams.get("search") || "";
@@ -18,7 +38,7 @@ export async function GET(req: Request) {
   // Submissions query
   let query = supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently")
+    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, signed_pdf_path, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently")
     .order("created_at", { ascending: false });
 
   if (filter === "today") query = query.gte("created_at", todayStart.toISOString());
