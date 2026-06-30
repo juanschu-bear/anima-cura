@@ -4,7 +4,10 @@ import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 
 export const maxDuration = 60;
 
-export async function POST() {
+
+export async function POST(req: Request) {
+  const url = new URL(req.url);
+  const limit = parseInt(url.searchParams.get("limit") || "5", 10);
   const supabase = createServerClient();
   const results: Array<{ id: string; name: string; patient_sync: string; doc_sync: string }> = [];
 
@@ -12,7 +15,7 @@ export async function POST() {
     .from("anamnese_submissions")
     .select("id, vorname, nachname, signed_pdf_path, ivoris_synced, ivoris_doc_synced")
     .or("ivoris_synced.eq.false,ivoris_doc_synced.eq.false")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }).limit(limit);
 
   if (!failed || failed.length === 0) {
     return NextResponse.json({ message: "Keine fehlgeschlagenen Syncs", results: [] });
