@@ -7,6 +7,7 @@ import {
   updateIvorisPatient,
 } from "@/lib/api/ivoris-client";
 import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
+import { formatManualReviewError } from "@/lib/services/animasign-sync-status";
 
 const SYNC_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
 const MAX_SYNC_ATTEMPTS = SYNC_BACKOFF_MINUTES.length;
@@ -87,6 +88,16 @@ export type NextStageSyncResult = {
   result?: SubmissionSyncResult;
   reason?: string;
 };
+
+class ManualReviewRequiredError extends Error {
+  constructor(
+    message: string,
+    readonly stage: SyncStage
+  ) {
+    super(message);
+    this.name = "ManualReviewRequiredError";
+  }
+}
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -379,6 +390,13 @@ function computeNextRetryAt(retryCount: number) {
   return new Date(Date.now() + minutes * 60_000).toISOString();
 }
 
+function isIvorisIdentityConstraintError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(
+    "Only one of the parameters firstname, lastname and birthday can be changed at the same time."
+  );
+}
+
 async function writeSyncLog(
   db: DbClient,
   submissionId: string,
@@ -453,6 +471,30 @@ async function markStageFailure(
   }
 }
 
+async function markStageManualReview(
+  db: DbClient,
+  submissionId: string,
+  stage: SyncStage,
+  reason: string
+) {
+  const patch = {
+    [syncedColumn(stage)]: false,
+    [retryColumn(stage)]: MAX_SYNC_ATTEMPTS,
+    [nextRetryColumn(stage)]: null,
+    [permanentFailureColumn(stage)]: true,
+    ivoris_sync_error: formatManualReviewError(reason),
+  };
+
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update(patch)
+    .eq("id", submissionId);
+
+  if (error) {
+    console.error("[ANIMASIGN][SYNC] manual review update failed:", error.message);
+  }
+}
+
 async function loadSubmission(
   db: DbClient,
   submissionId: string
@@ -512,7 +554,7 @@ async function patchSubmissionIvorisPatientId(
 async function recoverIvorisPatientIdFromDirectory(
   db: DbClient,
   submission: SubmissionRow
-): Promise<string | null> {
+): Promise<string> {
   const firstname = normalizeMatchValue(submission.vorname);
   const lastname = normalizeMatchValue(submission.nachname);
   const birthday = toIsoDateOrNull(submission.geburtsdatum);
@@ -520,8 +562,13 @@ async function recoverIvorisPatientIdFromDirectory(
   const phoneCandidates = extractSubmissionPhoneCandidates(submission);
 
   if (!birthday) {
-    return null;
+    throw new ManualReviewRequiredError(
+      `Dokument-Sync braucht manuelle Ivoris-Zuordnung, weil fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} kein gueltiger Geburtstag vorliegt.`,
+      "document"
+    );
   }
+
+  const strategyCounts: string[] = [];
 
   const pickRecoveredId = async (
     label: string,
@@ -541,6 +588,7 @@ async function recoverIvorisPatientIdFromDirectory(
     console.log(
       `[ANIMASIGN][IVORIS] directory recovery submission=${submission.id} strategy=${label} candidates=${matches.length}`
     );
+    strategyCounts.push(`${label}=${matches.length}`);
 
     if (matches.length !== 1) {
       return null;
@@ -600,7 +648,10 @@ async function recoverIvorisPatientIdFromDirectory(
   console.warn(
     `[ANIMASIGN][IVORIS] directory recovery failed for submission=${submission.id} name=${submission.vorname ?? ""} ${submission.nachname ?? ""} birthday=${birthday} email=${email ?? "-"} phones=${phoneCandidates.join(",") || "-"}`
   );
-  return null;
+  throw new ManualReviewRequiredError(
+    `Dokument-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Ivoris liefert keine eindeutige Person. Treffer: ${strategyCounts.join(", ") || "keine"}.`,
+    "document"
+  );
 }
 
 async function resolveSubmissionPatientIvorisId(
@@ -660,7 +711,17 @@ async function syncExistingPatient(
   );
 
   for (const operation of operations) {
-    await updateIvorisPatient(patient.ivoris_id, operation);
+    try {
+      await updateIvorisPatient(patient.ivoris_id, operation);
+    } catch (error) {
+      if (isIvorisIdentityConstraintError(error)) {
+        throw new ManualReviewRequiredError(
+          `Ivoris blockiert das Kontakt-/Adressupdate fuer den Bestandspatienten ${submission.vorname ?? ""} ${submission.nachname ?? ""}. Das Dokument kann separat synchronisiert werden, die Stammdaten muessen aber manuell in Ivoris geprueft werden.`,
+          "patient"
+        );
+      }
+      throw error;
+    }
   }
 
   return {
@@ -725,7 +786,11 @@ async function syncPatientStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "patient", attemptNo, "error", message);
-    await markStageFailure(db, submission.id, "patient", retryCountOnFailure, message);
+    if (error instanceof ManualReviewRequiredError) {
+      await markStageManualReview(db, submission.id, "patient", error.message);
+    } else {
+      await markStageFailure(db, submission.id, "patient", retryCountOnFailure, message);
+    }
     throw error;
   }
 }
@@ -795,7 +860,11 @@ async function syncDocumentStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "document", attemptNo, "error", message);
-    await markStageFailure(db, submission.id, "document", retryCountOnFailure, message);
+    if (error instanceof ManualReviewRequiredError) {
+      await markStageManualReview(db, submission.id, "document", error.message);
+    } else {
+      await markStageFailure(db, submission.id, "document", retryCountOnFailure, message);
+    }
     throw error;
   }
 }

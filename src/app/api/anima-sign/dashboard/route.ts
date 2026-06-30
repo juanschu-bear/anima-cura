@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { isManualReviewErrorText, stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
 
 export async function GET(req: Request) {
   const supabase = createServerClient();
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   // Submissions query
   let query = supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, ivoris_synced, ivoris_sync_error, ivoris_doc_synced")
+    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently")
     .order("created_at", { ascending: false });
 
   if (filter === "today") query = query.gte("created_at", todayStart.toISOString());
@@ -65,6 +66,11 @@ export async function GET(req: Request) {
     ...s,
     has_logged_in: s.account_email ? !!loginMap[s.account_email] : false,
     last_login: s.account_email ? loginMap[s.account_email] || null : null,
+    ivoris_manual_review:
+      isManualReviewErrorText(s.ivoris_sync_error) ||
+      s.ivoris_sync_failed_permanently === true ||
+      s.ivoris_doc_failed_permanently === true,
+    ivoris_manual_review_reason: stripManualReviewPrefix(s.ivoris_sync_error),
   }));
 
   // Count actual logins

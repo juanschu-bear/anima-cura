@@ -15,7 +15,12 @@ interface Submission {
   matched_patient_id: string | null;
   account_email: string | null;
   ivoris_synced: boolean;
+  ivoris_doc_synced: boolean;
   ivoris_sync_error: string | null;
+  ivoris_sync_failed_permanently: boolean;
+  ivoris_doc_failed_permanently: boolean;
+  ivoris_manual_review: boolean;
+  ivoris_manual_review_reason: string | null;
   has_logged_in: boolean;
   last_login: string | null;
 }
@@ -112,6 +117,22 @@ export default function AnimaSignPage() {
 
   const dot = (color: string, glow: string) => ({ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${glow}`, flexShrink: 0 } as const);
 
+  const getIvorisStatus = (submission: Submission) => {
+    if (submission.ivoris_synced && submission.ivoris_doc_synced) {
+      return { label: "OK", color: green, glow: greenBg };
+    }
+
+    if (submission.ivoris_manual_review) {
+      return { label: "Manuell", color: "#d45a52", glow: "rgba(212,90,82,0.12)" };
+    }
+
+    if (submission.ivoris_doc_synced && !submission.ivoris_synced) {
+      return { label: "Teilweise", color: blue, glow: blueBg };
+    }
+
+    return { label: "Ausstehend", color: gold, glow: goldBg };
+  };
+
   return (
     <div style={{ maxWidth: 1020, margin: "0 auto", padding: "32px 24px", fontFamily: "'Hanken Grotesk', sans-serif" }}>
       {/* Header */}
@@ -168,7 +189,7 @@ export default function AnimaSignPage() {
         ) : paged.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: muted }}>Keine Einreichungen gefunden.</div>
         ) : paged.map(s => (
-          <div key={s.id} style={{ display: "grid", gridTemplateColumns: cols, padding: "13px 20px", alignItems: "center", borderBottom: `1px solid ${line}` }}>
+          <div key={s.id} title={s.ivoris_manual_review_reason || undefined} style={{ display: "grid", gridTemplateColumns: cols, padding: "13px 20px", alignItems: "center", borderBottom: `1px solid ${line}` }}>
             {/* Patient */}
             <div>
               <div style={{ fontWeight: 600, color: ink }}>{s.nachname}, {s.vorname}</div>
@@ -205,10 +226,17 @@ export default function AnimaSignPage() {
             </div>
             {/* Ivoris */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={dot(s.ivoris_synced ? green : gold, s.ivoris_synced ? greenBg : goldBg)} />
-              <span style={{ fontSize: 12, color: s.ivoris_synced ? ink : muted }}>
-                {s.ivoris_synced ? "OK" : "Ausstehend"}
-              </span>
+              {(() => {
+                const ivoris = getIvorisStatus(s);
+                return (
+                  <>
+                    <span style={dot(ivoris.color, ivoris.glow)} />
+                    <span style={{ fontSize: 12, color: ivoris.label === "OK" ? ink : muted }}>
+                      {ivoris.label}
+                    </span>
+                  </>
+                );
+              })()}
             </div>
             {/* Zeit */}
             <div style={{ fontSize: 12, color: muted, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
