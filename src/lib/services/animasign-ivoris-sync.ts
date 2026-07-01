@@ -314,6 +314,36 @@ function extractCandidatePhones(payload: Record<string, unknown>) {
   return Array.from(new Set(values));
 }
 
+export function namesMatchSubmission(
+  submission: Pick<SubmissionRow, "vorname" | "nachname">,
+  candidateFirstname: string | null | undefined,
+  candidateLastname: string | null | undefined
+) {
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+
+  if (!firstname || !lastname) {
+    return false;
+  }
+
+  return (
+    firstname === normalizeMatchValue(candidateFirstname ?? null) &&
+    lastname === normalizeMatchValue(candidateLastname ?? null)
+  );
+}
+
+export function shouldReusePriorSubmissionMatch(params: {
+  sameName: boolean;
+  sameEmail: boolean;
+  samePhone: boolean;
+  hasSubmissionContact: boolean;
+}) {
+  return (
+    params.sameName &&
+    (params.sameEmail || params.samePhone || !params.hasSubmissionContact)
+  );
+}
+
 function extractSubmissionPhoneCandidates(submission: SubmissionRow) {
   const answers = submission.answers ?? {};
   const values = [
@@ -595,6 +625,10 @@ async function findReusableIvorisPatientIdFromPriorSubmissions(
     const priorPhones = new Set(
       extractSubmissionPhoneCandidates({
         ...submission,
+        vorname: row.vorname,
+        nachname: row.nachname,
+        email: row.email,
+        geburtsdatum: row.geburtsdatum,
         answers: (row.answers as Record<string, unknown> | null) ?? null,
       })
     );
@@ -603,7 +637,14 @@ async function findReusableIvorisPatientIdFromPriorSubmissions(
     const sameName = Boolean(firstname && lastname && firstname === priorFirstname && lastname === priorLastname);
     const samePhone = Array.from(phoneCandidates).some((phone) => priorPhones.has(phone));
 
-    if (sameEmail || sameName || samePhone) {
+    if (
+      shouldReusePriorSubmissionMatch({
+        sameName,
+        sameEmail,
+        samePhone,
+        hasSubmissionContact: Boolean(email || phoneCandidates.size > 0),
+      })
+    ) {
       matchingIds.add(priorIvorisId);
     }
   }
@@ -763,7 +804,13 @@ async function findReusableIvorisPatientIdForNewSubmission(
             entry &&
               typeof entry === "object" &&
               normalizeIvorisId((entry as Record<string, unknown>).Id) &&
-              toIsoDateOrNull(extractCandidateBirthday(entry as Record<string, unknown>)) === birthday
+              toIsoDateOrNull(extractCandidateBirthday(entry as Record<string, unknown>)) === birthday &&
+              (label === "name+birthday" ||
+                namesMatchSubmission(
+                  submission,
+                  extractCandidateFirstname(entry as Record<string, unknown>),
+                  extractCandidateLastname(entry as Record<string, unknown>)
+                ))
           )
       )
       .map((entry) => normalizeIvorisId(entry.Id))
