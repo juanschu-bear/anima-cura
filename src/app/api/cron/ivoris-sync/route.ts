@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { runNextPendingAnimaSignStage } from "@/lib/services/animasign-ivoris-sync";
+import { reconcilePendingAnimaSignSignatures } from "@/lib/services/animasign-signature-reconciliation";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,6 +15,12 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
   const db = createServerClient();
 
+  const signatureReconciliation = await reconcilePendingAnimaSignSignatures({
+    db,
+    limit: 10,
+    minAgeSeconds: 60,
+  });
+
   const patient = await runNextPendingAnimaSignStage("patient", { db });
   const document = {
     stage: "document" as const,
@@ -23,6 +30,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    signatureReconciliation,
     patient,
     document,
     duration_ms: Date.now() - startedAt,

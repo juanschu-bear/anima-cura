@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/ivoris-sync",
-      "schedule": "*/30 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron",
