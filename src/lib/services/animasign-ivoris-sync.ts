@@ -7,6 +7,10 @@ import {
   updateIvorisPatient,
 } from "@/lib/api/ivoris-client";
 import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
+import {
+  decideIvorisDirectoryAction,
+  type DirectoryStrategyResult,
+} from "@/lib/services/animasign-ivoris-directory";
 import { formatManualReviewError } from "@/lib/services/animasign-sync-status";
 
 const SYNC_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
@@ -551,6 +555,78 @@ async function patchSubmissionIvorisPatientId(
   }
 }
 
+async function findReusableIvorisPatientIdFromPriorSubmissions(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<string | null> {
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  if (!birthday) {
+    return null;
+  }
+
+  const email = normalizeEmailValue(submission.email);
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+  const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission));
+
+  const { data, error } = await db
+    .from("anamnese_submissions")
+    .select("id, vorname, nachname, email, geburtsdatum, answers, ivoris_patient_id")
+    .eq("geburtsdatum", birthday)
+    .neq("id", submission.id)
+    .not("ivoris_patient_id", "is", null)
+    .limit(50);
+
+  if (error) {
+    throw new Error(`Vorherige AnimaSign-Submissions konnten nicht geprueft werden: ${error.message}`);
+  }
+
+  const matchingIds = new Set<string>();
+
+  for (const row of data || []) {
+    const priorIvorisId = normalizeIvorisId(row.ivoris_patient_id);
+    if (!priorIvorisId) {
+      continue;
+    }
+
+    const priorEmail = normalizeEmailValue(row.email);
+    const priorFirstname = normalizeMatchValue(row.vorname);
+    const priorLastname = normalizeMatchValue(row.nachname);
+    const priorPhones = new Set(
+      extractSubmissionPhoneCandidates({
+        ...submission,
+        answers: (row.answers as Record<string, unknown> | null) ?? null,
+      })
+    );
+
+    const sameEmail = Boolean(email && priorEmail && email === priorEmail);
+    const sameName = Boolean(firstname && lastname && firstname === priorFirstname && lastname === priorLastname);
+    const samePhone = Array.from(phoneCandidates).some((phone) => priorPhones.has(phone));
+
+    if (sameEmail || sameName || samePhone) {
+      matchingIds.add(priorIvorisId);
+    }
+  }
+
+  const uniqueIds = Array.from(matchingIds);
+  if (uniqueIds.length === 1) {
+    await patchSubmissionIvorisPatientId(db, submission.id, uniqueIds[0]);
+    console.log(
+      `[ANIMASIGN][IVORIS] reused prior submission ivoris_patient_id=${uniqueIds[0]} for submission=${submission.id}`
+    );
+    return uniqueIds[0];
+  }
+
+  if (uniqueIds.length > 1) {
+    throw new ManualReviewRequiredError(
+      `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Vorherige AnimaSign-Submissions verweisen auf mehrere Ivoris-Patienten.`,
+      "patient"
+    );
+  }
+
+  return null;
+}
+
 async function recoverIvorisPatientIdFromDirectory(
   db: DbClient,
   submission: SubmissionRow
@@ -654,6 +730,97 @@ async function recoverIvorisPatientIdFromDirectory(
   );
 }
 
+async function findReusableIvorisPatientIdForNewSubmission(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<string | null> {
+  const priorSubmissionIvorisId = await findReusableIvorisPatientIdFromPriorSubmissions(db, submission);
+  if (priorSubmissionIvorisId) {
+    return priorSubmissionIvorisId;
+  }
+
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  const email = normalizeEmailValue(submission.email);
+  const phoneCandidates = extractSubmissionPhoneCandidates(submission);
+
+  if (!birthday) {
+    return null;
+  }
+
+  const strategyResults: DirectoryStrategyResult[] = [];
+
+  const collectMatches = async (
+    label: string,
+    searchParams: Record<string, string | undefined>
+  ) => {
+    const payload = await searchIvorisPatients(searchParams);
+    const ids = (Array.isArray(payload) ? payload : [])
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(
+            entry &&
+              typeof entry === "object" &&
+              normalizeIvorisId((entry as Record<string, unknown>).Id) &&
+              toIsoDateOrNull(extractCandidateBirthday(entry as Record<string, unknown>)) === birthday
+          )
+      )
+      .map((entry) => normalizeIvorisId(entry.Id))
+      .filter((id): id is string => Boolean(id));
+
+    strategyResults.push({
+      label,
+      ids: Array.from(new Set(ids)),
+    });
+  };
+
+  if (firstname && lastname) {
+    await collectMatches("name+birthday", {
+      firstname: submission.vorname ?? undefined,
+      lastname: submission.nachname ?? undefined,
+      birthday,
+    });
+  }
+
+  if (email) {
+    await collectMatches("email+birthday", {
+      email,
+      birthday,
+    });
+  }
+
+  for (const phone of phoneCandidates) {
+    await collectMatches("phone+birthday", {
+      phone,
+      birthday,
+    });
+    await collectMatches("mobile+birthday", {
+      mobile: phone,
+      birthday,
+    });
+  }
+
+  const decision = decideIvorisDirectoryAction(strategyResults);
+  console.log(
+    `[ANIMASIGN][IVORIS] new-patient directory decision submission=${submission.id} decision=${decision.kind} strategies=${decision.summary.join(", ")}`
+  );
+
+  if (decision.kind === "reuse") {
+    await patchSubmissionIvorisPatientId(db, submission.id, decision.id);
+    return decision.id;
+  }
+
+  if (decision.kind === "manual_review") {
+    throw new ManualReviewRequiredError(
+      `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Ivoris liefert mehrere moegliche Treffer. Treffer: ${decision.summary.join(", ") || "keine"}.`,
+      "patient"
+    );
+  }
+
+  return null;
+}
+
 async function resolveSubmissionPatientIvorisId(
   db: DbClient,
   submission: SubmissionRow,
@@ -736,6 +903,12 @@ async function syncNewPatient(
   submission: SubmissionRow
 ): Promise<{ status: SyncStatus; ivorisId: string | null; requestPayload: IvorisPatientInput }> {
   const payload = buildCreateInput(submission);
+  const reusableIvorisId = await findReusableIvorisPatientIdForNewSubmission(db, submission);
+
+  if (reusableIvorisId) {
+    return { status: "skipped", ivorisId: reusableIvorisId, requestPayload: payload };
+  }
+
   const ivorisId = await createIvorisPatient(payload);
   const resolvedPatientId = submission.matched_patient_id ?? submission.patient_id;
 

@@ -8,6 +8,7 @@ Repo: `anima-cura`
 - Das `[object Object]`-Problem beim Ivoris-Dokument-Push ist behoben.
 - Die signierten PDFs sind in Anima-Cura direkt aus dem AnimaSign-Dashboard oeffenbar.
 - Alte Test-/Schrottdaten wurden aus Supabase, Auth und Storage entfernt.
+- Ein neuer Duplicate-Guard verhindert, dass fruehere AnimaSign-Ivoris-IDs blind noch einmal als neuer Patient angelegt werden.
 - Es sind jetzt nur noch echte fachliche Ivoris-Klaerfaelle offen.
 
 ## Aktueller Systemstand
@@ -54,6 +55,14 @@ Entfernte Test-IDs:
 - `8debe9cc-e3e5-47b3-9a1c-f8c44be339f9`
 - `aed4682b-de29-493c-bfdb-e58e4eefe03e`
 - `b8c1e75d-860f-4fb4-821b-f9b0650613b2`
+
+Der Fake-Name `zguiuok hijop` / `hiob` ist damit nicht mehr in den Live-Daten vorhanden.
+
+### 5. Duplicate-Guard gegen neue Ivoris-Dubletten
+
+- Wenn fuer dieselbe Person bereits eine fruehere AnimaSign-Submission mit gueltiger `ivoris_patient_id` existiert, wird diese ID jetzt wiederverwendet.
+- Wenn fruehere AnimaSign-Submissions fuer dieselbe Person auf mehrere unterschiedliche Ivoris-IDs zeigen, stoppt der Sync jetzt mit `MANUAL_REVIEW` statt noch einen weiteren Dubletten-Patienten anzulegen.
+- Zusaetzlich bleibt die Ivoris-Verzeichnispruefung aktiv, um eindeutige bestehende Treffer wiederzuverwenden.
 
 ## Echte offene Klaerfaelle
 
@@ -118,6 +127,8 @@ Diese Patienten haben ihr Dokument bereits in Ivoris, aber Ivoris blockiert das 
 ## Verifikation
 
 - `next build` lief erfolgreich nach dem Dashboard-/PDF-Fix.
+- Duplicate-Guard Tests am 2026-07-01 erfolgreich:
+- Test 1: fruehere Submission-ID wird wiederverwendet, kein neuer Patient angelegt.
+- Test 2: bei widerspruechlichen frueheren Ivoris-IDs stoppt der Sync sauber mit `MANUAL_REVIEW`.
 - Datenbankstand wurde am 2026-07-01 direkt gegen Supabase geprueft.
-- Aktueller Git-Stand vor diesem Report baut auf Commit `06d616229b0a751333346c5be7fcba5629566de3` auf.
-
+- Aktueller Git-Stand vor diesem Report baut auf Commit `c272f58` auf.

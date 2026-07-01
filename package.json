@@ -10,6 +10,7 @@
     "lint": "next lint",
     "sync:animus-react": "node scripts/sync-animus-react.mjs",
     "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
+    "test:animasign-dupguard": "tsx scripts/test-animasign-duplicate-guard.ts && tsx --test src/lib/services/__tests__/animasign-ivoris-directory.test.ts",
     "db:migrate": "supabase db push",
     "animasign:sync-worker": "tsx scripts/animasign-sync-worker.ts",
     "db:reset": "supabase db reset",
