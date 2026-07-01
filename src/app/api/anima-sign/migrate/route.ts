@@ -8,7 +8,7 @@ export async function GET() {
   // Get all submissions
   const { data: subs } = await supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, geburtsdatum, email, account_email, is_existing, matched_patient_id, status")
+    .select("id, vorname, nachname, geburtsdatum, email, account_email, is_existing, matched_patient_id, status, signed_pdf_path, signiert_am")
     .order("created_at", { ascending: false });
 
   if (!subs) return NextResponse.json({ error: "No submissions found" });
@@ -58,8 +58,13 @@ export async function GET() {
       }
     }
 
-    // 3. Fix status: if canvas signature exists (all do), mark as signiert
-    if (sub.status === "offen" || sub.status === "signatur_ausstehend") {
+    // 3. Fix status nur dann, wenn wirklich ein versiegeltes PDF vorliegt.
+    // Das fruehere pauschale Hochstufen auf "signiert" hat offene Signaturen
+    // als erledigt markiert und die Pipeline fuer PDF/Ivoris-Dokumente verfälscht.
+    if (
+      sub.status !== "signiert" &&
+      (sub.signed_pdf_path || sub.signiert_am)
+    ) {
       updates.status = "signiert";
       actions.push("status->signiert");
     }

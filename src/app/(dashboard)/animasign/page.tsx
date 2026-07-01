@@ -118,6 +118,8 @@ export default function AnimaSignPage() {
 
   const dot = (color: string, glow: string) => ({ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${glow}`, flexShrink: 0 } as const);
 
+  const hasSignedPdf = (submission: Submission) => Boolean(submission.signed_pdf_path);
+
   const getIvorisStatus = (submission: Submission) => {
     if (submission.ivoris_synced && submission.ivoris_doc_synced) {
       return { label: "OK", color: green, glow: greenBg };
@@ -206,9 +208,9 @@ export default function AnimaSignPage() {
             </div>
             {/* Unterschrift */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={dot(s.status === "signiert" ? blue : s.status === "fehler" ? "#d45a52" : gold, s.status === "signiert" ? blueBg : goldBg)} />
-              <span style={{ fontSize: 12, color: s.status === "signiert" ? ink : muted }}>
-                {s.status === "signiert" ? "Signiert" : s.status === "fehler" ? "Fehler" : "Ausstehend"}
+              <span style={dot(hasSignedPdf(s) ? blue : s.status === "fehler" ? "#d45a52" : gold, hasSignedPdf(s) ? blueBg : goldBg)} />
+              <span style={{ fontSize: 12, color: hasSignedPdf(s) ? ink : muted }}>
+                {hasSignedPdf(s) ? "Signiert" : s.status === "fehler" ? "Fehler" : "Ausstehend"}
               </span>
             </div>
             {/* App-Status */}
