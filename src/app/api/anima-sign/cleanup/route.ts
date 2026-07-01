@@ -1,8 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { createServerComponentClient } from "@/lib/db/supabase-server";
 
-export async function GET(req: Request) {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  const authClient = createServerComponentClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+
   const supabase = createServerClient();
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || profile.role !== "admin") {
+    return NextResponse.json({ error: "Nur fuer Admins" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const confirm = searchParams.get("confirm") === "true";
 
@@ -37,16 +60,32 @@ export async function GET(req: Request) {
 
   // Delete mode
   const results: Array<{ name: string; action: string }> = [];
+  const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
 
   for (const sub of testSubs) {
     // Delete auth account if exists
     if (sub.account_email) {
-      const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
       const user = users?.find(u => u.email === sub.account_email);
       if (user) {
         await supabase.auth.admin.deleteUser(user.id);
         results.push({ name: `${sub.vorname} ${sub.nachname}`, action: `Auth-User ${sub.account_email} geloescht` });
       }
+
+      const { error: profileDeleteError } = await supabase
+        .from("user_profiles")
+        .delete()
+        .eq("email", sub.account_email);
+      if (!profileDeleteError) {
+        results.push({ name: `${sub.vorname} ${sub.nachname}`, action: `user_profiles fuer ${sub.account_email} bereinigt` });
+      }
+    }
+
+    const storagePaths = [`${sub.id}/Anamnesebogen.pdf`, `${sub.id}/Anamnesebogen-signiert.pdf`];
+    const { error: storageError } = await supabase.storage
+      .from("anamnese-dokumente")
+      .remove(storagePaths);
+    if (!storageError) {
+      results.push({ name: `${sub.vorname} ${sub.nachname}`, action: "Storage-Dateien geloescht" });
     }
 
     // Delete submission
