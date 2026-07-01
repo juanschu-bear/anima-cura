@@ -22,6 +22,14 @@ type NormalizedPatient = {
   notizen?: string | null;
 };
 
+type ExistingPatientCandidate = {
+  id: string;
+  ivoris_id: string | null;
+  vorname: string;
+  nachname: string;
+  geburtsdatum: string;
+};
+
 function asArray(payload: unknown): GenericRecord[] {
   if (Array.isArray(payload)) {
     return payload.filter((x): x is GenericRecord => Boolean(x && typeof x === "object"));
@@ -74,6 +82,37 @@ function mapInsurance(raw: string | null): "privat" | "gesetzlich" {
   if (value.includes("statutory")) return "gesetzlich";
   if (value.includes("private")) return "privat";
   return "privat";
+}
+
+function normalizePersonToken(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("de-DE")
+    .replace(/\s+/g, " ");
+}
+
+export function isSamePersonCandidate(
+  incoming: Pick<NormalizedPatient, "vorname" | "nachname" | "geburtsdatum" | "ivoris_id">,
+  existing: ExistingPatientCandidate
+): boolean {
+  if (!existing.ivoris_id || existing.ivoris_id === incoming.ivoris_id) {
+    return false;
+  }
+
+  return (
+    incoming.geburtsdatum === existing.geburtsdatum &&
+    normalizePersonToken(incoming.vorname) === normalizePersonToken(existing.vorname) &&
+    normalizePersonToken(incoming.nachname) === normalizePersonToken(existing.nachname)
+  );
+}
+
+export function findPotentialDuplicateCandidates(
+  incoming: Pick<NormalizedPatient, "vorname" | "nachname" | "geburtsdatum" | "ivoris_id">,
+  existing: ExistingPatientCandidate[]
+): ExistingPatientCandidate[] {
+  return existing.filter((candidate) => isSamePersonCandidate(incoming, candidate));
 }
 
 function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPatient } | { ok: false; reason: string } {
@@ -199,6 +238,33 @@ export async function syncIvorisPatients(): Promise<{
       } else {
         updated++;
       }
+      continue;
+    }
+
+    const { data: sameBirthdayCandidates, error: duplicateLookupError } = await db
+      .from("patients")
+      .select("id, ivoris_id, vorname, nachname, geburtsdatum")
+      .eq("geburtsdatum", patient.geburtsdatum);
+
+    if (duplicateLookupError) {
+      skipped++;
+      errors.push(`Duplicate-Lookup ${patient.ivoris_id}: ${duplicateLookupError.message}`);
+      continue;
+    }
+
+    const duplicateCandidates = findPotentialDuplicateCandidates(
+      patient,
+      (sameBirthdayCandidates as ExistingPatientCandidate[] | null) ?? []
+    );
+
+    if (duplicateCandidates.length) {
+      skipped++;
+      errors.push(
+        `Duplicate-Kandidat ${patient.ivoris_id}: ${patient.vorname} ${patient.nachname} (${patient.geburtsdatum}) bereits lokal vorhanden unter ${duplicateCandidates
+          .map((candidate) => candidate.ivoris_id)
+          .filter(Boolean)
+          .join(", ")}`
+      );
       continue;
     }
 

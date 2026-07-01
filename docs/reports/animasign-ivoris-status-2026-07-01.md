@@ -9,6 +9,7 @@ Repo: `anima-cura`
 - Die signierten PDFs sind in Anima-Cura direkt aus dem AnimaSign-Dashboard oeffenbar.
 - Alte Test-/Schrottdaten wurden aus Supabase, Auth und Storage entfernt.
 - Ein neuer Duplicate-Guard verhindert, dass fruehere AnimaSign-Ivoris-IDs blind noch einmal als neuer Patient angelegt werden.
+- Ein zusaetzlicher Import-Guard verhindert jetzt auch, dass Ivoris-Dubletten blind als neue lokale `patients`-Zeilen in Anima-Cura gespiegelt werden.
 - Es sind jetzt nur noch echte fachliche Ivoris-Klaerfaelle offen.
 
 ## Aktueller Systemstand
@@ -63,6 +64,21 @@ Der Fake-Name `zguiuok hijop` / `hiob` ist damit nicht mehr in den Live-Daten vo
 - Wenn fuer dieselbe Person bereits eine fruehere AnimaSign-Submission mit gueltiger `ivoris_patient_id` existiert, wird diese ID jetzt wiederverwendet.
 - Wenn fruehere AnimaSign-Submissions fuer dieselbe Person auf mehrere unterschiedliche Ivoris-IDs zeigen, stoppt der Sync jetzt mit `MANUAL_REVIEW` statt noch einen weiteren Dubletten-Patienten anzulegen.
 - Zusaetzlich bleibt die Ivoris-Verzeichnispruefung aktiv, um eindeutige bestehende Treffer wiederzuverwenden.
+
+### 6. Scribe-Kreuzcheck / Tammo Kornelson
+
+- Der Scribe-Doku-Flow legt keinen neuen Patienten an.
+- `POST /api/doku/eintrag` erwartet eine bestehende `patient_id` und speichert nur einen Doku-Eintrag.
+- `POST /api/doku/eintrag/[id]/ivoris-push` pusht nur einen Karteieintrag auf einen bereits vorhandenen `patients.ivoris_id`-Datensatz.
+- Falls `ivoris_id` fehlt, bricht der Push mit Fehler ab. Es gibt dort keinen Fallback, der einen neuen Ivoris-Patienten erzeugt.
+
+Konkreter Live-Befund fuer `Tammo Kornelson` am 2026-07-01:
+
+- In `anamnese_submissions` existiert genau `1` Submission.
+- In `doku_eintraege` existieren fuer Tammo `0` Scribe-Eintraege.
+- In `patients` existieren lokal `4` Datensaetze mit vier verschiedenen `ivoris_id`-Werten.
+- Diese vier lokalen Zeilen spiegeln bestehende Ivoris-Dubletten und wurden nicht durch Scribe-Dokumentation erzeugt.
+- Zusaetzlich blockt der allgemeine Ivoris-Patientensync jetzt neue lokale Spiegel-Dubletten fuer identische Personendaten.
 
 ## Echte offene Klaerfaelle
 
@@ -130,5 +146,6 @@ Diese Patienten haben ihr Dokument bereits in Ivoris, aber Ivoris blockiert das 
 - Duplicate-Guard Tests am 2026-07-01 erfolgreich:
 - Test 1: fruehere Submission-ID wird wiederverwendet, kein neuer Patient angelegt.
 - Test 2: bei widerspruechlichen frueheren Ivoris-IDs stoppt der Sync sauber mit `MANUAL_REVIEW`.
+- Test 3: der Ivoris-Import erkennt gleiche Person + anderes `ivoris_id` jetzt als Dubletten-Kandidaten und legt keinen neuen lokalen Patienten mehr an.
 - Datenbankstand wurde am 2026-07-01 direkt gegen Supabase geprueft.
-- Aktueller Git-Stand vor diesem Report baut auf Commit `c272f58` auf.
+- Der Scribe-/Kornelson-Kreuzcheck wurde am 2026-07-01 direkt gegen Supabase verifiziert.
