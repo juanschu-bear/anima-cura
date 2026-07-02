@@ -1,24 +1,36 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/db/supabase";
+import { createAdminClient, createServerClient } from "@/lib/db/supabase";
 
-export async function GET() {
+async function main() {
   const supabase = createServerClient();
+  const admin = createAdminClient();
   const results: Array<{ id: string; name: string; updates: string[] }> = [];
 
-  // Get all submissions
-  const { data: subs } = await supabase
+  const { data: subs, error: subsError } = await supabase
     .from("anamnese_submissions")
     .select("id, vorname, nachname, geburtsdatum, email, account_email, is_existing, matched_patient_id, status, signed_pdf_path, signiert_am")
     .order("created_at", { ascending: false });
 
-  if (!subs) return NextResponse.json({ error: "No submissions found" });
+  if (subsError) {
+    throw new Error(`Submissions konnten nicht geladen werden: ${subsError.message}`);
+  }
 
-  // Get all auth users for login check
-  const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  if (!subs?.length) {
+    console.log(JSON.stringify({ total: 0, updated: 0, results: [] }, null, 2));
+    return;
+  }
+
+  const { data: authUsers, error: usersError } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (usersError) {
+    throw new Error(`Auth-User konnten nicht geladen werden: ${usersError.message}`);
+  }
+
   const emailToUser: Record<string, { email: string; last_sign_in_at: string | null }> = {};
-  if (users) {
-    for (const u of users) {
-      if (u.email) emailToUser[u.email] = { email: u.email, last_sign_in_at: u.last_sign_in_at || null };
+  for (const user of authUsers.users ?? []) {
+    if (user.email) {
+      emailToUser[user.email] = {
+        email: user.email,
+        last_sign_in_at: user.last_sign_in_at || null,
+      };
     }
   }
 
@@ -26,7 +38,6 @@ export async function GET() {
     const updates: Record<string, unknown> = {};
     const actions: string[] = [];
 
-    // 1. Fix is_existing + matched_patient_id
     if (!sub.is_existing && sub.nachname && sub.geburtsdatum) {
       const { data: match } = await supabase
         .from("patients")
@@ -41,16 +52,20 @@ export async function GET() {
       }
     }
 
-    // 2. Fix account_email
     if (!sub.account_email && sub.vorname && sub.nachname) {
-      const normalize = (s: string) =>
-        s.toLowerCase()
-          .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      const normalize = (value: string) =>
+        value
+          .toLowerCase()
+          .replace(/ä/g, "ae")
+          .replace(/ö/g, "oe")
+          .replace(/ü/g, "ue")
+          .replace(/ß/g, "ss")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
           .replace(/[^a-z0-9]/g, "");
       const prefix = `${normalize(sub.vorname.trim())}.${normalize(sub.nachname.trim())}`;
-      const found = Object.keys(emailToUser).find(e =>
-        e.startsWith(prefix) && e.endsWith("@animacura.de")
+      const found = Object.keys(emailToUser).find(
+        (email) => email.startsWith(prefix) && email.endsWith("@animacura.de")
       );
       if (found) {
         updates.account_email = found;
@@ -58,18 +73,11 @@ export async function GET() {
       }
     }
 
-    // 3. Fix status nur dann, wenn wirklich ein versiegeltes PDF vorliegt.
-    // Das fruehere pauschale Hochstufen auf "signiert" hat offene Signaturen
-    // als erledigt markiert und die Pipeline fuer PDF/Ivoris-Dokumente verfälscht.
-    if (
-      sub.status !== "signiert" &&
-      (sub.signed_pdf_path || sub.signiert_am)
-    ) {
+    if (sub.status !== "signiert" && (sub.signed_pdf_path || sub.signiert_am)) {
       updates.status = "signiert";
       actions.push("status->signiert");
     }
 
-    // 4. Fix portal_zugang on matched patient
     const patientId = (updates.matched_patient_id as string) || sub.matched_patient_id;
     if (patientId && sub.account_email) {
       await supabase
@@ -80,22 +88,30 @@ export async function GET() {
     }
 
     if (Object.keys(updates).length > 0) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("anamnese_submissions")
         .update(updates)
         .eq("id", sub.id);
+      if (updateError) {
+        throw new Error(`Submission ${sub.id} konnte nicht aktualisiert werden: ${updateError.message}`);
+      }
     }
 
     if (actions.length > 0) {
       results.push({ id: sub.id, name: `${sub.vorname} ${sub.nachname}`, updates: actions });
     }
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  return NextResponse.json({
+  console.log(JSON.stringify({
     total: subs.length,
     updated: results.length,
     results,
-  });
+  }, null, 2));
 }
+
+void main().catch((error) => {
+  console.error("[animasign-migrate-submissions]", error);
+  process.exit(1);
+});

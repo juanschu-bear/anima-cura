@@ -100,9 +100,24 @@ export interface MatchingDetails {
   name_score: number;
   betrag_match: boolean;
   zweck_score: number;
-  methode: "exakt" | "fuzzy" | "iban" | "manuell" | "referenz" | "kategorie" | "name";
+  methode:
+    | "exakt"
+    | "fuzzy"
+    | "iban"
+    | "manuell"
+    | "referenz"
+    | "kategorie"
+    | "name"
+    | "basisnummer"
+    | "rechnungsnr"
+    | "name_plus_rate"
+    | "name_plus_posten"
+    | "animapay_aufladung";
   referenz?: string; // erkanntes unser_zeichen bei einem Referenz-Treffer
   ueberzahlung?: number; // verrechneter Ueberzahlungsbetrag, falls vorhanden
+  mehrdeutig?: boolean;
+  kategorie?: string;
+  quelle?: string;
 }
 
 // ─── Mahnwesen ──────────────────────────────────────────────
