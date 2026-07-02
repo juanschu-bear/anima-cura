@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, DragEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Mail, Phone, Shield, GripVertical, Info } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
@@ -41,6 +42,7 @@ const DEMO_ITEMS: MahnItem[] = [
 ];
 
 export default function MahnwesenPage() {
+  const router = useRouter();
   const { locale } = useAppStore();
   const STUFEN = getStufen(locale);
   const [patientFilter, setPatientFilter] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export default function MahnwesenPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPatientFilter(params.get("patient"));
+    const demoRequested = params.get("demo") === "1";
 
     async function fetchData() {
       const next: Record<StufeKey, MahnItem[]> = { karenz: [], stufe1: [], stufe2: [], stufe3: [] };
@@ -82,12 +85,16 @@ export default function MahnwesenPage() {
           const key: StufeKey = r.mahnstufe === 0 ? "karenz" : r.mahnstufe === 1 ? "stufe1" : r.mahnstufe === 2 ? "stufe2" : "stufe3";
           next[key].push(item);
         });
-      } else {
-        // Load demo items
+      } else if (demoRequested) {
+        setHasRealData(false);
+        setShowDemo(true);
         DEMO_ITEMS.forEach((item) => {
           const key: StufeKey = item.mahnstufe === 0 ? "karenz" : item.mahnstufe === 1 ? "stufe1" : item.mahnstufe === 2 ? "stufe2" : "stufe3";
           next[key].push(item);
         });
+      } else {
+        setHasRealData(false);
+        setShowDemo(false);
       }
       setPipeline(next);
     }
@@ -172,7 +179,15 @@ export default function MahnwesenPage() {
               <p className="mt-2 text-blue-600">
                 {t("dunning.chargebackInfo", locale)}
               </p>
-              <button onClick={() => setShowDemo(false)} className="mt-2 text-xs font-semibold text-blue-500 hover:text-blue-700">{t("dunning.hideDemo", locale)}</button>
+              <button
+                onClick={() => {
+                  setShowDemo(false);
+                  setPipeline({ karenz: [], stufe1: [], stufe2: [], stufe3: [] });
+                }}
+                className="mt-2 text-xs font-semibold text-blue-500 hover:text-blue-700"
+              >
+                {t("dunning.hideDemo", locale)}
+              </button>
             </div>
           </div>
         </div>
@@ -195,6 +210,11 @@ export default function MahnwesenPage() {
       <div className="stat-card">
         <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{t("dunning.pipeline", locale)}</h3>
         <p className="mb-4 text-sm text-praxis-400">{t("dunning.dragHint", locale)}</p>
+        {!hasRealData && !showDemo && (
+          <div className="mb-4 rounded-lg border border-surface-200 bg-surface-50 px-4 py-3 text-sm text-praxis-500">
+            Keine echten Mahnfaelle gefunden. Diese Ansicht zeigt nur live ueberfaellige oder offene Raten. Demo-Karten erscheinen nur noch bewusst mit `?demo=1`.
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {STUFEN.map((stufe) => {
             const items = patientFilter
@@ -234,10 +254,35 @@ export default function MahnwesenPage() {
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <p className="text-sm font-semibold text-praxis-800">{item.patient_name}</p>
+                            <button
+                              type="button"
+                              className="text-left text-sm font-semibold text-praxis-800 hover:text-[#4b42d6]"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (item.patient_id && item.typ !== "demo") {
+                                  router.push(`/patienten/${item.patient_id}`);
+                                }
+                              }}
+                              disabled={!item.patient_id || item.typ === "demo"}
+                              style={!item.patient_id || item.typ === "demo" ? { cursor: "default" } : undefined}
+                            >
+                              {item.patient_name}
+                            </button>
                             <p className="mt-1 text-sm text-praxis-600">{t("dunning.rate", locale)} {item.rate_nummer} · {Number(item.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</p>
                             <p className="text-sm text-praxis-500">{t("dunning.day", locale)} {days} · {t("dunning.due", locale)} {new Date(item.faellig_am).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</p>
                             {item.patient_email && <p className="mt-1 text-xs text-praxis-400">✉ {item.patient_email}</p>}
+                            {item.patient_id && item.typ !== "demo" && (
+                              <button
+                                type="button"
+                                className="mt-2 text-xs font-semibold text-[#4b42d6] hover:text-[#392fb8]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/patienten/${item.patient_id}`);
+                                }}
+                              >
+                                Profil öffnen
+                              </button>
+                            )}
                           </div>
                           <GripVertical size={16} className="mt-1 text-praxis-300" />
                         </div>

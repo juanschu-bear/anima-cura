@@ -47,6 +47,62 @@ function parseBetrag(s: string): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 
+function localDateFromIso(dateString: string) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0, 0);
+}
+
+function isoFromLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getExportRange(dateString: string, mode: "tag" | "woche" | "monat") {
+  const base = localDateFromIso(dateString);
+  const start = new Date(base);
+  const end = new Date(base);
+
+  if (mode === "woche") {
+    const weekday = (base.getDay() + 6) % 7;
+    start.setDate(base.getDate() - weekday);
+    end.setDate(start.getDate() + 6);
+  } else if (mode === "monat") {
+    start.setDate(1);
+    end.setMonth(base.getMonth() + 1, 0);
+  }
+
+  const startIso = isoFromLocalDate(start);
+  const endIso = isoFromLocalDate(end);
+  const label =
+    mode === "tag"
+      ? startIso
+      : mode === "woche"
+      ? `${startIso} bis ${endIso}`
+      : `${start.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}`;
+
+  return { startIso, endIso, label };
+}
+
+function euro(value: number) {
+  return value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function htmlEscape(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // GiroCode nach EPC069-12: Banking-App scannt, Felder sind vorausgefüllt.
 function epcPayload(betrag: number, zweck: string): string {
   return [
@@ -82,16 +138,19 @@ export default function KassePage() {
   const [detail, setDetail] = useState<any | null>(null);
   const [detailQr, setDetailQr] = useState<string | null>(null);
   const [loeschBestaetigung, setLoeschBestaetigung] = useState(false);
+  const [exportZeitraum, setExportZeitraum] = useState<"tag" | "woche" | "monat">("tag");
+  const [exporting, setExporting] = useState<null | "csv" | "pdf">(null);
 
   const treffer = useMemo(
     () => (patSearch.length >= 2 && !patient ? patienten.slice(0, 8) : []),
     [patienten, patSearch, patient]
   );
+  const exportRange = useMemo(() => getExportRange(kassenTag, exportZeitraum), [kassenTag, exportZeitraum]);
 
   async function ladeTagesliste() {
     const { data } = await supabase
       .from("kassen_zahlungen")
-      .select("*, patients:patient_id(vorname, nachname)")
+      .select("*, patients:patient_id(vorname, nachname, ivoris_nummer)")
       .eq("kassen_datum", kassenTag)
       .order("created_at", { ascending: false });
     setTagesListe(data || []);
@@ -113,6 +172,167 @@ export default function KassePage() {
     for (const z of tagesListe) s[z.zahlart] = (s[z.zahlart] || 0) + Number(z.betrag);
     return s;
   }, [tagesListe]);
+
+  async function ladeExportListe() {
+    const { data, error } = await supabase
+      .from("kassen_zahlungen")
+      .select("*, patients:patient_id(vorname, nachname, ivoris_nummer)")
+      .gte("kassen_datum", exportRange.startIso)
+      .lte("kassen_datum", exportRange.endIso)
+      .order("kassen_datum", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function exportiereCsv() {
+    setExporting("csv");
+    try {
+      const rows = await ladeExportListe();
+      const header = ["Datum", "Patient", "Patientennummer", "Zahlart", "Betrag_EUR", "Zweck", "Notiz", "Status"];
+      const lines = rows.map((row: any) => {
+        const status = row.zahlart === "qr_ueberweisung"
+          ? row.transaktion_id ? "Geldeingang da" : "Wartet auf Geldeingang"
+          : row.zahlart === "guthaben"
+          ? "Vom Guthaben verrechnet"
+          : row.zahlart === "bar"
+          ? "Bar erhalten"
+          : "Terminalumsatz erfasst";
+        return [
+          row.kassen_datum,
+          `${row.patients?.nachname || ""}, ${row.patients?.vorname || ""}`.trim().replace(/^,\s*/, ""),
+          row.patients?.ivoris_nummer || "",
+          ZAHLARTEN.find((item) => item.key === row.zahlart)?.label || row.zahlart,
+          euro(Number(row.betrag || 0)),
+          row.zweck || "",
+          row.notiz || "",
+          status,
+        ].map(csvCell).join(";");
+      });
+
+      const csv = [header.map(csvCell).join(";"), ...lines].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `anima-kasse-${exportZeitraum}-${exportRange.startIso}-${exportRange.endIso}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setHinweis(`CSV-Export erstellt fuer ${exportRange.label}.`);
+    } catch (error: any) {
+      setHinweis(`CSV-Export fehlgeschlagen: ${error?.message || "unbekannter Fehler"}`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function exportierePdf() {
+    setExporting("pdf");
+    try {
+      const rows = await ladeExportListe();
+      const totals = rows.reduce((acc: Record<string, number>, row: any) => {
+        acc[row.zahlart] = (acc[row.zahlart] || 0) + Number(row.betrag || 0);
+        return acc;
+      }, {});
+      const total = rows.reduce((sum: number, row: any) => sum + Number(row.betrag || 0), 0);
+      const htmlRows = rows.map((row: any) => `
+        <tr>
+          <td>${htmlEscape(row.kassen_datum)}</td>
+          <td>${htmlEscape(`${row.patients?.nachname || ""}, ${row.patients?.vorname || ""}`.replace(/^,\s*/, ""))}</td>
+          <td>${htmlEscape(row.patients?.ivoris_nummer || "")}</td>
+          <td>${htmlEscape(ZAHLARTEN.find((item) => item.key === row.zahlart)?.label || row.zahlart)}</td>
+          <td style="text-align:right;">${euro(Number(row.betrag || 0))} EUR</td>
+          <td>${htmlEscape(row.zweck || "")}</td>
+        </tr>
+      `).join("");
+      const htmlTotals = ZAHLARTEN.map((item) => `
+        <tr>
+          <td>${htmlEscape(item.label)}</td>
+          <td style="text-align:right;">${euro(totals[item.key] || 0)} EUR</td>
+        </tr>
+      `).join("");
+
+      const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=800");
+      if (!printWindow) {
+        throw new Error("Druckfenster wurde blockiert");
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="de">
+          <head>
+            <meta charset="utf-8" />
+            <title>Kassenexport ${exportRange.label}</title>
+            <style>
+              body { font-family: Arial, sans-serif; color: #172033; margin: 32px; }
+              h1 { margin: 0 0 8px; font-size: 24px; }
+              p { margin: 0 0 16px; color: #53627a; }
+              .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+              .card { border: 1px solid #d8e0ec; border-radius: 12px; padding: 16px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border-bottom: 1px solid #e5ebf3; padding: 8px 10px; font-size: 12px; text-align: left; vertical-align: top; }
+              th { background: #f6f8fb; }
+              .meta { font-size: 28px; font-weight: 700; margin-top: 8px; }
+              @media print {
+                body { margin: 16px; }
+              }
+            </style>
+          </head>
+          <body>
+            <h1>AnimaPay Kasse</h1>
+            <p>Exportzeitraum: ${htmlEscape(exportRange.label)}</p>
+            <div class="summary">
+              <div class="card">
+                <div>Gesamtzahlungen</div>
+                <div class="meta">${rows.length}</div>
+              </div>
+              <div class="card">
+                <div>Gesamtsumme</div>
+                <div class="meta">${euro(total)} EUR</div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom: 24px;">
+              <h2 style="margin: 0 0 12px; font-size: 16px;">Summen nach Zahlart</h2>
+              <table>
+                <thead><tr><th>Zahlart</th><th style="text-align:right;">Summe</th></tr></thead>
+                <tbody>${htmlTotals}</tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h2 style="margin: 0 0 12px; font-size: 16px;">Einzelposten</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Patient</th>
+                    <th>Patientennummer</th>
+                    <th>Zahlart</th>
+                    <th style="text-align:right;">Betrag</th>
+                    <th>Zweck</th>
+                  </tr>
+                </thead>
+                <tbody>${htmlRows || '<tr><td colspan="6">Keine Eintraege im gewaehlten Zeitraum.</td></tr>'}</tbody>
+              </table>
+            </div>
+            <script>
+              window.onload = () => {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setHinweis(`Druckansicht fuer ${exportRange.label} geoeffnet. Im Browser kannst du direkt als PDF speichern.`);
+    } catch (error: any) {
+      setHinweis(`PDF-Export fehlgeschlagen: ${error?.message || "unbekannter Fehler"}`);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   // Verknuepft wartende QR-Zahlungen mit bereits abgeholten
   // Ueberweisungen (Zeichen im Zweck + exakter Betrag). Loest bewusst
@@ -430,7 +650,10 @@ export default function KassePage() {
 
           <div className="stat-card">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Kassenbuch</p>
+              <div>
+                <p className="text-sm font-semibold">Kassenbuch</p>
+                <p className="mt-1 text-xs text-praxis-400">Export fuer Tag, Woche oder Monat direkt aus dem aktuellen Kassenstand.</p>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -442,6 +665,29 @@ export default function KassePage() {
                   {pruefe ? "Prüft …" : "Eingang prüfen"}
                 </button>
               </div>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {([
+                { key: "tag", label: "Tag" },
+                { key: "woche", label: "Woche" },
+                { key: "monat", label: "Monat" },
+              ] as const).map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setExportZeitraum(item.key)}
+                  className={`ac-chip text-xs ${exportZeitraum === item.key ? "ac-chip-active" : ""}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <button className="btn-secondary text-xs" onClick={exportiereCsv} disabled={exporting !== null}>
+                {exporting === "csv" ? "Exportiert CSV ..." : "CSV exportieren"}
+              </button>
+              <button className="btn-secondary text-xs" onClick={exportierePdf} disabled={exporting !== null}>
+                {exporting === "pdf" ? "Oeffnet Druckansicht ..." : "PDF / Drucken"}
+              </button>
+              <span className="text-xs text-praxis-400">Zeitraum: {exportRange.label}</span>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
               <button
