@@ -18,7 +18,7 @@ function getSupabase() {
 function isAuthorized(req: NextRequest): boolean {
   const token = req.headers.get("x-jordan-token");
   const expected = process.env.JORDAN_API_TOKEN;
-  if (!expected) return true;
+  if (!expected) return false;
   return token === expected;
 }
 

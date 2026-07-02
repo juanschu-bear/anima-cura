@@ -20,7 +20,10 @@ export async function GET(req: NextRequest) {
   if (process.env.IVORIS_SYNC_ENABLED === "true") {
     try {
       const syncRes = await fetch(`${appUrl}/api/ivoris/patients/batch-sync?startPage=0`, {
-        headers: { "Cache-Control": "no-cache" },
+        headers: {
+          "Cache-Control": "no-cache",
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
       });
       results.ivoris = syncRes.ok ? await syncRes.json() : { error: `HTTP ${syncRes.status}` };
     } catch (e) {

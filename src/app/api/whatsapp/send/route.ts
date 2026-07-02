@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,9 @@ async function logAudit(neueWerte: Record<string, unknown>) {
 }
 
 export async function POST(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   try {
     const parsedBody = requestSchema.safeParse(await request.json());
     if (!parsedBody.success) {

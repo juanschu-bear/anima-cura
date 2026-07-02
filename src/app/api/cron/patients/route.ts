@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
   for (let i = 0; i < 50; i++) {
     try {
       const res = await fetch(`${appUrl}/api/ivoris/patients/batch-sync?startPage=${startPage}`, {
-        headers: { "Cache-Control": "no-cache" },
+        headers: {
+          "Cache-Control": "no-cache",
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
       });
       if (!res.ok) {
         errors.push(`HTTP ${res.status} bei Seite ${startPage}`);

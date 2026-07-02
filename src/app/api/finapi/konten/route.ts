@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserToken, getAccounts, getTransactions } from "@/lib/api/finapi-client";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -11,6 +12,9 @@ const PRIVATE_ACCOUNT_IDS = [31760546, 31760547, 31760549];
 const BASE_URL = process.env.FINAPI_BASE_URL || "https://sandbox.finapi.io";
 
 export async function GET(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   try {
     const db = createServerClient();
     let userId = process.env.FINAPI_USER_ID;

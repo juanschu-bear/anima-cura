@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import OpenAI from "openai";
 import { z } from "zod";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
@@ -297,6 +298,9 @@ async function synthesizeSpeech(text: string) {
 }
 
 export async function POST(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   try {
     const formData = await request.formData();
     const audioValue = formData.get("audio");

@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
 // GET: Alle Kategorien + Zuordnungen laden
 export async function GET() {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   const db = createServerClient();
   const { data: kategorien, error: kErr } = await db
     .from("finanz_kategorien")
@@ -28,6 +32,9 @@ export async function GET() {
 
 // POST: Neue Kategorie erstellen ODER Transaktion zuordnen
 export async function POST(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   const db = createServerClient();
   const body = await request.json();
 
@@ -84,6 +91,9 @@ export async function POST(request: Request) {
 
 // PATCH: Kategorie umbenennen / Farbe aendern / Muster bearbeiten
 export async function PATCH(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   const db = createServerClient();
   const body = await request.json();
   const { id, name, color, muster } = body;
@@ -101,6 +111,9 @@ export async function PATCH(request: Request) {
 
 // DELETE: Kategorie loeschen
 export async function DELETE(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   const db = createServerClient();
   const { id } = await request.json();
   if (!id) return NextResponse.json({ ok: false, error: "id erforderlich" }, { status: 400 });

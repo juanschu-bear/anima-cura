@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { fetchIvorisPatientsRaw } from "@/lib/api/ivoris-client";
 import { syncIvorisPatients } from "@/lib/services/ivoris-sync";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST() {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   try {
     // Debug: test raw fetch first
     const raw = await fetchIvorisPatientsRaw();

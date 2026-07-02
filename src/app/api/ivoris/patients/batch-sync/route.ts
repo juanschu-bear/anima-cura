@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
@@ -72,6 +73,12 @@ function normalizePatient(raw: any) {
 }
 
 export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const authError = await requirePraxisRole(["admin", "verwaltung"]);
+    if (authError) return authError;
+  }
+
   const { searchParams } = new URL(request.url);
   const startPage = parseInt(searchParams.get("startPage") || "0", 10);
 

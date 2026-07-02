@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,9 @@ async function tryFetch(label: string, path: string, params?: Record<string, str
 }
 
 export async function GET(req: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung", "lesezugriff"]);
+  if (authError) return authError;
+
   const { searchParams } = new URL(req.url);
   const patientId = searchParams.get("patientId") || "ccd09c7e-3fac-47ae-8b00-7d942449c0a1";
 

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   const { text, locale } = await req.json();
 
   if (!text || typeof text !== "string") {

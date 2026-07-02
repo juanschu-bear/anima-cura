@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const authError = await requirePraxisRole(["admin", "verwaltung", "lesezugriff"]);
+  if (authError) return authError;
+
   const linkname = process.env.IVORIS_LINKNAME || "(missing)";
   const app = process.env.IVORIS_APP || "(missing)";
   const appVersion = process.env.IVORIS_APP_VERSION || "(missing)";
