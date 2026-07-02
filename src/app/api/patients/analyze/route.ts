@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const authError = await requirePraxisRole(["admin", "verwaltung", "lesezugriff"]);
+  if (authError) return authError;
+
   const db = createServerClient();
   const results: Record<string, unknown> = {};
 

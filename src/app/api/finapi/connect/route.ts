@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { getClientToken } from "@/lib/api/finapi-client";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -100,6 +101,9 @@ async function ensureFinapiUser(clientToken: string): Promise<string> {
 }
 
 export async function POST() {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+
   try {
     // Step 1: Get client token
     const clientToken = await getClientToken();
