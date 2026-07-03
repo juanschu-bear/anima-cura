@@ -30,6 +30,10 @@
   - bestaetigte Zahlungen werden rechnerisch ueber mehrere offene Raten verteilt statt nur auf eine einzelne Rate
   - Teilzahlungen werden als Teilzahlung gefuehrt
   - Ratenplan- und Patientendetail zeigen jetzt an, wenn gespeicherter Planstand und echte Zahlungshistorie auseinanderlaufen
+- `Patientennummer im Matching` gehaertet:
+  - 8-stellige `ivoris_nummer` im Verwendungszweck schlaegt Namensaehnlichkeit
+  - damit laufen neue Zahlungen mit sauber gesetzter Patientennummer direkt in den Auto-Flow
+  - auch Sammelzahlungen koennen jetzt direkt dem richtigen Patienten zugeordnet werden
 
 ## Was damit konkret besser ist
 
@@ -41,6 +45,7 @@
 - Praxis-Ausgaben muessen nicht mehr zwischen Einnahmen versteckt werden.
 - Quartalsbezogene Kassenbuchungen koennen jetzt strukturiert statt nur als Freitext erfasst werden.
 - Historische Faelle seit 2023/2024 koennen jetzt deutlich sauberer gegen bestaetigte Zahlungseingaenge gespiegelt werden.
+- Wenn Sabine oder die Praxis die Patientennummer im Verwendungszweck mitgibt, sinkt der spaetere manuelle Zahlungsabgleich deutlich.
 
 ## Noch offen
 

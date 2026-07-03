@@ -128,6 +128,16 @@ Moegliche Einsatzorte:
 - Bank-Matching
 - manuelle Nachbearbeitung
 
+Status:
+
+- umgesetzt am 2026-07-03 in
+  - `src/lib/services/matching-engine.ts`
+  - `src/lib/services/__tests__/matching-engine.test.ts`
+- Ergebnis:
+  - 8-stellige `ivoris_nummer` im Verwendungszweck sticht Namens-Fuzzy-Matching
+  - auch Sammelzahlungen mit korrekter Patientennummer laufen direkt in den Auto-Flow
+  - bei theoretischer Mehrdeutigkeit wird nicht blind gebucht, sondern auf `Abweichung` runtergestuft
+
 ### 9. Historische Ratenzahlung besser gegen echte Zahlungshistorie spiegeln
 
 Beobachtung:

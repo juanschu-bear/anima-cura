@@ -35,6 +35,7 @@ interface RateCandidate {
 
 interface PatientCandidate {
   id: string;
+  ivoris_nummer?: string | null;
   vorname: string;
   nachname: string;
   normalizedNachname: string;
@@ -93,7 +94,7 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
   const { data: patienten } = await db
     .from("patients")
     .select(`
-      id, vorname, nachname, email,
+      id, ivoris_nummer, vorname, nachname, email,
       raten!inner (
         id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag
       )
@@ -103,6 +104,7 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
 
   return (patienten ?? []).map((patient) => ({
     id: patient.id,
+    ivoris_nummer: (patient as { ivoris_nummer?: string | null }).ivoris_nummer ?? null,
     vorname: patient.vorname,
     nachname: patient.nachname,
     normalizedNachname: normalizeMatchText(patient.nachname || ""),
@@ -187,6 +189,52 @@ export function matchTransaction(
 ): MatchResult {
   if (!patienten.length) {
     return createUnklarResult();
+  }
+
+  const basisnummer = extractUnserZeichen(transaktion.verwendungszweck).base;
+  if (basisnummer) {
+    const nummerTreffer = patienten.filter((patient) => patient.ivoris_nummer === basisnummer);
+    if (nummerTreffer.length === 1) {
+      const patient = nummerTreffer[0];
+      const rate = [...(patient.raten || [])].sort((a, b) => {
+        const leftDate = new Date(a.faellig_am).getTime();
+        const rightDate = new Date(b.faellig_am).getTime();
+        if (leftDate !== rightDate) return leftDate - rightDate;
+        return a.rate_nummer - b.rate_nummer;
+      }).find(Boolean);
+
+      if (patient.id && rate?.id) {
+        const betragMatch = Math.abs(transaktion.betrag - rate.betrag) < 0.01;
+        return {
+          patient_id: patient.id,
+          rate_id: rate.id,
+          score: betragMatch ? 100 : 96,
+          status: "auto",
+          details: {
+            name_score: 0,
+            betrag_match: betragMatch,
+            zweck_score: 100,
+            methode: "basisnummer",
+          },
+        };
+      }
+    }
+
+    if (nummerTreffer.length > 1) {
+      return {
+        patient_id: null,
+        rate_id: null,
+        score: Math.min(79, config.auto_approve_score - 1),
+        status: "abweichung",
+        details: {
+          name_score: 0,
+          betrag_match: false,
+          zweck_score: 100,
+          methode: "basisnummer",
+          mehrdeutig: true,
+        },
+      };
+    }
   }
 
   // 3. Für jeden Patienten Score berechnen

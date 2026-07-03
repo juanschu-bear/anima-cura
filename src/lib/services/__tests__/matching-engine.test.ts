@@ -99,3 +99,88 @@ test("downgrades sibling-style IBAN collisions to manual review", () => {
   assert.equal(result.details.betrag_match, true);
   assert.equal(result.details.mehrdeutig, true);
 });
+
+test("auto-matches by unique patient number in purpose even when the sender name is unrelated", () => {
+  const result = matchTransaction(
+    {
+      absender_name: "Sabine Praxis Test",
+      absender_iban: null,
+      betrag: 150,
+      verwendungszweck: "KFO 00007919 Rate Juli",
+    },
+    [
+      {
+        id: "patient-1",
+        ivoris_nummer: "00007919",
+        vorname: "Anna",
+        nachname: "Marchenko",
+        normalizedNachname: "MARCHENKO",
+        raten: [
+          {
+            id: "rate-1",
+            rate_nummer: 1,
+            betrag: 150,
+            faellig_am: "2026-07-01",
+            status: "offen",
+            ratenplan_id: "plan-1",
+          },
+        ],
+      },
+    ],
+    new Map(),
+    config
+  );
+
+  assert.equal(result.status, "auto");
+  assert.equal(result.patient_id, "patient-1");
+  assert.equal(result.score, 100);
+  assert.equal(result.details.methode, "basisnummer");
+  assert.equal(result.details.zweck_score, 100);
+});
+
+test("uses patient number for auto-match even when the amount covers more than one rate", () => {
+  const result = matchTransaction(
+    {
+      absender_name: "Familie Marchenko",
+      absender_iban: null,
+      betrag: 300,
+      verwendungszweck: "00007919 Sammelzahlung",
+    },
+    [
+      {
+        id: "patient-1",
+        ivoris_nummer: "00007919",
+        vorname: "Anna",
+        nachname: "Marchenko",
+        normalizedNachname: "MARCHENKO",
+        raten: [
+          {
+            id: "rate-1",
+            rate_nummer: 1,
+            betrag: 150,
+            faellig_am: "2026-07-01",
+            status: "offen",
+            ratenplan_id: "plan-1",
+          },
+          {
+            id: "rate-2",
+            rate_nummer: 2,
+            betrag: 150,
+            faellig_am: "2026-08-01",
+            status: "offen",
+            ratenplan_id: "plan-1",
+          },
+        ],
+      },
+    ],
+    new Map(),
+    config
+  );
+
+  assert.equal(result.status, "auto");
+  assert.equal(result.patient_id, "patient-1");
+  assert.equal(result.rate_id, "rate-1");
+  assert.equal(result.score, 96);
+  assert.equal(result.details.methode, "basisnummer");
+  assert.equal(result.details.betrag_match, false);
+});
