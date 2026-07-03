@@ -175,6 +175,25 @@ export default function KassePage() {
     }
     return ZAHLARTEN;
   }, [buchungstyp]);
+  const gefilterteKassenListe = useMemo(
+    () => tagesListe.filter((z) => {
+      const artOk = filterArt === "alle" || z.zahlart === filterArt;
+      const typOk = filterBuchungstyp === "alle" || z.buchungstyp === filterBuchungstyp;
+      return artOk && typOk;
+    }),
+    [tagesListe, filterArt, filterBuchungstyp]
+  );
+  const methodenSummen = useMemo(
+    () =>
+      ZAHLARTEN.map(({ key, label }) => ({
+        key,
+        label,
+        summe: tagesListe
+          .filter((z) => z.zahlart === key)
+          .reduce((sum, z) => sum + Number(z.betrag || 0), 0),
+      })),
+    [tagesListe]
+  );
 
   async function ladeTagesliste() {
     const { data } = await supabase
@@ -678,18 +697,15 @@ export default function KassePage() {
             {buchungstyp === "einnahme" && patient && guthaben !== null && (
               <span className="mb-1 block text-xs" style={{ color: "#b88a2e" }}>Anima-Balance-Guthaben: {guthaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              {verfuegbareZahlarten.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setZahlart(key)}
-                  className={`ac-chip justify-center gap-2 py-3 ${zahlart === key ? "ac-chip-active" : ""}`}
-                  style={key === "guthaben" ? { gridColumn: "span 2", fontWeight: 700, color: "#b88a2e", border: "1px solid " + (zahlart === "guthaben" ? "#b88a2e" : "rgba(184,138,46,0.45)"), background: zahlart === "guthaben" ? "rgba(246,196,83,0.14)" : undefined } : undefined}
-                >
-                  <Icon size={16} /> {label}
-                </button>
+            <select
+              className="input w-full"
+              value={zahlart}
+              onChange={(e) => setZahlart(e.target.value as (typeof ZAHLARTEN)[number]["key"])}
+            >
+              {verfuegbareZahlarten.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <label className="block">
@@ -732,13 +748,14 @@ export default function KassePage() {
                 <p className="text-xs font-medium text-praxis-500">Quartalsbezug</p>
                 <p className="mt-1 text-xs text-praxis-400">Optional fuer Quartalskontrollen, Sammelbuchungen oder Praxis-Ausgaben.</p>
               </div>
-              <button
-                type="button"
-                className={`ac-chip text-xs ${quartalAktiv ? "ac-chip-active" : ""}`}
-                onClick={() => setQuartalAktiv((current) => !current)}
-              >
-                {quartalAktiv ? "Quartal aktiv" : "Kein Quartal"}
-              </button>
+              <label className="inline-flex items-center gap-2 text-xs font-semibold text-praxis-500">
+                <input
+                  type="checkbox"
+                  checked={quartalAktiv}
+                  onChange={() => setQuartalAktiv((current) => !current)}
+                />
+                Quartal aktiv
+              </label>
             </div>
             {quartalAktiv && (
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -810,73 +827,71 @@ export default function KassePage() {
                 </button>
               </div>
             </div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              {([
-                { key: "tag", label: "Tag" },
-                { key: "woche", label: "Woche" },
-                { key: "monat", label: "Monat" },
-              ] as const).map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setExportZeitraum(item.key)}
-                  className={`ac-chip text-xs ${exportZeitraum === item.key ? "ac-chip-active" : ""}`}
-                >
-                  {item.label}
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-praxis-400">Export</span>
+                <select className="input w-full text-sm" value={exportZeitraum} onChange={(e) => setExportZeitraum(e.target.value as "tag" | "woche" | "monat")}>
+                  <option value="tag">Tag</option>
+                  <option value="woche">Woche</option>
+                  <option value="monat">Monat</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-praxis-400">Buchungstyp</span>
+                <select className="input w-full text-sm" value={filterBuchungstyp} onChange={(e) => setFilterBuchungstyp(e.target.value as "alle" | "einnahme" | "ausgabe")}>
+                  <option value="alle">Alle Buchungen</option>
+                  <option value="einnahme">Nur Einnahmen</option>
+                  <option value="ausgabe">Nur Ausgaben</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-praxis-400">Zahlart</span>
+                <select className="input w-full text-sm" value={filterArt} onChange={(e) => setFilterArt(e.target.value)}>
+                  <option value="alle">Alle Zahlarten</option>
+                  {ZAHLARTEN.map(({ key, label }) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2 self-end">
+                <button className="btn-secondary text-xs" onClick={exportiereCsv} disabled={exporting !== null}>
+                  {exporting === "csv" ? "CSV …" : "CSV"}
                 </button>
-              ))}
-              <button className="btn-secondary text-xs" onClick={exportiereCsv} disabled={exporting !== null}>
-                {exporting === "csv" ? "Exportiert CSV ..." : "CSV exportieren"}
-              </button>
-              <button className="btn-secondary text-xs" onClick={exportierePdf} disabled={exporting !== null}>
-                {exporting === "pdf" ? "Oeffnet Druckansicht ..." : "PDF / Drucken"}
-              </button>
-              <span className="text-xs text-praxis-400">Zeitraum: {exportRange.label}</span>
-            </div>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {([
-                { key: "alle", label: "Alle Buchungen" },
-                { key: "einnahme", label: "Nur Einnahmen" },
-                { key: "ausgabe", label: "Nur Ausgaben" },
-              ] as const).map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => setFilterBuchungstyp(item.key)}
-                  className={`ac-chip text-xs ${filterBuchungstyp === item.key ? "ac-chip-active" : ""}`}
-                >
-                  {item.label}
+                <button className="btn-secondary text-xs" onClick={exportierePdf} disabled={exporting !== null}>
+                  {exporting === "pdf" ? "PDF …" : "PDF"}
                 </button>
-              ))}
+              </div>
             </div>
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => setFilterArt("alle")}
-                className={`ac-chip text-xs ${filterArt === "alle" ? "ac-chip-active" : ""}`}
-              >
-                Gesamt: {tagesListe.length} {tagesListe.length === 1 ? "Buchung" : "Buchungen"} · Saldo {euro(kassenUebersicht.saldo)} €
-              </button>
-              <button className="ac-chip text-xs">
-                Einnahmen: {euro(kassenUebersicht.einnahmen)} €
-              </button>
-              <button className="ac-chip text-xs">
-                Ausgaben: {euro(kassenUebersicht.ausgaben)} €
-              </button>
-              {ZAHLARTEN.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilterArt(filterArt === key ? "alle" : key)}
-                  className={`ac-chip text-xs ${filterArt === key ? "ac-chip-active" : ""}`}
-                >
-                  {label}: {(tagesSummen[key] || 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                </button>
-              ))}
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-praxis-400">Saldo</p>
+                <p className="mt-1 text-xl font-bold text-praxis-800">{euro(kassenUebersicht.saldo)} €</p>
+                <p className="mt-1 text-xs text-praxis-400">{tagesListe.length} {tagesListe.length === 1 ? "Buchung" : "Buchungen"}</p>
+              </div>
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-praxis-400">Einnahmen</p>
+                <p className="mt-1 text-xl font-bold text-[#4ca43f]">{euro(kassenUebersicht.einnahmen)} €</p>
+                <p className="mt-1 text-xs text-praxis-400">Zeitraum: {exportRange.label}</p>
+              </div>
+              <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-praxis-400">Ausgaben</p>
+                <p className="mt-1 text-xl font-bold text-accent-coral">{euro(kassenUebersicht.ausgaben)} €</p>
+                <p className="mt-1 text-xs text-praxis-400">Zeitraum: {exportRange.label}</p>
+              </div>
             </div>
+            <details className="mb-4 rounded-xl border border-surface-200 bg-surface-50">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-praxis-700">Aufschlüsselung nach Zahlart</summary>
+              <div className="grid grid-cols-1 gap-2 border-t border-surface-200 px-4 py-3 sm:grid-cols-2">
+                {methodenSummen.map((item) => (
+                  <div key={item.key} className="flex items-center justify-between text-sm">
+                    <span className="text-praxis-500">{item.label}</span>
+                    <span className="font-semibold text-praxis-800">{euro(item.summe)} €</span>
+                  </div>
+                ))}
+              </div>
+            </details>
             {(() => {
-              const gefiltert = tagesListe.filter((z) => {
-                const artOk = filterArt === "alle" || z.zahlart === filterArt;
-                const typOk = filterBuchungstyp === "alle" || z.buchungstyp === filterBuchungstyp;
-                return artOk && typOk;
-              });
+              const gefiltert = gefilterteKassenListe;
               const proSeite = 10;
               const seiten = Math.max(1, Math.ceil(gefiltert.length / proSeite));
               const sichtbar = gefiltert.slice((seite - 1) * proSeite, seite * proSeite);

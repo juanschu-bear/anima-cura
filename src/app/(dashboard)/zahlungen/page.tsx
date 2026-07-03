@@ -49,6 +49,7 @@ export default function ZahlungenPage() {
   const [statusHelpFor, setStatusHelpFor] = useState<string | null>(null);
   const [statusHelpPos, setStatusHelpPos] = useState<{ left: number; top: number } | null>(null);
   const [clientTx, setClientTx] = useState<any[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -244,6 +245,18 @@ export default function ZahlungenPage() {
     { key: "wartet", label: locale === "en" ? "Awaiting funds" : "Wartet" },
     { key: "guthaben", label: locale === "en" ? "Balance offset" : "Guthaben" },
     { key: "kartenzahlung", label: locale === "en" ? "Card terminal" : "Kartenzahlung" },
+  ];
+  const statusOptionen = filters.map((item) => ({ value: item.key, label: item.label }));
+  const kasseOptionen = [
+    { value: "alle", label: "Alle" },
+    { value: "gesetzlich", label: "Kasse (BEMA)" },
+    { value: "privat", label: "Privat (GOZ)" },
+  ];
+  const wegOptionen = [
+    { value: "alle", label: locale === "en" ? "All" : "Alle" },
+    { value: "kasse", label: "AnimaPay Kasse" },
+    { value: "app", label: "AnimaPay App" },
+    { value: "bank", label: "Bank" },
   ];
   const [kassenListe, setKassenListe] = useState<any[]>([]);
   const [wegFilter, setWegFilter] = useState("alle");
@@ -445,11 +458,8 @@ export default function ZahlungenPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
-            Schnellfilter
-          </p>
+      <div className="rounded-2xl border p-4" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {[
               { key: "heute", label: "Heute" },
@@ -466,109 +476,82 @@ export default function ZahlungenPage() {
               </button>
             ))}
           </div>
-        </div>
-        <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
-            Zeitraum von
-          </p>
-          <input
-            type="date"
-            className="input"
-            value={zeitraumVon}
-            onChange={(e) => {
-              setZeitraumVon(e.target.value);
-              setSchnellfilter("frei");
-            }}
-          />
-        </div>
-        <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
-            Zeitraum bis
-          </p>
-          <input
-            type="date"
-            className="input"
-            value={zeitraumBis}
-            onChange={(e) => {
-              setZeitraumBis(e.target.value);
-              setSchnellfilter("frei");
-            }}
-          />
-        </div>
-        {(zeitraumVon || zeitraumBis) && (
-          <button
-            type="button"
-            className="ac-chip"
-            onClick={() => {
-              setZeitraumVon("");
-              setZeitraumBis("");
-              setSchnellfilter("frei");
-            }}
-          >
-            Zeitraum zurücksetzen
+          <button type="button" className="ac-chip" onClick={() => setShowFilters((current) => !current)}>
+            {showFilters ? "Weniger Filter" : "Mehr Filter"}
           </button>
+        </div>
+        {showFilters && (
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Status</span>
+              <select className="input w-full" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+                {statusOptionen.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Abrechnungsart</span>
+              <select className="input w-full" value={kasseFilter} onChange={(e) => { setKasseFilter(e.target.value); setPage(1); }}>
+                {kasseOptionen.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zahlungsweg</span>
+              <select className="input w-full" value={wegFilter} onChange={(e) => { setWegFilter(e.target.value); setPage(1); }}>
+                {wegOptionen.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zeitraum von</span>
+              <input
+                type="date"
+                className="input w-full"
+                value={zeitraumVon}
+                onChange={(e) => {
+                  setZeitraumVon(e.target.value);
+                  setSchnellfilter("frei");
+                }}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zeitraum bis</span>
+              <input
+                type="date"
+                className="input w-full"
+                value={zeitraumBis}
+                onChange={(e) => {
+                  setZeitraumBis(e.target.value);
+                  setSchnellfilter("frei");
+                }}
+              />
+            </label>
+          </div>
         )}
-      </div>
-
-      <div>
-        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Status</p>
-        <div className="flex flex-wrap gap-2">
-          {filters.map((f) => (
+        {(zeitraumVon || zeitraumBis || statusFilter !== "alle" || kasseFilter !== "alle" || wegFilter !== "alle") && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--ac-text-mute)" }}>
+            <span>Aktive Filter</span>
             <button
-              key={f.key}
-              onClick={() => { setStatusFilter(f.key); setPage(1); }}
-              className={`ac-chip ${statusFilter === f.key ? "ac-chip-active" : ""}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Abrechnungsart</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "alle", label: "Alle" },
-            { key: "gesetzlich", label: "Kasse (BEMA)" },
-            { key: "privat", label: "Privat (GOZ)" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => { setKasseFilter(f.key); setPage(1); }}
-              className={`ac-chip ${kasseFilter === f.key ? "ac-chip-active" : ""}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>Zahlungsweg</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "alle", label: locale === "en" ? "All" : "Alle" },
-            { key: "kasse", label: "AnimaPay Kasse" },
-            { key: "app", label: "AnimaPay App" },
-            { key: "bank", label: "Bank" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => { setWegFilter(f.key); setPage(1); }}
+              type="button"
               className="ac-chip"
-              style={{
-                padding: "9px 20px",
-                fontSize: 14,
-                fontWeight: 700,
-                ...(wegFilter === f.key
-                  ? {
-                      borderColor: "#7aa2ff",
-                      color: "#7aa2ff",
-                      background: "rgba(122,162,255,0.1)",
-                      boxShadow: "0 0 14px rgba(122,162,255,0.35)",
-                    }
-                  : {}),
+              onClick={() => {
+                setStatusFilter("alle");
+                setKasseFilter("alle");
+                setWegFilter("alle");
+                setZeitraumVon("");
+                setZeitraumBis("");
+                setSchnellfilter("frei");
+                setPage(1);
               }}
             >
-              {f.label}
+              Alles zurücksetzen
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <details className="rounded-lg border" style={{ borderColor: "var(--ac-border)", background: "var(--ac-surface)" }}>
