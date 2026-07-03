@@ -157,24 +157,6 @@ function rememberIbanMatch(ibanHistory: IbanHistoryMap, iban: string | null, pat
   ibanHistory.set(normalizedIban, known);
 }
 
-function applyRateUpdatesToCandidates(patienten: PatientCandidate[], updates: Array<{ id: string; status: string; bezahlt_betrag: number }>) {
-  if (!updates.length) return;
-  for (const patient of patienten) {
-    patient.raten = patient.raten.flatMap((rate) => {
-      const update = updates.find((item) => item.id === rate.id);
-      if (!update) return [rate];
-      if (update.status === "bezahlt") return [];
-      const original = Number(rate.bezahlt_betrag || 0) + Number(rate.betrag || 0);
-      return [{
-        ...rate,
-        status: update.status,
-        bezahlt_betrag: update.bezahlt_betrag,
-        betrag: Math.max(0, original - Number(update.bezahlt_betrag || 0)),
-      }];
-    });
-  }
-}
-
 // ─── Hauptfunktion ──────────────────────────────────────────
 export function matchTransaction(
   transaktion: {
@@ -443,6 +425,16 @@ export interface ReferenceResult {
   ueberzahlung: number;
 }
 
+interface BookingCandidate {
+  id: string;
+  betrag: number;
+  datum: string;
+  verwendungszweck: string;
+  matched_patient_id: string | null;
+  matched_rate_id?: string | null;
+  matching_details?: MatchingDetails | null;
+}
+
 // Verrechnet eine Ueberzahlung mit den naechsten offenen Posten des Patienten
 // (aeltester zuerst). Der unverbrauchte Rest wird als Guthaben am Patienten geparkt.
 async function applyUeberzahlung(
@@ -488,6 +480,100 @@ async function applyUeberzahlung(
     const aktuell = ((pat?.guthaben as number | null) ?? 0);
     await db.from("patients").update({ guthaben: aktuell + rest }).eq("id", patientId);
   }
+}
+
+export async function applyConfirmedTransactionBooking(
+  db: ReturnType<typeof createServerClient>,
+  tx: BookingCandidate
+): Promise<{ mode: "raten" | "offene_posten" | "keine_offenen_raten" | "bereits"; matchedRateId: string | null }> {
+  if (!tx?.id) return { mode: "bereits", matchedRateId: null };
+  if (tx.matching_details?.booking_applied_at) {
+    return { mode: "bereits", matchedRateId: tx.matched_rate_id ?? null };
+  }
+
+  const bookingStampedAt = new Date().toISOString();
+  const { data: existingRateLink } = await db
+    .from("raten")
+    .select("id")
+    .eq("transaktion_id", tx.id)
+    .limit(1);
+
+  if (existingRateLink?.length) {
+    await db.from("transaktionen").update({
+      matching_details: {
+        ...(tx.matching_details || {}),
+        booking_applied_at: bookingStampedAt,
+        booking_mode: "raten",
+      },
+    }).eq("id", tx.id);
+    return { mode: "bereits", matchedRateId: existingRateLink[0].id };
+  }
+
+  const ref = await reconcileByReference(db, {
+    betrag: tx.betrag,
+    verwendungszweck: tx.verwendungszweck || "",
+    datum: tx.datum,
+  });
+
+  if (ref && (!tx.matched_patient_id || !ref.patient_id || ref.patient_id === tx.matched_patient_id)) {
+    await db.from("offene_posten").update({
+      status: ref.posten_update.status,
+      gezahlt: ref.posten_update.gezahlt,
+      offen: ref.posten_update.offen,
+      bezahlt_am: ref.posten_update.bezahlt_am,
+    }).eq("id", ref.posten_id);
+
+    if (ref.ueberzahlung > 0) {
+      await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
+    }
+
+    await db.from("transaktionen").update({
+      matching_details: {
+        ...(tx.matching_details || {}),
+        booking_applied_at: bookingStampedAt,
+        booking_mode: "offene_posten",
+      },
+    }).eq("id", tx.id);
+
+    return { mode: "offene_posten", matchedRateId: null };
+  }
+
+  if (!tx.matched_patient_id) {
+    return { mode: "keine_offenen_raten", matchedRateId: null };
+  }
+
+  const { data: offeneRaten } = await db
+    .from("raten")
+    .select("id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag")
+    .eq("patient_id", tx.matched_patient_id)
+    .in("status", ["offen", "teilbezahlt", "überfällig"])
+    .order("faellig_am", { ascending: true })
+    .order("rate_nummer", { ascending: true });
+
+  const allocation = allocatePaymentToRates(offeneRaten || [], Number(tx.betrag) || 0, tx.datum, tx.id);
+  for (const update of allocation.updates) {
+    await db.from("raten").update({
+      status: update.status,
+      bezahlt_am: update.bezahlt_am,
+      bezahlt_betrag: update.bezahlt_betrag,
+      transaktion_id: update.transaktion_id,
+    }).eq("id", update.id);
+  }
+
+  const firstRateId = allocation.updates[0]?.id ?? tx.matched_rate_id ?? null;
+  await db.from("transaktionen").update({
+    matched_rate_id: firstRateId,
+    matching_details: {
+      ...(tx.matching_details || {}),
+      booking_applied_at: bookingStampedAt,
+      booking_mode: allocation.updates.length > 0 ? "raten" : "keine_offenen_raten",
+    },
+  }).eq("id", tx.id);
+
+  return {
+    mode: allocation.updates.length > 0 ? "raten" : "keine_offenen_raten",
+    matchedRateId: firstRateId,
+  };
 }
 
 // Gibt null zurueck, wenn keine eindeutige Referenz gefunden wird (dann greift Stufe 1).
@@ -677,28 +763,40 @@ export async function runBatchMatching(): Promise<{
       geprueft_am: new Date().toISOString(),
     }).eq("id", tx.id);
 
-    // Bei Auto-Match: Zahlung sequentiell ueber offene/teiloffene Raten verteilen.
+    // Bei Auto-Match: Bankzeile und Forderungsseite muessen zusammen schliessen.
     if (result.status === "auto" && result.rate_id) {
-      const { data: offeneRaten } = await db
-        .from("raten")
-        .select("id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag")
-        .eq("patient_id", result.patient_id)
-        .in("status", ["offen", "teilbezahlt", "überfällig"])
-        .order("faellig_am", { ascending: true })
-        .order("rate_nummer", { ascending: true });
-
-      const allocation = allocatePaymentToRates(offeneRaten || [], Number(tx.betrag) || 0, tx.datum, tx.id);
-      for (const update of allocation.updates) {
-        await db.from("raten").update({
-          status: update.status,
-          bezahlt_am: update.bezahlt_am,
-          bezahlt_betrag: update.bezahlt_betrag,
-          transaktion_id: update.transaktion_id,
-        }).eq("id", update.id);
-      }
+      const booking = await applyConfirmedTransactionBooking(db, {
+        id: tx.id,
+        betrag: Number(tx.betrag) || 0,
+        datum: tx.datum,
+        verwendungszweck: tx.verwendungszweck || "",
+        matched_patient_id: result.patient_id,
+        matched_rate_id: result.rate_id,
+        matching_details: result.details,
+      });
 
       rememberIbanMatch(ibanHistory, tx.absender_iban, result.patient_id);
-      applyRateUpdatesToCandidates(patienten, allocation.updates);
+      if (booking.mode === "raten") {
+        const { data: refreshRates } = await db
+          .from("raten")
+          .select("id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag")
+          .eq("patient_id", result.patient_id)
+          .in("status", ["offen", "teilbezahlt", "überfällig"]);
+        const patient = patienten.find((entry) => entry.id === result.patient_id);
+        if (patient) {
+          patient.raten = (refreshRates || []).map((rate) => ({
+            id: rate.id,
+            rate_nummer: rate.rate_nummer,
+            betrag: rate.status === "teilbezahlt"
+              ? Math.max(0, Number(rate.betrag) - Number(rate.bezahlt_betrag || 0))
+              : rate.betrag,
+            faellig_am: rate.faellig_am,
+            status: rate.status,
+            ratenplan_id: rate.ratenplan_id,
+            bezahlt_betrag: rate.bezahlt_betrag,
+          }));
+        }
+      }
       stats.auto++;
     } else if (result.status === "abweichung") {
       stats.abweichung++;
@@ -791,8 +889,19 @@ export async function runBatchMatching(): Promise<{
     .update({ matching_status: "auto", geprueft_am: new Date().toISOString() })
     .eq("matching_status", "abweichung")
     .gte("matching_score", config.auto_approve_score)
-    .select("id");
+    .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details");
   const autoGebucht = Array.isArray(festgebucht) ? festgebucht.length : 0;
+  for (const tx of festgebucht || []) {
+    await applyConfirmedTransactionBooking(db, {
+      id: tx.id,
+      betrag: Number(tx.betrag) || 0,
+      datum: tx.datum,
+      verwendungszweck: tx.verwendungszweck || "",
+      matched_patient_id: tx.matched_patient_id,
+      matched_rate_id: tx.matched_rate_id,
+      matching_details: tx.matching_details,
+    });
+  }
   if (autoGebucht > 0) {
     stats.abweichung = Math.max(0, stats.abweichung - autoGebucht);
   }

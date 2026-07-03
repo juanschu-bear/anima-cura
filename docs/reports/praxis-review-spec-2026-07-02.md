@@ -159,7 +159,20 @@ Status:
   - Quartalsplaene laufen faelligkeitsseitig korrekt im 3-Monats-Rhythmus
   - bestaetigte Zahlungen werden rechnerisch ueber mehrere offene oder teiloffene Raten verteilt
   - Teilzahlungen werden sichtbar
-  - UI markiert Abweichungen zwischen gespeichertem Planstand und echter Zahlungshistorie
+- UI markiert Abweichungen zwischen gespeichertem Planstand und echter Zahlungshistorie
+
+Zusatzbeobachtung vom 2026-07-03:
+
+- Ein Teil der Alt-Fall-Abweichungen entstand nicht nur aus altem Datenstand, sondern auch daraus, dass bestaetigte Vorschlaege teils nur den Matching-Status aenderten, ohne die Forderungsseite mitzunehmen.
+
+Zusatzstatus:
+
+- behoben am 2026-07-03 in
+  - `src/lib/services/matching-engine.ts`
+  - `src/app/api/zahlungen/aktion/route.ts`
+- Ergebnis:
+  - `auto`, `manuell` und Stapel-Bestaetigungen buchen jetzt die zugehoerigen Raten oder offenen Posten mit
+  - dadurch laufen Status und Forderungsstand deutlich seltener auseinander
 
 ## Mahnwesen / Datenqualitaet
 

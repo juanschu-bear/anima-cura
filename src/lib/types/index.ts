@@ -118,6 +118,8 @@ export interface MatchingDetails {
   mehrdeutig?: boolean;
   kategorie?: string;
   quelle?: string;
+  booking_applied_at?: string;
+  booking_mode?: "raten" | "offene_posten" | "keine_offenen_raten";
 }
 
 // ─── Mahnwesen ──────────────────────────────────────────────

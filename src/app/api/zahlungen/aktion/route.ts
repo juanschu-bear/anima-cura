@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { applyConfirmedTransactionBooking } from "@/lib/services/matching-engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,16 +20,6 @@ async function berechtigung() {
 
 const STAMPEL = () => new Date().toISOString();
 
-// Zaehlt bzw. selektiert die sicheren Vorschlaege: Status abweichung, Patient zugeordnet, Score >= minScore.
-function vorschlagQuery(service: ReturnType<typeof createServerClient>, minScore: number) {
-  return service
-    .from("transaktionen")
-    .select("id, matching_score")
-    .eq("matching_status", "abweichung")
-    .not("matched_patient_id", "is", null)
-    .gte("matching_score", minScore);
-}
-
 export async function POST(request: NextRequest) {
   const { fehler } = await berechtigung();
   if (fehler) return fehler;
@@ -41,11 +32,22 @@ export async function POST(request: NextRequest) {
   if (body.aktion === "zuordnen") {
     const { txId, patientId } = body;
     if (!txId || !patientId) return NextResponse.json({ error: "txId und patientId noetig" }, { status: 400 });
-    const { error } = await service
+    const { data: tx, error } = await service
       .from("transaktionen")
       .update({ matching_status: "manuell", matched_patient_id: patientId, matching_score: 100, geprueft_am: STAMPEL() })
-      .eq("id", txId);
+      .eq("id", txId)
+      .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details")
+      .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await applyConfirmedTransactionBooking(service, {
+      id: tx.id,
+      betrag: Number(tx.betrag) || 0,
+      datum: tx.datum,
+      verwendungszweck: tx.verwendungszweck || "",
+      matched_patient_id: tx.matched_patient_id,
+      matched_rate_id: tx.matched_rate_id,
+      matching_details: tx.matching_details,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -55,16 +57,27 @@ export async function POST(request: NextRequest) {
     if (!txId) return NextResponse.json({ error: "txId noetig" }, { status: 400 });
     const { data: tx, error: leseErr } = await service
       .from("transaktionen")
-      .select("matching_score, matched_patient_id")
+      .select("id, betrag, datum, verwendungszweck, matching_score, matched_patient_id, matched_rate_id, matching_details")
       .eq("id", txId)
       .single();
     if (leseErr) return NextResponse.json({ error: leseErr.message }, { status: 500 });
     if (!tx?.matched_patient_id) return NextResponse.json({ error: "Kein Patient zugeordnet" }, { status: 400 });
-    const { error } = await service
+    const { data: updated, error } = await service
       .from("transaktionen")
       .update({ matching_status: "auto", matching_score: Math.max(Number(tx.matching_score || 0), 90), geprueft_am: STAMPEL() })
-      .eq("id", txId);
+      .eq("id", txId)
+      .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details")
+      .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await applyConfirmedTransactionBooking(service, {
+      id: updated.id,
+      betrag: Number(updated.betrag) || 0,
+      datum: updated.datum,
+      verwendungszweck: updated.verwendungszweck || "",
+      matched_patient_id: updated.matched_patient_id,
+      matched_rate_id: updated.matched_rate_id,
+      matching_details: updated.matching_details,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -96,19 +109,34 @@ export async function POST(request: NextRequest) {
   // Stapel: alle sicheren Vorschlaege ab Schwelle bestaetigen (abweichung -> auto), in Bloecken.
   if (body.aktion === "stapel_bestaetigen") {
     const minScore = Number(body.minScore ?? 80);
-    const { data: rows, error: selErr } = await vorschlagQuery(service, minScore);
+    const { data: rows, error: selErr } = await service
+      .from("transaktionen")
+      .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details, matching_score")
+      .eq("matching_status", "abweichung")
+      .not("matched_patient_id", "is", null)
+      .gte("matching_score", minScore);
     if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
     const ids = (rows ?? []).map((r: { id: string }) => r.id);
     if (ids.length === 0) return NextResponse.json({ ok: true, anzahl: 0 });
     let erledigt = 0;
-    for (let i = 0; i < ids.length; i += 500) {
-      const block = ids.slice(i, i + 500);
-      const { error } = await service
+    for (const row of rows ?? []) {
+      const { data: updated, error } = await service
         .from("transaktionen")
         .update({ matching_status: "auto", geprueft_am: STAMPEL() })
-        .in("id", block);
+        .eq("id", row.id)
+        .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details")
+        .single();
       if (error) return NextResponse.json({ error: error.message, anzahl: erledigt }, { status: 500 });
-      erledigt += block.length;
+      await applyConfirmedTransactionBooking(service, {
+        id: updated.id,
+        betrag: Number(updated.betrag) || 0,
+        datum: updated.datum,
+        verwendungszweck: updated.verwendungszweck || "",
+        matched_patient_id: updated.matched_patient_id,
+        matched_rate_id: updated.matched_rate_id,
+        matching_details: updated.matching_details,
+      });
+      erledigt += 1;
     }
     return NextResponse.json({ ok: true, anzahl: erledigt });
   }

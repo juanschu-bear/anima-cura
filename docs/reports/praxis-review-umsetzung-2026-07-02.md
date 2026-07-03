@@ -34,6 +34,10 @@
   - 8-stellige `ivoris_nummer` im Verwendungszweck schlaegt Namensaehnlichkeit
   - damit laufen neue Zahlungen mit sauber gesetzter Patientennummer direkt in den Auto-Flow
   - auch Sammelzahlungen koennen jetzt direkt dem richtigen Patienten zugeordnet werden
+- `Bestaetigte Zahlungen buchen jetzt wirklich durch`:
+  - manuelle Zuordnung, Einzel-Bestaetigung und Stapel-Bestaetigung buchen nicht mehr nur den Matching-Status um
+  - dieselben Aktionen schliessen jetzt auch die zugehoerige Rate oder den offenen Posten mit
+  - dadurch entstehen weniger Alt-Faelle, bei denen Zahlungen formal bestaetigt sind, aber im Plan trotzdem offen bleiben
 
 ## Was damit konkret besser ist
 
@@ -46,6 +50,7 @@
 - Quartalsbezogene Kassenbuchungen koennen jetzt strukturiert statt nur als Freitext erfasst werden.
 - Historische Faelle seit 2023/2024 koennen jetzt deutlich sauberer gegen bestaetigte Zahlungseingaenge gespiegelt werden.
 - Wenn Sabine oder die Praxis die Patientennummer im Verwendungszweck mitgibt, sinkt der spaetere manuelle Zahlungsabgleich deutlich.
+- Wenn sichere Vorschlaege bestaetigt werden, landet die Wirkung jetzt auch wirklich in Raten und offenen Posten statt nur in der Statusspalte.
 
 ## Noch offen
 
