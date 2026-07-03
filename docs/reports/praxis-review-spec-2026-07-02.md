@@ -174,6 +174,12 @@ Zusatzstatus:
   - `auto`, `manuell` und Stapel-Bestaetigungen buchen jetzt die zugehoerigen Raten oder offenen Posten mit
   - dadurch laufen Status und Forderungsstand deutlich seltener auseinander
 
+Nachtrag vom 2026-07-03:
+
+- zusaetzlicher Reparaturpfad in `src/lib/services/matching-engine.ts`
+- bestaetigte Alt-Zahlungen ohne gesetzten Buchungsmarker werden bei kuenftigen Matching-Laeufen konservativ nachverbucht
+- Fokus bewusst auf Ratenfaelle, damit historische offene Posten nicht versehentlich doppelt verrechnet werden
+
 ## Mahnwesen / Datenqualitaet
 
 ### 10. Im Mahnwesen auf Kontakt klicken -> Patientenprofil oeffnen

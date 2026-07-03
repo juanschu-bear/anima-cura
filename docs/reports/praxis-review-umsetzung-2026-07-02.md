@@ -38,6 +38,10 @@
   - manuelle Zuordnung, Einzel-Bestaetigung und Stapel-Bestaetigung buchen nicht mehr nur den Matching-Status um
   - dieselben Aktionen schliessen jetzt auch die zugehoerige Rate oder den offenen Posten mit
   - dadurch entstehen weniger Alt-Faelle, bei denen Zahlungen formal bestaetigt sind, aber im Plan trotzdem offen bleiben
+- `Alt-Bestaetigungen werden nachrepariert`:
+  - der Matching-Lauf sucht jetzt auch bestaetigte Alt-Zahlungen ohne Buchungsmarker
+  - diese werden konservativ in offene/teiloffene Raten nachverbucht
+  - dadurch kann sich der historische Planstand auch ohne neuen Praxis-Klick schrittweise selbst bereinigen
 
 ## Was damit konkret besser ist
 
@@ -51,6 +55,7 @@
 - Historische Faelle seit 2023/2024 koennen jetzt deutlich sauberer gegen bestaetigte Zahlungseingaenge gespiegelt werden.
 - Wenn Sabine oder die Praxis die Patientennummer im Verwendungszweck mitgibt, sinkt der spaetere manuelle Zahlungsabgleich deutlich.
 - Wenn sichere Vorschlaege bestaetigt werden, landet die Wirkung jetzt auch wirklich in Raten und offenen Posten statt nur in der Statusspalte.
+- Historische bestaetigte Ratenfaelle muessen nicht mehr zwingend erneut angefasst werden, damit die Verbuchung im Planstand nachzieht.
 
 ## Noch offen
 
