@@ -31,6 +31,15 @@ const ZAHLARTEN = [
   { key: "guthaben", label: "Guthaben", icon: Wallet },
 ] as const;
 
+const AUSGABEN_ARTEN = [
+  "Praxismaterial",
+  "Buerobedarf",
+  "Labor",
+  "Erstattung",
+  "Fahrtkosten",
+  "Sonstiges",
+] as const;
+
 function istMinderjaehrig(geburtsdatum?: string | null): boolean | null {
   if (!geburtsdatum) return null;
   const geb = new Date(geburtsdatum);
@@ -89,6 +98,11 @@ function euro(value: number) {
   return value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function signedEuro(value: number, buchungstyp: "einnahme" | "ausgabe") {
+  const sign = buchungstyp === "ausgabe" ? "-" : "+";
+  return `${sign}${euro(Math.abs(value))}`;
+}
+
 function csvCell(value: unknown) {
   const text = String(value ?? "");
   return `"${text.replace(/"/g, '""')}"`;
@@ -116,13 +130,14 @@ function epcPayload(betrag: number, zweck: string): string {
 const supabase = createBrowserClient();
 
 export default function KassePage() {
+  const [buchungstyp, setBuchungstyp] = useState<"einnahme" | "ausgabe">("einnahme");
   const [patSearch, setPatSearch] = useState("");
   const { patienten } = usePatienten(patSearch.length >= 2 ? patSearch : undefined);
   const [patient, setPatient] = useState<any | null>(null);
   const [betrag, setBetrag] = useState("");
   const [zahlart, setZahlart] = useState<(typeof ZAHLARTEN)[number]["key"]>("qr_ueberweisung");
   const [guthaben, setGuthaben] = useState<number | null>(null);
-  const [bestaetigung, setBestaetigung] = useState<{ kzId: string; name: string; betrag: number; zahlart: string; rest: number | null } | null>(null);
+  const [bestaetigung, setBestaetigung] = useState<{ kzId: string; name: string; betrag: number; zahlart: string; rest: number | null; buchungstyp: "einnahme" | "ausgabe" } | null>(null);
   const [notiz, setNotiz] = useState("");
   const [leistung, setLeistung] = useState<string>(LEISTUNGEN[0]);
   const [zweckManuell, setZweckManuell] = useState<string | null>(null);
@@ -140,12 +155,26 @@ export default function KassePage() {
   const [loeschBestaetigung, setLoeschBestaetigung] = useState(false);
   const [exportZeitraum, setExportZeitraum] = useState<"tag" | "woche" | "monat">("tag");
   const [exporting, setExporting] = useState<null | "csv" | "pdf">(null);
+  const [quartalAktiv, setQuartalAktiv] = useState(false);
+  const [quartalJahr, setQuartalJahr] = useState(new Date().getFullYear());
+  const [quartalNummer, setQuartalNummer] = useState(Math.floor(new Date().getMonth() / 3) + 1);
+  const [filterBuchungstyp, setFilterBuchungstyp] = useState<"alle" | "einnahme" | "ausgabe">("alle");
 
   const treffer = useMemo(
     () => (patSearch.length >= 2 && !patient ? patienten.slice(0, 8) : []),
     [patienten, patSearch, patient]
   );
   const exportRange = useMemo(() => getExportRange(kassenTag, exportZeitraum), [kassenTag, exportZeitraum]);
+  const quartalOptionen = useMemo(() => {
+    const year = new Date().getFullYear();
+    return [year - 1, year, year + 1];
+  }, []);
+  const verfuegbareZahlarten = useMemo(() => {
+    if (buchungstyp === "ausgabe") {
+      return ZAHLARTEN.filter((item) => item.key !== "qr_ueberweisung" && item.key !== "guthaben");
+    }
+    return ZAHLARTEN;
+  }, [buchungstyp]);
 
   async function ladeTagesliste() {
     const { data } = await supabase
@@ -156,7 +185,24 @@ export default function KassePage() {
     setTagesListe(data || []);
   }
   useEffect(() => { ladeTagesliste(); }, [kassenTag]);
-  useEffect(() => { setSeite(1); }, [kassenTag, filterArt]);
+  useEffect(() => { setSeite(1); }, [kassenTag, filterArt, filterBuchungstyp]);
+  useEffect(() => {
+    if (buchungstyp === "ausgabe") {
+      setPatient(null);
+      setPatSearch("");
+      if (zahlart === "qr_ueberweisung" || zahlart === "guthaben") {
+        setZahlart("bar");
+      }
+      if ((LEISTUNGEN as readonly string[]).includes(leistung)) {
+        setLeistung(AUSGABEN_ARTEN[0]);
+      }
+      setZweckManuell(null);
+      setQrDataUrl(null);
+      setQrInfo(null);
+    } else if ((AUSGABEN_ARTEN as readonly string[]).includes(leistung)) {
+      setLeistung(LEISTUNGEN[0]);
+    }
+  }, [buchungstyp, leistung, zahlart]);
   // Anima-Balance-Saldo des gewaehlten Patienten laden
   useEffect(() => {
     if (!patient) { setGuthaben(null); return; }
@@ -171,6 +217,16 @@ export default function KassePage() {
     const s: Record<string, number> = {};
     for (const z of tagesListe) s[z.zahlart] = (s[z.zahlart] || 0) + Number(z.betrag);
     return s;
+  }, [tagesListe]);
+  const kassenUebersicht = useMemo(() => {
+    let einnahmen = 0;
+    let ausgaben = 0;
+    for (const z of tagesListe) {
+      const wert = Number(z.betrag || 0);
+      if (z.buchungstyp === "ausgabe") ausgaben += wert;
+      else einnahmen += wert;
+    }
+    return { einnahmen, ausgaben, saldo: einnahmen - ausgaben };
   }, [tagesListe]);
 
   async function ladeExportListe() {
@@ -190,21 +246,26 @@ export default function KassePage() {
     setExporting("csv");
     try {
       const rows = await ladeExportListe();
-      const header = ["Datum", "Patient", "Patientennummer", "Zahlart", "Betrag_EUR", "Zweck", "Notiz", "Status"];
+      const header = ["Datum", "Typ", "Patient", "Patientennummer", "Zahlart", "Betrag_EUR", "Quartal", "Zweck", "Notiz", "Status"];
       const lines = rows.map((row: any) => {
-        const status = row.zahlart === "qr_ueberweisung"
+        const status = row.buchungstyp === "ausgabe"
+          ? "Praxis-Ausgabe"
+          : row.zahlart === "qr_ueberweisung"
           ? row.transaktion_id ? "Geldeingang da" : "Wartet auf Geldeingang"
           : row.zahlart === "guthaben"
           ? "Vom Guthaben verrechnet"
           : row.zahlart === "bar"
           ? "Bar erhalten"
           : "Terminalumsatz erfasst";
+        const quartal = row.quartal_jahr && row.quartal_nummer ? `Q${row.quartal_nummer} ${row.quartal_jahr}` : "";
         return [
           row.kassen_datum,
+          row.buchungstyp === "ausgabe" ? "Ausgabe" : "Einnahme",
           `${row.patients?.nachname || ""}, ${row.patients?.vorname || ""}`.trim().replace(/^,\s*/, ""),
           row.patients?.ivoris_nummer || "",
           ZAHLARTEN.find((item) => item.key === row.zahlart)?.label || row.zahlart,
           euro(Number(row.betrag || 0)),
+          quartal,
           row.zweck || "",
           row.notiz || "",
           status,
@@ -237,14 +298,21 @@ export default function KassePage() {
         acc[row.zahlart] = (acc[row.zahlart] || 0) + Number(row.betrag || 0);
         return acc;
       }, {});
-      const total = rows.reduce((sum: number, row: any) => sum + Number(row.betrag || 0), 0);
+      const summary = rows.reduce((acc: { einnahmen: number; ausgaben: number }, row: any) => {
+        const wert = Number(row.betrag || 0);
+        if (row.buchungstyp === "ausgabe") acc.ausgaben += wert;
+        else acc.einnahmen += wert;
+        return acc;
+      }, { einnahmen: 0, ausgaben: 0 });
       const htmlRows = rows.map((row: any) => `
         <tr>
           <td>${htmlEscape(row.kassen_datum)}</td>
+          <td>${htmlEscape(row.buchungstyp === "ausgabe" ? "Ausgabe" : "Einnahme")}</td>
           <td>${htmlEscape(`${row.patients?.nachname || ""}, ${row.patients?.vorname || ""}`.replace(/^,\s*/, ""))}</td>
           <td>${htmlEscape(row.patients?.ivoris_nummer || "")}</td>
           <td>${htmlEscape(ZAHLARTEN.find((item) => item.key === row.zahlart)?.label || row.zahlart)}</td>
           <td style="text-align:right;">${euro(Number(row.betrag || 0))} EUR</td>
+          <td>${htmlEscape(row.quartal_jahr && row.quartal_nummer ? `Q${row.quartal_nummer} ${row.quartal_jahr}` : "")}</td>
           <td>${htmlEscape(row.zweck || "")}</td>
         </tr>
       `).join("");
@@ -286,12 +354,22 @@ export default function KassePage() {
             <p>Exportzeitraum: ${htmlEscape(exportRange.label)}</p>
             <div class="summary">
               <div class="card">
-                <div>Gesamtzahlungen</div>
+                <div>Gesamtbuchungen</div>
                 <div class="meta">${rows.length}</div>
               </div>
               <div class="card">
-                <div>Gesamtsumme</div>
-                <div class="meta">${euro(total)} EUR</div>
+                <div>Kassensaldo</div>
+                <div class="meta">${euro(summary.einnahmen - summary.ausgaben)} EUR</div>
+              </div>
+            </div>
+            <div class="summary" style="margin-top: -8px;">
+              <div class="card">
+                <div>Einnahmen</div>
+                <div class="meta">${euro(summary.einnahmen)} EUR</div>
+              </div>
+              <div class="card">
+                <div>Ausgaben</div>
+                <div class="meta">${euro(summary.ausgaben)} EUR</div>
               </div>
             </div>
             <div class="card" style="margin-bottom: 24px;">
@@ -307,14 +385,16 @@ export default function KassePage() {
                 <thead>
                   <tr>
                     <th>Datum</th>
+                    <th>Typ</th>
                     <th>Patient</th>
                     <th>Patientennummer</th>
                     <th>Zahlart</th>
                     <th style="text-align:right;">Betrag</th>
+                    <th>Quartal</th>
                     <th>Zweck</th>
                   </tr>
                 </thead>
-                <tbody>${htmlRows || '<tr><td colspan="6">Keine Eintraege im gewaehlten Zeitraum.</td></tr>'}</tbody>
+                <tbody>${htmlRows || '<tr><td colspan="8">Keine Eintraege im gewaehlten Zeitraum.</td></tr>'}</tbody>
               </table>
             </div>
             <script>
@@ -342,7 +422,7 @@ export default function KassePage() {
     setDetail(z);
     setLoeschBestaetigung(false);
     setDetailQr(null);
-    if (z.zahlart === "qr_ueberweisung") {
+    if (z.buchungstyp !== "ausgabe" && z.zahlart === "qr_ueberweisung") {
       const zweck = z.zweck || `Behandlung ${z.zeichen || ""} ${z.patients?.nachname || ""}`.trim();
       const url = await QRCode.toDataURL(epcPayload(Number(z.betrag), zweck), { width: 240, margin: 1 });
       setDetailQr(url);
@@ -416,26 +496,33 @@ export default function KassePage() {
   async function speichern() {
     setHinweis("");
     const b = parseBetrag(betrag);
-    if (!patient) { setHinweis("Bitte zuerst einen Patienten wählen."); return; }
     if (!b) { setHinweis("Bitte einen gültigen Betrag eingeben, z. B. 36,23."); return; }
-    if (zahlart === "guthaben") {
+    if (buchungstyp === "einnahme" && !patient) { setHinweis("Bitte zuerst einen Patienten wählen."); return; }
+    if (buchungstyp === "ausgabe" && (zahlart === "qr_ueberweisung" || zahlart === "guthaben")) {
+      setHinweis("Ausgaben koennen nur als Bar-, Girocard- oder Kreditkartenbuchung erfasst werden.");
+      return;
+    }
+    if (buchungstyp === "einnahme" && zahlart === "guthaben") {
       const verf = guthaben ?? 0;
       if (verf <= 0) { setHinweis("Kein Guthaben vorhanden."); return; }
       if (b > verf + 0.001) { setHinweis(`Guthaben reicht nicht: verfügbar ${verf.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €.`); return; }
     }
 
     setSaving(true);
-    const zeichen = patient.ivoris_nummer || null;
-    const zweckFinal = zahlart === "qr_ueberweisung"
-      ? (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient.nachname || ""}`).trim()
+    const zeichen = buchungstyp === "einnahme" ? (patient?.ivoris_nummer || null) : null;
+    const zweckFinal = buchungstyp === "einnahme" && zahlart === "qr_ueberweisung"
+      ? (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient?.nachname || ""}`).trim()
       : leistung;
     const { data: kz, error } = await supabase.from("kassen_zahlungen").insert({
-      patient_id: patient.id,
+      patient_id: buchungstyp === "einnahme" ? patient?.id ?? null : null,
       betrag: b,
+      buchungstyp,
       zahlart,
       zeichen,
       zweck: zweckFinal,
       notiz: notiz || null,
+      quartal_jahr: quartalAktiv ? quartalJahr : null,
+      quartal_nummer: quartalAktiv ? quartalNummer : null,
     }).select().single();
     if (error) {
       setHinweis(`Speichern fehlgeschlagen: ${error.message}`);
@@ -443,9 +530,9 @@ export default function KassePage() {
       return;
     }
 
-    if (zahlart === "guthaben") {
+    if (buchungstyp === "einnahme" && zahlart === "guthaben") {
       const { error: balFehler } = await supabase.from("anima_balance_buchungen").insert({
-        patient_id: patient.id,
+        patient_id: patient!.id,
         betrag: -b,
         typ: "verrechnung",
         beschreibung: `An der Praxis-Kasse: ${leistung}`,
@@ -462,33 +549,39 @@ export default function KassePage() {
       fetch("/api/praxis/balance-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_id: patient.id, betrag: b, leistung, rest: Math.max(0, (guthaben ?? 0) - b) }),
+        body: JSON.stringify({ patient_id: patient!.id, betrag: b, leistung, rest: Math.max(0, (guthaben ?? 0) - b) }),
       }).catch(() => {});
     }
 
-    if (zahlart === "qr_ueberweisung" && zweckFinal) {
+    if (buchungstyp === "einnahme" && zahlart === "qr_ueberweisung" && zweckFinal) {
       const url = await QRCode.toDataURL(epcPayload(b, zweckFinal), { width: 280, margin: 1 });
       setQrDataUrl(url);
-      setQrInfo({ kzId: kz.id, name: `${patient.vorname} ${patient.nachname}`, betrag: b, zweck: zweckFinal, eingegangen: false });
+      setQrInfo({ kzId: kz.id, name: `${patient!.vorname} ${patient!.nachname}`, betrag: b, zweck: zweckFinal, eingegangen: false });
     } else {
       setQrDataUrl(null);
       setQrInfo(null);
       setBestaetigung({
         kzId: kz.id,
-        name: `${patient.nachname}, ${patient.vorname}`,
+        name: buchungstyp === "einnahme" && patient ? `${patient.nachname}, ${patient.vorname}` : "Praxis-Ausgabe",
         betrag: b,
         zahlart: ZAHLARTEN.find(a => a.key === zahlart)?.label || zahlart,
-        rest: zahlart === "guthaben" ? Math.max(0, (guthaben ?? 0) - b) : null,
+        rest: buchungstyp === "einnahme" && zahlart === "guthaben" ? Math.max(0, (guthaben ?? 0) - b) : null,
+        buchungstyp,
       });
     }
 
-    setHinweis(`Erfasst: ${patient.nachname}, ${patient.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}`);
+    setHinweis(
+      buchungstyp === "ausgabe"
+        ? `Ausgabe erfasst: ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} € · ${leistung}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
+        : `Erfasst: ${patient!.nachname}, ${patient!.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
+    );
     setPatient(null);
     setPatSearch("");
     setBetrag("");
     setNotiz("");
     setZweckManuell(null);
-    setLeistung(LEISTUNGEN[0]);
+    setLeistung(buchungstyp === "ausgabe" ? AUSGABEN_ARTEN[0] : LEISTUNGEN[0]);
+    setQuartalAktiv(false);
     setSaving(false);
     ladeTagesliste();
   }
@@ -498,7 +591,7 @@ export default function KassePage() {
       <div>
         <h1 className="ac-page-title">Kasse · AnimaPay Live</h1>
         <p className="mt-1 text-sm text-praxis-400">
-          Zahlung am Tresen erfassen. Bei QR-Überweisung erscheint sofort der GiroCode mit Zeichen, die Zuordnung läuft dann von allein.
+          Einnahmen und Ausgaben direkt an der Rezeption erfassen. Bei QR-Überweisung erscheint sofort der GiroCode mit Zeichen, die Zuordnung läuft dann von allein.
         </p>
       </div>
 
@@ -511,38 +604,63 @@ export default function KassePage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Erfassung */}
         <div className="stat-card space-y-4">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
-            <input
-              className="input w-full pl-9"
-              placeholder="Patient suchen (Name) …"
-              value={patient ? `${patient.nachname}, ${patient.vorname}` : patSearch}
-              onChange={(e) => { setPatient(null); setPatSearch(e.target.value); }}
-            />
-            {patient ? (
-              <button
-                onClick={() => { setPatient(null); setPatSearch(""); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-praxis-400 hover:text-praxis-600"
-                aria-label="Patient abwählen"
-              >
-                <X size={16} />
-              </button>
-            ) : null}
-            {treffer.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-lg border border-surface-200 bg-white shadow-lg">
-                {treffer.map((p: any) => (
-                  <button
-                    key={p.id}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-100"
-                    onClick={() => { setPatient(p); setPatSearch(""); }}
-                  >
-                    {p.nachname}, {p.vorname}
-                    <span className="ml-2 text-xs text-praxis-400">{p.ivoris_nummer}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div>
+            <span className="mb-1 block text-xs font-medium text-praxis-500">Buchungstyp</span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: "einnahme", label: "Einnahme" },
+                { key: "ausgabe", label: "Ausgabe" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setBuchungstyp(item.key as "einnahme" | "ausgabe")}
+                  className={`ac-chip justify-center py-3 ${buchungstyp === item.key ? "ac-chip-active" : ""}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {buchungstyp === "einnahme" ? (
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-praxis-400" />
+              <input
+                className="input w-full pl-9"
+                placeholder="Patient suchen (Name) …"
+                value={patient ? `${patient.nachname}, ${patient.vorname}` : patSearch}
+                onChange={(e) => { setPatient(null); setPatSearch(e.target.value); }}
+              />
+              {patient ? (
+                <button
+                  onClick={() => { setPatient(null); setPatSearch(""); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-praxis-400 hover:text-praxis-600"
+                  aria-label="Patient abwählen"
+                >
+                  <X size={16} />
+                </button>
+              ) : null}
+              {treffer.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-surface-200 bg-white shadow-lg">
+                  {treffer.map((p: any) => (
+                    <button
+                      key={p.id}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-100"
+                      onClick={() => { setPatient(p); setPatSearch(""); }}
+                    >
+                      {p.nachname}, {p.vorname}
+                      <span className="ml-2 text-xs text-praxis-400">{p.ivoris_nummer}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3 text-sm text-praxis-500">
+              Diese Buchung wird als Praxis-Ausgabe erfasst und ist nicht an einen Patienten gebunden.
+            </div>
+          )}
 
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-praxis-500">Betrag (€)</span>
@@ -557,11 +675,11 @@ export default function KassePage() {
 
           <div>
             <span className="mb-1 block text-xs font-medium text-praxis-500">Zahlart</span>
-            {patient && guthaben !== null && (
+            {buchungstyp === "einnahme" && patient && guthaben !== null && (
               <span className="mb-1 block text-xs" style={{ color: "#b88a2e" }}>Anima-Balance-Guthaben: {guthaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
             )}
             <div className="grid grid-cols-2 gap-2">
-              {ZAHLARTEN.map(({ key, label, icon: Icon }) => (
+              {verfuegbareZahlarten.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setZahlart(key)}
@@ -575,17 +693,17 @@ export default function KassePage() {
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-praxis-500">Leistung (wofür wird gezahlt)</span>
+            <span className="mb-1 block text-xs font-medium text-praxis-500">{buchungstyp === "ausgabe" ? "Kategorie / Zweck der Ausgabe" : "Leistung (wofür wird gezahlt)"}</span>
             <select
               className="input w-full"
               value={leistung}
               onChange={(e) => { setLeistung(e.target.value); setZweckManuell(null); }}
             >
-              {LEISTUNGEN.map(l => <option key={l} value={l}>{l}</option>)}
+              {(buchungstyp === "ausgabe" ? AUSGABEN_ARTEN : LEISTUNGEN).map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </label>
 
-          {zahlart === "qr_ueberweisung" && patient ? (() => {
+          {buchungstyp === "einnahme" && zahlart === "qr_ueberweisung" && patient ? (() => {
             const standard = `${leistung} ${patient.ivoris_nummer || ""} ${patient.nachname || ""}`.trim();
             const zweck = zweckManuell ?? standard;
             const ohneZeichen = patient.ivoris_nummer && !zweck.includes(patient.ivoris_nummer);
@@ -608,13 +726,39 @@ export default function KassePage() {
             );
           })() : null}
 
+          <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-praxis-500">Quartalsbezug</p>
+                <p className="mt-1 text-xs text-praxis-400">Optional fuer Quartalskontrollen, Sammelbuchungen oder Praxis-Ausgaben.</p>
+              </div>
+              <button
+                type="button"
+                className={`ac-chip text-xs ${quartalAktiv ? "ac-chip-active" : ""}`}
+                onClick={() => setQuartalAktiv((current) => !current)}
+              >
+                {quartalAktiv ? "Quartal aktiv" : "Kein Quartal"}
+              </button>
+            </div>
+            {quartalAktiv && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <select className="input w-full" value={quartalNummer} onChange={(e) => setQuartalNummer(Number(e.target.value))}>
+                  {[1, 2, 3, 4].map((q) => <option key={q} value={q}>{`Q${q}`}</option>)}
+                </select>
+                <select className="input w-full" value={quartalJahr} onChange={(e) => setQuartalJahr(Number(e.target.value))}>
+                  {quartalOptionen.map((jahr) => <option key={jahr} value={jahr}>{jahr}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-praxis-500">Notiz (optional, nur für die Praxis sichtbar, steht nicht im QR-Code)</span>
             <input className="input w-full" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Anzahlung Retainer" />
           </label>
 
           <button className="btn-primary w-full py-3" onClick={speichern} disabled={saving}>
-            {saving ? "Speichert …" : "Zahlung erfassen"}
+            {saving ? "Speichert …" : buchungstyp === "ausgabe" ? "Ausgabe erfassen" : "Zahlung erfassen"}
           </button>
 
         </div>
@@ -690,11 +834,32 @@ export default function KassePage() {
               <span className="text-xs text-praxis-400">Zeitraum: {exportRange.label}</span>
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
+              {([
+                { key: "alle", label: "Alle Buchungen" },
+                { key: "einnahme", label: "Nur Einnahmen" },
+                { key: "ausgabe", label: "Nur Ausgaben" },
+              ] as const).map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setFilterBuchungstyp(item.key)}
+                  className={`ac-chip text-xs ${filterBuchungstyp === item.key ? "ac-chip-active" : ""}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
               <button
                 onClick={() => setFilterArt("alle")}
                 className={`ac-chip text-xs ${filterArt === "alle" ? "ac-chip-active" : ""}`}
               >
-                Gesamt: {tagesListe.length} {tagesListe.length === 1 ? "Zahlung" : "Zahlungen"} · {tagesListe.reduce((s, z) => s + Number(z.betrag), 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                Gesamt: {tagesListe.length} {tagesListe.length === 1 ? "Buchung" : "Buchungen"} · Saldo {euro(kassenUebersicht.saldo)} €
+              </button>
+              <button className="ac-chip text-xs">
+                Einnahmen: {euro(kassenUebersicht.einnahmen)} €
+              </button>
+              <button className="ac-chip text-xs">
+                Ausgaben: {euro(kassenUebersicht.ausgaben)} €
               </button>
               {ZAHLARTEN.map(({ key, label }) => (
                 <button
@@ -707,28 +872,38 @@ export default function KassePage() {
               ))}
             </div>
             {(() => {
-              const gefiltert = tagesListe.filter(z => filterArt === "alle" || z.zahlart === filterArt);
+              const gefiltert = tagesListe.filter((z) => {
+                const artOk = filterArt === "alle" || z.zahlart === filterArt;
+                const typOk = filterBuchungstyp === "alle" || z.buchungstyp === filterBuchungstyp;
+                return artOk && typOk;
+              });
               const proSeite = 10;
               const seiten = Math.max(1, Math.ceil(gefiltert.length / proSeite));
               const sichtbar = gefiltert.slice((seite - 1) * proSeite, seite * proSeite);
               if (gefiltert.length === 0) {
-                return <p className="text-sm text-praxis-400">Keine Zahlungen an diesem Tag{filterArt !== "alle" ? " mit dieser Zahlart" : ""}.</p>;
+                return <p className="text-sm text-praxis-400">Keine Buchungen an diesem Tag{filterArt !== "alle" ? " mit dieser Zahlart" : ""}.</p>;
               }
               return (
                 <>
               <div className="space-y-1">
                 {sichtbar.map((z: any) => (
                   <button key={z.id} onClick={() => oeffneDetail(z)} className="flex w-full items-center justify-between border-b border-surface-100 px-2 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-[rgba(127,148,180,0.12)] rounded">
-                    <span>{z.patients?.nachname}, {z.patients?.vorname}</span>
+                    <span>
+                      {z.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : `${z.patients?.nachname}, ${z.patients?.vorname}`}
+                      {z.quartal_jahr && z.quartal_nummer ? <span className="ml-2 text-[11px] text-praxis-400">{`Q${z.quartal_nummer} ${z.quartal_jahr}`}</span> : null}
+                    </span>
                     <span className="text-xs text-praxis-400">
+                      {z.buchungstyp === "ausgabe" ? "Ausgabe · " : "Einnahme · "}
                       {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
-                      {z.zahlart === "qr_ueberweisung" ? (
+                      {z.buchungstyp === "einnahme" && z.zahlart === "qr_ueberweisung" ? (
                         z.transaktion_id
                           ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen{z.eingang_typ === "echtzeit" ? " (Echtzeit)" : z.eingang_typ === "standard" ? " (Standard)" : ""}</span>
                           : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· wartet auf Geldeingang</span>
                       ) : null}
                     </span>
-                    <span className="font-semibold">{Number(z.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                    <span className={`font-semibold ${z.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>
+                      {signedEuro(Number(z.betrag || 0), z.buchungstyp || "einnahme")} €
+                    </span>
                   </button>
                 ))}
               </div>
@@ -765,7 +940,7 @@ export default function KassePage() {
             <ul className="list-disc space-y-1 pl-4">
               <li>Girocard und Kreditkarte laufen weiter ganz normal über das Kartengerät. Hier wird die Zahlung nur <strong>eingetragen</strong>, damit das Kassenbuch stimmt.</li>
               <li>Dieser Eintrag ersetzt die Papier-Liste: Das Programm vergleicht die Tagessummen später mit den Sammel-Gutschriften des Kartengeräts.</li>
-              <li>Barzahlungen werden genauso eingetragen, dann ist der Tag komplett.</li>
+              <li>Barzahlungen und Praxis-Ausgaben werden genauso eingetragen, dann ist der Tag komplett.</li>
               <li>Die <strong>Notiz</strong> ist nur für die Praxis sichtbar, sie steht nirgends auf dem QR-Code oder der Überweisung.</li>
             </ul>
           </div>
@@ -782,17 +957,27 @@ export default function KassePage() {
               </div>
             ) : null}
             <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Typ</span>
+              <span className="font-semibold">{detail.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"}</span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-praxis-400">Patient</span>
-              <span className="font-semibold">{detail.patients?.nachname}, {detail.patients?.vorname}</span>
+              <span className="font-semibold">{detail.patient_id ? `${detail.patients?.nachname}, ${detail.patients?.vorname}` : "—"}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-praxis-400">Betrag</span>
-              <span className="font-semibold">{Number(detail.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+              <span className={`font-semibold ${detail.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>{signedEuro(Number(detail.betrag || 0), detail.buchungstyp || "einnahme")} €</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-praxis-400">Zahlart</span>
               <span>{ZAHLARTEN.find(a => a.key === detail.zahlart)?.label}</span>
             </div>
+            {(detail.quartal_jahr && detail.quartal_nummer) ? (
+              <div className="flex items-center justify-between">
+                <span className="text-praxis-400">Quartal</span>
+                <span>{`Q${detail.quartal_nummer} ${detail.quartal_jahr}`}</span>
+              </div>
+            ) : null}
             {detail.zweck ? (
               <div className="flex items-center justify-between gap-3">
                 <span className="shrink-0 text-praxis-400">Verwendungszweck</span>
@@ -805,7 +990,7 @@ export default function KassePage() {
                 <span className="text-right text-xs">{detail.notiz}</span>
               </div>
             ) : null}
-            {detail.zahlart === "qr_ueberweisung" ? (
+            {detail.buchungstyp !== "ausgabe" && detail.zahlart === "qr_ueberweisung" ? (
               <div className="flex items-center justify-between">
                 <span className="text-praxis-400">Status</span>
                 {detail.transaktion_id
@@ -828,7 +1013,7 @@ export default function KassePage() {
             >
               Beleg anzeigen / drucken
             </a>
-            {!detail.transaktion_id ? (
+            {(!detail.transaktion_id || detail.buchungstyp === "ausgabe") ? (
               loeschBestaetigung ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-red-400/40 p-3">
                   <span className="text-xs text-red-400">Wirklich löschen? Das lässt sich nicht rückgängig machen.</span>
@@ -845,7 +1030,7 @@ export default function KassePage() {
           </div>
         ) : null}
       </Modal>
-      <Modal open={!!bestaetigung} onClose={() => setBestaetigung(null)} title="Zahlung erfasst">
+      <Modal open={!!bestaetigung} onClose={() => setBestaetigung(null)} title={bestaetigung?.buchungstyp === "ausgabe" ? "Ausgabe erfasst" : "Zahlung erfasst"}>
         {bestaetigung && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -855,7 +1040,7 @@ export default function KassePage() {
                 <div className="text-xs text-praxis-500">{bestaetigung.zahlart}</div>
               </div>
             </div>
-            <div className="text-2xl font-bold">{bestaetigung.betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
+            <div className={`text-2xl font-bold ${bestaetigung.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>{signedEuro(bestaetigung.betrag, bestaetigung.buchungstyp)} €</div>
             {bestaetigung.rest !== null && (
               <div className="text-sm" style={{ color: "#b88a2e" }}>Verbleibendes Anima-Balance-Guthaben: {bestaetigung.rest.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
             )}

@@ -22,6 +22,11 @@ const ZAHLART_LABEL: Record<string, string> = {
   guthaben: "Guthaben (Anima Balance)",
 };
 
+function signedAmount(betrag: number, buchungstyp?: string) {
+  const sign = buchungstyp === "ausgabe" ? "-" : "";
+  return `${sign}${Number(betrag || 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
+}
+
 function BelegInhalt() {
   const params = useSearchParams();
   const id = params.get("id");
@@ -69,7 +74,7 @@ function BelegInhalt() {
             <p style={{ fontSize: 11, color: "#6b7a90", margin: "4px 0 0" }}>{PRAXIS.strasse} · {PRAXIS.ort}</p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <p style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>Quittung</p>
+            <p style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>{zahlung.buchungstyp === "ausgabe" ? "Kassenbeleg" : "Quittung"}</p>
             <p style={{ fontSize: 11, color: "#6b7a90", margin: "4px 0 0" }}>Beleg-Nr. {zahlung.beleg_nr || "—"}</p>
             <p style={{ fontSize: 11, color: "#6b7a90", margin: "2px 0 0" }}>{datum}</p>
           </div>
@@ -79,10 +84,12 @@ function BelegInhalt() {
         <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
           <tbody>
             {[
-              ["Patient", `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}`],
-              ["Patientennummer", zahlung.patients?.ivoris_nummer || "—"],
+              ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
+              ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
+              ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
               ["Leistung", zahlung.zweck || "—"],
               ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
+              ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
             ].map(([k, v]) => (
               <tr key={k as string} style={{ borderBottom: "1px solid #e8ecf2" }}>
                 <td style={{ padding: "8px 0", color: "#6b7a90", width: 180 }}>{k}</td>
@@ -90,20 +97,22 @@ function BelegInhalt() {
               </tr>
             ))}
             <tr>
-              <td style={{ padding: "14px 0", fontSize: 14, fontWeight: 700 }}>Erhaltener Betrag</td>
+              <td style={{ padding: "14px 0", fontSize: 14, fontWeight: 700 }}>{zahlung.buchungstyp === "ausgabe" ? "Ausgabebetrag" : "Erhaltener Betrag"}</td>
               <td style={{ padding: "14px 0", fontSize: 22, fontWeight: 800, textAlign: "right" }}>
-                {Number(zahlung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                {signedAmount(zahlung.betrag, zahlung.buchungstyp)}
               </td>
             </tr>
           </tbody>
         </table>
 
-        <p style={{ fontSize: 13, margin: "0 0 36px" }}>Betrag dankend erhalten.</p>
+        <p style={{ fontSize: 13, margin: "0 0 36px" }}>
+          {zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe intern dokumentiert." : "Betrag dankend erhalten."}
+        </p>
 
         {/* Fusszeile */}
         <div style={{ borderTop: "1px solid #e8ecf2", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9aa7b8" }}>
           <span>{PRAXIS.name} · {PRAXIS.strasse} · {PRAXIS.ort}</span>
-          <span>Quittung über eine erhaltene Zahlung, keine Rechnung.</span>
+          <span>{zahlung.buchungstyp === "ausgabe" ? "Interner Kassenbeleg, keine Rechnung." : "Quittung über eine erhaltene Zahlung, keine Rechnung."}</span>
         </div>
       </div>
 

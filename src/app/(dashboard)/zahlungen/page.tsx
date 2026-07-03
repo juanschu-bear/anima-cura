@@ -21,6 +21,7 @@ export default function ZahlungenPage() {
   const [sucheAktiv, setSucheAktiv] = useState("");
   const [zeitraumVon, setZeitraumVon] = useState("");
   const [zeitraumBis, setZeitraumBis] = useState("");
+  const [schnellfilter, setSchnellfilter] = useState<"frei" | "heute" | "woche" | "monat">("frei");
   const { transaktionen, totalCount, refetch } = useTransaktionen({
     status: statusFilter,
     kasse: kasseFilter,
@@ -62,6 +63,30 @@ export default function ZahlungenPage() {
   useEffect(() => {
     setPage(1);
   }, [zeitraumVon, zeitraumBis]);
+
+  function setQuickRange(mode: "heute" | "woche" | "monat") {
+    const today = new Date();
+    const end = today.toISOString().slice(0, 10);
+    if (mode === "heute") {
+      setZeitraumVon(end);
+      setZeitraumBis(end);
+      setSchnellfilter("heute");
+      return;
+    }
+    if (mode === "woche") {
+      const start = new Date(today);
+      const weekday = (today.getDay() + 6) % 7;
+      start.setDate(today.getDate() - weekday);
+      setZeitraumVon(start.toISOString().slice(0, 10));
+      setZeitraumBis(end);
+      setSchnellfilter("woche");
+      return;
+    }
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    setZeitraumVon(start.toISOString().slice(0, 10));
+    setZeitraumBis(end);
+    setSchnellfilter("monat");
+  }
 
   useEffect(() => {
     const pages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -226,6 +251,7 @@ export default function ZahlungenPage() {
     const db = createBrowserClient();
     db.from("kassen_zahlungen")
       .select("*, patients:patient_id(vorname, nachname)")
+      .eq("buchungstyp", "einnahme")
       .order("kassen_datum", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(100)
@@ -422,13 +448,37 @@ export default function ZahlungenPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
+            Schnellfilter
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "heute", label: "Heute" },
+              { key: "woche", label: "Diese Woche" },
+              { key: "monat", label: "Dieser Monat" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`ac-chip ${schnellfilter === item.key ? "ac-chip-active" : ""}`}
+                onClick={() => setQuickRange(item.key as "heute" | "woche" | "monat")}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
             Zeitraum von
           </p>
           <input
             type="date"
             className="input"
             value={zeitraumVon}
-            onChange={(e) => setZeitraumVon(e.target.value)}
+            onChange={(e) => {
+              setZeitraumVon(e.target.value);
+              setSchnellfilter("frei");
+            }}
           />
         </div>
         <div>
@@ -439,7 +489,10 @@ export default function ZahlungenPage() {
             type="date"
             className="input"
             value={zeitraumBis}
-            onChange={(e) => setZeitraumBis(e.target.value)}
+            onChange={(e) => {
+              setZeitraumBis(e.target.value);
+              setSchnellfilter("frei");
+            }}
           />
         </div>
         {(zeitraumVon || zeitraumBis) && (
@@ -449,6 +502,7 @@ export default function ZahlungenPage() {
             onClick={() => {
               setZeitraumVon("");
               setZeitraumBis("");
+              setSchnellfilter("frei");
             }}
           >
             Zeitraum zurücksetzen

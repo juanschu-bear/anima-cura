@@ -23,6 +23,8 @@
   - Export fuer Tag / Woche / Monat
   - CSV-Export
   - Druckansicht zum PDF-Speichern
+  - getrennte Erfassung von Einnahmen und Ausgaben
+  - optionaler strukturierter Quartalsbezug `Q1-Q4 + Jahr`
 
 ## Was damit konkret besser ist
 
@@ -31,6 +33,8 @@
 - Kartenzahlungen werden nicht mehr irrefuehrend als klassischer Geldeingang dargestellt.
 - Im Mahnwesen tauchen nicht mehr automatisch Beispielkarten auf, die wie echte Faelle wirken.
 - Die Kasse kann direkt fuer Tages-, Wochen- und Monatsauswertungen exportiert werden.
+- Praxis-Ausgaben muessen nicht mehr zwischen Einnahmen versteckt werden.
+- Quartalsbezogene Kassenbuchungen koennen jetzt strukturiert statt nur als Freitext erfasst werden.
 
 ## Noch offen
 
