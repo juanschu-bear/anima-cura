@@ -484,7 +484,8 @@ async function applyUeberzahlung(
 
 export async function applyConfirmedTransactionBooking(
   db: ReturnType<typeof createServerClient>,
-  tx: BookingCandidate
+  tx: BookingCandidate,
+  options: { preferReference?: boolean } = {}
 ): Promise<{ mode: "raten" | "offene_posten" | "keine_offenen_raten" | "bereits"; matchedRateId: string | null }> {
   if (!tx?.id) return { mode: "bereits", matchedRateId: null };
   if (tx.matching_details?.booking_applied_at) {
@@ -509,11 +510,13 @@ export async function applyConfirmedTransactionBooking(
     return { mode: "bereits", matchedRateId: existingRateLink[0].id };
   }
 
-  const ref = await reconcileByReference(db, {
-    betrag: tx.betrag,
-    verwendungszweck: tx.verwendungszweck || "",
-    datum: tx.datum,
-  });
+  const ref = options.preferReference === false
+    ? null
+    : await reconcileByReference(db, {
+        betrag: tx.betrag,
+        verwendungszweck: tx.verwendungszweck || "",
+        datum: tx.datum,
+      });
 
   if (ref && (!tx.matched_patient_id || !ref.patient_id || ref.patient_id === tx.matched_patient_id)) {
     await db.from("offene_posten").update({
@@ -574,6 +577,35 @@ export async function applyConfirmedTransactionBooking(
     mode: allocation.updates.length > 0 ? "raten" : "keine_offenen_raten",
     matchedRateId: firstRateId,
   };
+}
+
+async function backfillConfirmedRateBookings(db: ReturnType<typeof createServerClient>) {
+  const { data: kandidaten } = await db
+    .from("transaktionen")
+    .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details")
+    .in("matching_status", ["auto", "manuell"])
+    .not("matched_patient_id", "is", null)
+    .order("datum", { ascending: true })
+    .limit(500);
+
+  let repariert = 0;
+  for (const tx of (kandidaten || []).filter((row) => !row.matching_details?.booking_applied_at)) {
+    const booking = await applyConfirmedTransactionBooking(db, {
+      id: tx.id,
+      betrag: Number(tx.betrag) || 0,
+      datum: tx.datum,
+      verwendungszweck: tx.verwendungszweck || "",
+      matched_patient_id: tx.matched_patient_id,
+      matched_rate_id: tx.matched_rate_id,
+      matching_details: tx.matching_details,
+    }, { preferReference: false });
+
+    if (booking.mode === "raten" || booking.mode === "bereits") {
+      repariert += 1;
+    }
+  }
+
+  return repariert;
 }
 
 // Gibt null zurueck, wenn keine eindeutige Referenz gefunden wird (dann greift Stufe 1).
@@ -657,9 +689,10 @@ export async function runBatchMatching(): Promise<{
   auto: number;
   abweichung: number;
   unklar: number;
+  repariert?: number;
 }> {
   const db = createServerClient();
-  const stats = { total: 0, auto: 0, abweichung: 0, unklar: 0 };
+  const stats = { total: 0, auto: 0, abweichung: 0, unklar: 0, repariert: 0 };
 
   // Alle ungematchten Transaktionen laden
   const { data: unmatched } = await db
@@ -671,15 +704,13 @@ export async function runBatchMatching(): Promise<{
     .order("datum", { ascending: false })
     .limit(500);
 
-  if (!unmatched?.length) return stats;
-
   const [config, patienten, ibanHistory] = await Promise.all([
     loadMatchingConfig(db),
     loadPatientCandidates(db),
     loadIbanHistoryMap(db),
   ]);
 
-  for (const tx of unmatched) {
+  for (const tx of unmatched || []) {
     stats.total++;
 
     // Kategorisierer: Nicht-Patientenzahlungen sofort aussortieren.
@@ -906,11 +937,13 @@ export async function runBatchMatching(): Promise<{
     stats.abweichung = Math.max(0, stats.abweichung - autoGebucht);
   }
 
+  stats.repariert = await backfillConfirmedRateBookings(db);
+
   // Alert erstellen
   await db.from("alerts").insert({
     typ: "matching",
     titel: `Ratenabgleich: ${stats.auto} automatisch, ${stats.abweichung} Abweichungen`,
-    beschreibung: `${stats.total} Transaktionen verarbeitet. ${stats.auto} automatisch zugeordnet, ${stats.abweichung} mit Abweichung, ${stats.unklar} manuell zu prüfen.`,
+    beschreibung: `${stats.total} Transaktionen verarbeitet. ${stats.auto} automatisch zugeordnet, ${stats.abweichung} mit Abweichung, ${stats.unklar} manuell zu prüfen.${stats.repariert ? ` ${stats.repariert} bestaetigte Alt-Buchungen wurden nachverbucht.` : ""}`,
     schweregrad: stats.abweichung > 0 ? "warnung" : "info",
     empfaenger: "sabine",
   });
