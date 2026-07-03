@@ -7,6 +7,7 @@
 
 import { createServerClient } from "../db/supabase";
 import type { MatchingDetails } from "../types";
+import { allocatePaymentToRates } from "../raten/reconciliation";
 
 interface MatchResult {
   patient_id: string | null;
@@ -29,6 +30,7 @@ interface RateCandidate {
   faellig_am: string;
   status: string;
   ratenplan_id: string | null;
+  bezahlt_betrag?: number | null;
 }
 
 interface PatientCandidate {
@@ -93,10 +95,10 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
     .select(`
       id, vorname, nachname, email,
       raten!inner (
-        id, rate_nummer, betrag, faellig_am, status, ratenplan_id
+        id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag
       )
     `)
-    .eq("raten.status", "offen")
+    .in("raten.status", ["offen", "teilbezahlt", "überfällig"])
     .order("faellig_am", { referencedTable: "raten", ascending: true });
 
   return (patienten ?? []).map((patient) => ({
@@ -107,10 +109,13 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
     raten: ((patient as { raten?: RateCandidate[] }).raten ?? []).map((rate) => ({
       id: rate.id,
       rate_nummer: rate.rate_nummer,
-      betrag: rate.betrag,
+      betrag: rate.status === "teilbezahlt"
+        ? Math.max(0, Number(rate.betrag) - Number(rate.bezahlt_betrag || 0))
+        : rate.betrag,
       faellig_am: rate.faellig_am,
       status: rate.status,
       ratenplan_id: rate.ratenplan_id,
+      bezahlt_betrag: rate.bezahlt_betrag,
     })),
   }));
 }
@@ -150,10 +155,21 @@ function rememberIbanMatch(ibanHistory: IbanHistoryMap, iban: string | null, pat
   ibanHistory.set(normalizedIban, known);
 }
 
-function removeMatchedRate(patienten: PatientCandidate[], rateId: string | null) {
-  if (!rateId) return;
+function applyRateUpdatesToCandidates(patienten: PatientCandidate[], updates: Array<{ id: string; status: string; bezahlt_betrag: number }>) {
+  if (!updates.length) return;
   for (const patient of patienten) {
-    patient.raten = patient.raten.filter((rate) => rate.id !== rateId);
+    patient.raten = patient.raten.flatMap((rate) => {
+      const update = updates.find((item) => item.id === rate.id);
+      if (!update) return [rate];
+      if (update.status === "bezahlt") return [];
+      const original = Number(rate.bezahlt_betrag || 0) + Number(rate.betrag || 0);
+      return [{
+        ...rate,
+        status: update.status,
+        bezahlt_betrag: update.bezahlt_betrag,
+        betrag: Math.max(0, original - Number(update.bezahlt_betrag || 0)),
+      }];
+    });
   }
 }
 
@@ -613,17 +629,28 @@ export async function runBatchMatching(): Promise<{
       geprueft_am: new Date().toISOString(),
     }).eq("id", tx.id);
 
-    // Bei Auto-Match: Rate als bezahlt markieren
+    // Bei Auto-Match: Zahlung sequentiell ueber offene/teiloffene Raten verteilen.
     if (result.status === "auto" && result.rate_id) {
-      await db.from("raten").update({
-        status: "bezahlt",
-        bezahlt_am: tx.datum,
-        bezahlt_betrag: tx.betrag,
-        transaktion_id: tx.id,
-      }).eq("id", result.rate_id);
+      const { data: offeneRaten } = await db
+        .from("raten")
+        .select("id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag")
+        .eq("patient_id", result.patient_id)
+        .in("status", ["offen", "teilbezahlt", "überfällig"])
+        .order("faellig_am", { ascending: true })
+        .order("rate_nummer", { ascending: true });
+
+      const allocation = allocatePaymentToRates(offeneRaten || [], Number(tx.betrag) || 0, tx.datum, tx.id);
+      for (const update of allocation.updates) {
+        await db.from("raten").update({
+          status: update.status,
+          bezahlt_am: update.bezahlt_am,
+          bezahlt_betrag: update.bezahlt_betrag,
+          transaktion_id: update.transaktion_id,
+        }).eq("id", update.id);
+      }
 
       rememberIbanMatch(ibanHistory, tx.absender_iban, result.patient_id);
-      removeMatchedRate(patienten, result.rate_id);
+      applyRateUpdatesToCandidates(patienten, allocation.updates);
       stats.auto++;
     } else if (result.status === "abweichung") {
       stats.abweichung++;
