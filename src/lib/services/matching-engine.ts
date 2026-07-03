@@ -6,7 +6,7 @@
 // ============================================================
 
 import { createServerClient } from "../db/supabase";
-import type { Transaktion, Rate, Patient, MatchingDetails } from "../types";
+import type { MatchingDetails } from "../types";
 
 interface MatchResult {
   patient_id: string | null;
@@ -16,16 +16,78 @@ interface MatchResult {
   details: MatchingDetails;
 }
 
-// ─── Hauptfunktion ──────────────────────────────────────────
-export async function matchTransaction(transaktion: {
-  absender_name: string;
-  absender_iban: string | null;
-  betrag: number;
-  verwendungszweck: string;
-}): Promise<MatchResult> {
-  const db = createServerClient();
+interface MatchingConfig {
+  min_score: number;
+  auto_approve_score: number;
+  fuzzy_threshold: number;
+}
 
-  // 1. Alle Patienten mit offenen Raten laden
+interface RateCandidate {
+  id: string;
+  rate_nummer: number;
+  betrag: number;
+  faellig_am: string;
+  status: string;
+  ratenplan_id: string | null;
+}
+
+interface PatientCandidate {
+  id: string;
+  vorname: string;
+  nachname: string;
+  normalizedNachname: string;
+  raten: RateCandidate[];
+}
+
+type IbanHistoryMap = Map<string, Set<string>>;
+
+const DEFAULT_MATCHING_CONFIG: MatchingConfig = {
+  min_score: 70,
+  auto_approve_score: 80,
+  fuzzy_threshold: 0.7,
+};
+
+function createUnklarResult(): MatchResult {
+  return {
+    patient_id: null,
+    rate_id: null,
+    score: 0,
+    status: "unklar",
+    details: { name_score: 0, betrag_match: false, zweck_score: 0, methode: "manuell" },
+  };
+}
+
+function normalizeMatchText(input: string): string {
+  return input
+    .toUpperCase()
+    .replace(/[,.\-_\/\\]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/UE/g, "Ü")
+    .replace(/OE/g, "Ö")
+    .replace(/AE/g, "Ä")
+    .replace(/SS/g, "ß");
+}
+
+function normalizeIban(iban: string | null | undefined): string | null {
+  if (!iban) return null;
+  return iban.replace(/\s+/g, "").toUpperCase();
+}
+
+async function loadMatchingConfig(db: ReturnType<typeof createServerClient>): Promise<MatchingConfig> {
+  const { data: settings } = await db
+    .from("einstellungen")
+    .select("value")
+    .eq("key", "matching")
+    .single();
+
+  return {
+    ...DEFAULT_MATCHING_CONFIG,
+    ...((settings?.value as Partial<MatchingConfig> | null) ?? {}),
+  };
+}
+
+async function loadPatientCandidates(db: ReturnType<typeof createServerClient>): Promise<PatientCandidate[]> {
   const { data: patienten } = await db
     .from("patients")
     .select(`
@@ -37,45 +99,96 @@ export async function matchTransaction(transaktion: {
     .eq("raten.status", "offen")
     .order("faellig_am", { referencedTable: "raten", ascending: true });
 
-  if (!patienten?.length) {
-    return { patient_id: null, rate_id: null, score: 0, status: "unklar", details: { name_score: 0, betrag_match: false, zweck_score: 0, methode: "manuell" } };
+  return (patienten ?? []).map((patient) => ({
+    id: patient.id,
+    vorname: patient.vorname,
+    nachname: patient.nachname,
+    normalizedNachname: normalizeMatchText(patient.nachname || ""),
+    raten: ((patient as { raten?: RateCandidate[] }).raten ?? []).map((rate) => ({
+      id: rate.id,
+      rate_nummer: rate.rate_nummer,
+      betrag: rate.betrag,
+      faellig_am: rate.faellig_am,
+      status: rate.status,
+      ratenplan_id: rate.ratenplan_id,
+    })),
+  }));
+}
+
+async function loadIbanHistoryMap(db: ReturnType<typeof createServerClient>): Promise<IbanHistoryMap> {
+  const { data } = await db
+    .from("transaktionen")
+    .select("absender_iban, matched_patient_id")
+    .eq("matching_status", "auto")
+    .not("absender_iban", "is", null)
+    .not("matched_patient_id", "is", null);
+
+  const ibanHistory = new Map<string, Set<string>>();
+  for (const row of data ?? []) {
+    const iban = normalizeIban(row.absender_iban);
+    const patientId = row.matched_patient_id;
+    if (!iban || !patientId) continue;
+    const known = ibanHistory.get(iban) ?? new Set<string>();
+    known.add(patientId);
+    ibanHistory.set(iban, known);
   }
 
-  // 2. Einstellungen laden
-  const { data: settings } = await db
-    .from("einstellungen")
-    .select("value")
-    .eq("key", "matching")
-    .single();
+  return ibanHistory;
+}
 
-  const config = settings?.value as { min_score: number; auto_approve_score: number; fuzzy_threshold: number } || {
-    min_score: 70,
-    auto_approve_score: 90,
-    fuzzy_threshold: 0.7,
-  };
+function hasIbanHistory(ibanHistory: IbanHistoryMap, iban: string | null, patientId: string): boolean {
+  const normalizedIban = normalizeIban(iban);
+  if (!normalizedIban) return false;
+  return ibanHistory.get(normalizedIban)?.has(patientId) ?? false;
+}
+
+function rememberIbanMatch(ibanHistory: IbanHistoryMap, iban: string | null, patientId: string | null) {
+  const normalizedIban = normalizeIban(iban);
+  if (!normalizedIban || !patientId) return;
+  const known = ibanHistory.get(normalizedIban) ?? new Set<string>();
+  known.add(patientId);
+  ibanHistory.set(normalizedIban, known);
+}
+
+function removeMatchedRate(patienten: PatientCandidate[], rateId: string | null) {
+  if (!rateId) return;
+  for (const patient of patienten) {
+    patient.raten = patient.raten.filter((rate) => rate.id !== rateId);
+  }
+}
+
+// ─── Hauptfunktion ──────────────────────────────────────────
+export function matchTransaction(
+  transaktion: {
+  absender_name: string;
+  absender_iban: string | null;
+  betrag: number;
+  verwendungszweck: string;
+  },
+  patienten: PatientCandidate[],
+  ibanHistory: IbanHistoryMap,
+  config: MatchingConfig
+): MatchResult {
+  if (!patienten.length) {
+    return createUnklarResult();
+  }
 
   // 3. Für jeden Patienten Score berechnen
-  let bestMatch: MatchResult = {
-    patient_id: null,
-    rate_id: null,
-    score: 0,
-    status: "unklar",
-    details: { name_score: 0, betrag_match: false, zweck_score: 0, methode: "manuell" },
-  };
+  let bestMatch: MatchResult = createUnklarResult();
+  let bestMatchNachname: string | null = null;
+  const strongHitsByNachname = new Map<string, Set<string>>();
 
   for (const patient of patienten) {
     const nameScore = calculateNameScore(
       transaktion.absender_name,
-      `${patient.nachname} ${patient.vorname}`
+      `${patient.nachname || ""} ${patient.vorname || ""}`
     );
 
     // IBAN-Matching (höchste Priorität)
-    const ibanMatch = transaktion.absender_iban
-      ? await checkIBANMatch(db, transaktion.absender_iban, patient.id)
-      : false;
+    const ibanMatch = hasIbanHistory(ibanHistory, transaktion.absender_iban, patient.id);
 
     // Offene Raten durchgehen
-    for (const rate of (patient as any).raten || []) {
+    for (const rate of patient.raten || []) {
       const betragMatch = Math.abs(transaktion.betrag - rate.betrag) < 0.01;
       const betragNah = Math.abs(transaktion.betrag - rate.betrag) / rate.betrag < 0.1; // 10% Toleranz
       const zweckScore = calculateZweckScore(transaktion.verwendungszweck, rate.rate_nummer);
@@ -99,6 +212,12 @@ export async function matchTransaction(transaktion: {
         methode = "fuzzy";
       }
 
+      if (score >= config.auto_approve_score && betragMatch) {
+        const kandidaten = strongHitsByNachname.get(patient.normalizedNachname) ?? new Set<string>();
+        kandidaten.add(patient.id);
+        strongHitsByNachname.set(patient.normalizedNachname, kandidaten);
+      }
+
       if (score > bestMatch.score) {
         const isAbweichung = score >= config.min_score && !betragMatch && betragNah;
         bestMatch = {
@@ -119,8 +238,27 @@ export async function matchTransaction(transaktion: {
             methode,
           },
         };
+        bestMatchNachname = patient.normalizedNachname;
       }
     }
+  }
+
+  if (
+    bestMatch.patient_id &&
+    bestMatchNachname &&
+    bestMatch.details.betrag_match &&
+    bestMatch.score >= config.auto_approve_score &&
+    (strongHitsByNachname.get(bestMatchNachname)?.size ?? 0) >= 2
+  ) {
+    return {
+      ...bestMatch,
+      score: Math.min(79, config.auto_approve_score - 1),
+      status: "abweichung",
+      details: {
+        ...bestMatch.details,
+        mehrdeutig: true,
+      },
+    };
   }
 
   return bestMatch;
@@ -128,19 +266,8 @@ export async function matchTransaction(transaktion: {
 
 // ─── Name-Matching ──────────────────────────────────────────
 function calculateNameScore(bankName: string, patientName: string): number {
-  const normalize = (s: string) =>
-    s.toUpperCase()
-      .replace(/[,.\-_\/\\]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      // Deutsche Umlaute normalisieren (Bank schreibt oft UE statt Ü)
-      .replace(/UE/g, "Ü")
-      .replace(/OE/g, "Ö")
-      .replace(/AE/g, "Ä")
-      .replace(/SS/g, "ß");
-
-  const a = normalize(bankName);
-  const b = normalize(patientName);
+  const a = normalizeMatchText(bankName);
+  const b = normalizeMatchText(patientName);
 
   // Exakte Übereinstimmung
   if (a === b) return 1.0;
@@ -186,20 +313,6 @@ function calculateZweckScore(zweck: string, rateNummer: number): number {
   }
 
   return Math.min(score, 1.0);
-}
-
-// ─── IBAN prüfen ────────────────────────────────────────────
-async function checkIBANMatch(db: any, iban: string, patientId: string): Promise<boolean> {
-  // Prüfe ob diese IBAN schon mal für diesen Patienten verwendet wurde
-  const { data } = await db
-    .from("transaktionen")
-    .select("id")
-    .eq("absender_iban", iban)
-    .eq("matched_patient_id", patientId)
-    .eq("matching_status", "auto")
-    .limit(1);
-
-  return (data?.length || 0) > 0;
 }
 
 // ─── Levenshtein-Distanz ────────────────────────────────────
@@ -410,6 +523,12 @@ export async function runBatchMatching(): Promise<{
 
   if (!unmatched?.length) return stats;
 
+  const [config, patienten, ibanHistory] = await Promise.all([
+    loadMatchingConfig(db),
+    loadPatientCandidates(db),
+    loadIbanHistoryMap(db),
+  ]);
+
   for (const tx of unmatched) {
     stats.total++;
 
@@ -472,12 +591,17 @@ export async function runBatchMatching(): Promise<{
       continue;
     }
 
-    const result = await matchTransaction({
-      absender_name: tx.absender_name || "",
-      absender_iban: tx.absender_iban,
-      betrag: tx.betrag,
-      verwendungszweck: tx.verwendungszweck || "",
-    });
+    const result = matchTransaction(
+      {
+        absender_name: tx.absender_name || "",
+        absender_iban: tx.absender_iban,
+        betrag: tx.betrag,
+        verwendungszweck: tx.verwendungszweck || "",
+      },
+      patienten,
+      ibanHistory,
+      config
+    );
 
     // Transaktion aktualisieren
     await db.from("transaktionen").update({
@@ -498,6 +622,8 @@ export async function runBatchMatching(): Promise<{
         transaktion_id: tx.id,
       }).eq("id", result.rate_id);
 
+      rememberIbanMatch(ibanHistory, tx.absender_iban, result.patient_id);
+      removeMatchedRate(patienten, result.rate_id);
       stats.auto++;
     } else if (result.status === "abweichung") {
       stats.abweichung++;
@@ -589,7 +715,7 @@ export async function runBatchMatching(): Promise<{
     .from("transaktionen")
     .update({ matching_status: "auto", geprueft_am: new Date().toISOString() })
     .eq("matching_status", "abweichung")
-    .gte("matching_score", 90)
+    .gte("matching_score", config.auto_approve_score)
     .select("id");
   const autoGebucht = Array.isArray(festgebucht) ? festgebucht.length : 0;
   if (autoGebucht > 0) {

@@ -256,7 +256,7 @@ export default function EinstellungenPage() {
           />
           <NumberField
             label={t("settings.autoApproveFrom", locale)}
-            value={matching.auto_approve_score ?? 90}
+            value={matching.auto_approve_score ?? 80}
             onChange={(v) => (matching.auto_approve_score = v)}
           />
           <NumberField

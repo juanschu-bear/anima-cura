@@ -2,8 +2,60 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { useAppStore } from "@/hooks/useAppStore";
 
 const supabase = createBrowserClient();
+
+function normalizePatientSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildSearchVariants(input: string) {
+  const base = normalizePatientSearch(input);
+  const compact = base.replace(/\s+/g, " ").trim();
+  const variants = new Set<string>([compact]);
+  if (compact.includes("ae")) variants.add(compact.replace(/ae/g, "a"));
+  if (compact.includes("oe")) variants.add(compact.replace(/oe/g, "o"));
+  if (compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
+  if (compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
+  return Array.from(variants).filter(Boolean);
+}
+
+function rankPatientMatch(patient: any, search: string) {
+  const variants = buildSearchVariants(search);
+  const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
+  const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
+  const lastName = normalizePatientSearch(patient.nachname ?? "");
+  const firstName = normalizePatientSearch(patient.vorname ?? "");
+  const patientNumber = String(patient.ivoris_nummer ?? "").toLowerCase();
+
+  let best = Number.POSITIVE_INFINITY;
+  for (const variant of variants) {
+    if (patientNumber && patientNumber === variant) best = Math.min(best, 0);
+    else if (lastName && lastName === variant) best = Math.min(best, 1);
+    else if (fullName && fullName === variant) best = Math.min(best, 2);
+    else if (reversedName && reversedName === variant) best = Math.min(best, 3);
+    else if (patientNumber && patientNumber.includes(variant)) best = Math.min(best, 4);
+    else if (lastName && lastName.startsWith(variant)) best = Math.min(best, 5);
+    else if (fullName && fullName.startsWith(variant)) best = Math.min(best, 6);
+    else if (reversedName && reversedName.startsWith(variant)) best = Math.min(best, 7);
+    else if (lastName && lastName.includes(variant)) best = Math.min(best, 8);
+    else if (firstName && firstName.includes(variant)) best = Math.min(best, 9);
+    else if (fullName && fullName.includes(variant)) best = Math.min(best, 10);
+    else if (reversedName && reversedName.includes(variant)) best = Math.min(best, 11);
+  }
+
+  return best;
+}
 
 // ─── Dashboard Stats ────────────────────────────────────────
 export function useDashboardStats() {
@@ -24,12 +76,14 @@ export function useDashboardStats() {
 
 // ─── Patienten ──────────────────────────────────────────────
 export function usePatienten(search?: string) {
+  const authReady = useAppStore((state) => state.authReady);
   const [patienten, setPatienten] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
+    if (!authReady) return;
     setLoading(true);
     setError(null);
 
@@ -46,7 +100,13 @@ export function usePatienten(search?: string) {
       .range(0, 9999);
 
     if (search) {
-      query = query.or(`nachname.ilike.%${search}%,vorname.ilike.%${search}%`);
+      const variants = buildSearchVariants(search);
+      const muster = Array.from(new Set(variants.flatMap((variant) => [
+        `nachname.ilike.%${variant}%`,
+        `vorname.ilike.%${variant}%`,
+        `ivoris_nummer.ilike.%${variant}%`,
+      ]))).join(",");
+      query = query.or(muster);
     }
 
     const { data, error: queryError } = await query;
@@ -55,13 +115,31 @@ export function usePatienten(search?: string) {
       setError(queryError.message);
       setPatienten([]);
     } else {
-      setPatienten(data || []);
+      const rows = data || [];
+      if (search?.trim()) {
+        const normalizedSearch = search.trim();
+        rows.sort((a, b) => {
+          const rankA = rankPatientMatch(a, normalizedSearch);
+          const rankB = rankPatientMatch(b, normalizedSearch);
+          if (rankA !== rankB) return rankA - rankB;
+          const lastNameCompare = String(a.nachname ?? "").localeCompare(String(b.nachname ?? ""), "de");
+          if (lastNameCompare !== 0) return lastNameCompare;
+          return String(a.vorname ?? "").localeCompare(String(b.vorname ?? ""), "de");
+        });
+      }
+      setPatienten(rows);
     }
 
     setLoading(false);
-  }, [search]);
+  }, [authReady, search]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    if (!authReady) {
+      setLoading(true);
+      return;
+    }
+    fetch();
+  }, [authReady, fetch]);
 
   return { patienten, totalCount, loading, error, refetch: fetch };
 }

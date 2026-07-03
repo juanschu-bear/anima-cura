@@ -19,7 +19,18 @@ export default function ZahlungenPage() {
   const pageSize = 25;
   const [suche, setSuche] = useState("");
   const [sucheAktiv, setSucheAktiv] = useState("");
-  const { transaktionen, totalCount, refetch } = useTransaktionen({ status: statusFilter, kasse: kasseFilter, page, pageSize, suche: sucheAktiv });
+  const [zeitraumVon, setZeitraumVon] = useState("");
+  const [zeitraumBis, setZeitraumBis] = useState("");
+  const [schnellfilter, setSchnellfilter] = useState<"frei" | "heute" | "woche" | "monat">("frei");
+  const { transaktionen, totalCount, refetch } = useTransaktionen({
+    status: statusFilter,
+    kasse: kasseFilter,
+    from: zeitraumVon || undefined,
+    to: zeitraumBis || undefined,
+    page,
+    pageSize,
+    suche: sucheAktiv,
+  });
 
   // Suche entprellen: erst 350ms nach dem letzten Tastendruck abfragen.
   useEffect(() => {
@@ -48,6 +59,34 @@ export default function ZahlungenPage() {
   useEffect(() => {
     setClientTx(transaktionen);
   }, [transaktionen]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [zeitraumVon, zeitraumBis]);
+
+  function setQuickRange(mode: "heute" | "woche" | "monat") {
+    const today = new Date();
+    const end = today.toISOString().slice(0, 10);
+    if (mode === "heute") {
+      setZeitraumVon(end);
+      setZeitraumBis(end);
+      setSchnellfilter("heute");
+      return;
+    }
+    if (mode === "woche") {
+      const start = new Date(today);
+      const weekday = (today.getDay() + 6) % 7;
+      start.setDate(today.getDate() - weekday);
+      setZeitraumVon(start.toISOString().slice(0, 10));
+      setZeitraumBis(end);
+      setSchnellfilter("woche");
+      return;
+    }
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    setZeitraumVon(start.toISOString().slice(0, 10));
+    setZeitraumBis(end);
+    setSchnellfilter("monat");
+  }
 
   useEffect(() => {
     const pages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -203,6 +242,8 @@ export default function ZahlungenPage() {
     { key: "ignoriert", label: t("payments.filter.ignored", locale) },
     { key: "erhalten", label: locale === "en" ? "Received (till)" : "Erhalten (Kasse)" },
     { key: "wartet", label: locale === "en" ? "Awaiting funds" : "Wartet" },
+    { key: "guthaben", label: locale === "en" ? "Balance offset" : "Guthaben" },
+    { key: "kartenzahlung", label: locale === "en" ? "Card terminal" : "Kartenzahlung" },
   ];
   const [kassenListe, setKassenListe] = useState<any[]>([]);
   const [wegFilter, setWegFilter] = useState("alle");
@@ -210,6 +251,7 @@ export default function ZahlungenPage() {
     const db = createBrowserClient();
     db.from("kassen_zahlungen")
       .select("*, patients:patient_id(vorname, nachname)")
+      .eq("buchungstyp", "einnahme")
       .order("kassen_datum", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(100)
@@ -227,17 +269,27 @@ export default function ZahlungenPage() {
     return { gruppe: "bank", w1: "Bank", w2: "Überweisung" };
   }
 
+  function kassenFilterStatus(z: any) {
+    if (z.zahlart === "qr_ueberweisung") return "wartet";
+    if (z.zahlart === "bar") return "erhalten";
+    if (z.zahlart === "guthaben") return "guthaben";
+    return "kartenzahlung";
+  }
+
   const kassenSichtbar = kassenListe.filter((z: any) => {
-    const status = z.zahlart === "qr_ueberweisung" ? "wartet" : "erhalten";
+    const status = kassenFilterStatus(z);
     const statusOk = statusFilter === "alle" || statusFilter === status;
     const wegOk = wegFilter === "alle" || wegFilter === "kasse";
-    return statusOk && wegOk;
+    const datum = String(z.kassen_datum || "");
+    const vonOk = !zeitraumVon || datum >= zeitraumVon;
+    const bisOk = !zeitraumBis || datum <= zeitraumBis;
+    return statusOk && wegOk && vonOk && bisOk;
   });
 
   const visibleTransactions = clientTx
     .filter((tx) => {
-      // "erhalten"/"wartet" sind reine Kassen-Zustaende
-      if (statusFilter === "erhalten" || statusFilter === "wartet") return false;
+      // Diese Stati existieren nur fuer Kassenzeilen.
+      if (["erhalten", "wartet", "guthaben", "kartenzahlung"].includes(statusFilter)) return false;
       return statusFilter === "alle" ? true : tx.matching_status === statusFilter;
     })
     .filter((tx) => (wegFilter === "alle" ? true : wegVonTransaktion(tx).gruppe === wegFilter));
@@ -257,6 +309,24 @@ export default function ZahlungenPage() {
     const monthlyRate =
       (matchedPatient.raten || []).find((r: any) => typeof r?.betrag === "number")?.betrag ?? null;
     return typeof monthlyRate === "number" ? monthlyRate : null;
+  }
+
+  function kassenStatusInfo(z: any) {
+    if (z.zahlart === "qr_ueberweisung") {
+      return z.transaktion_id
+        ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
+        : { label: "Wartet auf Geldeingang", color: "var(--ac-text-soft)", weight: 500 };
+    }
+    if (z.zahlart === "bar") {
+      return { label: "Bar erhalten", color: "#4ca43f", weight: 700 };
+    }
+    if (z.zahlart === "guthaben") {
+      return { label: "Vom Guthaben verrechnet", color: "#b88a2e", weight: 700 };
+    }
+    if (z.zahlart === "girocard" || z.zahlart === "kreditkarte") {
+      return { label: "Terminalumsatz erfasst", color: "#7aa2ff", weight: 700 };
+    }
+    return { label: "Erfasst", color: "var(--ac-text-soft)", weight: 600 };
   }
 
   // Klartext: worueber wurde diese Zahlung gefunden?
@@ -373,6 +443,71 @@ export default function ZahlungenPage() {
             <X className="h-4 w-4" />
           </button>
         ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
+            Schnellfilter
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "heute", label: "Heute" },
+              { key: "woche", label: "Diese Woche" },
+              { key: "monat", label: "Dieser Monat" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`ac-chip ${schnellfilter === item.key ? "ac-chip-active" : ""}`}
+                onClick={() => setQuickRange(item.key as "heute" | "woche" | "monat")}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
+            Zeitraum von
+          </p>
+          <input
+            type="date"
+            className="input"
+            value={zeitraumVon}
+            onChange={(e) => {
+              setZeitraumVon(e.target.value);
+              setSchnellfilter("frei");
+            }}
+          />
+        </div>
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
+            Zeitraum bis
+          </p>
+          <input
+            type="date"
+            className="input"
+            value={zeitraumBis}
+            onChange={(e) => {
+              setZeitraumBis(e.target.value);
+              setSchnellfilter("frei");
+            }}
+          />
+        </div>
+        {(zeitraumVon || zeitraumBis) && (
+          <button
+            type="button"
+            className="ac-chip"
+            onClick={() => {
+              setZeitraumVon("");
+              setZeitraumBis("");
+              setSchnellfilter("frei");
+            }}
+          >
+            Zeitraum zurücksetzen
+          </button>
+        )}
       </div>
 
       <div>
@@ -494,7 +629,7 @@ export default function ZahlungenPage() {
                 <td className="table-cell py-3 text-sm">
                   <span>
                     <span className="block font-bold" style={{ color: "#4ade80" }}>AnimaPay Kasse</span>
-                    <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.zahlart === "qr_ueberweisung" ? "QR-Überweisung" : z.zahlart === "girocard" ? "Girocard" : z.zahlart === "kreditkarte" ? "Kreditkarte" : z.zahlart === "guthaben" ? "Guthaben" : "Bar"}</span>
+                    <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{KASSE_ZAHLART[z.zahlart] || z.zahlart}</span>
                   </span>
                 </td>
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(z.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
@@ -503,9 +638,14 @@ export default function ZahlungenPage() {
                   {z.beleg_nr ? <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.beleg_nr}</span> : null}
                 </td>
                 <td className="table-cell py-3">
-                  {z.zahlart === "qr_ueberweisung"
-                    ? <span className="text-sm" style={{ color: "var(--ac-text-soft)" }}>wartet auf Geldeingang</span>
-                    : <span className="text-sm font-semibold" style={{ color: "#4ca43f" }}>erhalten</span>}
+                  {(() => {
+                    const info = kassenStatusInfo(z);
+                    return (
+                      <span className="text-sm" style={{ color: info.color, fontWeight: info.weight as number }}>
+                        {info.label}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-mute)" }}>—</td>
@@ -632,7 +772,7 @@ export default function ZahlungenPage() {
           </tbody>
         </table>
 
-        {visibleTransactions.length === 0 && (
+        {visibleTransactions.length === 0 && kassenSichtbar.length === 0 && (
           <div className="p-10 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "var(--ac-surface-muted)" }}>
               <CreditCard size={28} style={{ color: "var(--ac-text-mute)" }} />
@@ -689,7 +829,7 @@ export default function ZahlungenPage() {
         <span style={{ color: "#7aa2ff", fontWeight: 700 }}>AnimaPay App</span> zahlt der Patient künftig selbst im Portal,{" "}
         <span className="font-bold">Bank</span> sind fremde Überweisungen, die das System entziffert.
         Eine Kasse-QR-Zahlung erscheint genau einmal: erst als „wartet auf Geldeingang", nach Eintreffen als bestätigte Zeile mit demselben Weg.
-        Bar- und Kartenzeilen haben keine Aktionen, da gibt es nichts zuzuordnen.
+        Bar ist sofort erhalten. Guthaben wird als interne Verrechnung markiert. Girocard und Kreditkarte werden als Terminalumsatz erfasst, nicht als klassischer Bankeingang.
       </div>
 
       {/* Rücklastschriften */}

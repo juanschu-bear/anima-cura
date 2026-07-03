@@ -243,7 +243,7 @@ export const demoAlerts = [
 export const demoSettings = {
   mahnfristen: { karenz_tage: 5, stufe1_ab_tag: 6, stufe2_ab_tag: 21, eskalation_ab_tag: 42 },
   benachrichtigungen: { auto_email: true, auto_brief: true, sabine_briefing: true, maria_eskalation: true },
-  matching: { min_score: 70, auto_approve_score: 90, fuzzy_threshold: 0.7 },
+  matching: { min_score: 70, auto_approve_score: 80, fuzzy_threshold: 0.7 },
 };
 
 export const demoBankConnections = [

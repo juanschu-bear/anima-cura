@@ -49,13 +49,7 @@ export default function PatientenPage() {
 
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
   const [statusPopoverPos, setStatusPopoverPos] = useState<{ left: number; top: number } | null>(null);
-  const { patienten: allPatienten, totalCount, loading, refetch } = usePatienten();
-  const patienten = search
-    ? allPatienten.filter((p: any) => {
-        const s = search.toLowerCase();
-        return (p.vorname || "").toLowerCase().includes(s) || (p.nachname || "").toLowerCase().includes(s);
-      })
-    : allPatienten;
+  const { patienten, totalCount, loading, refetch } = usePatienten(search || undefined);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);

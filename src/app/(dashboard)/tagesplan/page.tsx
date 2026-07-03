@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { useAppStore } from "@/hooks/useAppStore";
 
 interface TerminEintrag {
   id: string;
@@ -25,22 +26,28 @@ interface TerminEintrag {
 
 export default function TagesplanPage() {
   const supabase = createBrowserClient();
+  const authReady = useAppStore((state) => state.authReady);
   const [termine, setTermine] = useState<TerminEintrag[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
 
   const loadTermine = useCallback(async () => {
+    if (!authReady) return;
     const { data, error } = await supabase.from("tagesplan_heute").select("*");
     if (error) { console.error("[tagesplan]", error); return; }
     setTermine((data as TerminEintrag[]) || []);
     setLoading(false);
-  }, [supabase]);
+  }, [authReady, supabase]);
 
   useEffect(() => {
+    if (!authReady) {
+      setLoading(true);
+      return;
+    }
     loadTermine();
     const ch = supabase.channel("tp-rt").on("postgres_changes", { event: "*", schema: "public", table: "tagesplan_termine" }, () => loadTermine()).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [supabase, loadTermine]);
+  }, [authReady, supabase, loadTermine]);
 
   useEffect(() => {
     const link = document.createElement("link");
