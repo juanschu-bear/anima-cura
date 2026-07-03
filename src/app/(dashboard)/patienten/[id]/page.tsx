@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MessageSquare, FileText } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
@@ -10,6 +10,7 @@ import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 import PatientPortalAdmin from "@/components/patient/PatientPortalAdmin";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { reconcileInstallments } from "@/lib/raten/reconciliation";
 
 const supabaseDetail = createBrowserClient();
 
@@ -25,6 +26,7 @@ export default function PatientDetailPage() {
   const { theme, locale } = useAppStore();
   const { patient, loading } = usePatient(params.id as string);
   const [geldbewegungen, setGeldbewegungen] = useState<any[]>([]);
+  const [bankZahlungen, setBankZahlungen] = useState<any[]>([]);
 
   useEffect(() => {
     const pid = params.id as string;
@@ -73,6 +75,7 @@ export default function PatientDetailPage() {
       }
       liste.sort((a, b) => (a.datum < b.datum ? 1 : -1));
       setGeldbewegungen(liste.slice(0, 25));
+      setBankZahlungen(bank.data || []);
     })();
   }, [params.id]);
 
@@ -88,6 +91,13 @@ export default function PatientDetailPage() {
   if (!patient) return <p className="text-praxis-400">{t("patients.notFound", locale)}</p>;
 
   const raten = (patient.raten || []).sort((a: any, b: any) => a.rate_nummer - b.rate_nummer);
+  const aktivePlaene = [...(patient.ratenplaene || [])].sort((a: any, b: any) => {
+    const left = new Date(b.start_datum || 0).getTime();
+    const right = new Date(a.start_datum || 0).getTime();
+    return left - right;
+  });
+  const aktiverPlan = aktivePlaene.find((plan: any) => plan.status === "aktiv") || aktivePlaene[0] || null;
+  const aktivePlanRaten = aktiverPlan ? raten.filter((rate: any) => rate.ratenplan_id === aktiverPlan.id) : [];
   const totalRaten = Math.max(raten.length, 1);
   const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
   const restschuld = raten
@@ -143,6 +153,15 @@ export default function PatientDetailPage() {
       const db = new Date(b.faellig_am).getTime();
       return db - da;
     });
+  const istAbgleich = useMemo(() => {
+    if (!aktiverPlan) return null;
+    return reconcileInstallments(aktiverPlan, aktivePlanRaten, bankZahlungen);
+  }, [aktiverPlan, aktivePlanRaten, bankZahlungen]);
+  const planstandAktiv = aktivePlanRaten.filter((rate: any) => rate.status === "bezahlt").length;
+  const hatIstAbweichung = Boolean(
+    istAbgleich &&
+    (istAbgleich.rechnerischBezahlt !== planstandAktiv || istAbgleich.teilbezahlt > 0)
+  );
 
   return (
     <div className="space-y-6">
@@ -262,6 +281,25 @@ export default function PatientDetailPage() {
           <Legend color="bg-accent-coral" label={t("detail.overdue", locale)} />
           <Legend color="bg-white border border-surface-200" label={t("detail.pending", locale)} />
         </div>
+        {istAbgleich && (
+          <div
+            className="mt-4 rounded-xl border px-4 py-3 text-sm"
+            style={{
+              borderColor: hatIstAbweichung ? "#fbbf24" : "rgba(74,222,128,0.25)",
+              background: theme === "dark" ? "rgba(255,255,255,0.02)" : "#fff",
+            }}
+          >
+            <div style={{ fontWeight: 700, color: hatIstAbweichung ? "#fbbf24" : "#4ade80" }}>
+              {hatIstAbweichung ? "Bestätigte Historie weicht vom gespeicherten Planstand ab" : "Bestätigte Historie passt zum aktiven Plan"}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-4 text-xs text-praxis-500">
+              <span>Aktiver Plan: {planstandAktiv} / {Math.max(aktivePlanRaten.length, istAbgleich.anzahl)} gebucht</span>
+              <span>Bestätigte Zahlungen: {istAbgleich.rechnerischBezahlt} / {istAbgleich.anzahl} gedeckt</span>
+              {istAbgleich.teilbezahlt > 0 ? <span>Teilbezahlt: {istAbgleich.teilbezahlt}</span> : null}
+              {istAbgleich.guthaben > 0 ? <span>Guthaben: {istAbgleich.guthaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span> : null}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="stat-card">
@@ -298,7 +336,7 @@ export default function PatientDetailPage() {
 
       {(history.length > 0 || totalRaten > 0) && (
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{locale === "en" ? "Installment history (plan)" : "Raten-Historie (Sollplan)"}</h3>
+        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{locale === "en" ? "Installment history (plan state)" : "Raten-Historie (Planstand)"}</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

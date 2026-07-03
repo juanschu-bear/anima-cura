@@ -138,6 +138,19 @@ Ziel:
 
 - bezahlte Historie gegen offene Raten und Planlogik sauber abgleichen
 
+Status:
+
+- umgesetzt am 2026-07-03 in
+  - `src/lib/raten/reconciliation.ts`
+  - `src/lib/services/matching-engine.ts`
+  - `src/app/(dashboard)/ratenplan/page.tsx`
+  - `src/app/(dashboard)/patienten/[id]/page.tsx`
+- Ergebnis:
+  - Quartalsplaene laufen faelligkeitsseitig korrekt im 3-Monats-Rhythmus
+  - bestaetigte Zahlungen werden rechnerisch ueber mehrere offene oder teiloffene Raten verteilt
+  - Teilzahlungen werden sichtbar
+  - UI markiert Abweichungen zwischen gespeichertem Planstand und echter Zahlungshistorie
+
 ## Mahnwesen / Datenqualitaet
 
 ### 10. Im Mahnwesen auf Kontakt klicken -> Patientenprofil oeffnen
