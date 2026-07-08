@@ -285,6 +285,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   // --- Self-service: practice-added option texts (Weg B) ---
   const [optOffen, setOptOffen] = useState<string | null>(null); // key `${termin_typ}:${gruppe}` of the open editor
+  const [bausteinSuche, setBausteinSuche] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> Suchtext im "Weitere Varianten"-Dropdown
   const [optText, setOptText] = useState("");
   const [optSpeichert, setOptSpeichert] = useState(false);
 
@@ -1327,16 +1328,27 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         )}
 
         <div className="feld" style={{ marginTop: 14 }}>
-          {module.map((m) => (
-            <div key={m.id} className="modulblock">
-              {Object.entries(m.struktur.groups).map(([g, grp]) => (
+          {module.map((m) => {
+            const renderGruppe = (g: string, grp: (typeof m.struktur.groups)[string]) => {
+              const TOP_N = 5;
+              const vieleOptionen = grp.opts.length > TOP_N;
+              const suche = (bausteinSuche[`${m.termin_typ}:${g}`] || "").trim().toLowerCase();
+              const alleMitIndex = grp.opts.map((o, i) => ({ o, i }));
+              const topOpts = vieleOptionen ? alleMitIndex.slice(0, TOP_N) : alleMitIndex;
+              const restOpts = vieleOptionen ? alleMitIndex.slice(TOP_N) : [];
+              const restGefiltert = suche
+                ? restOpts.filter(({ o }) => o.t.toLowerCase().includes(suche))
+                : restOpts;
+
+              return (
                 <div className="gruppe" key={`${m.termin_typ}:${g}`}>
                   <div className="gname">
                     {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
                     {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
                   </div>
+                  {vieleOptionen && <div className="gunterlabel">Häufigste</div>}
                   <div className="wahlzeile">
-                    {grp.opts.map((o, i) => (
+                    {topOpts.map(({ o, i }) => (
                       <button
                         key={i}
                         className="wahl bernstein"
@@ -1346,7 +1358,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                         {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
                       </button>
                     ))}
-                    {grp.req && (
+                    {!vieleOptionen && grp.req && (
                       <button
                         className="wahl keine"
                         aria-pressed={leer[`${m.termin_typ}:${g}`] === true}
@@ -1356,6 +1368,45 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                       </button>
                     )}
                   </div>
+                  {vieleOptionen && (
+                    <details className="weitere-details">
+                      <summary>
+                        <span className="wahl weitere">Weitere Varianten ({restOpts.length})</span>
+                      </summary>
+                      <div className="weitere-panel">
+                        <input
+                          className="freitext"
+                          type="text"
+                          placeholder="Suchen…"
+                          value={bausteinSuche[`${m.termin_typ}:${g}`] || ""}
+                          onChange={(e) =>
+                            setBausteinSuche((prev) => ({ ...prev, [`${m.termin_typ}:${g}`]: e.target.value }))
+                          }
+                        />
+                        <div className="wahlzeile" style={{ marginTop: 8 }}>
+                          {restGefiltert.map(({ o, i }) => (
+                            <button
+                              key={i}
+                              className="wahl bernstein"
+                              aria-pressed={(auswahl[m.termin_typ]?.[g] ?? []).includes(i)}
+                              onClick={() => toggleOpt(m.termin_typ, g, i)}
+                            >
+                              {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
+                            </button>
+                          ))}
+                          {grp.req && (
+                            <button
+                              className="wahl keine"
+                              aria-pressed={leer[`${m.termin_typ}:${g}`] === true}
+                              onClick={() => toggleKeineAngabe(m.termin_typ, g)}
+                            >
+                              keine Angabe
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  )}
                   {(() => {
                     const key = `${m.termin_typ}:${g}`;
                     if (optOffen !== key) {
@@ -1396,9 +1447,27 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                     );
                   })()}
                 </div>
-              ))}
-            </div>
-          ))}
+              );
+            };
+
+            const eintraege = Object.entries(m.struktur.groups);
+            const bogenOk = eintraege.find(([g]) => g === "bogen_ok");
+            const bogenUk = eintraege.find(([g]) => g === "bogen_uk");
+            const hatBogenPaar = !!bogenOk && !!bogenUk;
+            const uebrige = eintraege.filter(([g]) => !(hatBogenPaar && (g === "bogen_ok" || g === "bogen_uk")));
+
+            return (
+              <div key={m.id} className="modulblock">
+                {hatBogenPaar && (
+                  <div className="bogen-paar">
+                    {renderGruppe(bogenOk![0], bogenOk![1])}
+                    {renderGruppe(bogenUk![0], bogenUk![1])}
+                  </div>
+                )}
+                {uebrige.map(([g, grp]) => renderGruppe(g, grp))}
+              </div>
+            );
+          })}
           <input
             className="freitext"
             type="text"
