@@ -28,6 +28,68 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
+type VersichertenPatch = {
+  versicherter_vorname?: string;
+  versicherter_nachname?: string;
+  versicherter_geburtsdatum?: string;
+  versicherter_strasse?: string;
+  versicherter_plz?: string;
+  versicherter_ort?: string;
+  versicherter_telefon?: string;
+  versicherter_email?: string;
+  eb2_vorname?: string;
+  eb2_nachname?: string;
+  eb2_telefon?: string;
+  eb2_email?: string;
+  versicherungsart?: string;
+  krankenkasse?: string;
+  zusatzversicherung?: string;
+};
+
+function normalizeVersicherungsart(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (v.includes("gesetzlich")) return "gesetzlich";
+  if (v.includes("privat")) return "privat";
+  if (v.includes("beihilfe")) return "beihilfe";
+  if (v.includes("selbstzahler")) return "selbstzahler";
+  return value;
+}
+
+// Baut aus den Anamnesebogen-Antworten die lokalen Versichertenfelder.
+// Nur vorhandene Werte werden gesetzt, damit ein Re-Sync bestehende Daten nicht leert.
+function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenPatch {
+  const patch: VersichertenPatch = {};
+  const set = (key: keyof VersichertenPatch, value: string | null): void => {
+    if (value !== null) patch[key] = value;
+  };
+
+  set("versicherter_vorname", asString(answers["vp_vorname"]));
+  set("versicherter_nachname", asString(answers["vp_nachname"]));
+  set("versicherter_geburtsdatum", asString(answers["vp_geburtsdatum"]));
+
+  const strasse = asString(answers["vp_strasse"]);
+  const hausnummer = asString(answers["vp_hausnummer"]);
+  const adresse = [strasse, hausnummer].filter((p): p is string => p !== null).join(" ").trim();
+  if (adresse !== "") patch.versicherter_strasse = adresse;
+
+  set("versicherter_plz", asString(answers["vp_plz"]));
+  set("versicherter_ort", asString(answers["vp_wohnort"]));
+  set("versicherter_telefon", asString(answers["vp_telefon"]));
+  set("versicherter_email", asString(answers["vp_email"]));
+
+  set("eb2_vorname", asString(answers["vp2_vorname"]));
+  set("eb2_nachname", asString(answers["vp2_nachname"]));
+  set("eb2_telefon", asString(answers["vp2_telefon"]));
+  set("eb2_email", asString(answers["vp2_email"]));
+
+  set("versicherungsart", normalizeVersicherungsart(asString(answers["versicherungsart"])));
+  set("krankenkasse", asString(answers["krankenkasse"]));
+  set("zusatzversicherung", asString(answers["zusatzversicherung"]));
+
+  return patch;
+}
+
 function normalizeForEmail(name: string): string {
   return name
     .toLowerCase()
@@ -249,11 +311,11 @@ export async function POST(request: Request) {
         .update({ account_email: account.login_email, account_password: account.password })
         .eq("id", submissionId);
 
-      // Portal-Zugang im Patienten-Record aktivieren
+      // Portal-Zugang und Versichertendaten aus dem Anamnesebogen im Patienten-Record setzen
       if (abgleich?.patient_id) {
         await supabase
           .from("patients")
-          .update({ portal_zugang: true })
+          .update({ portal_zugang: true, ...buildVersichertenPatch(answers) })
           .eq("id", abgleich.patient_id);
       }
 
