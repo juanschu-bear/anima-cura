@@ -7,6 +7,7 @@ import { AlertTriangle, Mail, Phone, Shield, GripVertical, Info } from "lucide-r
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { isSafeDunningRate } from "@/lib/patient-safety";
 
 interface MahnItem {
   id: string;
@@ -62,15 +63,17 @@ export default function MahnwesenPage() {
       const supabase = createBrowserClient();
       const { data: raten } = await supabase
         .from("raten")
-        .select("*, patients:patient_id(id, vorname, nachname, email, telefon)")
+        .select("*, patients:patient_id(id, vorname, nachname, email, telefon, ivoris_nummer, ivoris_id, behandlung)")
         .in("status", ["überfällig", "offen"])
         .lt("faellig_am", new Date().toISOString().split("T")[0])
         .order("faellig_am", { ascending: true });
 
-      if (raten && raten.length > 0) {
+      const realeRaten = (raten || []).filter((r: any) => isSafeDunningRate(r, r.patients));
+
+      if (realeRaten.length > 0) {
         setHasRealData(true);
         setShowDemo(false);
-        raten.forEach((r: any) => {
+        realeRaten.forEach((r: any) => {
           const item: MahnItem = {
             id: r.id,
             patient_id: r.patients?.id,

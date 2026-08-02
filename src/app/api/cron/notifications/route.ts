@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
+import { hasReliablePatientIdentity, isSafeDunningRate } from "@/lib/patient-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,12 +29,14 @@ export async function GET(request: NextRequest) {
   // 1. Rates due in next 3 days - remind patient
   const { data: faelligBald } = await sc
     .from("raten")
-    .select("id, patient_id, betrag, faellig_am, rate_nummer")
+    .select("id, patient_id, betrag, faellig_am, rate_nummer, bezahlt_am, patients:patient_id(id, vorname, nachname, ivoris_nummer, ivoris_id, behandlung)")
     .eq("status", "offen")
     .gte("faellig_am", today)
     .lte("faellig_am", in3Days);
 
-  for (const rate of (faelligBald || [])) {
+  const sichereFaelligBald = (faelligBald || []).filter((rate: any) => isSafeDunningRate(rate, rate.patients));
+
+  for (const rate of sichereFaelligBald) {
     const tage = Math.ceil((new Date(rate.faellig_am).getTime() - now.getTime()) / 864e5);
     const exists = await sc
       .from("patient_notifications")
@@ -58,11 +61,13 @@ export async function GET(request: NextRequest) {
   // 2. Rates that are now overdue
   const { data: ueberfaellig } = await sc
     .from("raten")
-    .select("id, patient_id, betrag, faellig_am, rate_nummer, mahnstufe")
+    .select("id, patient_id, betrag, faellig_am, rate_nummer, mahnstufe, bezahlt_am, patients:patient_id(id, vorname, nachname, ivoris_nummer, ivoris_id, behandlung)")
     .eq("status", "offen")
     .lt("faellig_am", today);
 
-  for (const rate of (ueberfaellig || [])) {
+  const sichereUeberfaellig = (ueberfaellig || []).filter((rate: any) => isSafeDunningRate(rate, rate.patients));
+
+  for (const rate of sichereUeberfaellig) {
     const tage = Math.floor((now.getTime() - new Date(rate.faellig_am).getTime()) / 864e5);
     
     // Update status to überfällig
@@ -97,12 +102,14 @@ export async function GET(request: NextRequest) {
   const yesterday = new Date(now.getTime() - 864e5).toISOString().slice(0, 10);
   const { data: bezahlt } = await sc
     .from("raten")
-    .select("id, patient_id, betrag, bezahlt_am, rate_nummer")
+    .select("id, patient_id, betrag, bezahlt_am, rate_nummer, patients:patient_id(id, vorname, nachname, ivoris_nummer, ivoris_id, behandlung)")
     .eq("status", "bezahlt")
     .gte("bezahlt_am", yesterday)
     .lte("bezahlt_am", today);
 
-  for (const rate of (bezahlt || [])) {
+  const sichereBezahlt = (bezahlt || []).filter((rate: any) => hasReliablePatientIdentity(rate.patients));
+
+  for (const rate of sichereBezahlt) {
     const exists = await sc
       .from("patient_notifications")
       .select("id")
@@ -125,7 +132,7 @@ export async function GET(request: NextRequest) {
 
   // 4. Negative Event Detection: Rate fällig in 3 Tagen aber AnimaPay nicht geöffnet
   let negativeEvents = 0;
-  for (const rate of (faelligBald || [])) {
+  for (const rate of sichereFaelligBald) {
     const { data: recentAnimaPay } = await sc
       .from("patient_engagement")
       .select("id")
@@ -153,9 +160,9 @@ export async function GET(request: NextRequest) {
     created,
     negative_events: negativeEvents,
     checked: {
-      faellig_bald: (faelligBald || []).length,
-      ueberfaellig: (ueberfaellig || []).length,
-      bezahlt: (bezahlt || []).length,
+      faellig_bald: sichereFaelligBald.length,
+      ueberfaellig: sichereUeberfaellig.length,
+      bezahlt: sichereBezahlt.length,
     },
     timestamp: now.toISOString(),
   });

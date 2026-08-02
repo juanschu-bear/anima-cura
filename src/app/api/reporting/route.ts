@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { hasReliablePatientIdentity, isSafeDunningRate } from "@/lib/patient-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +40,10 @@ export async function GET(request: NextRequest) {
         .gt("betrag", 0)
         .neq("matching_status", "ignoriert"),
       sc.from("offene_posten")
-        .select("id, betrag, offen, gezahlt, status, patient_id"),
+        .select("id, betrag, offen, gezahlt, status, patient_id, rechnung_datum, bezahlt_am, mahnstufe"),
     ]);
 
-    const bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];
+    let bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];
     const txArr = quarterTransactions || [];
     const receivableArr = receivables || [];
     const allRatePatientIds = Array.from(
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     );
     const { data: patientScopes } = await sc
       .from("patients")
-      .select("id, vorname, nachname, kasse")
+      .select("id, vorname, nachname, kasse, ivoris_nummer, ivoris_id, behandlung")
       .in("id", allRatePatientIds.length > 0 ? allRatePatientIds : ["00000000-0000-0000-0000-000000000000"]);
     const patMap: Record<string, string> = {};
     const kasseMap: Record<string, "gesetzlich" | "privat" | undefined> = {};
@@ -65,6 +66,12 @@ export async function GET(request: NextRequest) {
       patMap[p.id] = `${p.nachname}, ${p.vorname}`;
       kasseMap[p.id] = p.kasse as "gesetzlich" | "privat" | undefined;
     });
+
+    const patientById = new Map((patientScopes || []).map((patient) => [patient.id, patient]));
+    bArr = bArr.filter((rate) => hasReliablePatientIdentity(patientById.get(rate.patient_id)));
+    fArr = fArr.filter((rate) => hasReliablePatientIdentity(patientById.get(rate.patient_id)));
+    uArr = uArr.filter((rate) => isSafeDunningRate(rate, patientById.get(rate.patient_id)));
+    mArr = mArr.filter((rate) => isSafeDunningRate(rate, patientById.get((rate as any).patient_id)));
 
     // Core KPIs
     const einnahmen = bArr.reduce((s, r) => s + Number(r.bezahlt_betrag || r.betrag || 0), 0);
@@ -77,7 +84,13 @@ export async function GET(request: NextRequest) {
     const verz = bArr.filter(r => r.faellig_am && r.bezahlt_am).map(r => Math.max(0, Math.floor((new Date(r.bezahlt_am).getTime() - new Date(r.faellig_am).getTime()) / 864e5)));
     const avgVerzoegerung = verz.length > 0 ? Math.round(verz.reduce((s, v) => s + v, 0) / verz.length * 10) / 10 : 0;
     const mahnquote = faelligCount > 0 ? Math.round((mArr.length / faelligCount) * 100) : 0;
-    const offenePosten = uArr.reduce((s, r) => s + Number(r.betrag || 0), 0);
+    const receivableOpenRows = receivableArr.filter((item) => {
+      if (!["offen", "teilbezahlt", "überfällig"].includes(item.status)) return false;
+      return hasReliablePatientIdentity(patientById.get(item.patient_id));
+    });
+    const offenePosten = receivableOpenRows.reduce((sum, item) => {
+      return sum + Number(item.offen ?? Math.max(0, Number(item.betrag || 0) - Number((item as any).gezahlt || 0)));
+    }, 0);
 
     const quarterFinance = {
       eingang_gesamt: 0,
@@ -161,16 +174,21 @@ export async function GET(request: NextRequest) {
     // Forderungsalter (unter 30, 30-60, über 60 Tage)
     const now = Date.now();
     const forderungsalter = { unter30: { count: 0, betrag: 0 }, bis60: { count: 0, betrag: 0 }, ueber60: { count: 0, betrag: 0 } };
-    uArr.forEach(r => {
-      const tage = Math.floor((now - new Date(r.faellig_am).getTime()) / 864e5);
-      const b = Number(r.betrag || 0);
+    receivableOpenRows.forEach(r => {
+      const basisDatum = r.rechnung_datum || r.bezahlt_am || null;
+      const tage = basisDatum ? Math.floor((now - new Date(basisDatum).getTime()) / 864e5) : 0;
+      const b = Number(r.offen ?? Math.max(0, Number(r.betrag || 0) - Number((r as any).gezahlt || 0)));
       if (tage < 30) { forderungsalter.unter30.count++; forderungsalter.unter30.betrag += b; }
       else if (tage <= 60) { forderungsalter.bis60.count++; forderungsalter.bis60.betrag += b; }
       else { forderungsalter.ueber60.count++; forderungsalter.ueber60.betrag += b; }
     });
 
-    // Alle offene Posten (nicht nur top 5)
-    const alleOffene = uArr.sort((a, b) => Number(b.betrag) - Number(a.betrag));
+    // Alle echten offenen Posten aus IVORIS / offene_posten.
+    const alleOffene = [...receivableOpenRows].sort((a, b) => {
+      const av = Number(a.offen ?? Math.max(0, Number(a.betrag || 0) - Number((a as any).gezahlt || 0)));
+      const bv = Number(b.offen ?? Math.max(0, Number(b.betrag || 0) - Number((b as any).gezahlt || 0)));
+      return bv - av;
+    });
 
     // Enrich mahnDetails with names and betrag
     const mahnDetailsMapped = mahnDetails.map(m => {
@@ -186,7 +204,19 @@ export async function GET(request: NextRequest) {
       verteilung: { puenktlich, verspaetet, ueberfaellig: ueberfaelligCount, offen: offenCount },
       monatlich: Object.entries(monatlich).sort((a, b) => a[0].localeCompare(b[0])).map(([monat, data]) => ({ monat, ...data })),
       mahnstufen, mahnDetails: mahnDetailsMapped, forderungsalter,
-      offenePostenListe: alleOffene.map(r => ({ id: r.id, betrag: Number(r.betrag), faellig_am: r.faellig_am, patient_name: patMap[r.patient_id] || "Unbekannt", patient_id: r.patient_id, mahnstufe: r.mahnstufe, tage: Math.floor((now - new Date(r.faellig_am).getTime()) / 864e5) })),
+      offenePostenListe: alleOffene.map(r => {
+        const referenceDate = r.rechnung_datum || r.bezahlt_am || null;
+        const amount = Number(r.offen ?? Math.max(0, Number(r.betrag || 0) - Number((r as any).gezahlt || 0)));
+        return {
+          id: r.id,
+          betrag: amount,
+          faellig_am: referenceDate,
+          patient_name: patMap[r.patient_id] || "Unbekannt",
+          patient_id: r.patient_id,
+          mahnstufe: r.mahnstufe || 0,
+          tage: referenceDate ? Math.floor((now - new Date(referenceDate).getTime()) / 864e5) : 0,
+        };
+      }),
     };
   }
 

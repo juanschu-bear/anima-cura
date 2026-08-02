@@ -119,7 +119,7 @@ export default function BerichtePage() {
     try {
       const a = data.aktuell;
       const v = data.vergleich;
-      const prompt = `Du bist ein Finanzanalyst für eine Kieferorthäpädie-Praxis. Erstelle einen kurzen, professionellen Bericht (max 250 Wörter, auf Deutsch) für den Zeitraum ${selected.label}.\n\nDaten:\n- Einnahmen: ${fmtEur(a.einnahmen)} (${a.zahlendePatienten} zahlende Patienten, ${fmtEur(a.einnahmenProKopf)} Ø pro Patient)\n- Zahlungsquote: ${a.zahlungsquote}%\n- Ø Verzögerung: ${a.avgVerzoegerung} Tage\n- Mahnquote: ${a.mahnquote}%\n- Aktive Ratenpläne: ${a.aktivePlaene}\n- Offene Posten: ${fmtEur(a.offenePosten)} (${a.offenePostenListe?.length || 0} überfällige Forderungen)\n- Forderungsalter: <30T: ${fmtEur(a.forderungsalter?.unter30?.betrag || 0)}, 30-60T: ${fmtEur(a.forderungsalter?.bis60?.betrag || 0)}, >60T: ${fmtEur(a.forderungsalter?.ueber60?.betrag || 0)}\n${v ? `- Vorperiode (${prev?.label}): Einnahmen ${fmtEur(v.einnahmen)}, Zahlungsquote ${v.zahlungsquote}%, Mahnquote ${v.mahnquote}%` : ""}\n\nStruktur: 1) Zusammenfassung (2 Sätze) 2) Highlights 3) Risiken 4) Empfehlungen. Kein Markdown, kein **, kein ##. Fließender Text, professionell aber verständlich. Absätze mit Leerzeilen.`;
+      const prompt = `Du bist ein Finanzanalyst für eine Kieferorthäpädie-Praxis. Erstelle einen kurzen, professionellen Bericht (max 250 Wörter, auf Deutsch) für den Zeitraum ${selected.label}.\n\nDaten:\n- Einnahmen: ${fmtEur(a.einnahmen)} (${a.zahlendePatienten} zahlende Patienten, ${fmtEur(a.einnahmenProKopf)} Ø pro Patient)\n- Zahlungsquote: ${a.zahlungsquote}%\n- Ø Verzögerung: ${a.avgVerzoegerung} Tage\n- Mahnquote: ${a.mahnquote}%\n- Aktive Ratenpläne: ${a.aktivePlaene}\n- Offene Posten: ${fmtEur(a.offenePosten)} (${a.offenePostenListe?.length || 0} reale offene Forderungen)\n- Forderungsalter: <30T: ${fmtEur(a.forderungsalter?.unter30?.betrag || 0)}, 30-60T: ${fmtEur(a.forderungsalter?.bis60?.betrag || 0)}, >60T: ${fmtEur(a.forderungsalter?.ueber60?.betrag || 0)}\n${v ? `- Vorperiode (${prev?.label}): Einnahmen ${fmtEur(v.einnahmen)}, Zahlungsquote ${v.zahlungsquote}%, Mahnquote ${v.mahnquote}%` : ""}\n\nStruktur: 1) Zusammenfassung (2 Sätze) 2) Highlights 3) Risiken 4) Empfehlungen. Kein Markdown, kein **, kein ##. Fließender Text, professionell aber verständlich. Absätze mit Leerzeilen.`;
       const res = await fetch("/api/ai-report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
       if (res.ok) { const j = await res.json(); setAiReport(j.reply || "Bericht konnte nicht generiert werden."); }
     } catch { setAiReport("Fehler bei der Berichterstellung."); }
@@ -240,7 +240,7 @@ export default function BerichtePage() {
         <KpiCard dk={dk} label={"Ø Verzögerung"} value={a.avgVerzoegerung} fmt="tage" d={v ? delta(a.avgVerzoegerung, v.avgVerzoegerung) : null} good="down" i={3} />
         <KpiCard dk={dk} label="Mahnquote" value={a.mahnquote} fmt="pct" d={v ? delta(a.mahnquote, v.mahnquote) : null} good="down" i={4} />
         <KpiCard dk={dk} label="Aktive Pläne" value={a.aktivePlaene} fmt="num" i={5} onClick={() => setPopup("plaene")} clickable />
-        <KpiCard dk={dk} label={"Offene Forderungen"} value={a.offenePosten} fmt="eur" d={v ? delta(a.offenePosten, v.offenePosten) : null} good="down" i={6} accent sub={`${postenList.length} überfällige Raten`} />
+        <KpiCard dk={dk} label={"Offene Forderungen"} value={a.offenePosten} fmt="eur" d={v ? delta(a.offenePosten, v.offenePosten) : null} good="down" i={6} accent sub={`${postenList.length} reale offene Forderungen`} />
         <KpiCard dk={dk} label="Bezahlte Raten" value={a.bezahltCount} fmt="num" i={7} sub={`von ${a.faelligCount} fällig`} />
       </div>
 
@@ -248,14 +248,14 @@ export default function BerichtePage() {
       {a.forderungsalter && (
         <motion.div {...anim(0.1)} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
           {[
-            { label: "< 30 Tage überfällig", ...a.forderungsalter.unter30, color: ylw },
-            { label: "30\u201360 Tage überfällig", ...a.forderungsalter.bis60, color: orn },
-            { label: "> 60 Tage überfällig", ...a.forderungsalter.ueber60, color: red },
+            { label: "< 30 Tage offen", ...a.forderungsalter.unter30, color: ylw },
+            { label: "30\u201360 Tage offen", ...a.forderungsalter.bis60, color: orn },
+            { label: "> 60 Tage offen", ...a.forderungsalter.ueber60, color: red },
           ].map((b, i) => (
             <div key={i} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, padding: "14px 18px", backdropFilter: dk ? "blur(20px)" : undefined }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: b.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{b.label}</div>
               <div style={{ fontSize: 24, fontWeight: 800, color: txtH, fontFamily: "'Fraunces', serif" }}>{fmtEur(b.betrag)}</div>
-              <div style={{ fontSize: 12, color: muted }}>{b.count} offene Raten</div>
+              <div style={{ fontSize: 12, color: muted }}>{b.count} offene Forderungen</div>
             </div>
           ))}
         </motion.div>
@@ -349,7 +349,7 @@ export default function BerichtePage() {
         <motion.div {...anim(0.28)} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20, backdropFilter: dk ? "blur(20px)" : undefined }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: txtH, margin: 0 }}>Offene Forderungen</h3>
-            <span style={{ fontSize: 12, fontWeight: 600, color: red }}>{postenList.length} überfällige Raten — {fmtEur(a.offenePosten)}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: red }}>{postenList.length} reale offene Forderungen — {fmtEur(a.offenePosten)}</span>
           </div>
           {postenList.length === 0 ? (
             <p style={{ fontSize: 14, color: muted, textAlign: "center", padding: "40px 0" }}>Keine überfälligen Forderungen</p>
@@ -359,7 +359,7 @@ export default function BerichtePage() {
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${dk ? "rgba(255,255,255,0.04)" : "#f0f0f0"}` : "none" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: txtH, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.patient_name}</div>
-                    <div style={{ fontSize: 11, color: muted }}>{p.tage} Tage überfällig · Mahnstufe {p.mahnstufe}</div>
+                    <div style={{ fontSize: 11, color: muted }}>{p.tage} Tage offen · Mahnstufe {p.mahnstufe}</div>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: red, marginLeft: 12 }}>{fmtEur(p.betrag)}</div>
                 </div>

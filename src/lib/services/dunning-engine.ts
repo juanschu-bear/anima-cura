@@ -8,6 +8,7 @@
 import { createServerClient } from "../db/supabase";
 import { sendEmail } from "./email-service";
 import type { MahnEinstellungen } from "../types";
+import { isSafeDunningRate } from "../patient-safety";
 
 interface DunningResult {
   checked: number;
@@ -52,7 +53,7 @@ export async function runDunningEngine(): Promise<DunningResult> {
     .from("raten")
     .select(`
       *,
-      patients!inner ( id, vorname, nachname, email, telefon ),
+      patients!inner ( id, vorname, nachname, email, telefon, ivoris_nummer, ivoris_id, behandlung ),
       ratenplaene!inner ( id, rate_betrag, anzahl_raten )
     `)
     .in("status", ["offen", "überfällig"])
@@ -63,10 +64,12 @@ export async function runDunningEngine(): Promise<DunningResult> {
 
   // 3. Für jede überfällige Rate: Mahnstufe bestimmen
   for (const rate of offeneRaten) {
-    result.checked++;
     const faellig = new Date(rate.faellig_am);
     const tageUeberfaellig = Math.floor((today.getTime() - faellig.getTime()) / (1000 * 60 * 60 * 24));
     const patient = (rate as any).patients;
+
+    if (!isSafeDunningRate(rate, patient)) continue;
+    result.checked++;
 
     // Noch in Karenzzeit?
     if (tageUeberfaellig <= config.karenz_tage) continue;
