@@ -27,6 +27,19 @@ export async function GET(request: NextRequest) {
     ]);
 
     const bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];
+    const allRatePatientIds = Array.from(
+      new Set([...bArr, ...fArr, ...uArr, ...mArr].map((entry) => entry.patient_id).filter(Boolean))
+    );
+    const { data: patientScopes } = await sc
+      .from("patients")
+      .select("id, vorname, nachname, kasse")
+      .in("id", allRatePatientIds.length > 0 ? allRatePatientIds : ["00000000-0000-0000-0000-000000000000"]);
+    const patMap: Record<string, string> = {};
+    const kasseMap: Record<string, "gesetzlich" | "privat" | undefined> = {};
+    (patientScopes || []).forEach((p) => {
+      patMap[p.id] = `${p.nachname}, ${p.vorname}`;
+      kasseMap[p.id] = p.kasse as "gesetzlich" | "privat" | undefined;
+    });
 
     // Core KPIs
     const einnahmen = bArr.reduce((s, r) => s + Number(r.bezahlt_betrag || r.betrag || 0), 0);
@@ -40,6 +53,55 @@ export async function GET(request: NextRequest) {
     const avgVerzoegerung = verz.length > 0 ? Math.round(verz.reduce((s, v) => s + v, 0) / verz.length * 10) / 10 : 0;
     const mahnquote = faelligCount > 0 ? Math.round((mArr.length / faelligCount) * 100) : 0;
     const offenePosten = uArr.reduce((s, r) => s + Number(r.betrag || 0), 0);
+
+    const quarterFinance = {
+      bezahlt_gesamt: 0,
+      bezahlt_privat: 0,
+      bezahlt_gesetzlich: 0,
+      faellig_gesamt: 0,
+      faellig_privat: 0,
+      faellig_gesetzlich: 0,
+      offen_gesamt: 0,
+      offen_privat: 0,
+      offen_gesetzlich: 0,
+      teilbezahlt_gesamt: 0,
+      teilbezahlt_privat: 0,
+      teilbezahlt_gesetzlich: 0,
+    };
+
+    for (const rate of bArr) {
+      const amount = Number(rate.bezahlt_betrag || rate.betrag || 0);
+      quarterFinance.bezahlt_gesamt += amount;
+      if (kasseMap[rate.patient_id] === "gesetzlich") quarterFinance.bezahlt_gesetzlich += amount;
+      else quarterFinance.bezahlt_privat += amount;
+    }
+
+    for (const rate of fArr) {
+      const totalAmount = Number(rate.betrag || 0);
+      const paidAmount = Number((rate as any).bezahlt_betrag || 0);
+      const openAmount = rate.status === "teilbezahlt"
+        ? Math.max(0, totalAmount - paidAmount)
+        : rate.status === "bezahlt"
+        ? 0
+        : totalAmount;
+      const scope = kasseMap[rate.patient_id] === "gesetzlich" ? "gesetzlich" : "privat";
+
+      quarterFinance.faellig_gesamt += totalAmount;
+      if (scope === "gesetzlich") quarterFinance.faellig_gesetzlich += totalAmount;
+      else quarterFinance.faellig_privat += totalAmount;
+
+      if (rate.status === "offen" || rate.status === "überfällig") {
+        quarterFinance.offen_gesamt += openAmount;
+        if (scope === "gesetzlich") quarterFinance.offen_gesetzlich += openAmount;
+        else quarterFinance.offen_privat += openAmount;
+      }
+
+      if (rate.status === "teilbezahlt") {
+        quarterFinance.teilbezahlt_gesamt += openAmount;
+        if (scope === "gesetzlich") quarterFinance.teilbezahlt_gesetzlich += openAmount;
+        else quarterFinance.teilbezahlt_privat += openAmount;
+      }
+    }
 
     // Zahlungsstatus-Verteilung
     const puenktlich = fArr.filter(r => r.status === "bezahlt" && r.bezahlt_am && r.faellig_am && (new Date(r.bezahlt_am).getTime() - new Date(r.faellig_am).getTime()) <= 3 * 864e5).length;
@@ -75,10 +137,6 @@ export async function GET(request: NextRequest) {
 
     // Alle offene Posten (nicht nur top 5)
     const alleOffene = uArr.sort((a, b) => Number(b.betrag) - Number(a.betrag));
-    const allPatIds = Array.from(new Set([...alleOffene.map(r => r.patient_id), ...mahnDetails.map(m => m.patient_id)].filter(Boolean)));
-    const { data: patienten } = await sc.from("patients").select("id, vorname, nachname").in("id", allPatIds.length > 0 ? allPatIds : ["00000000-0000-0000-0000-000000000000"]);
-    const patMap: Record<string, string> = {};
-    (patienten || []).forEach(p => { patMap[p.id] = `${p.nachname}, ${p.vorname}`; });
 
     // Enrich mahnDetails with names and betrag
     const mahnDetailsMapped = mahnDetails.map(m => {
@@ -90,6 +148,7 @@ export async function GET(request: NextRequest) {
       einnahmen, einnahmenProKopf, zahlungsquote, avgVerzoegerung, mahnquote,
       aktivePlaene: aktivePlaene || 0, offenePosten, bezahltCount, faelligCount,
       zahlendePatienten: uniquePatients.size,
+      quartalsumsatz: quarterFinance,
       verteilung: { puenktlich, verspaetet, ueberfaellig: ueberfaelligCount, offen: offenCount },
       monatlich: Object.entries(monatlich).sort((a, b) => a[0].localeCompare(b[0])).map(([monat, data]) => ({ monat, ...data })),
       mahnstufen, mahnDetails: mahnDetailsMapped, forderungsalter,
