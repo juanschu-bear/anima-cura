@@ -478,7 +478,7 @@ interface BookingCandidate {
 
 // Verrechnet eine Ueberzahlung mit den naechsten offenen Posten des Patienten
 // (aeltester zuerst). Der unverbrauchte Rest wird als Guthaben am Patienten geparkt.
-async function applyUeberzahlung(
+export async function applyUeberzahlung(
   db: ReturnType<typeof createServerClient>,
   patientId: string | null,
   excess: number,
@@ -652,10 +652,12 @@ async function backfillConfirmedRateBookings(db: ReturnType<typeof createServerC
 // Gibt null zurueck, wenn keine eindeutige Referenz gefunden wird (dann greift Stufe 1).
 export async function reconcileByReference(
   db: ReturnType<typeof createServerClient>,
-  tx: { betrag: number; verwendungszweck: string; datum: string }
+  tx: { betrag: number; verwendungszweck: string; datum: string },
+  options?: { allowBaseFallback?: boolean }
 ): Promise<ReferenceResult | null> {
   const { full, base } = extractUnserZeichen(tx.verwendungszweck);
   if (!full && !base) return null;
+  const allowBaseFallback = options?.allowBaseFallback ?? true;
 
   let posten: OffenerPosten | null = null;
 
@@ -670,7 +672,7 @@ export async function reconcileByReference(
   }
 
   // Fallback: nur zuordnen, wenn genau ein offener Posten zur 8-stelligen Basis existiert.
-  if (!posten && base) {
+  if (!posten && allowBaseFallback && base) {
     const { data } = await db
       .from("offene_posten")
       .select("id, unser_zeichen, basis_nr, offen, gezahlt, betrag, status, patient_id")
@@ -714,6 +716,36 @@ export async function reconcileByReference(
     posten_update: { status: neuerStatus, gezahlt: gezahltVorher + zahlung, offen: offenNachher, bezahlt_am: bezahltAm },
     ueberzahlung,
   };
+}
+
+export async function applyReferenceMatch(
+  db: ReturnType<typeof createServerClient>,
+  txId: string,
+  tx: { datum: string },
+  ref: ReferenceResult,
+  existingDetails?: Record<string, unknown> | null
+): Promise<void> {
+  await db.from("offene_posten").update({
+    status: ref.posten_update.status,
+    gezahlt: ref.posten_update.gezahlt,
+    offen: ref.posten_update.offen,
+    bezahlt_am: ref.posten_update.bezahlt_am,
+  }).eq("id", ref.posten_id);
+
+  await db.from("transaktionen").update({
+    matching_status: ref.status,
+    matched_patient_id: ref.patient_id,
+    matching_score: 100,
+    matching_details: {
+      ...(existingDetails || {}),
+      ...ref.details,
+    },
+    geprueft_am: new Date().toISOString(),
+  }).eq("id", txId);
+
+  if (ref.ueberzahlung > 0) {
+    await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
+  }
 }
 
 // Die vier Konten der Praxis (Sparkasse Leipzig). Eingaenge von diesen
@@ -793,24 +825,7 @@ export async function runBatchMatching(): Promise<{
       datum: tx.datum,
     });
     if (ref) {
-      await db.from("offene_posten").update({
-        status: ref.posten_update.status,
-        gezahlt: ref.posten_update.gezahlt,
-        offen: ref.posten_update.offen,
-        bezahlt_am: ref.posten_update.bezahlt_am,
-      }).eq("id", ref.posten_id);
-
-      await db.from("transaktionen").update({
-        matching_status: ref.status,
-        matched_patient_id: ref.patient_id,
-        matching_score: 100,
-        matching_details: ref.details,
-        geprueft_am: new Date().toISOString(),
-      }).eq("id", tx.id);
-
-      if (ref.ueberzahlung > 0) {
-        await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
-      }
+      await applyReferenceMatch(db, tx.id, { datum: tx.datum }, ref);
 
       if (ref.status === "auto") stats.auto++;
       else stats.abweichung++;

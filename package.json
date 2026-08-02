@@ -16,6 +16,7 @@
     "db:reset": "supabase db reset",
     "cron:bank-sync": "tsx src/lib/services/bank-sync.ts",
     "cron:matching": "tsx src/lib/services/matching-engine.ts",
+    "repair:offene-posten": "tsx scripts/repair-offene-posten.ts",
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",
     "cron:reports": "tsx src/lib/services/report-generator.ts"
   },
