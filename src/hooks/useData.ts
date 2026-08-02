@@ -240,21 +240,53 @@ export function useTransaktionen(filters?: {
     if (filters?.from) query = query.gte("datum", filters.from);
     if (filters?.to) query = query.lte("datum", filters.to);
 
-    // Serverseitige Suche ueber Absender, Verwendungszweck und Betrag.
-    // Kommas/Klammern wuerden die PostgREST-or()-Syntax brechen -> raus.
     const suchbegriff = (filters?.suche || "").trim();
     if (suchbegriff) {
-      const istZahl = /^[0-9]+([.,][0-9]{1,2})?$/.test(suchbegriff);
-      const sauber = suchbegriff.replace(/[%,()*]/g, " ").trim();
-      const teile: string[] = [];
-      if (sauber) {
-        teile.push(`verwendungszweck.ilike.*${sauber}*`);
-        teile.push(`absender_name.ilike.*${sauber}*`);
+      const tokens = buildSearchTokens(suchbegriff);
+      const patientMuster = Array.from(new Set(tokens.flatMap((token) => [
+        `nachname.ilike.%${token}%`,
+        `vorname.ilike.%${token}%`,
+        `ivoris_nummer.ilike.%${token}%`,
+      ]))).join(",");
+
+      let patientIds: string[] = [];
+      if (patientMuster) {
+        const { data: patientTreffer } = await supabase
+          .from("patients")
+          .select("id, vorname, nachname, ivoris_nummer")
+          .or(patientMuster)
+          .limit(200);
+
+        const gefiltert = (patientTreffer || []).filter((patient) => {
+          const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
+          const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
+          const patientNumber = String((patient as any).ivoris_nummer ?? "").toLowerCase();
+          return tokens.every((token) =>
+            fullName.includes(token) ||
+            reversedName.includes(token) ||
+            patientNumber.includes(token)
+          );
+        });
+        patientIds = gefiltert.map((patient) => patient.id);
       }
-      if (istZahl) {
-        teile.push(`betrag.eq.${suchbegriff.replace(",", ".")}`);
+
+      if (patientIds.length > 0) {
+        query = query.in("matched_patient_id", patientIds);
+      } else {
+        // Fallback: Suche ueber Absender, Verwendungszweck und Betrag.
+        // Kommas/Klammern wuerden die PostgREST-or()-Syntax brechen -> raus.
+        const istZahl = /^[0-9]+([.,][0-9]{1,2})?$/.test(suchbegriff);
+        const sauber = suchbegriff.replace(/[%,()*]/g, " ").replace(/,/g, " ").trim();
+        const teile: string[] = [];
+        for (const token of buildSearchTokens(sauber)) {
+          teile.push(`verwendungszweck.ilike.*${token}*`);
+          teile.push(`absender_name.ilike.*${token}*`);
+        }
+        if (istZahl) {
+          teile.push(`betrag.eq.${suchbegriff.replace(",", ".")}`);
+        }
+        if (teile.length) query = query.or(Array.from(new Set(teile)).join(","));
       }
-      if (teile.length) query = query.or(teile.join(","));
     }
 
     const { data, count } = await query;
