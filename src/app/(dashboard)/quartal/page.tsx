@@ -17,6 +17,17 @@ interface QuartalData {
   mitMobil: number;
 }
 
+interface PatientRecord {
+  geburtsdatum: string | null;
+  versicherung_status: string | null;
+  kasse: string | null;
+  behandlung: string | null;
+  behandlung_status: string | null;
+  email: string | null;
+  telefon: string | null;
+  mobiltelefon: string | null;
+}
+
 interface QuartalFinance {
   eingang_gesamt: number;
   eingang_privat: number;
@@ -73,9 +84,11 @@ function euro(value: number) {
 
 export default function QuartalPage() {
   const { locale } = useAppStore();
-  const [data, setData] = useState<QuartalData | null>(null);
+  const [activeData, setActiveData] = useState<QuartalData | null>(null);
+  const [historyData, setHistoryData] = useState<QuartalData | null>(null);
   const [finance, setFinance] = useState<QuartalFinance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [patientScope, setPatientScope] = useState<"aktiv" | "historie">("aktiv");
 
   useEffect(() => {
     async function loadQuarterData() {
@@ -88,7 +101,7 @@ export default function QuartalPage() {
         supabase
           .from("patients")
           .select(
-            "geburtsdatum, versicherung_status, kasse, behandlung, email, telefon, mobiltelefon"
+            "geburtsdatum, versicherung_status, kasse, behandlung, behandlung_status, email, telefon, mobiltelefon"
           )
           .range(0, 9999),
         fetch(
@@ -98,74 +111,83 @@ export default function QuartalPage() {
         ),
       ]);
 
-      const patients = patientsRes.data;
+      const patients = patientsRes.data as PatientRecord[] | null;
       if (patients) {
-        const versMap: Record<string, number> = {};
-        const behMap: Record<string, number> = {};
-        let kinder = 0;
-        let erwachsene = 0;
-        let mitEmail = 0;
-        let mitTelefon = 0;
-        let mitMobil = 0;
-        const now = Date.now();
+        const activePatients = patients.filter(
+          (patient) => (patient.behandlung_status || "").toLowerCase() === "aktiv"
+        );
 
-        for (const patient of patients) {
-          const vs =
-            patient.versicherung_status === "Family"
-              ? "Familienversichert"
-              : patient.versicherung_status === "Statutory"
-              ? "Gesetzlich"
-              : patient.versicherung_status === "Private"
-              ? "Privat"
-              : patient.versicherung_status === "Retired"
-              ? "Rentner"
-              : patient.kasse === "gesetzlich"
-              ? "Gesetzlich"
-              : "Privat";
-          versMap[vs] = (versMap[vs] || 0) + 1;
+        const buildSummary = (rows: PatientRecord[]) => {
+          const versMap: Record<string, number> = {};
+          const behMap: Record<string, number> = {};
+          let kinder = 0;
+          let erwachsene = 0;
+          let mitEmail = 0;
+          let mitTelefon = 0;
+          let mitMobil = 0;
+          const now = Date.now();
 
-          const beh = patient.behandlung || "Kein Status";
-          behMap[beh] = (behMap[beh] || 0) + 1;
+          for (const patient of rows) {
+            const vs =
+              patient.versicherung_status === "Family"
+                ? "Familienversichert"
+                : patient.versicherung_status === "Statutory"
+                ? "Gesetzlich"
+                : patient.versicherung_status === "Private"
+                ? "Privat"
+                : patient.versicherung_status === "Retired"
+                ? "Rentner"
+                : patient.kasse === "gesetzlich"
+                ? "Gesetzlich"
+                : "Privat";
+            versMap[vs] = (versMap[vs] || 0) + 1;
 
-          if (patient.geburtsdatum) {
-            const age = Math.floor(
-              (now - new Date(patient.geburtsdatum).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000)
-            );
-            if (age < 18) kinder += 1;
-            else erwachsene += 1;
+            const beh = patient.behandlung || "Kein Status";
+            behMap[beh] = (behMap[beh] || 0) + 1;
+
+            if (patient.geburtsdatum) {
+              const age = Math.floor(
+                (now - new Date(patient.geburtsdatum).getTime()) /
+                  (365.25 * 24 * 60 * 60 * 1000)
+              );
+              if (age < 18) kinder += 1;
+              else erwachsene += 1;
+            }
+
+            if (patient.email) mitEmail += 1;
+            if (patient.telefon) mitTelefon += 1;
+            if (patient.mobiltelefon) mitMobil += 1;
           }
 
-          if (patient.email) mitEmail += 1;
-          if (patient.telefon) mitTelefon += 1;
-          if (patient.mobiltelefon) mitMobil += 1;
-        }
+          const colorMap: Record<string, string> = {
+            Familienversichert: "#1aa57a",
+            Gesetzlich: "#2cb88a",
+            Privat: "#4b42d6",
+            Rentner: "#7a6fe0",
+          };
 
-        const colorMap: Record<string, string> = {
-          Familienversichert: "#1aa57a",
-          Gesetzlich: "#2cb88a",
-          Privat: "#4b42d6",
-          Rentner: "#7a6fe0",
+          return {
+            totalPatienten: rows.length,
+            versicherungSplit: Object.entries(versMap)
+              .sort((a, b) => b[1] - a[1])
+              .map(([name, value]) => ({
+                name,
+                value,
+                color: colorMap[name] || "#999",
+              })),
+            behandlungSplit: Object.entries(behMap)
+              .sort((a, b) => b[1] - a[1])
+              .map(([label, count]) => ({ label, patients: count })),
+            kinderCount: kinder,
+            erwachseneCount: erwachsene,
+            mitEmail,
+            mitTelefon,
+            mitMobil,
+          };
         };
 
-        setData({
-          totalPatienten: patients.length,
-          versicherungSplit: Object.entries(versMap)
-            .sort((a, b) => b[1] - a[1])
-            .map(([name, value]) => ({
-              name,
-              value,
-              color: colorMap[name] || "#999",
-            })),
-          behandlungSplit: Object.entries(behMap)
-            .sort((a, b) => b[1] - a[1])
-            .map(([label, count]) => ({ label, patients: count })),
-          kinderCount: kinder,
-          erwachseneCount: erwachsene,
-          mitEmail,
-          mitTelefon,
-          mitMobil,
-        });
+        setActiveData(buildSummary(activePatients));
+        setHistoryData(buildSummary(patients));
       }
 
       if (reportingRes.ok) {
@@ -184,6 +206,8 @@ export default function QuartalPage() {
     return `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`;
   }, []);
 
+  const data = patientScope === "aktiv" ? activeData : historyData;
+
   if (loading) return <div className="text-praxis-400">{t("quarterly.loading", locale)}</div>;
   if (!data) return <div className="text-praxis-400">{t("quarterly.noData", locale)}</div>;
 
@@ -197,7 +221,7 @@ export default function QuartalPage() {
         </h1>
         <p className="mt-1 text-sm text-praxis-400">
           {quarterLabel} · {locale === "de"
-            ? "Patientenstruktur plus echter Zahlungseingang bis heute"
+            ? "Quartalsblick und Patientenbasis klar getrennt"
             : "Patient structure plus instant quarter revenue view"}
         </p>
       </div>
@@ -228,10 +252,10 @@ export default function QuartalPage() {
                 accent="green"
               />
               <KPI
-                title={locale === "de" ? "Noch unklar im Eingang" : "Still unclear"}
-                value={euro(finance.eingang_unklar)}
-                sub={locale === "de" ? "Noch nicht sauber Privat/Kasse zugeordnet" : "Not yet cleanly split by insurance"}
-                accent="amber"
+                title={locale === "de" ? "Bereits zugeordnet" : "Already assigned"}
+                value={euro(finance.zugeordnet_gesamt)}
+                sub={locale === "de" ? "Schon einem Patienten zugeordnet" : "Already assigned to a patient"}
+                accent="default"
               />
             </div>
           </div>
@@ -239,49 +263,92 @@ export default function QuartalPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Aktuell offen" : "Currently open"}
+                {locale === "de" ? "Im Quartal noch unklar" : "Still unclear this quarter"}
               </h3>
               <p className="text-4xl font-semibold text-[#c8942d]">
+                {euro(finance.eingang_unklar)}
+              </p>
+              <p className="mt-2 text-sm text-praxis-500">
+                {locale === "de"
+                  ? "Quartals-Eingänge, die noch nicht sauber klassifiziert sind"
+                  : "Quarter inflows not yet fully classified"}
+              </p>
+            </div>
+
+            <div className="stat-card">
+              <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
+                {locale === "de" ? "Offene Forderungen heute" : "Open receivables today"}
+              </h3>
+              <p className="text-4xl font-semibold text-[#b96a2d]">
                 {euro(finance.offen_gesamt)}
               </p>
               <p className="mt-2 text-sm text-praxis-500">
                 {locale === "de"
-                  ? `Privat: ${euro(finance.offen_privat)} · Kasse: ${euro(finance.offen_gesetzlich)} · Unklar: ${euro(finance.offen_unklar)}`
-                  : `Private: ${euro(finance.offen_privat)} · Statutory: ${euro(finance.offen_gesetzlich)} · Unclear: ${euro(finance.offen_unklar)}`}
+                  ? "Bestandsgröße heute, ausdrücklich nicht nur dieses Quartal"
+                  : "Balance today, explicitly not quarter-only"}
               </p>
             </div>
 
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Aktuell teilbezahlt" : "Currently part-paid"}
+                {locale === "de" ? "Teilbezahlt heute" : "Part-paid today"}
               </h3>
-              <p className="text-4xl font-semibold text-[#b96a2d]">
-                {euro(finance.teilbezahlt_gesamt)}
-              </p>
-              <p className="mt-2 text-sm text-praxis-500">
-                {locale === "de"
-                  ? `Privat: ${euro(finance.teilbezahlt_privat)} · Kasse: ${euro(finance.teilbezahlt_gesetzlich)} · Unklar: ${euro(finance.teilbezahlt_unklar)}`
-                  : `Private: ${euro(finance.teilbezahlt_privat)} · Statutory: ${euro(finance.teilbezahlt_gesetzlich)} · Unclear: ${euro(finance.teilbezahlt_unklar)}`}
-              </p>
-            </div>
-
-            <div className="stat-card">
-              <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Davon bereits zugeordnet" : "Already assigned"}
-              </h3>
-              <p className="text-4xl font-semibold text-[#4b42d6]">{euro(finance.zugeordnet_gesamt)}</p>
+              <p className="text-4xl font-semibold text-[#4b42d6]">{euro(finance.teilbezahlt_gesamt)}</p>
               <p className="mt-3 text-sm text-praxis-500">
                 {locale === "de"
-                  ? "Automatisch oder manuell bereits einem Patienten zugeordnet"
-                  : "Already assigned to a patient, automatically or manually."}
+                  ? "Ebenfalls Bestandswert heute, nicht quartalsbezogen"
+                  : "Also a current balance, not quarter-specific."}
               </p>
             </div>
           </div>
         </>
       )}
 
+      <div className="stat-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-[24px] font-extrabold tracking-tight text-praxis-700">
+              {locale === "de" ? "Patientenbasis" : "Patient base"}
+            </h3>
+            <p className="mt-1 text-sm text-praxis-500">
+              {patientScope === "aktiv"
+                ? locale === "de"
+                  ? "Nur aktive Behandlungen. Keine Alt-Historie."
+                  : "Only active treatments."
+                : locale === "de"
+                ? "Gesamte Historie aller importierten Patienten."
+                : "Entire imported patient history."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPatientScope("aktiv")}
+              className={`ac-chip ${patientScope === "aktiv" ? "ac-chip-active" : ""}`}
+            >
+              {locale === "de" ? "Aktive Behandlung" : "Active treatment"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPatientScope("historie")}
+              className={`ac-chip ${patientScope === "historie" ? "ac-chip-active" : ""}`}
+            >
+              {locale === "de" ? "Gesamthistorie" : "Full history"}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPI title={t("quarterly.totalPatients", locale)} value={String(data.totalPatienten)} />
+        <KPI
+          title={patientScope === "aktiv"
+            ? locale === "de" ? "Aktive Patienten" : "Active patients"
+            : locale === "de" ? "Patienten gesamt" : "Patients total"}
+          value={String(data.totalPatienten)}
+          sub={patientScope === "aktiv"
+            ? locale === "de" ? "Aktuell laufende Behandlungen" : "Currently active treatments"
+            : locale === "de" ? "Historischer Gesamtbestand" : "Historical patient base"}
+        />
         <KPI
           title={t("quarterly.children", locale)}
           value={String(data.kinderCount)}
