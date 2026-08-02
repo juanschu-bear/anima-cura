@@ -1,5 +1,6 @@
 import { createServerClient } from "../db/supabase";
 import { fetchIvorisPatientsRaw } from "../api/ivoris-client";
+import { isBlockedPatientName } from "../patient-blocklist";
 
 type GenericRecord = Record<string, unknown>;
 
@@ -197,6 +198,11 @@ export async function syncIvorisPatients(): Promise<{
     }
 
     const patient = normalized.patient;
+    if (isBlockedPatientName(patient.vorname, patient.nachname)) {
+      skipped++;
+      errors.push(`blocked patient skipped: ${patient.nachname}, ${patient.vorname}`);
+      continue;
+    }
 
     const { data: existing, error: existingError } = await db
       .from("patients")

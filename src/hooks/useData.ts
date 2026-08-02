@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
+import { isBlockedPatientRecord, sanitizeBlockedTransactionMatch } from "@/lib/patient-blocklist";
 
 const supabase = createBrowserClient();
 
@@ -28,6 +29,17 @@ function buildSearchVariants(input: string) {
   if (compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
   if (compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
   return Array.from(variants).filter(Boolean);
+}
+
+function buildSearchTokens(input: string) {
+  return Array.from(
+    new Set(
+      buildSearchVariants(input)
+        .flatMap((variant) => variant.split(/\s+/))
+        .map((token) => token.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function rankPatientMatch(patient: any, search: string) {
@@ -100,11 +112,11 @@ export function usePatienten(search?: string) {
       .range(0, 9999);
 
     if (search) {
-      const variants = buildSearchVariants(search);
-      const muster = Array.from(new Set(variants.flatMap((variant) => [
-        `nachname.ilike.%${variant}%`,
-        `vorname.ilike.%${variant}%`,
-        `ivoris_nummer.ilike.%${variant}%`,
+      const tokens = buildSearchTokens(search);
+      const muster = Array.from(new Set(tokens.flatMap((token) => [
+        `nachname.ilike.%${token}%`,
+        `vorname.ilike.%${token}%`,
+        `ivoris_nummer.ilike.%${token}%`,
       ]))).join(",");
       query = query.or(muster);
     }
@@ -115,10 +127,21 @@ export function usePatienten(search?: string) {
       setError(queryError.message);
       setPatienten([]);
     } else {
-      const rows = data || [];
+      const rows = (data || []).filter((patient) => !isBlockedPatientRecord(patient));
       if (search?.trim()) {
         const normalizedSearch = search.trim();
-        rows.sort((a, b) => {
+        const tokens = buildSearchTokens(normalizedSearch);
+        const filteredRows = rows.filter((patient) => {
+          const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
+          const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
+          const patientNumber = String(patient.ivoris_nummer ?? "").toLowerCase();
+          return tokens.every((token) =>
+            fullName.includes(token) ||
+            reversedName.includes(token) ||
+            patientNumber.includes(token)
+          );
+        });
+        filteredRows.sort((a, b) => {
           const rankA = rankPatientMatch(a, normalizedSearch);
           const rankB = rankPatientMatch(b, normalizedSearch);
           if (rankA !== rankB) return rankA - rankB;
@@ -126,8 +149,10 @@ export function usePatienten(search?: string) {
           if (lastNameCompare !== 0) return lastNameCompare;
           return String(a.vorname ?? "").localeCompare(String(b.vorname ?? ""), "de");
         });
+        setPatienten(filteredRows);
+      } else {
+        setPatienten(rows);
       }
-      setPatienten(rows);
     }
 
     setLoading(false);
@@ -233,7 +258,7 @@ export function useTransaktionen(filters?: {
     }
 
     const { data, count } = await query;
-    setTransaktionen(data || []);
+    setTransaktionen((data || []).map((tx) => sanitizeBlockedTransactionMatch(tx)));
     setTotalCount(count ?? 0);
     setLoading(false);
   }, [filters?.status, filters?.kasse, filters?.from, filters?.to, filters?.page, filters?.pageSize, filters?.suche]);
