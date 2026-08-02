@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -34,14 +35,6 @@ interface QuartalFinance {
   eingang_gesetzlich: number;
   eingang_unklar: number;
   zugeordnet_gesamt: number;
-  offen_gesamt: number;
-  offen_privat: number;
-  offen_gesetzlich: number;
-  offen_unklar: number;
-  teilbezahlt_gesamt: number;
-  teilbezahlt_privat: number;
-  teilbezahlt_gesetzlich: number;
-  teilbezahlt_unklar: number;
 }
 
 function KPI({
@@ -260,7 +253,7 @@ export default function QuartalPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
                 {locale === "de" ? "Im Quartal noch unklar" : "Still unclear this quarter"}
@@ -270,35 +263,28 @@ export default function QuartalPage() {
               </p>
               <p className="mt-2 text-sm text-praxis-500">
                 {locale === "de"
-                  ? "Quartals-Eingänge, die noch nicht sauber klassifiziert sind"
-                  : "Quarter inflows not yet fully classified"}
+                  ? "Nur Zahlungseingänge aus diesem Quartal, die noch nicht sauber klassifiziert sind."
+                  : "Only quarter inflows not yet fully classified."}
               </p>
             </div>
 
-            <div className="stat-card">
-              <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Offene Forderungen heute" : "Open receivables today"}
+            <div className="rounded-[18px] border border-[#d9d4c7] bg-[#fbf8f1] px-5 py-5 text-praxis-700 shadow-sm">
+              <h3 className="text-[20px] font-extrabold tracking-tight">
+                {locale === "de" ? "Wichtig zur Einordnung" : "Important context"}
               </h3>
-              <p className="text-4xl font-semibold text-[#b96a2d]">
-                {euro(finance.offen_gesamt)}
-              </p>
-              <p className="mt-2 text-sm text-praxis-500">
+              <p className="mt-2 text-sm text-praxis-600">
                 {locale === "de"
-                  ? "Bestandsgröße heute, ausdrücklich nicht nur dieses Quartal"
-                  : "Balance today, explicitly not quarter-only"}
+                  ? "Diese Seite zeigt bewusst nur Quartalszahlen und die Patientenbasis. Gesamtbestände wie offene Forderungen werden hier nicht mehr angezeigt, damit nichts mit dem aktuellen Quartal verwechselt wird."
+                  : "This page only shows quarter numbers and patient base."}
               </p>
-            </div>
-
-            <div className="stat-card">
-              <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Teilbezahlt heute" : "Part-paid today"}
-              </h3>
-              <p className="text-4xl font-semibold text-[#4b42d6]">{euro(finance.teilbezahlt_gesamt)}</p>
-              <p className="mt-3 text-sm text-praxis-500">
-                {locale === "de"
-                  ? "Ebenfalls Bestandswert heute, nicht quartalsbezogen"
-                  : "Also a current balance, not quarter-specific."}
-              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/offene-posten" className="ac-chip ac-chip-active">
+                  {locale === "de" ? "Zu Offene Posten" : "Open receivables"}
+                </Link>
+                <Link href="/berichte" className="ac-chip">
+                  {locale === "de" ? "Zu Berichte" : "Reports"}
+                </Link>
+              </div>
             </div>
           </div>
         </>
