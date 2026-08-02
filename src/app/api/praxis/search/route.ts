@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { isBlockedPatientRecord } from "@/lib/patient-blocklist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,17 @@ function buildSearchVariants(input: string) {
   if (compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
   if (compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
   return Array.from(variants).filter(Boolean);
+}
+
+function buildSearchTokens(input: string) {
+  return Array.from(
+    new Set(
+      buildSearchVariants(input)
+        .flatMap((variant) => variant.split(/\s+/))
+        .map((token) => token.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function rankPatientMatch(patient: any, search: string) {
@@ -73,7 +85,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     return NextResponse.json({
-      results: patient
+      results: patient && !isBlockedPatientRecord(patient)
         ? [{
             id: patient.id,
             ivoris_nummer: patient.ivoris_nummer ?? null,
@@ -97,7 +109,7 @@ export async function GET(request: NextRequest) {
 
   if (!q || q.length < 2) return NextResponse.json({ results: [] });
 
-  const teile = buildSearchVariants(q);
+  const teile = buildSearchTokens(q);
   const muster = Array.from(new Set(teile.flatMap((teil) => [
     `vorname.ilike.%${teil}%`,
     `nachname.ilike.%${teil}%`,
@@ -112,6 +124,7 @@ export async function GET(request: NextRequest) {
     .limit(40);
 
   const treffer = (patients || []).filter((patient) => {
+    if (isBlockedPatientRecord(patient)) return false;
     const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
     const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
     const email = normalizePatientSearch(patient.email ?? "");

@@ -8,6 +8,7 @@
 import { createServerClient } from "../db/supabase";
 import type { MatchingDetails } from "../types";
 import { allocatePaymentToRates } from "../raten/reconciliation";
+import { isBlockedPatientName } from "../patient-blocklist";
 
 interface MatchResult {
   patient_id: string | null;
@@ -102,24 +103,64 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
     .in("raten.status", ["offen", "teilbezahlt", "überfällig"])
     .order("faellig_am", { referencedTable: "raten", ascending: true });
 
-  return (patienten ?? []).map((patient) => ({
-    id: patient.id,
-    ivoris_nummer: (patient as { ivoris_nummer?: string | null }).ivoris_nummer ?? null,
-    vorname: patient.vorname,
-    nachname: patient.nachname,
-    normalizedNachname: normalizeMatchText(patient.nachname || ""),
-    raten: ((patient as { raten?: RateCandidate[] }).raten ?? []).map((rate) => ({
-      id: rate.id,
-      rate_nummer: rate.rate_nummer,
-      betrag: rate.status === "teilbezahlt"
-        ? Math.max(0, Number(rate.betrag) - Number(rate.bezahlt_betrag || 0))
-        : rate.betrag,
-      faellig_am: rate.faellig_am,
-      status: rate.status,
-      ratenplan_id: rate.ratenplan_id,
-      bezahlt_betrag: rate.bezahlt_betrag,
-    })),
-  }));
+  return (patienten ?? [])
+    .filter((patient) => !isBlockedPatientName(patient.vorname, patient.nachname))
+    .map((patient) => ({
+      id: patient.id,
+      ivoris_nummer: (patient as { ivoris_nummer?: string | null }).ivoris_nummer ?? null,
+      vorname: patient.vorname,
+      nachname: patient.nachname,
+      normalizedNachname: normalizeMatchText(patient.nachname || ""),
+      raten: ((patient as { raten?: RateCandidate[] }).raten ?? []).map((rate) => ({
+        id: rate.id,
+        rate_nummer: rate.rate_nummer,
+        betrag: rate.status === "teilbezahlt"
+          ? Math.max(0, Number(rate.betrag) - Number(rate.bezahlt_betrag || 0))
+          : rate.betrag,
+        faellig_am: rate.faellig_am,
+        status: rate.status,
+        ratenplan_id: rate.ratenplan_id,
+        bezahlt_betrag: rate.bezahlt_betrag,
+      })),
+    }));
+}
+
+async function sanitizeBlockedPatientAssignments(db: ReturnType<typeof createServerClient>) {
+  const { data: blockedPatients } = await db
+    .from("patients")
+    .select("id, vorname, nachname");
+
+  const blockedIds = (blockedPatients || [])
+    .filter((patient) => isBlockedPatientName(patient.vorname, patient.nachname))
+    .map((patient) => patient.id);
+
+  if (blockedIds.length === 0) return 0;
+
+  const { data: rows, error } = await db
+    .from("transaktionen")
+    .update({
+      matching_status: "unklar",
+      matched_patient_id: null,
+      matched_rate_id: null,
+      matching_score: null,
+      matching_details: {
+        methode: "manuell",
+        quelle: "blocked_patient_cleanup",
+        name_score: 0,
+        betrag_match: false,
+        zweck_score: 0,
+      },
+      geprueft_am: null,
+    })
+    .in("matched_patient_id", blockedIds)
+    .select("id");
+
+  if (error) {
+    console.error("Blocked patient cleanup failed", error.message);
+    return 0;
+  }
+
+  return rows?.length ?? 0;
 }
 
 async function loadIbanHistoryMap(db: ReturnType<typeof createServerClient>): Promise<IbanHistoryMap> {
@@ -704,7 +745,11 @@ export async function runBatchMatching(): Promise<{
     .order("datum", { ascending: false })
     .limit(500);
 
-  const [config, patienten, ibanHistory] = await Promise.all([
+  const [, config, patienten, ibanHistory] = await Promise.all([
+    sanitizeBlockedPatientAssignments(db).then((count) => {
+      stats.repariert = count;
+      return count;
+    }),
     loadMatchingConfig(db),
     loadPatientCandidates(db),
     loadIbanHistoryMap(db),

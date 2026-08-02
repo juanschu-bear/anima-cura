@@ -11,7 +11,18 @@ import { Landmark, CreditCard, Users, Receipt, ShieldAlert, ArrowLeftRight, Wall
 
 type TabId = "konten" | "messstation";
 interface KAccount { id: number; name: string; iban: string; balance: number }
-interface KTransaction { id: number; accountId: number; amount: number; date: string; counterpart: string; purpose: string; category: string | null }
+interface KTransaction {
+  id: number;
+  accountId: number;
+  amount: number;
+  date: string;
+  counterpart: string;
+  purpose: string;
+  counterpartIban?: string | null;
+  valueDate?: string | null;
+  bookingDate?: string | null;
+  category: string | null;
+}
 interface Kategorie { id: string; name: string; color: string; muster: string[] }
 interface Zaehler { anzahl: number; summe: number }
 interface Messwerte {
@@ -43,6 +54,12 @@ function datShort(iso: string): string {
   return `${p[2]}.${p[1]}.`;
 }
 function zahl(v: number): string { return v.toLocaleString("de-DE"); }
+function compactIban(value: string | null | undefined): string {
+  const clean = String(value ?? "").replace(/\s+/g, "");
+  if (!clean) return "";
+  if (clean.length <= 8) return clean;
+  return `${clean.slice(0, 4)} … ${clean.slice(-4)}`;
+}
 
 function matchKategorie(counterpart: string, kategorien: Kategorie[]): Kategorie | null {
   const lc = counterpart.toLowerCase();
@@ -142,11 +159,19 @@ const CSS = `
 .af .tx-bar.inc{background:var(--grn)}.af .tx-bar.out{background:var(--red)}
 .af .tx-bd{flex:1;min-width:0}
 .af .tx-nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)}
+.af .tx-rf{font-size:11px;color:var(--t2);margin-top:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.af .tx-rf.full{-webkit-line-clamp:unset;display:block}
 .af .tx-mt{font-size:11px;color:var(--t3);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .af .tx-tg{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;cursor:pointer;border:1px solid var(--bdr);transition:all .15s;position:relative}
 .af .tx-tg:hover{border-color:var(--t3)}
 .af .tx-tg-unset{border-style:dashed;color:var(--t4)}
 .af .tx-tg-suggest{border-style:dashed;font-style:italic}
+.af .tx-more{margin-top:6px;padding:0;background:none;border:none;color:var(--gold);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit}
+.af .tx-dt{margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr);display:grid;gap:4px}
+.af .tx-dl{font-size:10px;color:var(--t3);display:flex;gap:6px;align-items:flex-start;line-height:1.45}
+.af .tx-dk{min-width:98px;color:var(--t4);text-transform:uppercase;letter-spacing:.4px}
+.af .tx-dv{color:var(--t2);word-break:break-word}
+.af .tx-ln{margin-top:6px;font-size:10px;color:var(--gold);background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.14);border-radius:999px;padding:3px 8px;display:inline-flex;align-items:center}
 .af .tx-rt{text-align:right;flex-shrink:0}
 .af .tx-am{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace}
 .af .tx-am.pos{color:var(--grn)}.af .tx-am.neg{color:var(--red)}
@@ -184,6 +209,7 @@ export default function FinanzenPage() {
   const [showAllCats, setShowAllCats] = useState(false);
   const [editTxId, setEditTxId] = useState<number | null>(null);
   const [newCatName, setNewCatName] = useState("");
+  const [openTxId, setOpenTxId] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const [werte, setWerte] = useState<Messwerte | null>(null);
   const [messFehler, setMessFehler] = useState<string | null>(null);
@@ -439,6 +465,8 @@ export default function FinanzenPage() {
                 const dayChanged = tx.date !== lastDay;
                 if (dayChanged) lastDay = tx.date;
                 const r = tx.resolved;
+                const hasDetails = Boolean(tx.purpose || tx.counterpartIban || tx.category || tx.bookingDate || tx.valueDate);
+                const expanded = openTxId === tx.id;
                 return (
                   <div key={tx.id}>
                     {dayChanged && <div className="day-label">{datDE(tx.date)}</div>}
@@ -446,6 +474,7 @@ export default function FinanzenPage() {
                       <div className={`tx-bar ${tx.dir}`} />
                       <div className="tx-bd">
                         <div className="tx-nm">{tx.counterpart}</div>
+                        {tx.purpose ? <div className={`tx-rf${expanded ? " full" : ""}`}>{tx.purpose}</div> : null}
                         <div className="tx-mt">
                           <span className="mono" style={{ fontSize: 11 }}>{datShort(tx.date)}</span>
                           <span>·</span>
@@ -476,6 +505,49 @@ export default function FinanzenPage() {
                             )}
                           </span>
                         </div>
+                        {hasDetails ? (
+                          <>
+                            <button className="tx-more" onClick={() => setOpenTxId(expanded ? null : tx.id)}>
+                              {expanded ? "Weniger Details" : "Mehr Details"}
+                            </button>
+                            {expanded ? (
+                              <div className="tx-dt">
+                                {tx.category ? (
+                                  <div className="tx-dl">
+                                    <span className="tx-dk">Bank-Kategorie</span>
+                                    <span className="tx-dv">{tx.category}</span>
+                                  </div>
+                                ) : null}
+                                {tx.counterpartIban ? (
+                                  <div className="tx-dl">
+                                    <span className="tx-dk">Gegenkonto</span>
+                                    <span className="tx-dv">{compactIban(tx.counterpartIban)}</span>
+                                  </div>
+                                ) : null}
+                                {tx.bookingDate ? (
+                                  <div className="tx-dl">
+                                    <span className="tx-dk">Buchungstag</span>
+                                    <span className="tx-dv">{datDE(tx.bookingDate)}</span>
+                                  </div>
+                                ) : null}
+                                {tx.valueDate && tx.valueDate !== tx.bookingDate ? (
+                                  <div className="tx-dl">
+                                    <span className="tx-dk">Wertstellung</span>
+                                    <span className="tx-dv">{datDE(tx.valueDate)}</span>
+                                  </div>
+                                ) : null}
+                                {tx.purpose ? (
+                                  <div className="tx-dl">
+                                    <span className="tx-dk">Verwendungszweck</span>
+                                    <span className="tx-dv">{tx.purpose}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="tx-ln">Zu dieser Buchung liefert finAPI aktuell kaum Zusatztext.</div>
+                        )}
                       </div>
                       <div className="tx-rt">
                         <div className={`tx-am ${tx.dir === "inc" ? "pos" : "neg"}`}>
