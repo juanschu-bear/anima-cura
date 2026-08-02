@@ -54,11 +54,10 @@ function datShort(iso: string): string {
   return `${p[2]}.${p[1]}.`;
 }
 function zahl(v: number): string { return v.toLocaleString("de-DE"); }
-function compactIban(value: string | null | undefined): string {
+function formatFullIban(value: string | null | undefined): string {
   const clean = String(value ?? "").replace(/\s+/g, "");
   if (!clean) return "";
-  if (clean.length <= 8) return clean;
-  return `${clean.slice(0, 4)} … ${clean.slice(-4)}`;
+  return clean.replace(/(.{4})/g, "$1 ").trim();
 }
 
 function matchKategorie(counterpart: string, kategorien: Kategorie[]): Kategorie | null {
@@ -521,7 +520,7 @@ export default function FinanzenPage() {
                                 {tx.counterpartIban ? (
                                   <div className="tx-dl">
                                     <span className="tx-dk">Gegenkonto</span>
-                                    <span className="tx-dv">{compactIban(tx.counterpartIban)}</span>
+                                    <span className="tx-dv">{formatFullIban(tx.counterpartIban)}</span>
                                   </div>
                                 ) : null}
                                 {tx.bookingDate ? (
