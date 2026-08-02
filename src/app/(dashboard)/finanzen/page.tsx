@@ -22,6 +22,8 @@ interface KTransaction {
   valueDate?: string | null;
   bookingDate?: string | null;
   category: string | null;
+  rawSummary?: Array<{ key: string; value: string }>;
+  rawJson?: Record<string, unknown> | null;
 }
 interface Kategorie { id: string; name: string; color: string; muster: string[] }
 interface Zaehler { anzahl: number; summe: number }
@@ -36,9 +38,24 @@ interface Messwerte {
 
 // ═══════ HELPERS ═══════
 
-const ACC_LABELS: Record<number, string> = { 31760549: "Hauptkonto", 31760546: "Betrieb", 31760547: "Privat" };
+const ACC_LABELS: Record<number, string> = { 31760549: "Hauptkonto", 31760546: "Mietkonto", 31760547: "Privat" };
 const ACC_SHORT: Record<number, string> = { 31760549: "...950", 31760546: "...976", 31760547: "...206" };
 const ACC_COLORS: Record<number, string> = { 31760549: "#b8860b", 31760546: "#3060a0", 31760547: "#6050a0" };
+const RAW_LABELS: Record<string, string> = {
+  counterpartBic: "Gegenkonto-BIC",
+  counterpartAccountNumber: "Kontonummer",
+  bankReference: "Bankreferenz",
+  endToEndReference: "End-to-End-Referenz",
+  mandateReference: "Mandatsreferenz",
+  creditorId: "Glaeubiger-ID",
+  customerReference: "Kundenreferenz",
+  primaNotaNumber: "Prima-Nota",
+  additionalInformation: "Zusatzinfo",
+  bookingText: "Buchungstext",
+  bookingType: "Buchungsart",
+  sepaPurposeCode: "SEPA-Code",
+  erpReference: "ERP-Referenz",
+};
 
 function euro(v: number): string { return v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
 function euroK(v: number): string { return Math.round(v).toLocaleString("de-DE") + " €"; }
@@ -171,6 +188,9 @@ const CSS = `
 .af .tx-dk{min-width:98px;color:var(--t4);text-transform:uppercase;letter-spacing:.4px}
 .af .tx-dv{color:var(--t2);word-break:break-word}
 .af .tx-ln{margin-top:6px;font-size:10px;color:var(--gold);background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.14);border-radius:999px;padding:3px 8px;display:inline-flex;align-items:center}
+.af .tx-raw{margin-top:10px;border-top:1px dashed var(--bdr);padding-top:8px}
+.af .tx-rawh{font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.af .tx-rawpre{margin:6px 0 0;background:#f6f1e8;border:1px solid var(--bdr);border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-word;font-size:10px;line-height:1.45;color:var(--t2);font-family:'JetBrains Mono',monospace;max-height:220px;overflow:auto}
 .af .tx-rt{text-align:right;flex-shrink:0}
 .af .tx-am{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace}
 .af .tx-am.pos{color:var(--grn)}.af .tx-am.neg{color:var(--red)}
@@ -464,7 +484,15 @@ export default function FinanzenPage() {
                 const dayChanged = tx.date !== lastDay;
                 if (dayChanged) lastDay = tx.date;
                 const r = tx.resolved;
-                const hasDetails = Boolean(tx.purpose || tx.counterpartIban || tx.category || tx.bookingDate || tx.valueDate);
+                const hasDetails = Boolean(
+                  tx.purpose ||
+                  tx.counterpartIban ||
+                  tx.category ||
+                  tx.bookingDate ||
+                  tx.valueDate ||
+                  tx.rawSummary?.length ||
+                  tx.rawJson
+                );
                 const expanded = openTxId === tx.id;
                 return (
                   <div key={tx.id}>
@@ -539,6 +567,23 @@ export default function FinanzenPage() {
                                   <div className="tx-dl">
                                     <span className="tx-dk">Verwendungszweck</span>
                                     <span className="tx-dv">{tx.purpose}</span>
+                                  </div>
+                                ) : null}
+                                {tx.rawSummary?.length ? (
+                                  <div className="tx-raw">
+                                    <div className="tx-rawh">Weitere Rohdaten</div>
+                                    {tx.rawSummary.map((entry) => (
+                                      <div className="tx-dl" key={entry.key}>
+                                        <span className="tx-dk">{RAW_LABELS[entry.key] || entry.key}</span>
+                                        <span className="tx-dv">{entry.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {tx.rawJson ? (
+                                  <div className="tx-raw">
+                                    <div className="tx-rawh">Rohdaten-Archiv</div>
+                                    <pre className="tx-rawpre">{JSON.stringify(tx.rawJson, null, 2)}</pre>
                                   </div>
                                 ) : null}
                               </div>

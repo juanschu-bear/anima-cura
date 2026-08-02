@@ -11,6 +11,41 @@ const PRIVATE_ACCOUNT_IDS = [31760546, 31760547, 31760549];
 
 const BASE_URL = process.env.FINAPI_BASE_URL || "https://sandbox.finapi.io";
 
+const RAW_DETAIL_KEYS = [
+  "counterpartBic",
+  "counterpartAccountNumber",
+  "bankReference",
+  "endToEndReference",
+  "mandateReference",
+  "creditorId",
+  "customerReference",
+  "primaNotaNumber",
+  "additionalInformation",
+  "bookingText",
+  "bookingType",
+  "sepaPurposeCode",
+  "erpReference",
+] as const;
+
+function formatRawValue(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const compact = value.map((entry) => formatRawValue(entry)).filter(Boolean);
+    return compact.length ? compact.join(" | ") : null;
+  }
+  return null;
+}
+
+function buildRawSummary(raw: Record<string, unknown> | null | undefined) {
+  if (!raw || typeof raw !== "object") return [];
+  return RAW_DETAIL_KEYS.flatMap((key) => {
+    const formatted = formatRawValue(raw[key]);
+    return formatted ? [{ key, value: formatted }] : [];
+  });
+}
+
 export async function GET(request: Request) {
   const authError = await requirePraxisRole(["admin", "verwaltung"]);
   if (authError) return authError;
@@ -56,6 +91,16 @@ export async function GET(request: Request) {
       page: 1,
     });
 
+    const rawIds = txResult.transactions.map((tx) => String(tx.id));
+    const { data: rawRows } = await db
+      .from("bank_transactions_raw")
+      .select("finapi_id, raw")
+      .in("finapi_id", rawIds.length ? rawIds : ["-1"]);
+
+    const rawById = new Map(
+      (rawRows || []).map((row) => [String(row.finapi_id), row.raw as Record<string, unknown> | null])
+    );
+
     return NextResponse.json({
       ok: true,
       accounts: accounts.map((a) => ({
@@ -75,6 +120,8 @@ export async function GET(request: Request) {
         valueDate: tx.valueDate || null,
         bookingDate: tx.bankBookingDate || null,
         category: tx.category?.name || null,
+        rawSummary: buildRawSummary(rawById.get(String(tx.id))),
+        rawJson: rawById.get(String(tx.id)) || null,
       })),
       totalCount: txResult.paging?.totalCount ?? txResult.transactions.length,
     });
