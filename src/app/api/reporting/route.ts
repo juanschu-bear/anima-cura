@@ -18,17 +18,42 @@ export async function GET(request: NextRequest) {
   const vBis = url.searchParams.get("vergleich_bis") || null;
 
   async function getStats(from: string, to: string) {
-    const [{ data: bezahlt }, { data: faellig }, { data: ueberfaellig }, { count: aktivePlaene }, { data: mahnungen }] = await Promise.all([
+    const [
+      { data: bezahlt },
+      { data: faellig },
+      { data: ueberfaellig },
+      { count: aktivePlaene },
+      { data: mahnungen },
+      { data: quarterTransactions },
+      { data: receivables },
+    ] = await Promise.all([
       sc.from("raten").select("id, betrag, bezahlt_betrag, faellig_am, bezahlt_am, mahnstufe, patient_id").eq("status", "bezahlt").gte("bezahlt_am", from).lte("bezahlt_am", to),
       sc.from("raten").select("id, betrag, faellig_am, status, bezahlt_am, mahnstufe, patient_id").gte("faellig_am", from).lte("faellig_am", to),
       sc.from("raten").select("id, betrag, faellig_am, patient_id, mahnstufe").eq("status", "überfällig"),
       sc.from("ratenplaene").select("id", { count: "exact", head: true }).eq("status", "aktiv"),
       sc.from("raten").select("id, mahnstufe, faellig_am, patient_id, betrag").gt("mahnstufe", 0).gte("faellig_am", from).lte("faellig_am", to),
+      sc.from("transaktionen")
+        .select("id, betrag, datum, matching_status, matched_patient_id")
+        .gte("datum", from)
+        .lte("datum", to)
+        .gt("betrag", 0)
+        .neq("matching_status", "ignoriert"),
+      sc.from("offene_posten")
+        .select("id, betrag, offen, gezahlt, status, patient_id"),
     ]);
 
     const bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];
+    const txArr = quarterTransactions || [];
+    const receivableArr = receivables || [];
     const allRatePatientIds = Array.from(
-      new Set([...bArr, ...fArr, ...uArr, ...mArr].map((entry) => entry.patient_id).filter(Boolean))
+      new Set([
+        ...bArr,
+        ...fArr,
+        ...uArr,
+        ...mArr,
+        ...txArr.map((entry) => ({ patient_id: entry.matched_patient_id })),
+        ...receivableArr,
+      ].map((entry) => entry.patient_id).filter(Boolean))
     );
     const { data: patientScopes } = await sc
       .from("patients")
@@ -55,51 +80,60 @@ export async function GET(request: NextRequest) {
     const offenePosten = uArr.reduce((s, r) => s + Number(r.betrag || 0), 0);
 
     const quarterFinance = {
-      bezahlt_gesamt: 0,
-      bezahlt_privat: 0,
-      bezahlt_gesetzlich: 0,
-      faellig_gesamt: 0,
-      faellig_privat: 0,
-      faellig_gesetzlich: 0,
+      eingang_gesamt: 0,
+      eingang_privat: 0,
+      eingang_gesetzlich: 0,
+      eingang_unklar: 0,
+      zugeordnet_gesamt: 0,
       offen_gesamt: 0,
       offen_privat: 0,
       offen_gesetzlich: 0,
+      offen_unklar: 0,
       teilbezahlt_gesamt: 0,
       teilbezahlt_privat: 0,
       teilbezahlt_gesetzlich: 0,
+      teilbezahlt_unklar: 0,
     };
 
-    for (const rate of bArr) {
-      const amount = Number(rate.bezahlt_betrag || rate.betrag || 0);
-      quarterFinance.bezahlt_gesamt += amount;
-      if (kasseMap[rate.patient_id] === "gesetzlich") quarterFinance.bezahlt_gesetzlich += amount;
-      else quarterFinance.bezahlt_privat += amount;
+    for (const tx of txArr) {
+      const amount = Number(tx.betrag || 0);
+      const kasse = tx.matched_patient_id ? kasseMap[tx.matched_patient_id] : undefined;
+      quarterFinance.eingang_gesamt += amount;
+      if (tx.matched_patient_id) {
+        quarterFinance.zugeordnet_gesamt += amount;
+      }
+      if (kasse === "gesetzlich") {
+        quarterFinance.eingang_gesetzlich += amount;
+      } else if (kasse === "privat") {
+        quarterFinance.eingang_privat += amount;
+      } else {
+        quarterFinance.eingang_unklar += amount;
+      }
     }
 
-    for (const rate of fArr) {
-      const totalAmount = Number(rate.betrag || 0);
-      const paidAmount = Number((rate as any).bezahlt_betrag || 0);
-      const openAmount = rate.status === "teilbezahlt"
-        ? Math.max(0, totalAmount - paidAmount)
-        : rate.status === "bezahlt"
-        ? 0
-        : totalAmount;
-      const scope = kasseMap[rate.patient_id] === "gesetzlich" ? "gesetzlich" : "privat";
+    for (const item of receivableArr) {
+      if (!["offen", "teilbezahlt", "überfällig"].includes(item.status)) continue;
+      const amount = Number(item.offen ?? Math.max(0, Number(item.betrag || 0) - Number((item as any).gezahlt || 0)));
+      const kasse = item.patient_id ? kasseMap[item.patient_id] : undefined;
 
-      quarterFinance.faellig_gesamt += totalAmount;
-      if (scope === "gesetzlich") quarterFinance.faellig_gesetzlich += totalAmount;
-      else quarterFinance.faellig_privat += totalAmount;
-
-      if (rate.status === "offen" || rate.status === "überfällig") {
-        quarterFinance.offen_gesamt += openAmount;
-        if (scope === "gesetzlich") quarterFinance.offen_gesetzlich += openAmount;
-        else quarterFinance.offen_privat += openAmount;
+      quarterFinance.offen_gesamt += amount;
+      if (kasse === "gesetzlich") {
+        quarterFinance.offen_gesetzlich += amount;
+      } else if (kasse === "privat") {
+        quarterFinance.offen_privat += amount;
+      } else {
+        quarterFinance.offen_unklar += amount;
       }
 
-      if (rate.status === "teilbezahlt") {
-        quarterFinance.teilbezahlt_gesamt += openAmount;
-        if (scope === "gesetzlich") quarterFinance.teilbezahlt_gesetzlich += openAmount;
-        else quarterFinance.teilbezahlt_privat += openAmount;
+      if (item.status === "teilbezahlt") {
+        quarterFinance.teilbezahlt_gesamt += amount;
+        if (kasse === "gesetzlich") {
+          quarterFinance.teilbezahlt_gesetzlich += amount;
+        } else if (kasse === "privat") {
+          quarterFinance.teilbezahlt_privat += amount;
+        } else {
+          quarterFinance.teilbezahlt_unklar += amount;
+        }
       }
     }
 

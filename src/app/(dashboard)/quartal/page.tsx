@@ -18,18 +18,19 @@ interface QuartalData {
 }
 
 interface QuartalFinance {
-  bezahlt_gesamt: number;
-  bezahlt_privat: number;
-  bezahlt_gesetzlich: number;
-  faellig_gesamt: number;
-  faellig_privat: number;
-  faellig_gesetzlich: number;
+  eingang_gesamt: number;
+  eingang_privat: number;
+  eingang_gesetzlich: number;
+  eingang_unklar: number;
+  zugeordnet_gesamt: number;
   offen_gesamt: number;
   offen_privat: number;
   offen_gesetzlich: number;
+  offen_unklar: number;
   teilbezahlt_gesamt: number;
   teilbezahlt_privat: number;
   teilbezahlt_gesetzlich: number;
+  teilbezahlt_unklar: number;
 }
 
 function KPI({
@@ -82,7 +83,6 @@ export default function QuartalPage() {
       const today = new Date();
       const quarterIndex = Math.floor(today.getMonth() / 3);
       const quarterStart = new Date(today.getFullYear(), quarterIndex * 3, 1);
-      const quarterEnd = new Date(today.getFullYear(), quarterIndex * 3 + 3, 0);
 
       const [patientsRes, reportingRes] = await Promise.all([
         supabase
@@ -92,7 +92,7 @@ export default function QuartalPage() {
           )
           .range(0, 9999),
         fetch(
-          `/api/reporting?von=${quarterStart.toISOString().slice(0, 10)}&bis=${quarterEnd
+          `/api/reporting?von=${quarterStart.toISOString().slice(0, 10)}&bis=${today
             .toISOString()
             .slice(0, 10)}`
         ),
@@ -197,7 +197,7 @@ export default function QuartalPage() {
         </h1>
         <p className="mt-1 text-sm text-praxis-400">
           {quarterLabel} · {locale === "de"
-            ? "Patientenstruktur plus sofortiger Umsatzblick für Dr. Schubert"
+            ? "Patientenstruktur plus echter Zahlungseingang bis heute"
             : "Patient structure plus instant quarter revenue view"}
         </p>
       </div>
@@ -206,32 +206,32 @@ export default function QuartalPage() {
         <>
           <div className="stat-card">
             <h3 className="mb-4 text-[28px] font-extrabold tracking-tight text-praxis-700">
-              {locale === "de" ? "Umsatz dieses Quartals" : "Quarter revenue"}
+              {locale === "de" ? "Zahlungseingänge dieses Quartals" : "Quarter cash received"}
             </h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <KPI
-                title={locale === "de" ? "Bereits bezahlt" : "Already paid"}
-                value={euro(finance.bezahlt_gesamt)}
-                sub={locale === "de" ? "Real eingegangen" : "Actually received"}
+                title={locale === "de" ? "Gesamt eingegangen" : "Received total"}
+                value={euro(finance.eingang_gesamt)}
+                sub={locale === "de" ? "Alle patientenrelevanten Eingänge bis heute" : "All patient-related inflows to date"}
                 accent="green"
               />
               <KPI
                 title={locale === "de" ? "Davon Privat" : "Private"}
-                value={euro(finance.bezahlt_privat)}
+                value={euro(finance.eingang_privat)}
                 sub={locale === "de" ? "GOZ / Privatpatienten" : "Private patients"}
                 accent="blue"
               />
               <KPI
                 title={locale === "de" ? "Davon Kasse" : "Statutory"}
-                value={euro(finance.bezahlt_gesetzlich)}
+                value={euro(finance.eingang_gesetzlich)}
                 sub={locale === "de" ? "BEMA / Kassenpatienten" : "Statutory patients"}
                 accent="green"
               />
               <KPI
-                title={locale === "de" ? "Im Quartal fällig" : "Due this quarter"}
-                value={euro(finance.faellig_gesamt)}
-                sub={locale === "de" ? "Sollstellung gesamt" : "Total due volume"}
-                accent="default"
+                title={locale === "de" ? "Noch unklar im Eingang" : "Still unclear"}
+                value={euro(finance.eingang_unklar)}
+                sub={locale === "de" ? "Noch nicht sauber Privat/Kasse zugeordnet" : "Not yet cleanly split by insurance"}
+                accent="amber"
               />
             </div>
           </div>
@@ -239,46 +239,41 @@ export default function QuartalPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Offen im Quartal" : "Open in quarter"}
+                {locale === "de" ? "Aktuell offen" : "Currently open"}
               </h3>
               <p className="text-4xl font-semibold text-[#c8942d]">
                 {euro(finance.offen_gesamt)}
               </p>
               <p className="mt-2 text-sm text-praxis-500">
                 {locale === "de"
-                  ? `Privat: ${euro(finance.offen_privat)} · Kasse: ${euro(finance.offen_gesetzlich)}`
-                  : `Private: ${euro(finance.offen_privat)} · Statutory: ${euro(finance.offen_gesetzlich)}`}
+                  ? `Privat: ${euro(finance.offen_privat)} · Kasse: ${euro(finance.offen_gesetzlich)} · Unklar: ${euro(finance.offen_unklar)}`
+                  : `Private: ${euro(finance.offen_privat)} · Statutory: ${euro(finance.offen_gesetzlich)} · Unclear: ${euro(finance.offen_unklar)}`}
               </p>
             </div>
 
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Teilbezahlt im Quartal" : "Partially paid"}
+                {locale === "de" ? "Aktuell teilbezahlt" : "Currently part-paid"}
               </h3>
               <p className="text-4xl font-semibold text-[#b96a2d]">
                 {euro(finance.teilbezahlt_gesamt)}
               </p>
               <p className="mt-2 text-sm text-praxis-500">
                 {locale === "de"
-                  ? `Privat: ${euro(finance.teilbezahlt_privat)} · Kasse: ${euro(finance.teilbezahlt_gesetzlich)}`
-                  : `Private: ${euro(finance.teilbezahlt_privat)} · Statutory: ${euro(finance.teilbezahlt_gesetzlich)}`}
+                  ? `Privat: ${euro(finance.teilbezahlt_privat)} · Kasse: ${euro(finance.teilbezahlt_gesetzlich)} · Unklar: ${euro(finance.teilbezahlt_unklar)}`
+                  : `Private: ${euro(finance.teilbezahlt_privat)} · Statutory: ${euro(finance.teilbezahlt_gesetzlich)} · Unclear: ${euro(finance.teilbezahlt_unklar)}`}
               </p>
             </div>
 
             <div className="stat-card">
               <h3 className="mb-3 text-[22px] font-extrabold tracking-tight text-praxis-700">
-                {locale === "de" ? "Fälligkeits-Split" : "Due split"}
+                {locale === "de" ? "Davon bereits zugeordnet" : "Already assigned"}
               </h3>
-              <p className="text-base font-semibold text-praxis-700">
-                {locale === "de" ? "Privat" : "Private"}: {euro(finance.faellig_privat)}
-              </p>
-              <p className="mt-2 text-base font-semibold text-praxis-700">
-                {locale === "de" ? "Kasse" : "Statutory"}: {euro(finance.faellig_gesetzlich)}
-              </p>
+              <p className="text-4xl font-semibold text-[#4b42d6]">{euro(finance.zugeordnet_gesamt)}</p>
               <p className="mt-3 text-sm text-praxis-500">
                 {locale === "de"
-                  ? "Damit sieht man sofort, welcher Quartalsanteil aus Privat- vs. Kassenfällen kommt."
-                  : "Instant view of how much quarter volume comes from private vs statutory patients."}
+                  ? "Automatisch oder manuell bereits einem Patienten zugeordnet"
+                  : "Already assigned to a patient, automatically or manually."}
               </p>
             </div>
           </div>
