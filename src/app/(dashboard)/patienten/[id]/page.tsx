@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, MessageSquare, FileText } from "lucide-react";
 import { usePatient } from "@/hooks/useData";
 import { Skeleton, StatusBadge } from "@/components/ui";
@@ -153,10 +153,9 @@ export default function PatientDetailPage() {
       const db = new Date(b.faellig_am).getTime();
       return db - da;
     });
-  const istAbgleich = useMemo(() => {
-    if (!aktiverPlan) return null;
-    return reconcileInstallments(aktiverPlan, aktivePlanRaten, bankZahlungen);
-  }, [aktiverPlan, aktivePlanRaten, bankZahlungen]);
+  const istAbgleich = aktiverPlan
+    ? reconcileInstallments(aktiverPlan, aktivePlanRaten, bankZahlungen)
+    : null;
   const planstandAktiv = aktivePlanRaten.filter((rate: any) => rate.status === "bezahlt").length;
   const hatIstAbweichung = Boolean(
     istAbgleich &&
