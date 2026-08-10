@@ -11,6 +11,10 @@ interface QuartalFinance {
   eingang_gesetzlich: number;
   eingang_unklar: number;
   zugeordnet_gesamt: number;
+  offene_rechnungen_im_quartal: number;
+  offene_summe_im_quartal: number;
+  teilbezahlt_rechnungen_im_quartal: number;
+  teilbezahlt_summe_im_quartal: number;
 }
 
 function InfoCard({
@@ -69,6 +73,7 @@ function euro(value: number) {
 export default function QuartalPage() {
   const { locale } = useAppStore();
   const [finance, setFinance] = useState<QuartalFinance | null>(null);
+  const [comparisonFinance, setComparisonFinance] = useState<QuartalFinance | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
@@ -77,16 +82,21 @@ export default function QuartalPage() {
       const today = new Date();
       const quarterIndex = Math.floor(today.getMonth() / 3);
       const quarterStart = new Date(today.getFullYear(), quarterIndex * 3, 1);
+      const previousQuarterStart = new Date(today.getFullYear(), quarterIndex * 3 - 3, 1);
+      const previousQuarterEnd = new Date(today.getFullYear(), quarterIndex * 3, 0);
 
       const reportingRes = await fetch(
         `/api/reporting?von=${quarterStart.toISOString().slice(0, 10)}&bis=${today
           .toISOString()
-          .slice(0, 10)}`
+          .slice(0, 10)}&vergleich_von=${previousQuarterStart
+          .toISOString()
+          .slice(0, 10)}&vergleich_bis=${previousQuarterEnd.toISOString().slice(0, 10)}`
       );
 
       if (reportingRes.ok) {
         const reporting = await reportingRes.json();
         setFinance(reporting?.aktuell?.quartalsumsatz ?? null);
+        setComparisonFinance(reporting?.vergleich?.quartalsumsatz ?? null);
         setLoadedAt(new Date());
       }
 
@@ -108,6 +118,20 @@ export default function QuartalPage() {
 
   const privateNeutral = (finance?.eingang_privat || 0) === 0;
   const statutoryNeutral = (finance?.eingang_gesetzlich || 0) === 0;
+  const openQuarterAmount = finance?.offene_summe_im_quartal || 0;
+  const partialQuarterAmount = finance?.teilbezahlt_summe_im_quartal || 0;
+  const collectedShare = useMemo(() => {
+    if (!finance) return 0;
+    const denominator = finance.eingang_gesamt + finance.offene_summe_im_quartal + finance.teilbezahlt_summe_im_quartal;
+    if (denominator <= 0) return 0;
+    return Math.round((finance.eingang_gesamt / denominator) * 100);
+  }, [finance]);
+  const previousQuarterTotal = comparisonFinance?.eingang_gesamt || 0;
+  const previousQuarterDelta = useMemo(() => {
+    if (!finance) return null;
+    if (previousQuarterTotal <= 0) return null;
+    return Math.round(((finance.eingang_gesamt - previousQuarterTotal) / previousQuarterTotal) * 100);
+  }, [finance, previousQuarterTotal]);
 
   const standLabel = useMemo(() => {
     if (!loadedAt) return null;
@@ -181,6 +205,29 @@ export default function QuartalPage() {
             accent={assignmentRate >= 80 ? "green" : assignmentRate >= 40 ? "amber" : "red"}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <InfoCard
+          title={locale === "de" ? "Im Quartal bereits eingesammelt" : "Collected this quarter"}
+          body={locale === "de"
+            ? `${collectedShare}% des bislang sichtbaren Quartalsvolumens sind bereits bezahlt verbucht. Offene und teilbezahlte Rechnungen aus diesem Quartal bleiben separat sichtbar.`
+            : "Collected share of visible quarter volume."}
+        />
+        <InfoCard
+          title={locale === "de" ? "Noch offen aus diesem Quartal" : "Still open this quarter"}
+          body={locale === "de"
+            ? `${euro(openQuarterAmount)} aus ${finance.offene_rechnungen_im_quartal} Rechnungen sind noch komplett offen. ${euro(partialQuarterAmount)} aus ${finance.teilbezahlt_rechnungen_im_quartal} Rechnungen sind bereits teilbezahlt.`
+            : "Open and partially paid invoices from this quarter."}
+        />
+        <InfoCard
+          title={locale === "de" ? "Vergleich zum Vorquartal" : "Compared to previous quarter"}
+          body={locale === "de"
+            ? previousQuarterDelta === null
+              ? `Vorquartal: ${euro(previousQuarterTotal)}. Noch kein prozentual sinnvoller Vergleich möglich.`
+              : `Vorquartal: ${euro(previousQuarterTotal)}. Das aktuelle Quartal liegt ${previousQuarterDelta >= 0 ? `${previousQuarterDelta}% darüber` : `${Math.abs(previousQuarterDelta)}% darunter`}.`
+            : "Quarter-over-quarter comparison."}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

@@ -98,6 +98,10 @@ export async function GET(request: NextRequest) {
       eingang_gesetzlich: 0,
       eingang_unklar: 0,
       zugeordnet_gesamt: 0,
+      offene_rechnungen_im_quartal: 0,
+      offene_summe_im_quartal: 0,
+      teilbezahlt_rechnungen_im_quartal: 0,
+      teilbezahlt_summe_im_quartal: 0,
       offen_gesamt: 0,
       offen_privat: 0,
       offen_gesetzlich: 0,
@@ -128,6 +132,8 @@ export async function GET(request: NextRequest) {
       if (!["offen", "teilbezahlt", "überfällig"].includes(item.status)) continue;
       const amount = Number(item.offen ?? Math.max(0, Number(item.betrag || 0) - Number((item as any).gezahlt || 0)));
       const kasse = item.patient_id ? kasseMap[item.patient_id] : undefined;
+      const invoiceDate = item.rechnung_datum || null;
+      const isQuarterReceivable = Boolean(invoiceDate && invoiceDate >= from && invoiceDate <= to);
 
       quarterFinance.offen_gesamt += amount;
       if (kasse === "gesetzlich") {
@@ -140,6 +146,10 @@ export async function GET(request: NextRequest) {
 
       if (item.status === "teilbezahlt") {
         quarterFinance.teilbezahlt_gesamt += amount;
+        if (isQuarterReceivable) {
+          quarterFinance.teilbezahlt_rechnungen_im_quartal += 1;
+          quarterFinance.teilbezahlt_summe_im_quartal += amount;
+        }
         if (kasse === "gesetzlich") {
           quarterFinance.teilbezahlt_gesetzlich += amount;
         } else if (kasse === "privat") {
@@ -147,6 +157,9 @@ export async function GET(request: NextRequest) {
         } else {
           quarterFinance.teilbezahlt_unklar += amount;
         }
+      } else if (isQuarterReceivable) {
+        quarterFinance.offene_rechnungen_im_quartal += 1;
+        quarterFinance.offene_summe_im_quartal += amount;
       }
     }
 
