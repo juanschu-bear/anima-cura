@@ -37,6 +37,8 @@ const docIc: Record<string, string> = { kostenplan: "📋", vertrag: "📝", rat
 
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
+  const welcomeGuideStorageKey = `ac_welcome_guide_dismissed:${patientId}`;
+  const welcomeGuideVideoUrl = process.env.NEXT_PUBLIC_PATIENT_WELCOME_VIDEO_URL?.trim() || "";
   const [tab, setTab] = useState<Tab>("home");
   // Tab-Persistenz: nach einem Seiten-Refresh dort weitermachen, wo man war.
   // sessionStorage statt localStorage: ueberlebt den Refresh, aber nicht das
@@ -116,6 +118,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     } catch (e) { setPushStatus("\u2717 Aktivierung gescheitert: " + String((e as Error)?.message || e)); }
   };
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
+  const [welcomeGuideExpanded, setWelcomeGuideExpanded] = useState(false);
 
   // ── Anima Balance ──
   const [finSheet, setFinSheet] = useState(false);
@@ -235,6 +239,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab, typing]);
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(welcomeGuideStorageKey) === "1";
+      if (!dismissed) {
+        setShowWelcomeGuide(true);
+        setWelcomeGuideExpanded(true);
+      }
+    } catch {
+      setShowWelcomeGuide(true);
+      setWelcomeGuideExpanded(true);
+    }
+  }, [welcomeGuideStorageKey]);
   // Auto-archive chat after 1 hour of inactivity
   useEffect(() => {
     if (tab !== "chat" || msgs.length === 0) return;
@@ -378,6 +394,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   };
 
   const logout = async () => { const sb = createBrowserClient(); await sb.auth.signOut(); router.replace("/patient/login"); router.refresh(); };
+  const closeWelcomeGuide = () => {
+    setWelcomeGuideExpanded(false);
+    setShowWelcomeGuide(false);
+    try { localStorage.setItem(welcomeGuideStorageKey, "1"); } catch { /* ignore */ }
+  };
+  const jumpToPortalTab = (nextTab: Tab, balance = false) => {
+    setTab(nextTab);
+    setBalanceView(balance);
+    setShowWelcomeGuide(false);
+    setWelcomeGuideExpanded(false);
+    try { localStorage.setItem(welcomeGuideStorageKey, "1"); } catch { /* ignore */ }
+  };
 
   const firstName = patientName.split(" ")[0];
   const activePhase = phasen.find(p => p.status === "aktiv");
@@ -425,6 +453,67 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const hd: React.CSSProperties = { fontFamily: "'Fraunces', serif" };
   const lb: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: muted };
   const card: React.CSSProperties = { borderRadius: 18, padding: 22, marginBottom: 14, background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" };
+  const WelcomeGuide = showWelcomeGuide ? (
+    <div style={{ position: "absolute", right: 16, bottom: 104, zIndex: 230, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, pointerEvents: "none" }}>
+      {welcomeGuideExpanded && (
+        <div style={{ width: "min(320px, calc(100vw - 32px))", borderRadius: 24, padding: 18, background: dk ? "rgba(12,17,15,0.96)" : "rgba(255,255,255,0.96)", border: "1px solid " + (dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"), boxShadow: "0 24px 60px rgba(0,0,0,0.35)", pointerEvents: "auto" }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: dk ? "linear-gradient(160deg, rgba(74,222,128,0.35), rgba(167,139,250,0.22))" : "linear-gradient(160deg, rgba(34,197,94,0.2), rgba(124,58,237,0.16))", border: "2px solid " + (dk ? "rgba(74,222,128,0.45)" : "rgba(34,197,94,0.25)"), display: "grid", placeItems: "center" }}>
+              {welcomeGuideVideoUrl ? (
+                /\.(mp4|m4v|webm|mov)(\?|$)/i.test(welcomeGuideVideoUrl) ? (
+                  <video src={welcomeGuideVideoUrl} autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <iframe src={welcomeGuideVideoUrl} title="Willkommen bei Anima Cura" allow="autoplay; fullscreen" style={{ width: "100%", height: "100%", border: "none" }} />
+                )
+              ) : (
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 800, color: "#fff" }}>M</span>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: grn, marginBottom: 4 }}>Willkommen</div>
+              <h3 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg, marginBottom: 8 }}>Dein Portal ist bereit.</h3>
+              <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, marginBottom: 14 }}>
+                Hier findest du Verträge, Anamnesebogen, Rechnungen und kannst der Praxis direkt schreiben. Ich springe dich auch direkt an die richtige Stelle.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button onClick={() => jumpToPortalTab("more")} style={{ borderRadius: 999, border: "none", padding: "10px 14px", background: grn, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Zu Verträgen & Dokumenten</button>
+                <button onClick={() => jumpToPortalTab("progress")} style={{ borderRadius: 999, border: "1px solid " + border, padding: "10px 14px", background: "transparent", color: fg, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Zu Rechnungen & Raten</button>
+                <button onClick={() => jumpToPortalTab("chat")} style={{ borderRadius: 999, border: "1px solid " + border, padding: "10px 14px", background: "transparent", color: fg, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Zur Praxis schreiben</button>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+            <button onClick={() => setWelcomeGuideExpanded(false)} style={{ border: "none", background: "none", color: muted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Später einklappen</button>
+            <button onClick={closeWelcomeGuide} style={{ border: "none", background: "none", color: soft, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Nicht mehr anzeigen</button>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => {
+          if (welcomeGuideExpanded) {
+            closeWelcomeGuide();
+            return;
+          }
+          setShowWelcomeGuide(true);
+          setWelcomeGuideExpanded(true);
+        }}
+        style={{ width: 72, height: 72, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.16)", background: "radial-gradient(circle at 32% 28%, #7dd3fc, #4f46e5 55%, #0f172a 100%)", boxShadow: "0 22px 42px rgba(79,70,229,0.35)", display: "grid", placeItems: "center", cursor: "pointer", pointerEvents: "auto" }}
+        aria-label={welcomeGuideExpanded ? "Willkommenshilfe schließen" : "Willkommenshilfe öffnen"}
+      >
+        <span style={{ width: 58, height: 58, borderRadius: "50%", overflow: "hidden", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.12)", color: "#fff", fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 800 }}>
+          {welcomeGuideVideoUrl ? (
+            /\.(mp4|m4v|webm|mov)(\?|$)/i.test(welcomeGuideVideoUrl) ? (
+              <video src={welcomeGuideVideoUrl} autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              "▶"
+            )
+          ) : (
+            "M"
+          )}
+        </span>
+      </button>
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -1374,6 +1463,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         {tab === "chat" && ChatTab}
         {tab === "more" && MoreTab}
       </div>
+      {WelcomeGuide}
       {Nav}
       {NotifsSheet}
 
