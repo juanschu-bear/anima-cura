@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CalendarDays } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useThema } from "./ScribeShell";
 
@@ -280,6 +281,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [gewaehlt, setGewaehlt] = useState<string[]>([]); // termin_typ-Slugs, stapelbar
   const [terminOffen, setTerminOffen] = useState(false); // Klapp-Menue der Terminarten
   const terminRef = useRef<HTMLDivElement>(null);
+  const datumRef = useRef<HTMLInputElement>(null);
 
   const [auswahl, setAuswahl] = useState<Record<string, Record<string, number[]>>>({});
   const [zaehne, setZaehne] = useState<number[]>([]);
@@ -1004,6 +1006,17 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     router.refresh();
   }
 
+  function datumPickerOeffnen() {
+    const feld = datumRef.current;
+    if (!feld) return;
+    if (typeof feld.showPicker === "function") {
+      feld.showPicker();
+      return;
+    }
+    feld.focus();
+    feld.click();
+  }
+
   function leistungsName(terminTyp: string | null, artKey: string | null): string {
     if (!terminTyp) return "";
     const proArt = vorlagen.filter((v) => v.behandlungsart === artKey);
@@ -1103,7 +1116,20 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <div className="listensteuer">
             <div className="datumnav">
               <button className="tagpfeil" aria-label="Tag zurück" onClick={() => setListenDatum((d) => verschiebeTag(d, -1))}>‹</button>
-              <input className="tagwahl" type="date" value={listenDatum} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setListenDatum(e.target.value || listenDatum)} aria-label="Datum wählen" />
+              <div className="tagwahl-wrap">
+                <input
+                  ref={datumRef}
+                  className="tagwahl"
+                  type="date"
+                  value={listenDatum}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setListenDatum(e.target.value || listenDatum)}
+                  aria-label="Datum wählen"
+                />
+                <button type="button" className="tagwahl-icon" aria-label="Kalender öffnen" onClick={datumPickerOeffnen}>
+                  <CalendarDays size={18} strokeWidth={2.2} />
+                </button>
+              </div>
               <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= new Date().toISOString().slice(0, 10)} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
               {listenDatum !== new Date().toISOString().slice(0, 10) && (
                 <button className="heutbtn" onClick={() => setListenDatum(new Date().toISOString().slice(0, 10))}>Heute</button>

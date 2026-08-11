@@ -544,8 +544,13 @@
   display:flex;align-items:center;justify-content:center;transition:border-color .15s,background .15s}
 .scribe .tagpfeil:hover:not(:disabled){border-color:var(--primaer);color:var(--primaer)}
 .scribe .tagpfeil:disabled{opacity:.35;cursor:not-allowed}
+.scribe .tagwahl-wrap{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
 .scribe .tagwahl{
-  font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:10px;
+  font-family:var(--mono);font-size:13px;padding:8px 46px 8px 10px;border-radius:10px;
   border:1px solid var(--kante);background:var(--flaeche);color:var(--schrift);cursor:pointer;
   min-width:164px;transition:border-color .15s,box-shadow .15s,background .15s;color-scheme:dark}
 .scribe .tagwahl:hover,
@@ -554,18 +559,53 @@
   box-shadow:0 0 0 3px rgba(109,233,190,.12);
 }
 .scribe .tagwahl::-webkit-calendar-picker-indicator{
-  opacity:1;
+  opacity:.02;
   cursor:pointer;
-  filter:invert(89%) sepia(18%) saturate(505%) hue-rotate(100deg) brightness(101%) contrast(92%);
+  position:absolute;
+  right:0;
+  width:42px;
+  height:100%;
 }
 .scribe .tagwahl::-webkit-date-and-time-value{
   text-align:left;
 }
+.scribe .tagwahl-icon{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:28px;
+  height:28px;
+  border:none;
+  border-radius:8px;
+  background:rgba(109,233,190,.14);
+  color:#b9ffe0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-shadow:0 0 0 1px rgba(109,233,190,.22);
+  transition:background .15s, box-shadow .15s, color .15s;
+}
+.scribe .tagwahl-icon:hover,
+.scribe .tagwahl-icon:focus{
+  background:rgba(109,233,190,.22);
+  color:#e7fff4;
+  box-shadow:0 0 0 1px rgba(109,233,190,.4), 0 0 0 4px rgba(109,233,190,.12);
+}
 .scribe[data-thema="hell"] .tagwahl{
   color-scheme:light;
 }
-.scribe[data-thema="hell"] .tagwahl::-webkit-calendar-picker-indicator{
-  filter:none;
+.scribe[data-thema="hell"] .tagwahl-icon{
+  background:rgba(27,109,75,.08);
+  color:#1b6d4b;
+  box-shadow:0 0 0 1px rgba(27,109,75,.16);
+}
+.scribe[data-thema="hell"] .tagwahl-icon:hover,
+.scribe[data-thema="hell"] .tagwahl-icon:focus{
+  background:rgba(27,109,75,.14);
+  color:#11452f;
+  box-shadow:0 0 0 1px rgba(27,109,75,.26), 0 0 0 4px rgba(27,109,75,.08);
 }
 .scribe .heutbtn{
   font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
