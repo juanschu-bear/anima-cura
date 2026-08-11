@@ -470,9 +470,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   // Does NOT touch the current selection.
   const ladeVorlagen = useCallback(async () => {
     const res = await fetch("/api/doku/vorlagen");
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const json = await res.json();
-    setVorlagen(json.vorlagen ?? []);
+    const liste: Vorlage[] = json.vorlagen ?? [];
+    setVorlagen(liste);
+    return liste;
   }, []);
 
   async function eigenenTextSpeichern(m: Vorlage, g: string) {
@@ -491,7 +493,27 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         }),
       });
       if (res.ok) {
-        await ladeVorlagen(); // re-merge -> new chip shows up in this group
+        const neueVorlagen = await ladeVorlagen(); // re-merge -> new chip shows up in this group
+        const aktualisierteVorlage = neueVorlagen?.find(
+          (vorlage) => vorlage.behandlungsart === m.behandlungsart && vorlage.termin_typ === m.termin_typ,
+        );
+        const neuerIndex = aktualisierteVorlage?.struktur.groups[g]?.opts.findIndex((opt) => opt.t === text) ?? -1;
+        if (neuerIndex >= 0) {
+          bearbeitet();
+          setLeer((alt) => ({ ...alt, [`${m.termin_typ}:${g}`]: false }));
+          setAuswahl((alt) => {
+            const modul = alt[m.termin_typ] ?? {};
+            const aktuell = modul[g] ?? [];
+            if (aktuell.includes(neuerIndex)) return alt;
+            return {
+              ...alt,
+              [m.termin_typ]: {
+                ...modul,
+                [g]: [...aktuell, neuerIndex].sort((a, b) => a - b),
+              },
+            };
+          });
+        }
         setOptOffen(null);
         setOptText("");
       } else {
@@ -686,7 +708,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
     let text = segs.map((s) => (s.art === "fehlt" ? "" : s.text)).join("");
     text += schieneText;
-    if (ausnahme.trim()) text += ` Ausnahme: ${ausnahme.trim()}`;
+    if (ausnahme.trim()) text += ` ${ausnahme.trim()}`;
     text = text.replace(/\s{2,}/g, " ").trim();
     return { segs, fehlt: Array.from(new Set(fehlt)), text };
   }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz]);
@@ -738,6 +760,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         auswahl,
         positionen,
         ausnahme_freitext: ausnahme.trim() || null,
+        termin_datum: listenDatum,
         aenderungsgrund: aenderungsgrund.trim(),
       }),
     });
@@ -811,6 +834,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         auswahl,
         positionen,
         ausnahme_freitext: ausnahme.trim() || null,
+        termin_datum: listenDatum,
         bestaetigen: true,
         entwurf_id: entwurfId,
       }),
@@ -869,6 +893,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         auswahl,
         positionen,
         ausnahme_freitext: ausnahme.trim() || null,
+        termin_datum: listenDatum,
         bestaetigen: false,
         entwurf_id: entwurfId,
       }),
@@ -1257,7 +1282,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 {s.text}
               </span>
             ))}
-            {ausnahme.trim() && <span className="seg-var"> Ausnahme: {ausnahme.trim()}</span>}
+            {ausnahme.trim() && <span className="seg-var"> {ausnahme.trim()}</span>}
           </div>
           <div className="kartenfuss">
             {bestaetigt ? (

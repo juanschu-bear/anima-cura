@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
     vorlage_id: body.vorlage_id ?? null,
     behandlungsart: body.behandlungsart ?? null,
     termin_typ: body.termin_typ ?? null,
+    termin_datum: terminDatum,
     text: (body.text ?? "").trim(),
     zaehne: body.zaehne ?? [],
     variablen: body.variablen ?? {},
@@ -133,7 +134,6 @@ export async function POST(request: NextRequest) {
   const insert = {
     patient_id: body.patient_id,
     ...daten,
-    termin_datum: terminDatum,
     status: bestaetigen ? "bestaetigt" : "entwurf",
     version: 1,
     bestaetigt_von: bestaetigen ? user.id : null,
