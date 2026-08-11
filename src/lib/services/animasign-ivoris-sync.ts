@@ -53,6 +53,16 @@ type PatientRow = {
   ivoris_id: string | null;
 };
 
+type LocalPatientCandidate = {
+  id: string;
+  ivoris_id: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  geburtsdatum?: string | null;
+  email?: string | null;
+  telefon?: string | null;
+};
+
 type IvorisContactSnapshot = {
   Email?: string;
   Phone?: string;
@@ -585,6 +595,72 @@ async function patchSubmissionIvorisPatientId(
   }
 }
 
+async function patchSubmissionResolvedPatient(
+  db: DbClient,
+  submissionId: string,
+  patientId: string,
+  ivorisId: string | null
+) {
+  const patch: Record<string, unknown> = {
+    patient_id: patientId,
+    matched_patient_id: patientId,
+    is_existing: true,
+  };
+
+  if (ivorisId) {
+    patch.ivoris_patient_id = ivorisId;
+  }
+
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update(patch)
+    .eq("id", submissionId);
+
+  if (error) {
+    console.error("[ANIMASIGN][IVORIS] failed to patch resolved patient:", error.message);
+  }
+}
+
+async function findExactLocalPatientCandidate(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<LocalPatientCandidate | null> {
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+  const email = normalizeEmailValue(submission.email);
+  const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission));
+
+  if (!birthday || !firstname || !lastname) {
+    return null;
+  }
+
+  const { data, error } = await db
+    .from("patients")
+    .select("id, ivoris_id, vorname, nachname, geburtsdatum, email, telefon")
+    .eq("geburtsdatum", birthday)
+    .limit(50);
+
+  if (error) {
+    throw new Error(`Lokale Patienten konnten nicht geladen werden: ${error.message}`);
+  }
+
+  const candidates = (data ?? []).filter((entry) => {
+    const patient = entry as LocalPatientCandidate;
+    if (normalizeMatchValue(patient.vorname) !== firstname) return false;
+    if (normalizeMatchValue(patient.nachname) !== lastname) return false;
+
+    const patientEmail = normalizeEmailValue(patient.email);
+    const patientPhone = normalizePhoneValue(patient.telefon);
+    const sameEmail = Boolean(email && patientEmail && email === patientEmail);
+    const samePhone = Boolean(patientPhone && phoneCandidates.has(patientPhone));
+
+    return sameEmail || samePhone;
+  }) as LocalPatientCandidate[];
+
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
 async function findReusableIvorisPatientIdFromPriorSubmissions(
   db: DbClient,
   submission: SubmissionRow
@@ -775,6 +851,20 @@ async function findReusableIvorisPatientIdForNewSubmission(
   db: DbClient,
   submission: SubmissionRow
 ): Promise<string | null> {
+  const localPatient = await findExactLocalPatientCandidate(db, submission);
+  if (localPatient?.id && localPatient.ivoris_id) {
+    await patchSubmissionResolvedPatient(
+      db,
+      submission.id,
+      localPatient.id,
+      localPatient.ivoris_id
+    );
+    console.log(
+      `[ANIMASIGN][IVORIS] resolved exact local patient=${localPatient.id} ivoris_id=${localPatient.ivoris_id} for submission=${submission.id}`
+    );
+    return localPatient.ivoris_id;
+  }
+
   const priorSubmissionIvorisId = await findReusableIvorisPatientIdFromPriorSubmissions(db, submission);
   if (priorSubmissionIvorisId) {
     return priorSubmissionIvorisId;
