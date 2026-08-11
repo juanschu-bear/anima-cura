@@ -451,6 +451,7 @@ export async function POST(request: Request) {
     ];
 
     try {
+      const welcomeUrl = `https://animacura.io/welcome/${submissionId}`;
       const signing = await createAndDistribute({
         title: `Anamnesebogen ${patientName}`.trim(),
         externalId: submissionId,
@@ -459,6 +460,8 @@ export async function POST(request: Request) {
         pdf: pdfBuffer,
         pdfFilename,
         language: "de",
+      }, {
+        redirectUrl: welcomeUrl,
       });
 
       await supabase
@@ -482,6 +485,7 @@ export async function POST(request: Request) {
         id: submissionId,
         token: signing.token,
         host: documensoHost,
+        signingUrl: signing.signingUrl,
         abgleich: abgleich ?? null,
         account: account ?? null,
       });

@@ -515,6 +515,7 @@ export function AnamneseForm({ patientId }: Props) {
   const [data, setData] = useState<Record<string, unknown>>({});
   const [stepName, setStepName] = useState<StepName>("versicherung");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [fehlen, setFehlen] = useState<string[]>([]);
   const [account, setAccount] = useState<{ login_email: string; password: string } | null>(null);
   const [lang, setLang] = useState<"de"|"en"|"es"|"ru"|"tr">("de");
@@ -659,7 +660,9 @@ export function AnamneseForm({ patientId }: Props) {
 
   const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  const submit = () => {
+  const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     const payload = {
       ...data,
       unterschrift_versicherter: sig1.current ? sig1.current.toDataURL() : null,
@@ -674,16 +677,34 @@ export function AnamneseForm({ patientId }: Props) {
       ],
       consents: CONSENTS.map((c) => ({ key: c.key, label: c.label, pflicht: c.pflicht })),
     };
-    fetch("/api/anima-sign/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patientId, answers: payload, schema }),
-    })
-      .then((res) => res.json())
-      .then((res) => { if (res.account) setAccount(res.account); })
-      .catch((error) => console.error("Anamnese-Übermittlung fehlgeschlagen:", error));
-    setDone(true);
-    scrollTop();
+    try {
+      const response = await fetch("/api/anima-sign/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId, answers: payload, schema }),
+      });
+      const res = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(res?.error || "Anamnese-Übermittlung fehlgeschlagen.");
+      }
+
+      if (res.account) setAccount(res.account);
+
+      if (typeof res.signingUrl === "string" && res.signingUrl.trim()) {
+        window.location.assign(res.signingUrl);
+        return;
+      }
+
+      setDone(true);
+      scrollTop();
+    } catch (error) {
+      console.error("Anamnese-Übermittlung fehlgeschlagen:", error);
+      const message = error instanceof Error ? error.message : "Anamnese-Übermittlung fehlgeschlagen.";
+      window.alert(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const goNext = () => {
@@ -979,7 +1000,9 @@ export function AnamneseForm({ patientId }: Props) {
           <div className="inner">
             <button className="btn" type="button" onClick={goBack} disabled={pos === 0}>Zurück</button>
             <span className="plabel">{"Schritt " + (pos + 1) + " von " + total}</span>
-            <button className="btn primary" type="button" onClick={goNext}>{pos === total - 1 ? "Absenden" : "Weiter"}</button>
+            <button className="btn primary" type="button" onClick={goNext} disabled={submitting}>
+              {pos === total - 1 ? (submitting ? "Wird übermittelt..." : "Absenden") : "Weiter"}
+            </button>
           </div>
         </div>
       )}
