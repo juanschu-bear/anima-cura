@@ -111,7 +111,7 @@ async function createPatientAccount(
   patientEmail: string | null,
   patientId: string | null,
 ): Promise<{ login_email: string; password: string; user_id: string } | null> {
-  if (!vorname || !nachname) return null;
+  if (!vorname || !nachname || !patientId) return null;
 
   const admin = createAdminClient();
   const base = normalizeForEmail(vorname) + "." + normalizeForEmail(nachname);
@@ -146,7 +146,6 @@ async function createPatientAccount(
         id: authData.user.id,
         email: loginEmail,
         display_name: `${vorname} ${nachname}`,
-        full_name: `${vorname} ${nachname}`,
         role: "patient",
         patient_id: patientId,
       };
@@ -157,6 +156,8 @@ async function createPatientAccount(
 
       if (profileError) {
         console.error("Patient profile linkage failed:", profileError.message);
+        await admin.auth.admin.deleteUser(authData.user.id);
+        return null;
       }
 
       return { login_email: loginEmail, password, user_id: authData.user.id };
@@ -302,7 +303,8 @@ export async function POST(request: Request) {
     }
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const account = await createPatientAccount(vorname, nachname, email, abgleich?.patient_id || null);
+    const resolvedPatientId = abgleich?.patient_id || patientId;
+    const account = await createPatientAccount(vorname, nachname, email, resolvedPatientId || null);
 
     // 1e) Account-Email in Submission speichern
     if (account?.login_email) {
@@ -312,28 +314,11 @@ export async function POST(request: Request) {
         .eq("id", submissionId);
 
       // Portal-Zugang und Versichertendaten aus dem Anamnesebogen im Patienten-Record setzen
-      if (abgleich?.patient_id) {
+      if (resolvedPatientId) {
         await supabase
           .from("patients")
           .update({ portal_zugang: true, ...buildVersichertenPatch(answers) })
-          .eq("id", abgleich.patient_id);
-      }
-
-      // user_profiles: role=patient + patient_id setzen (noetig fuer Patient-Login)
-      const { data: { users: allUsers } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-      const authUser = allUsers?.find(u => u.email === account.login_email);
-      if (authUser) {
-        await supabase
-          .from("user_profiles")
-          .upsert({
-            id: authUser.id,
-            email: account.login_email,
-            display_name: vorname || "",
-            full_name: (vorname || "") + " " + (nachname || ""),
-            role: "patient",
-            patient_id: abgleich?.patient_id || null,
-          }, { onConflict: "id" });
-        console.log("[ANIMASIGN] user_profiles gesetzt: role=patient, patient_id=" + (abgleich?.patient_id || "null"));
+          .eq("id", resolvedPatientId);
       }
 
       // Willkommens-Email senden (nicht-blockierend)

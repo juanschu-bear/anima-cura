@@ -96,6 +96,10 @@ function anzeigeName(v: Vorlage): string {
   return v.name;
 }
 
+function bereinigeZusatztext(wert: string): string {
+  return wert.replace(/^\s*ausnahme\s*:?\s*/i, "").trim();
+}
+
 /* Häufige Kombis: eine Sitzung, mehrere Leistungen (Praxis-Begriffe) */
 const KOMBIS: Record<string, { label: string; slugs: string[] }[]> = {
   aligner: [{ label: "Erstberatung (Anfangsdiagnostik)", slugs: ["beratung", "diagnostik"] }],
@@ -483,15 +487,28 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
   const animaKopplung = artVorlagen[0]?.struktur.anima_kopplung ?? "";
 
-  // Reload templates so freshly added practice options appear as chips.
-  // Does NOT touch the current selection.
-  const ladeVorlagen = useCallback(async () => {
-    const res = await fetch("/api/doku/vorlagen");
-    if (!res.ok) return null;
-    const json = await res.json();
-    const liste: Vorlage[] = json.vorlagen ?? [];
-    setVorlagen(liste);
-    return liste;
+  const optionLokalAnhaengen = useCallback((m: Vorlage, g: string, text: string) => {
+    setVorlagen((alt) =>
+      alt.map((vorlage) => {
+        if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
+        const gruppe = vorlage.struktur?.groups?.[g];
+        if (!gruppe || !Array.isArray(gruppe.opts)) return vorlage;
+        if (gruppe.opts.some((opt) => opt.t === text)) return vorlage;
+        return {
+          ...vorlage,
+          struktur: {
+            ...vorlage.struktur,
+            groups: {
+              ...vorlage.struktur.groups,
+              [g]: {
+                ...gruppe,
+                opts: [...gruppe.opts, { t: text }],
+              },
+            },
+          },
+        };
+      }),
+    );
   }, []);
 
   async function eigenenTextSpeichern(m: Vorlage, g: string) {
@@ -510,11 +527,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         }),
       });
       if (res.ok) {
-        const neueVorlagen = await ladeVorlagen(); // re-merge -> new chip shows up in this group
-        const aktualisierteVorlage = neueVorlagen?.find(
-          (vorlage) => vorlage.behandlungsart === m.behandlungsart && vorlage.termin_typ === m.termin_typ,
-        );
-        const neuerIndex = aktualisierteVorlage?.struktur.groups[g]?.opts.findIndex((opt) => opt.t === text) ?? -1;
+        const neuerIndex = m.struktur.groups[g]?.opts.length ?? -1;
+        optionLokalAnhaengen(m, g, text);
         if (neuerIndex >= 0) {
           bearbeitet();
           setLeer((alt) => ({ ...alt, [`${m.termin_typ}:${g}`]: false }));
@@ -725,7 +739,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
     let text = segs.map((s) => (s.art === "fehlt" ? "" : s.text)).join("");
     text += schieneText;
-    if (ausnahme.trim()) text += ` ${ausnahme.trim()}`;
+    const bereinigterZusatz = bereinigeZusatztext(ausnahme);
+    if (bereinigterZusatz) text += ` ${bereinigterZusatz}`;
     text = text.replace(/\s{2,}/g, " ").trim();
     return { segs, fehlt: Array.from(new Set(fehlt)), text };
   }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz]);
@@ -957,7 +972,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     if (typeof v.schiene_notiz === "string") setSchieneNotiz(v.schiene_notiz);
     if (typeof v.bogen === "string") setBogen(v.bogen);
     if (v.zahn_seiten && typeof v.zahn_seiten === "object") setSeiten(v.zahn_seiten as Record<number, Seite>);
-    setAusnahme(e.ausnahme_freitext ?? "");
+    setAusnahme(bereinigeZusatztext(e.ausnahme_freitext ?? ""));
     setEntwurfId(e.id);
     setBestaetigt(null);
     setDirty(false);
@@ -1353,7 +1368,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 {s.text}
               </span>
             ))}
-            {ausnahme.trim() && <span className="seg-var"> {ausnahme.trim()}</span>}
+            {bereinigeZusatztext(ausnahme) && <span className="seg-var"> {bereinigeZusatztext(ausnahme)}</span>}
           </div>
           <div className="kartenfuss">
             {bestaetigt ? (
@@ -1567,7 +1582,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <input
             className="freitext"
             type="text"
-            placeholder="Ausnahme (Freitext, optional)"
+            placeholder="Zusatztext (optional)"
             value={ausnahme}
             onChange={(e) => { bearbeitet(); setAusnahme(e.target.value); }}
           />
