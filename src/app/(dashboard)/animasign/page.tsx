@@ -70,9 +70,17 @@ export default function AnimaSignPage() {
     try {
       const r = await fetch("/api/anima-sign/ivoris-nachsync", { method: "POST" });
       const d = await r.json();
-      alert(`Sync: ${d.total} Patienten verarbeitet.`);
+      if (!r.ok) {
+        throw new Error(d?.message || "Sync fehlgeschlagen.");
+      }
+      alert(
+        d?.message ||
+          `Sync: ${d?.processed ?? 0} Fälle verarbeitet, ${d?.patientSuccess ?? 0} Patienten-Syncs, ${d?.documentSuccess ?? 0} Dokumente.`
+      );
       void fetchData();
-    } catch { alert("Sync fehlgeschlagen."); }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Sync fehlgeschlagen.");
+    }
     setSyncing(false);
   };
 
