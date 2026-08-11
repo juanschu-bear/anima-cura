@@ -26,6 +26,12 @@ interface Submission {
   last_login: string | null;
 }
 
+interface PatientHit {
+  id: string;
+  name: string;
+  geburtsdatum?: string | null;
+}
+
 interface Stats {
   total: number;
   today: number;
@@ -49,6 +55,11 @@ export default function AnimaSignPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("today");
   const [page, setPage] = useState(0);
+  const [resolveTarget, setResolveTarget] = useState<Submission | null>(null);
+  const [resolveSearch, setResolveSearch] = useState("");
+  const [resolveHits, setResolveHits] = useState<PatientHit[]>([]);
+  const [resolveSaving, setResolveSaving] = useState(false);
+  const [resolveIvorisId, setResolveIvorisId] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -62,6 +73,28 @@ export default function AnimaSignPage() {
     } catch (e) { console.error("[AnimaSign]", e); }
     setLoading(false);
   }, [search, filter]);
+
+  useEffect(() => {
+    if (!resolveTarget || resolveSearch.trim().length < 2) {
+      setResolveHits([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(resolveSearch.trim())}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setResolveHits((data.results || []).map((entry: { id: string; name: string; geburtsdatum?: string | null }) => ({
+          id: entry.id,
+          name: entry.name,
+          geburtsdatum: entry.geburtsdatum ?? null,
+        })));
+      } catch {
+        setResolveHits([]);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [resolveSearch, resolveTarget]);
 
   useEffect(() => { void fetchData(); const iv = setInterval(() => { void fetchData(); }, 120_000); return () => clearInterval(iv); }, [fetchData]);
 
@@ -142,6 +175,32 @@ export default function AnimaSignPage() {
     }
 
     return { label: "Ausstehend", color: gold, glow: goldBg };
+  };
+
+  const resolveSubmission = async (payload: { patientId?: string; ivorisId?: string }) => {
+    if (!resolveTarget) return;
+    setResolveSaving(true);
+    try {
+      const res = await fetch(`/api/anima-sign/submission/${resolveTarget.id}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "Zuordnung fehlgeschlagen.");
+      }
+      alert("AnimaSign-Fall wurde übernommen und erneut synchronisiert.");
+      setResolveTarget(null);
+      setResolveSearch("");
+      setResolveHits([]);
+      setResolveIvorisId("");
+      void fetchData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Zuordnung fehlgeschlagen.");
+    } finally {
+      setResolveSaving(false);
+    }
   };
 
   return (
@@ -245,6 +304,31 @@ export default function AnimaSignPage() {
                     <span style={{ fontSize: 12, color: ivoris.label === "OK" ? ink : muted }}>
                       {ivoris.label}
                     </span>
+                    {s.ivoris_manual_review && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResolveTarget(s);
+                          setResolveSearch(`${s.nachname} ${s.vorname}`.trim());
+                          setResolveIvorisId("");
+                          setResolveHits([]);
+                        }}
+                        style={{
+                          marginLeft: 8,
+                          padding: "5px 8px",
+                          borderRadius: 8,
+                          border: `1px solid ${lineS}`,
+                          background: bg2,
+                          color: ink,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Zuordnen
+                      </button>
+                    )}
                   </>
                 );
               })()}
@@ -295,6 +379,149 @@ export default function AnimaSignPage() {
           </div>
         )}
       </div>
+
+      {resolveTarget && (
+        <div
+          onClick={() => !resolveSaving && setResolveTarget(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(4px)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(680px, 100%)",
+              background: cardBg,
+              border: `1px solid ${line}`,
+              borderRadius: 18,
+              padding: 22,
+              boxShadow: "0 24px 70px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: ink }}>
+                  AnimaSign manuell auflösen
+                </div>
+                <div style={{ fontSize: 13, color: muted, marginTop: 4 }}>
+                  {resolveTarget.nachname}, {resolveTarget.vorname}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !resolveSaving && setResolveTarget(null)}
+                style={{ border: "none", background: "transparent", color: muted, cursor: "pointer", fontSize: 20 }}
+              >
+                ×
+              </button>
+            </div>
+
+            {resolveTarget.ivoris_manual_review_reason && (
+              <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: bg2, border: `1px solid ${line}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                  Warum hakt es?
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: ink }}>{resolveTarget.ivoris_manual_review_reason}</div>
+              </div>
+            )}
+
+            <div style={{ display: "grid", gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 8 }}>1. Lokalen Patienten auswählen</div>
+                <input
+                  value={resolveSearch}
+                  onChange={(event) => setResolveSearch(event.target.value)}
+                  placeholder="Patient in Anima Cura suchen"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: `1px solid ${lineS}`,
+                    background: bg,
+                    color: ink,
+                    fontSize: 14,
+                    outline: "none",
+                    fontFamily: "inherit",
+                  }}
+                />
+                {resolveHits.length > 0 && (
+                  <div style={{ marginTop: 10, display: "grid", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+                    {resolveHits.map((hit) => (
+                      <button
+                        key={hit.id}
+                        type="button"
+                        disabled={resolveSaving}
+                        onClick={() => void resolveSubmission({ patientId: hit.id })}
+                        style={{
+                          textAlign: "left",
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: `1px solid ${line}`,
+                          background: bg2,
+                          color: ink,
+                          cursor: resolveSaving ? "wait" : "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{hit.name}</div>
+                        <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>{hit.geburtsdatum || "Geburtsdatum unbekannt"}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 8 }}>2. Oder direkte Ivoris-ID eintragen</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <input
+                    value={resolveIvorisId}
+                    onChange={(event) => setResolveIvorisId(event.target.value)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    style={{
+                      flex: 1,
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: `1px solid ${lineS}`,
+                      background: bg,
+                      color: ink,
+                      fontSize: 14,
+                      outline: "none",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={resolveSaving || !resolveIvorisId.trim()}
+                    onClick={() => void resolveSubmission({ ivorisId: resolveIvorisId.trim() })}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 12,
+                      border: `1px solid ${blue}`,
+                      background: blueBg,
+                      color: blue,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: resolveSaving ? "wait" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Jetzt auflösen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
