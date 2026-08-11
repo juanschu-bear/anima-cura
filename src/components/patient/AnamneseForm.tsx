@@ -692,7 +692,9 @@ export function AnamneseForm({ patientId }: Props) {
       if (res.account) setAccount(res.account);
 
       if (typeof res.signingUrl === "string" && res.signingUrl.trim()) {
-        window.location.assign(res.signingUrl);
+        window.location.assign(
+          `/patient/anamnese/sign?url=${encodeURIComponent(res.signingUrl)}`
+        );
         return;
       }
 
