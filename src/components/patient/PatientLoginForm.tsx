@@ -27,6 +27,24 @@ export default function PatientLoginForm() {
   const [emailFehlt, setEmailFehlt] = useState(false);
   const [passwortFehlt, setPasswortFehlt] = useState(false);
 
+  const isPatientAuthUser = (user: {
+    app_metadata?: Record<string, unknown> | null;
+    user_metadata?: Record<string, unknown> | null;
+  } | null) => {
+    if (!user) return false;
+    const role =
+      typeof user.app_metadata?.role === "string"
+        ? user.app_metadata.role
+        : typeof user.user_metadata?.role === "string"
+          ? user.user_metadata.role
+          : null;
+    const patientId =
+      typeof user.user_metadata?.patient_id === "string"
+        ? user.user_metadata.patient_id.trim()
+        : "";
+    return role === "patient" && patientId.length > 0;
+  };
+
   // ---- Animated "plexus" network background (canvas, client-only) ----
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -140,6 +158,12 @@ export default function PatientLoginForm() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (isPatientAuthUser(user)) {
+      router.replace("/patient/portal");
+      router.refresh();
+      return;
+    }
 
     if (user) {
       const { data: profile } = await supabase

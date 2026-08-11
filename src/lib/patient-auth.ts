@@ -1,12 +1,44 @@
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 
 export interface AuthenticatedPatient {
   userId: string;
   patientId: string;
   email: string;
   name: string;
+}
+
+function readPatientAuthMetadata(user: User) {
+  const role =
+    typeof user.app_metadata?.role === "string"
+      ? user.app_metadata.role
+      : typeof user.user_metadata?.role === "string"
+        ? user.user_metadata.role
+        : null;
+
+  const patientId =
+    typeof user.user_metadata?.patient_id === "string" && user.user_metadata.patient_id.trim()
+      ? user.user_metadata.patient_id.trim()
+      : null;
+
+  const displayName =
+    typeof user.user_metadata?.display_name === "string" && user.user_metadata.display_name.trim()
+      ? user.user_metadata.display_name.trim()
+      : typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()
+        ? user.user_metadata.full_name.trim()
+        : null;
+
+  if (role !== "patient" || !patientId) {
+    return null;
+  }
+
+  return {
+    role,
+    patientId,
+    displayName,
+  };
 }
 
 export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | null> {
@@ -27,13 +59,40 @@ export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | 
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile || profile.role !== "patient" || !profile.patient_id) return null;
+  const metadataPatient = readPatientAuthMetadata(user);
+
+  if (profile?.role === "patient" && profile.patient_id) {
+    return {
+      userId: user.id,
+      patientId: profile.patient_id,
+      email: user.email ?? "",
+      name: profile.display_name || metadataPatient?.displayName || "Patient",
+    };
+  }
+
+  if (!metadataPatient) return null;
+
+  // Self-heal missing or stale user_profiles rows for patient accounts.
+  const { error: healError } = await serviceClient.from("user_profiles").upsert(
+    {
+      id: user.id,
+      email: user.email ?? "",
+      display_name: metadataPatient.displayName ?? user.email ?? "Patient",
+      role: "patient",
+      patient_id: metadataPatient.patientId,
+    },
+    { onConflict: "id" }
+  );
+
+  if (healError) {
+    console.error("[PATIENT AUTH] profile self-heal failed:", healError.message);
+  }
 
   return {
     userId: user.id,
-    patientId: profile.patient_id,
+    patientId: metadataPatient.patientId,
     email: user.email ?? "",
-    name: profile.display_name || "Patient",
+    name: metadataPatient.displayName || "Patient",
   };
 }
 
