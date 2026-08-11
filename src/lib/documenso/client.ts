@@ -110,10 +110,16 @@ function normalizeBaseUrl(raw: string): string {
 }
 
 function getConfig(): DocumensoConfig {
-  const apiKey = process.env.ANIMASIGN_API_KEY;
-  const rawBase = process.env.DOCUMENSO_BASE_URL;
+  const apiKey =
+    process.env.ANIMASIGN_API_KEY ||
+    process.env.DOCUMENSO_API_KEY ||
+    process.env.DOCUMENSO_KEY;
+  const rawBase =
+    process.env.DOCUMENSO_BASE_URL ||
+    process.env.ANIMASIGN_BASE_URL ||
+    process.env.NEXT_PUBLIC_DOCUMENSO_BASE_URL;
   if (!apiKey) {
-    throw new DocumensoError("ANIMASIGN_API_KEY fehlt", 0, "");
+    throw new DocumensoError("ANIMASIGN_API_KEY/DOCUMENSO_API_KEY fehlt", 0, "");
   }
   if (!rawBase) {
     throw new DocumensoError("DOCUMENSO_BASE_URL fehlt", 0, "");

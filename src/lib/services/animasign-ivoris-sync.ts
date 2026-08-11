@@ -900,7 +900,11 @@ async function resolveSubmissionPatientIvorisId(
 async function syncExistingPatient(
   db: DbClient,
   submission: SubmissionRow
-): Promise<{ status: SyncStatus; ivorisId: string | null; metadata?: Record<string, unknown> }> {
+): Promise<{
+  status: SyncStatus;
+  ivorisId: string | null;
+  metadata?: Record<string, unknown>;
+}> {
   const patient = await loadResolvedPatient(db, submission);
   if (!patient?.ivoris_id) {
     throw new Error("Bestandspatient hat keine gueltige ivoris_id");
@@ -931,10 +935,17 @@ async function syncExistingPatient(
       await updateIvorisPatient(patient.ivoris_id, operation);
     } catch (error) {
       if (isIvorisIdentityConstraintError(error)) {
-        throw new ManualReviewRequiredError(
-          `Ivoris blockiert das Kontakt-/Adressupdate fuer den Bestandspatienten ${submission.vorname ?? ""} ${submission.nachname ?? ""}. Das Dokument kann separat synchronisiert werden, die Stammdaten muessen aber manuell in Ivoris geprueft werden.`,
-          "patient"
-        );
+        return {
+          status: "success",
+          ivorisId: patient.ivoris_id,
+          metadata: {
+            operations: operations.length,
+            warning:
+              `Ivoris blockiert das Kontakt-/Adressupdate fuer den Bestandspatienten ${submission.vorname ?? ""} ${submission.nachname ?? ""}. ` +
+              "Patientenzuordnung bleibt bestehen; Dokument-Sync darf weiterlaufen.",
+            warningCode: "IVORIS_CONTACT_UPDATE_BLOCKED",
+          },
+        };
       }
       throw error;
     }
