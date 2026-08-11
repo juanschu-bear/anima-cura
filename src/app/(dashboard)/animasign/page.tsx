@@ -26,6 +26,14 @@ interface Submission {
   last_login: string | null;
 }
 
+type StatusPresentation = {
+  label: string;
+  color: string;
+  glow: string;
+  textColor: string;
+  note?: string;
+};
+
 interface PatientHit {
   id: string;
   name: string;
@@ -161,20 +169,83 @@ export default function AnimaSignPage() {
 
   const hasSignedPdf = (submission: Submission) => Boolean(submission.signed_pdf_path);
 
-  const getIvorisStatus = (submission: Submission) => {
-    if (submission.ivoris_synced && submission.ivoris_doc_synced) {
-      return { label: "OK", color: green, glow: greenBg };
+  const errorRed = "#d45a52";
+  const errorRedBg = "rgba(212,90,82,0.12)";
+
+  const getSignatureStatus = (submission: Submission): StatusPresentation => {
+    if (hasSignedPdf(submission)) {
+      return { label: "Signiert", color: blue, glow: blueBg, textColor: ink, note: "PDF liegt vor" };
     }
 
-    if (submission.ivoris_manual_review) {
-      return { label: "Manuell", color: "#d45a52", glow: "rgba(212,90,82,0.12)" };
+    if (submission.status === "fehler") {
+      return { label: "Fehler", color: errorRed, glow: errorRedBg, textColor: ink, note: "Bitte pruefen" };
+    }
+
+    return { label: "Ausstehend", color: gold, glow: goldBg, textColor: muted, note: "Patient muss noch unterschreiben" };
+  };
+
+  const getAppStatus = (submission: Submission): StatusPresentation => {
+    if (submission.account_email) {
+      return {
+        label: "Registriert",
+        color: green,
+        glow: greenBg,
+        textColor: ink,
+        note: submission.has_logged_in ? "Login erfolgt" : "Account angelegt",
+      };
+    }
+
+    return { label: "Ausstehend", color: gold, glow: goldBg, textColor: muted, note: "Noch kein Zugang erstellt" };
+  };
+
+  const getIvorisStatus = (submission: Submission): StatusPresentation => {
+    if (submission.ivoris_synced && submission.ivoris_doc_synced) {
+      return { label: "Vollstaendig", color: green, glow: greenBg, textColor: ink, note: "Stammdaten und PDF in Ivoris" };
+    }
+
+    if (!hasSignedPdf(submission)) {
+      if (submission.ivoris_manual_review) {
+        return {
+          label: "Stammdaten pruefen",
+          color: errorRed,
+          glow: errorRedBg,
+          textColor: ink,
+          note: "Ivoris blockiert das Update, PDF folgt nach Signatur",
+        };
+      }
+
+      if (submission.ivoris_synced) {
+        return { label: "Wartet auf PDF", color: gold, glow: goldBg, textColor: muted, note: "Patientenabgleich ist erledigt" };
+      }
+
+      return { label: "Wartet auf Signatur", color: gold, glow: goldBg, textColor: muted, note: "Noch kein unterschriebenes PDF vorhanden" };
     }
 
     if (submission.ivoris_doc_synced && !submission.ivoris_synced) {
-      return { label: "Teilweise", color: blue, glow: blueBg };
+      return { label: "Dokument da", color: blue, glow: blueBg, textColor: ink, note: "PDF ist in Ivoris, Stammdaten offen" };
     }
 
-    return { label: "Ausstehend", color: gold, glow: goldBg };
+    if (submission.ivoris_manual_review) {
+      return { label: "Stammdaten pruefen", color: errorRed, glow: errorRedBg, textColor: ink, note: "Kontakt- oder Adressupdate manuell in Ivoris pruefen" };
+    }
+
+    if (submission.ivoris_synced && !submission.ivoris_doc_synced) {
+      return { label: "PDF-Sync offen", color: blue, glow: blueBg, textColor: ink, note: "Patient ist verbunden, Dokument wird noch uebertragen" };
+    }
+
+    return { label: "Ausstehend", color: gold, glow: goldBg, textColor: muted, note: "Sync noch nicht abgeschlossen" };
+  };
+
+  const getPdfStatusNote = (submission: Submission) => {
+    if (submission.signed_pdf_path) {
+      return submission.ivoris_doc_synced ? "In Ivoris abgelegt" : "Liegt vor, Sync noch offen";
+    }
+
+    if (submission.status === "fehler") {
+      return "PDF konnte noch nicht erstellt werden";
+    }
+
+    return "Wartet auf Signatur";
   };
 
   const resolveSubmission = async (payload: { patientId?: string; ivorisId?: string }) => {
@@ -274,18 +345,42 @@ export default function AnimaSignPage() {
               </span>
             </div>
             {/* Unterschrift */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={dot(hasSignedPdf(s) ? blue : s.status === "fehler" ? "#d45a52" : gold, hasSignedPdf(s) ? blueBg : goldBg)} />
-              <span style={{ fontSize: 12, color: hasSignedPdf(s) ? ink : muted }}>
-                {hasSignedPdf(s) ? "Signiert" : s.status === "fehler" ? "Fehler" : "Ausstehend"}
-              </span>
+            <div>
+              {(() => {
+                const signature = getSignatureStatus(s);
+                return (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={dot(signature.color, signature.glow)} />
+                      <span style={{ fontSize: 12, color: signature.textColor }}>
+                        {signature.label}
+                      </span>
+                    </div>
+                    {signature.note && (
+                      <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{signature.note}</div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
             {/* App-Status */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={dot(s.account_email ? green : gold, s.account_email ? greenBg : goldBg)} />
-              <span style={{ fontSize: 12, color: s.account_email ? ink : muted }}>
-                {s.account_email ? "Registriert" : "Ausstehend"}
-              </span>
+            <div>
+              {(() => {
+                const appStatus = getAppStatus(s);
+                return (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={dot(appStatus.color, appStatus.glow)} />
+                      <span style={{ fontSize: 12, color: appStatus.textColor }}>
+                        {appStatus.label}
+                      </span>
+                    </div>
+                    {appStatus.note && (
+                      <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{appStatus.note}</div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
             {/* Angemeldet */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -295,39 +390,44 @@ export default function AnimaSignPage() {
               </span>
             </div>
             {/* Ivoris */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div>
               {(() => {
                 const ivoris = getIvorisStatus(s);
                 return (
                   <>
-                    <span style={dot(ivoris.color, ivoris.glow)} />
-                    <span style={{ fontSize: 12, color: ivoris.label === "OK" ? ink : muted }}>
-                      {ivoris.label}
-                    </span>
-                    {s.ivoris_manual_review && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResolveTarget(s);
-                          setResolveSearch(`${s.nachname} ${s.vorname}`.trim());
-                          setResolveIvorisId("");
-                          setResolveHits([]);
-                        }}
-                        style={{
-                          marginLeft: 8,
-                          padding: "5px 8px",
-                          borderRadius: 8,
-                          border: `1px solid ${lineS}`,
-                          background: bg2,
-                          color: ink,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Zuordnen
-                      </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={dot(ivoris.color, ivoris.glow)} />
+                      <span style={{ fontSize: 12, color: ivoris.textColor }}>
+                        {ivoris.label}
+                      </span>
+                      {s.ivoris_manual_review && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResolveTarget(s);
+                            setResolveSearch(`${s.nachname} ${s.vorname}`.trim());
+                            setResolveIvorisId("");
+                            setResolveHits([]);
+                          }}
+                          style={{
+                            marginLeft: 8,
+                            padding: "5px 8px",
+                            borderRadius: 8,
+                            border: `1px solid ${lineS}`,
+                            background: bg2,
+                            color: ink,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Zuordnen
+                        </button>
+                      )}
+                    </div>
+                    {ivoris.note && (
+                      <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{ivoris.note}</div>
                     )}
                   </>
                 );
@@ -336,29 +436,35 @@ export default function AnimaSignPage() {
             {/* PDF */}
             <div>
               {s.signed_pdf_path ? (
-                <a
-                  href={`/api/anima-sign/submission/${s.id}/signed-pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 78,
-                    padding: "6px 10px",
-                    borderRadius: 9,
-                    border: `1px solid ${blue}`,
-                    background: blueBg,
-                    color: blue,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                  }}
-                >
-                  Oeffnen
-                </a>
+                <>
+                  <a
+                    href={`/api/anima-sign/submission/${s.id}/signed-pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: 78,
+                      padding: "6px 10px",
+                      borderRadius: 9,
+                      border: `1px solid ${blue}`,
+                      background: blueBg,
+                      color: blue,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Oeffnen
+                  </a>
+                  <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{getPdfStatusNote(s)}</div>
+                </>
               ) : (
-                <span style={{ fontSize: 12, color: muted }}>Noch nicht da</span>
+                <>
+                  <span style={{ fontSize: 12, color: muted }}>Noch nicht da</span>
+                  <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{getPdfStatusNote(s)}</div>
+                </>
               )}
             </div>
             {/* Zeit */}

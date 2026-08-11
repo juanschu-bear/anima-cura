@@ -906,6 +906,8 @@ async function syncExistingPatient(
     throw new Error("Bestandspatient hat keine gueltige ivoris_id");
   }
 
+  await patchSubmissionIvorisPatientId(db, submission.id, patient.ivoris_id);
+
   const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
   const currentContacts = extractCurrentContacts(currentPatient);
   const requestedContacts = buildContactUpdate(submission);
