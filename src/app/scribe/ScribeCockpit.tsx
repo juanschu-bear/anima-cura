@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
@@ -1310,6 +1311,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             )}
           </div>
           {kontext && <div className="kontext"><b>{ART_NAMEN[art]}:</b> {kontext}</div>}
+          <div className="vorlagen-hinweis">
+            <span>Fehlt oben eine Terminart oder soll eine Vorlage angepasst werden?</span>
+            <Link href="/scribe/praxis-pass" className="neben klein vorlagen-link">
+              Terminarten &amp; Vorlagen bearbeiten
+            </Link>
+          </div>
         </div>
 
         {/* ===== Eintrag ===== */}
