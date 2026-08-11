@@ -51,6 +51,12 @@ type TagesEintrag = {
   patients: { id?: string; vorname: string; nachname: string; geburtsdatum?: string | null } | null;
 };
 
+function formatDatumKurz(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("de-DE");
+}
+
 const ART_NAMEN: Record<string, string> = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" };
 const BOGEN = ["12er NiTi", "14er NiTi", "16er NiTi", "16×22 NiTi", "16×22 Stahl", "18er Stahl"];
 const FDI_OK = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -298,7 +304,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [speichert, setSpeichert] = useState(false);
   const [entwurfId, setEntwurfId] = useState<string | null>(null);
   const [zwischenInfo, setZwischenInfo] = useState<string | null>(null);
-  const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string } | null>(null);
+  const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string; terminDatum: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
   const [demo, setDemo] = useState(false);
   const [pwOffen, setPwOffen] = useState(false);
@@ -733,7 +739,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   async function neueVersion() {
     if (!bestaetigt || !aenderungsgrund.trim() || komposition.fehlt.length > 0) return;
     if (demo) {
-      setBestaetigt({ ...bestaetigt, version: bestaetigt.version + 1, am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) });
+      setBestaetigt({
+        ...bestaetigt,
+        version: bestaetigt.version + 1,
+        am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+        terminDatum: listenDatum,
+      });
       setDirty(false);
       setAenderungsgrund("");
       setPushStatus("offen");
@@ -775,6 +786,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       id: json.eintrag.id,
       version: json.eintrag.version,
       am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+      terminDatum: json.eintrag.termin_datum ?? listenDatum,
     });
     setDirty(false);
     setAenderungsgrund("");
@@ -803,7 +815,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     if (bestaetigt) return;
     if (!patient || module.length === 0 || komposition.fehlt.length > 0) return;
     if (demo) {
-      setBestaetigt({ id: "demo", version: 1, am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) });
+      setBestaetigt({
+        id: "demo",
+        version: 1,
+        am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+        terminDatum: listenDatum,
+      });
       setDirty(false);
       setAenderungsgrund("");
       setPushStatus("offen");
@@ -850,6 +867,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       id: json.eintrag.id,
       version: json.eintrag.version,
       am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+      terminDatum: json.eintrag.termin_datum ?? listenDatum,
     });
     setEntwurfId(null);
     setZwischenInfo(null);
@@ -1568,7 +1586,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {bestaetigt ? (
               <>
                 <div className="aktemeta">
-                  {new Date().toLocaleDateString("de-DE")} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ")}
+                  {formatDatumKurz(bestaetigt.terminDatum)} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ")}
                 </div>
                 <div className="aktetext">{komposition.text}</div>
                 <div className="akteversion">
