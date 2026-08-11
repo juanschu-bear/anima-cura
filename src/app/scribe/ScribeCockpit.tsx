@@ -417,6 +417,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     () => gewaehlt.map(vorlageVon).filter((v): v is Vorlage => v !== null),
     [gewaehlt, vorlageVon]
   );
+  const bogenkontrolleVorlage = useMemo(
+    () => artVorlagen.find((v) => v.termin_typ === "kontrolle") ?? null,
+    [artVorlagen]
+  );
+  const hatOkUkAuswahl = useMemo(
+    () => module.some((m) => !!m.struktur?.groups?.bogen_ok && !!m.struktur?.groups?.bogen_uk),
+    [module]
+  );
   const sichtbareVorlagen = useMemo(
     () => artVorlagen.filter((v) => passtAlter(v, patient?.alter ?? null)),
     [artVorlagen, patient]
@@ -1310,6 +1318,18 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               </div>
             )}
           </div>
+          {art === "multiband" && bogenkontrolleVorlage && !hatOkUkAuswahl && (
+            <div className="vorlagen-hinweis okuk-hinweis">
+              <span>OK/UK mit Varianten gibt es in der Terminart {anzeigeName(bogenkontrolleVorlage)}.</span>
+              <button
+                type="button"
+                className="neben klein vorlagen-link"
+                onClick={() => leistungToggle(bogenkontrolleVorlage.termin_typ)}
+              >
+                {anzeigeName(bogenkontrolleVorlage)} laden
+              </button>
+            </div>
+          )}
           {kontext && <div className="kontext"><b>{ART_NAMEN[art]}:</b> {kontext}</div>}
           <div className="vorlagen-hinweis">
             <span>Fehlt oben eine Terminart oder soll eine Vorlage angepasst werden?</span>
