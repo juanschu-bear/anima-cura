@@ -16,6 +16,16 @@ const PAGE_GUIDES: Array<{
   summary: string[];
 }> = [
   {
+    match: (pathname) => pathname.startsWith("/kasse"),
+    title: "Kasse",
+    summary: [
+      "Hier werden Einnahmen und Ausgaben direkt an der Rezeption erfasst.",
+      "QR-Zahlungen fuer Patienten werden ueber Einnahme -> Patient waehlen -> Betrag -> QR-Ueberweisung -> Leistung -> optionale Notiz -> Zahlung erfassen erstellt.",
+      "Danach erscheint sofort der GiroCode; die Notiz ist nur intern sichtbar und steht nicht im QR-Code.",
+      "QR-Eingaenge werden spaeter gegen echte Ueberweisungen mit Zeichen und Betrag abgeglichen.",
+    ],
+  },
+  {
     match: (pathname) => pathname.startsWith("/zahlungen"),
     title: "Zahlungen",
     summary: [

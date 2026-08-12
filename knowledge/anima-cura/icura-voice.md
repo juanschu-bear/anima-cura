@@ -23,6 +23,24 @@ Sein Job:
 - zeigt einzelne Transaktionen, Zuordnungen, offene Treffer und Prueffaelle
 - wichtig: hier geht es um Bankbewegungen und Zahlungsabgleich, nicht um die Gesamthistorie offener Forderungen
 
+### Kasse
+- hier werden Praxis-Einnahmen und Ausgaben direkt am Tresen erfasst
+- QR-Zahlung fuer einen Patienten ist verfuegbar und kein Sonderfall
+- kanonischer Ablauf:
+  - zu `Kasse`
+  - `Einnahme` waehlen
+  - Patient suchen und auswaehlen
+  - Betrag eintragen
+  - `QR-Ueberweisung` als Zahlart lassen oder aktiv waehlen
+  - Leistung auswaehlen
+  - optional interne Notiz eintragen
+  - `Zahlung erfassen`
+  - danach erscheint sofort der GiroCode fuer die Banking-App
+- wichtig:
+  - die Notiz ist nur intern sichtbar
+  - der Verwendungszweck im QR ist anpassbar
+  - der spaetere Zahlungseingang wird gegen Betrag plus Zeichen abgeglichen
+
 ### Offene Posten
 - zeigt Rechnungen und Forderungen aus IVORIS
 - Statuslogik: offen, teilbezahlt, bezahlt, Erloesminderung

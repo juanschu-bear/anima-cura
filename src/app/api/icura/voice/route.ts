@@ -53,7 +53,10 @@ const patientFinancialSchema = z.object({
 const voiceMap = {
   patients: "/patienten",
   overview: "/uebersicht",
+  cash: "/kasse",
+  kasse: "/kasse",
   payments: "/zahlungen",
+  openItems: "/offene-posten",
   automations: "/automatisierungen",
   rateplans: "/ratenplan",
   dunning: "/mahnwesen",
@@ -350,6 +353,7 @@ YOU CAN:
 
 APP STRUCTURE:
 - /uebersicht - Overview dashboard
+- /kasse - Reception till with QR payments, cash and card entries
 - /zahlungen - Payment transactions and bank sync
 - /patienten - Patient list
 - /ratenplan - Rate plans / installment management
@@ -361,7 +365,7 @@ APP STRUCTURE:
 - /einstellungen - Settings
 
 SIDEBAR SELECTORS:
-[data-nav="uebersicht"], [data-nav="zahlungen"], [data-nav="patienten"], [data-nav="ratenplan"], [data-nav="mahnwesen"], [data-nav="quartal"], [data-nav="automatisierungen"], [data-nav="import"], [data-nav="einstellungen"]
+[data-nav="uebersicht"], [data-nav="kasse"], [data-nav="zahlungen"], [data-nav="offene-posten"], [data-nav="patienten"], [data-nav="ratenplan"], [data-nav="mahnwesen"], [data-nav="quartal"], [data-nav="automatisierungen"], [data-nav="import"], [data-nav="einstellungen"]
 
 PERSONALITY:
 - Speak naturally, as if talking to a colleague
