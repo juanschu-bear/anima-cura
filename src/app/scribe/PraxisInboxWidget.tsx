@@ -297,7 +297,7 @@ export default function PraxisInboxWidget() {
           </div>
 
           <div className="praxis-inbox-liste">
-            <div className="praxis-listenblock">
+            <div className="praxis-listenblock heute">
               <div className="praxis-listenblock-kopf">
                 <h4>Heute im Blick</h4>
                 <span>{heuteListe.length}</span>
@@ -332,7 +332,7 @@ export default function PraxisInboxWidget() {
               )}
             </div>
 
-            <div className="praxis-listenblock">
+            <div className="praxis-listenblock arbeit">
               <div className="praxis-listenblock-kopf">
                 <h4>In Arbeit</h4>
                 <span>{inArbeitListe.length}</span>
@@ -362,7 +362,7 @@ export default function PraxisInboxWidget() {
               )}
             </div>
 
-            <div className="praxis-listenblock">
+            <div className="praxis-listenblock naechstes">
               <div className="praxis-listenblock-kopf">
                 <h4>Als Nächstes</h4>
                 <span>{spaeterListe.length}</span>

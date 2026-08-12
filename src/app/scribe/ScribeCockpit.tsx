@@ -1709,7 +1709,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                     if (optOffen !== key) {
                       return (
                         <button className="wahl plus" onClick={() => { setOptOffen(key); setOptText(""); }}>
-                          + Baustein hinzufügen
+                          + Eigener Text-Baustein
                         </button>
                       );
                     }

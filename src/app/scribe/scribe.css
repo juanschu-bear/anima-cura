@@ -913,6 +913,18 @@
 .scribe .praxis-listenblock{
   padding:12px;border-radius:20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)
 }
+.scribe .praxis-listenblock.heute{
+  background:linear-gradient(180deg,rgba(44,111,230,.10),rgba(255,255,255,.03));
+  border-color:rgba(94,162,255,.24);
+}
+.scribe .praxis-listenblock.arbeit{
+  background:linear-gradient(180deg,rgba(242,181,68,.11),rgba(255,255,255,.03));
+  border-color:rgba(242,181,68,.22);
+}
+.scribe .praxis-listenblock.naechstes{
+  background:linear-gradient(180deg,rgba(171,139,255,.10),rgba(255,255,255,.03));
+  border-color:rgba(171,139,255,.2);
+}
 .scribe .praxis-listenblock.erledigt{background:rgba(123,216,166,.05)}
 .scribe .praxis-listenblock-kopf{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .scribe .praxis-listenblock-kopf h4{margin:0;font-family:var(--display);font-size:15px}
@@ -940,6 +952,12 @@
   border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#EAF2FD;cursor:pointer;
   border-radius:999px;padding:6px 10px;font-size:11.5px
 }
+.scribe .praxis-item-actions button.kritisch{color:#FFB4A6;border-color:rgba(255,151,126,.18)}
+.scribe .praxis-item-zeiten{margin-top:8px;font-size:11px;color:#95AFCA;line-height:1.5}
+.scribe .praxis-item-details summary{list-style:none;cursor:pointer}
+.scribe .praxis-item-details summary::-webkit-details-marker{display:none}
+.scribe .praxis-item-summary{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.scribe .praxis-item-summary-right{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:#95AFCA}
 .scribe .praxis-item-actions button.kritisch{color:#FFB4A6;border-color:rgba(255,151,126,.18)}
 .scribe .praxis-item-zeiten{margin-top:8px;font-size:11px;color:#95AFCA;line-height:1.5}
 .scribe .praxis-item-details summary{list-style:none;cursor:pointer}
