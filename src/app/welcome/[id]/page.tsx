@@ -1,5 +1,4 @@
 import { createServerClient } from "@/lib/db/supabase";
-import { notFound } from "next/navigation";
 import WelcomeScreen from "./WelcomeScreen";
 
 export default async function WelcomePage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,18 +11,30 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
   const supabase = createServerClient();
   const { data: sub } = await supabase
     .from("anamnese_submissions")
-    .select("vorname, account_email, account_password, answers")
+    .select("vorname, email, account_email, account_password, answers")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  if (!sub || !sub.account_email) return notFound();
+  if (!sub) {
+    return (
+      <WelcomeScreen
+        vorname=""
+        loginEmail=""
+        password=""
+        fallbackMode="missing_submission"
+      />
+    );
+  }
 
   const lang = (sub.answers as Record<string, string>)?.sprache || "de";
 
   return <WelcomeScreen
     vorname={sub.vorname || ""}
-    loginEmail={sub.account_email}
+    loginEmail={sub.account_email || ""}
     password={sub.account_password || ""}
+    contactEmail={sub.email || ""}
+    accountReady={Boolean(sub.account_email)}
+    fallbackMode={sub.account_email ? "none" : "account_pending"}
     lang={lang as "de"|"en"|"es"|"ru"|"tr"}
   />;
 }

@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 
-type Props = { vorname: string; loginEmail: string; password: string; lang?: string };
+type FallbackMode = "none" | "account_pending" | "missing_submission";
+type Props = {
+  vorname: string;
+  loginEmail: string;
+  password: string;
+  lang?: string;
+  accountReady?: boolean;
+  contactEmail?: string;
+  fallbackMode?: FallbackMode;
+};
 
 const T: Record<string, Record<string, string | string[]>> = {
   de: {
@@ -40,6 +49,12 @@ const T: Record<string, Record<string, string | string[]>> = {
     success: "Dein Account ist erstellt!",
     copy: "Kopieren",
     copied: "Kopiert!",
+    pendingTitle: "Dein Zugang wird gerade vorbereitet",
+    pendingText: "Dein Anamnesebogen ist sicher eingegangen. Der App-Zugang ist für diesen Fall noch nicht vollständig erzeugt. Die Praxis kann den Zugang direkt für dich freischalten.",
+    pendingHint: "Bitte melde dich kurz bei der Praxis, falls du die App sofort nutzen möchtest.",
+    missingTitle: "Diese Seite ist nicht mehr verfügbar",
+    missingText: "Der aufgerufene Link konnte keiner aktiven Willkommensseite zugeordnet werden.",
+    loginFallback: "Zum Patienten-Login",
   },
   en: {
     thanks: "Thank you",
@@ -76,6 +91,12 @@ const T: Record<string, Record<string, string | string[]>> = {
     success: "Your account is ready!",
     copy: "Copy",
     copied: "Copied!",
+    pendingTitle: "Your access is being prepared",
+    pendingText: "Your medical history form was received successfully. For this case, the app account has not been fully created yet. The practice can activate it directly for you.",
+    pendingHint: "Please contact the practice if you need immediate access.",
+    missingTitle: "This page is no longer available",
+    missingText: "The requested link could not be matched to an active welcome page.",
+    loginFallback: "Go to patient login",
   },
   es: {
     thanks: "Gracias",
@@ -112,6 +133,12 @@ const T: Record<string, Record<string, string | string[]>> = {
     success: "Tu cuenta está lista!",
     copy: "Copiar",
     copied: "¡Copiado!",
+    pendingTitle: "Tu acceso se está preparando",
+    pendingText: "Tu formulario se recibió correctamente. En este caso, la cuenta de la app aún no se ha creado por completo.",
+    pendingHint: "Por favor contacta con la consulta si necesitas acceso inmediato.",
+    missingTitle: "Esta página ya no está disponible",
+    missingText: "No se pudo asociar el enlace solicitado a una página de bienvenida activa.",
+    loginFallback: "Ir al acceso del paciente",
   },
   ru: {
     thanks: "Спасибо",
@@ -148,6 +175,12 @@ const T: Record<string, Record<string, string | string[]>> = {
     success: "Аккаунт готов!",
     copy: "Копировать",
     copied: "Скопировано!",
+    pendingTitle: "Твой доступ готовится",
+    pendingText: "Твоя анкета получена. В этом случае доступ в приложение ещё не создан полностью.",
+    pendingHint: "Если доступ нужен сразу, пожалуйста, свяжись с клиникой.",
+    missingTitle: "Эта страница больше недоступна",
+    missingText: "Не удалось связать эту ссылку с активной приветственной страницей.",
+    loginFallback: "К входу пациента",
   },
   tr: {
     thanks: "Teşekkürler",
@@ -184,10 +217,24 @@ const T: Record<string, Record<string, string | string[]>> = {
     success: "Hesabın hazır!",
     copy: "Kopyala",
     copied: "Kopyalandı!",
+    pendingTitle: "Erişimin hazırlanıyor",
+    pendingText: "Formun başarıyla ulaştı. Bu durumda uygulama hesabın henüz tamamen oluşturulmadı.",
+    pendingHint: "Hemen erişim gerekiyorsa lütfen muayenehane ile iletişime geç.",
+    missingTitle: "Bu sayfa artık mevcut değil",
+    missingText: "Açılan bağlantı aktif bir karşılama sayfasıyla eşleştirilemedi.",
+    loginFallback: "Hasta girişine git",
   },
 };
 
-export default function WelcomeScreen({ vorname, loginEmail, password, lang: initLang = "de" }: Props) {
+export default function WelcomeScreen({
+  vorname,
+  loginEmail,
+  password,
+  lang: initLang = "de",
+  accountReady = true,
+  contactEmail = "",
+  fallbackMode = "none",
+}: Props) {
   const [lang, setLang] = useState(initLang);
   const [pwVisible, setPwVisible] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -235,9 +282,38 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
               <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(145deg,#5fd0a8,#0f8a72)", display: "grid", placeItems: "center", boxShadow: "0 0 16px rgba(35,176,143,0.4)" }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><path d="M20 6L9 17l-5-5" /></svg>
               </div>
-              <span style={{ fontFamily: "'Fraunces',serif", fontSize: 17, fontWeight: 600, color: "#0f8a72" }}>{s("success")}</span>
+              <span style={{ fontFamily: "'Fraunces',serif", fontSize: 17, fontWeight: 600, color: "#0f8a72" }}>
+                {fallbackMode === "account_pending" ? s("pendingTitle") : fallbackMode === "missing_submission" ? s("missingTitle") : s("success")}
+              </span>
             </div>
           </div>
+          {fallbackMode !== "none" && (
+            <>
+              {divider}
+              <div style={{ background: "#fff", border: "1.5px solid rgba(29,42,39,0.16)", borderRadius: 14, padding: 22, marginBottom: 20 }}>
+                <div style={{ fontSize: 15, color: "#1d2a27", lineHeight: 1.65, marginBottom: 12 }}>
+                  {fallbackMode === "account_pending" ? s("pendingText") : s("missingText")}
+                </div>
+                {fallbackMode === "account_pending" && (
+                  <>
+                    <div style={{ fontSize: 13, color: "#5f6d67", lineHeight: 1.6, marginBottom: 12 }}>
+                      {s("pendingHint")}
+                    </div>
+                    {contactEmail ? (
+                      <div style={{ fontSize: 13, color: "#5f6d67", lineHeight: 1.6 }}>
+                        Kontakt-E-Mail aus dem Bogen: <strong style={{ color: "#1d2a27" }}>{contactEmail}</strong>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+                <div style={{ marginTop: 16 }}>
+                  <a href={appUrl} style={{ display: "inline-block", textDecoration: "none", fontFamily: "inherit", fontSize: 14, fontWeight: 700, borderRadius: 12, padding: "12px 18px", background: "linear-gradient(150deg,#e6b347,#c2922f)", color: "#3a2c08", boxShadow: "0 12px 30px -10px #c2922f" }}>{s("loginFallback")}</a>
+                </div>
+              </div>
+            </>
+          )}
+          {!accountReady ? null : (
+            <>
           {divider}
           <div style={{ fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: "#0f8a72", fontWeight: 600, margin: "0 0 16px" }}>{s("next")}</div>
           <div style={{ borderRadius: 16, padding: 24, marginBottom: 24, background: "linear-gradient(160deg,rgba(15,138,114,0.08),rgba(95,208,168,0.04),transparent)", border: "1.5px solid rgba(35,176,143,0.25)", boxShadow: "0 0 20px rgba(35,176,143,0.2)", textAlign: "left" }}>
@@ -315,6 +391,8 @@ export default function WelcomeScreen({ vorname, loginEmail, password, lang: ini
             </div>
           )}
           <div style={{ textAlign: "center", fontSize: 12.5, color: "#5f6d67", marginTop: 20, padding: 12, border: "1px solid rgba(29,42,39,0.10)", borderRadius: 11, background: "#fff" }}>{s("appNote")}</div>
+            </>
+          )}
           <div style={{ textAlign: "center", marginTop: 24, fontSize: 12.5, color: "#5f6d67" }}>KFO-Praxis Dr. Maria Elena Schubert, Leipzig</div>
         </div>
       </div>
