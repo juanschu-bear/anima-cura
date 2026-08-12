@@ -1,321 +1,387 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/hooks/useAppStore";
 
-type CapabilityCard = {
+type LaneId = "eingang" | "review" | "ausrollen";
+type SignalType = "fehlantwort" | "feature-wunsch" | "navigationsproblem" | "wissensluecke";
+type Priority = "hoch" | "mittel" | "niedrig";
+
+type OpsItem = {
+  id: string;
+  lane: LaneId;
   title: string;
+  type: SignalType;
+  priority: Priority;
+  source: string;
+  area: string;
   summary: string;
-  href: string;
-  cta: string;
-  tone: string;
+  ask: string;
+  fix: string;
+  href?: string;
+  hrefLabel?: string;
+  patient?: string;
 };
 
-type FrictionItem = {
-  title: string;
-  why: string;
-  nextStep: string;
-  href: string;
-  cta: string;
-  status: "offen" | "in arbeit" | "konzept";
-};
-
-const CAPABILITIES: CapabilityCard[] = [
+const OPS_ITEMS: OpsItem[] = [
   {
-    title: "QR-Zahlungen sauber erklären",
-    summary: "iCura soll den realen Ablauf über Kasse, Einnahme, Patient, Betrag und QR-Überweisung erklären.",
+    id: "qr-payment-explanation",
+    lane: "review",
+    title: "QR-Zahlung wurde falsch erklärt",
+    type: "fehlantwort",
+    priority: "hoch",
+    source: "Praxisfeedback",
+    area: "Kasse / Zahlungen",
+    summary: "iCura hat gesagt, QR-Zahlungen stünden nicht zur Verfügung, obwohl der echte Flow über Kasse existiert.",
+    ask: "Wie kann ich QR-Zahlungen für Patienten erstellen?",
+    fix: "Produktwissen, Voice-Hilfe und Navigation müssen auf den echten Kassen-Flow zeigen.",
     href: "/kasse",
-    cta: "Zu Kasse",
-    tone: "#4ade80",
+    hrefLabel: "Kasse öffnen",
   },
   {
-    title: "Patienten und Zahlungen einordnen",
-    summary: "iCura soll Patientensuche, Geldbewegungen und Zuordnungen unterscheiden können, ohne Zahlungen und Forderungen zu vermischen.",
+    id: "open-patient-via-voice",
+    lane: "review",
+    title: "Patient direkt öffnen per Sprache",
+    type: "navigationsproblem",
+    priority: "hoch",
+    source: "Dr. Schubert im Alltag",
+    area: "Patientensuche",
+    summary: "Wenn die Praxis sagt ‚Zeig mir folgenden Patienten‘, muss iCura nicht nur antworten, sondern direkt in den richtigen Patientenkontext führen.",
+    ask: "Zeig mir folgenden Patienten.",
+    fix: "Trefferliste, Auswahl und direkte Navigation zum Patientenprofil ergänzen.",
+    href: "/patienten",
+    hrefLabel: "Patienten öffnen",
+  },
+  {
+    id: "payments-vs-open-items",
+    lane: "eingang",
+    title: "Zahlungen, Umsatz und offene Posten werden verwechselt",
+    type: "wissensluecke",
+    priority: "hoch",
+    source: "Mehrfaches Praxisfeedback",
+    area: "Quartal / Offene Posten / Zahlungen",
+    summary: "Für die Praxis muss klar sein, ob iCura gerade über Geldbewegungen, Umsatz oder Forderungen spricht.",
+    ask: "Wie viel Umsatz haben wir dieses Quartal gemacht und wie viel ist noch offen?",
+    fix: "Intent-Trennung im Finanzbereich und präzise Weiterleitung in Quartal, Zahlungen oder Offene Posten.",
+    href: "/quartal",
+    hrefLabel: "Quartalsbericht öffnen",
+  },
+  {
+    id: "unknowns-to-inbox",
+    lane: "eingang",
+    title: "Unbekannte Fragen landen noch nirgends",
+    type: "feature-wunsch",
+    priority: "mittel",
+    source: "Produktidee",
+    area: "iCura Core",
+    summary: "Wenn iCura etwas nicht weiß, brauchen wir eine echte Sammelstelle statt einer improvisierten Antwort.",
+    ask: "Das wäre cool, wenn du mir bei X weiterhelfen könntest.",
+    fix: "Automatische Feedback-Inbox für unbekannte Fragen, Fehlantworten und neue Fähigkeitswünsche bauen.",
+  },
+  {
+    id: "animasign-state-language",
+    lane: "ausrollen",
+    title: "AnimaSign-Status sprachlich trennen",
+    type: "wissensluecke",
+    priority: "mittel",
+    source: "Bereits identifiziert",
+    area: "AnimaSign",
+    summary: "Signatur offen, PDF offen, Ivoris-Sync offen und manuelle Prüfung dürfen nicht vermischt werden.",
+    ask: "Warum steht hier PDF noch nicht da oder Ivoris manuell?",
+    fix: "Statussprache und Hilfetexte im Assistenten sauber getrennt halten.",
+    href: "/animasign",
+    hrefLabel: "AnimaSign öffnen",
+  },
+  {
+    id: "payment-context-per-patient",
+    lane: "ausrollen",
+    title: "Patientenzahlungen operativ beantworten",
+    type: "feature-wunsch",
+    priority: "mittel",
+    source: "Bereits umgesetzt in Teilen",
+    area: "Patienten / Zahlungen",
+    summary: "iCura soll letzte Geldbewegungen, offene Posten und wartende Zahlungen pro Patient sauber benennen können.",
+    ask: "Was ist bei diesem Patienten finanziell offen oder schon bezahlt?",
+    fix: "Tooling mit Patientensnapshot und Bewegungslogik weiter nutzen und sichtbar machen.",
     href: "/zahlungen",
-    cta: "Zu Zahlungen",
-    tone: "#fbbf24",
+    hrefLabel: "Zahlungen öffnen",
+    patient: "patientenspezifisch",
   },
-  {
-    title: "Offene Posten von Umsatz trennen",
-    summary: "Fragen zu Quartalsumsatz, offenen Forderungen und historischen Beständen müssen in getrennte Bereiche geführt werden.",
-    href: "/offene-posten",
-    cta: "Zu Offene Posten",
+];
+
+const LANE_META: Record<
+  LaneId,
+  { title: string; subtitle: string; tone: string }
+> = {
+  eingang: {
+    title: "1. Eingang",
+    subtitle: "Neue Fragen, Friktionen, Wünsche",
     tone: "#60a5fa",
   },
-  {
-    title: "AnimaSign-Status präzise benennen",
-    summary: "Signatur offen, PDF offen, Ivoris-Sync offen und manuelle Prüfung müssen klar unterscheidbar bleiben.",
-    href: "/animasign",
-    cta: "Zu AnimaSign",
-    tone: "#a78bfa",
+  review: {
+    title: "2. Review",
+    subtitle: "Was wir als Nächstes lösen müssen",
+    tone: "#fbbf24",
   },
-];
-
-const FRICTIONS: FrictionItem[] = [
-  {
-    title: "Patient direkt per Sprache öffnen",
-    why: "Frau Dr. Schubert hat nach einzelnen Patienten gefragt und iCura konnte den Patienten nicht zuverlässig direkt öffnen oder führen.",
-    nextStep: "Voice-Antwort mit echter Navigation koppeln und Treffer mit Name, Status und Zielbereich zurückgeben.",
-    href: "/patienten",
-    cta: "Patienten prüfen",
-    status: "in arbeit",
-  },
-  {
-    title: "QR-Zahlungen wurden falsch erklärt",
-    why: "iCura hat behauptet, QR-Zahlungen stünden nicht zur Verfügung, obwohl der echte Ablauf über Kasse existiert.",
-    nextStep: "Produktwissen, Tooling und Hilfetexte nur noch an den real vorhandenen Schritten ausrichten.",
-    href: "/kasse",
-    cta: "Kassenfluss prüfen",
-    status: "in arbeit",
-  },
-  {
-    title: "Umsatz, Zahlungen und offene Posten nicht vermischen",
-    why: "Die Praxis braucht selbsterklärende Trennung zwischen Quartalsumsatz, Transaktionen und offenen Forderungen.",
-    nextStep: "iCura muss bei jeder Finanzfrage zuerst den Fragetyp erkennen und den Nutzer in den richtigen Bereich führen.",
-    href: "/quartal",
-    cta: "Quartal ansehen",
-    status: "offen",
-  },
-  {
-    title: "Unknowns als Lernsignal statt als falsche Antwort",
-    why: "Wenn iCura etwas nicht weiß, darf keine erfundene Sicherheit entstehen.",
-    nextStep: "Eine echte Review-Inbox für ungeklärte Fragen, Fehlantworten und Wunschfunktionen aufbauen.",
-    href: "/automatisierungen",
-    cta: "Ausbau planen",
-    status: "konzept",
-  },
-];
-
-const PIPELINE = [
-  {
-    title: "1. Einsammeln",
-    text: "Noch nicht live verdrahtet: iCura soll echte Fehlfragen, unbekannte Themen und Nutzerwünsche sauber protokollieren.",
-  },
-  {
-    title: "2. Reviewen",
-    text: "Diese Fälle sollen in einer Inbox priorisiert werden: Was war die Frage, warum war die Antwort unklar und welcher Bereich ist betroffen?",
-  },
-  {
+  ausrollen: {
     title: "3. Ausrollen",
-    text: "Nach dem Review werden Wissen, Tools oder Navigation erweitert, damit dieselbe Frage später korrekt und operativ beantwortet wird.",
+    subtitle: "Bereits definierte Verbesserungen",
+    tone: "#4ade80",
   },
-];
+};
+
+const TYPE_LABEL: Record<SignalType, string> = {
+  fehlantwort: "Fehlantwort",
+  "feature-wunsch": "Feature-Wunsch",
+  navigationsproblem: "Navigation",
+  wissensluecke: "Wissenslücke",
+};
+
+const PRIORITY_TONE: Record<Priority, string> = {
+  hoch: "#f87171",
+  mittel: "#fbbf24",
+  niedrig: "#94a3b8",
+};
 
 export default function ICuraOpsPage() {
   const { theme } = useAppStore();
   const dk = theme === "dark";
+  const [activeId, setActiveId] = useState<string>(OPS_ITEMS[0]?.id ?? "");
 
   const fg = dk ? "#edf2f7" : "#162033";
   const muted = dk ? "#94a3b8" : "#66758d";
   const border = dk ? "rgba(255,255,255,0.08)" : "#e6ebf3";
   const card = dk ? "rgba(11,16,28,0.94)" : "#ffffff";
   const panel = dk ? "linear-gradient(135deg, rgba(7,11,20,0.98), rgba(16,18,34,0.98))" : "linear-gradient(135deg, #ffffff, #f7fafc)";
-  const green = "#4ade80";
-  const yellow = "#fbbf24";
   const purple = "#a78bfa";
-  const red = "#f87171";
 
-  const statusTone = (status: FrictionItem["status"]) =>
-    status === "in arbeit" ? green : status === "offen" ? yellow : purple;
-
-  const statusLabel = (status: FrictionItem["status"]) =>
-    status === "in arbeit" ? "in Arbeit" : status === "offen" ? "offen" : "Konzept";
+  const activeItem = useMemo(
+    () => OPS_ITEMS.find((item) => item.id === activeId) ?? OPS_ITEMS[0],
+    [activeId],
+  );
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1380, margin: "0 auto" }}>
       <section
         style={{
           background: panel,
           border: `1px solid ${border}`,
           borderRadius: 24,
           padding: 28,
-          marginBottom: 20,
+          marginBottom: 18,
           boxShadow: dk ? "0 24px 70px rgba(0,0,0,0.28)" : "0 18px 50px rgba(15,23,42,0.08)",
         }}
       >
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.8, textTransform: "uppercase", color: purple, marginBottom: 12 }}>
-          Eigener Bereich für iCura
+          iCura Product Ops
         </div>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, lineHeight: 1.02, letterSpacing: -0.8, color: fg, margin: 0 }}>
-          iCura Ops
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, lineHeight: 1.02, letterSpacing: -0.8, color: fg, margin: 0 }}>
+          Inbox, Review, Ausrollen
         </h1>
-        <p style={{ fontSize: 15, lineHeight: 1.7, color: muted, maxWidth: 880, margin: "14px 0 0" }}>
-          Hier geht es nur um iCura selbst: Fähigkeiten, Friktionspunkte, Fehlantworten und den Ausbau des operativen Assistenten.
-          Das ist bewusst getrennt von Revenue Intelligence, damit Produktverbesserung und Finanzanalyse nicht miteinander vermischt werden.
+        <p style={{ fontSize: 15, lineHeight: 1.7, color: muted, maxWidth: 980, margin: "14px 0 0" }}>
+          Das hier ist kein Revenue-Board und auch keine bloße Instruction-Seite. Es ist das Arbeitsinterface dafür, wie iCura besser wird:
+          neue Friktionen kommen rein, werden priorisiert und anschließend als konkrete Produktverbesserung ausgerollt.
         </p>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginBottom: 20 }}>
-        {CAPABILITIES.map((item) => (
-          <article
-            key={item.title}
-            style={{
-              background: card,
-              border: `1px solid ${border}`,
-              borderRadius: 18,
-              padding: 20,
-            }}
-          >
-            <div style={{ width: 42, height: 5, borderRadius: 999, background: item.tone, marginBottom: 14 }} />
-            <h2 style={{ fontSize: 17, lineHeight: 1.2, color: fg, margin: 0 }}>{item.title}</h2>
-            <p style={{ fontSize: 13, lineHeight: 1.65, color: muted, margin: "10px 0 16px" }}>{item.summary}</p>
+      <section style={{ display: "grid", gridTemplateColumns: "1.5fr 0.9fr", gap: 16, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+          {(["eingang", "review", "ausrollen"] as LaneId[]).map((lane) => {
+            const meta = LANE_META[lane];
+            const items = OPS_ITEMS.filter((item) => item.lane === lane);
+            return (
+              <div
+                key={lane}
+                style={{
+                  background: card,
+                  border: `1px solid ${border}`,
+                  borderRadius: 20,
+                  padding: 16,
+                  minHeight: 720,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: fg }}>{meta.title}</div>
+                    <div style={{ fontSize: 11.5, color: muted, marginTop: 4 }}>{meta.subtitle}</div>
+                  </div>
+                  <div
+                    style={{
+                      minWidth: 30,
+                      height: 30,
+                      borderRadius: 999,
+                      display: "grid",
+                      placeItems: "center",
+                      background: `${meta.tone}18`,
+                      border: `1px solid ${meta.tone}33`,
+                      color: meta.tone,
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {items.length}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  {items.map((item) => {
+                    const isActive = activeItem?.id === item.id;
+                    const tone = PRIORITY_TONE[item.priority];
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setActiveId(item.id)}
+                        style={{
+                          textAlign: "left",
+                          width: "100%",
+                          border: `1px solid ${isActive ? `${tone}55` : border}`,
+                          background: isActive ? `${tone}10` : dk ? "rgba(255,255,255,0.02)" : "#fbfcfe",
+                          borderRadius: 16,
+                          padding: 14,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              letterSpacing: 1.1,
+                              textTransform: "uppercase",
+                              color: tone,
+                            }}
+                          >
+                            {TYPE_LABEL[item.type]}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              letterSpacing: 1.1,
+                              textTransform: "uppercase",
+                              color: tone,
+                            }}
+                          >
+                            {item.priority}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 15, lineHeight: 1.25, fontWeight: 700, color: fg }}>{item.title}</div>
+                        <div style={{ fontSize: 11.5, color: muted, marginTop: 8 }}>{item.area}</div>
+                        <div style={{ fontSize: 12.5, lineHeight: 1.55, color: muted, marginTop: 10 }}>{item.summary}</div>
+                        <div style={{ fontSize: 11.5, color: fg, marginTop: 12 }}>
+                          <strong>Quelle:</strong> {item.source}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <aside
+          style={{
+            background: card,
+            border: `1px solid ${border}`,
+            borderRadius: 20,
+            padding: 20,
+            position: "sticky",
+            top: 24,
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: purple, marginBottom: 12 }}>
+            Detailansicht
+          </div>
+          <h2 style={{ fontSize: 24, lineHeight: 1.08, color: fg, margin: 0 }}>{activeItem.title}</h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14, marginBottom: 18 }}>
+            <span style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${border}`, color: fg, fontSize: 11, fontWeight: 700 }}>
+              {TYPE_LABEL[activeItem.type]}
+            </span>
+            <span style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${PRIORITY_TONE[activeItem.priority]}55`, color: PRIORITY_TONE[activeItem.priority], fontSize: 11, fontWeight: 700 }}>
+              Priorität {activeItem.priority}
+            </span>
+            <span style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${border}`, color: muted, fontSize: 11, fontWeight: 700 }}>
+              {activeItem.area}
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ border: `1px solid ${border}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: muted, marginBottom: 8 }}>
+                Problem
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.65, color: fg }}>{activeItem.summary}</div>
+            </div>
+
+            <div style={{ border: `1px solid ${border}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: muted, marginBottom: 8 }}>
+                Beispiel aus der Praxis
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.65, color: fg }}>{activeItem.ask}</div>
+            </div>
+
+            <div style={{ border: `1px solid ${border}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: muted, marginBottom: 8 }}>
+                Was wir daraus bauen
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.65, color: fg }}>{activeItem.fix}</div>
+            </div>
+
+            <div style={{ border: `1px solid ${border}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: muted, marginBottom: 8 }}>
+                Kontext
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.65, color: muted }}>
+                <div><strong style={{ color: fg }}>Quelle:</strong> {activeItem.source}</div>
+                <div><strong style={{ color: fg }}>Lane:</strong> {LANE_META[activeItem.lane].title}</div>
+                {activeItem.patient ? <div><strong style={{ color: fg }}>Patient:</strong> {activeItem.patient}</div> : null}
+              </div>
+            </div>
+          </div>
+
+          {activeItem.href ? (
             <Link
-              href={item.href}
+              href={activeItem.href}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "10px 14px",
+                marginTop: 18,
+                padding: "12px 16px",
                 borderRadius: 999,
-                border: `1px solid ${item.tone}55`,
-                background: `${item.tone}14`,
-                color: item.tone,
+                border: `1px solid ${purple}55`,
+                background: `${purple}14`,
+                color: purple,
                 fontSize: 12,
                 fontWeight: 800,
                 textDecoration: "none",
               }}
             >
-              {item.cta}
+              {activeItem.hrefLabel || "Öffnen"}
             </Link>
-          </article>
-        ))}
-      </section>
+          ) : null}
 
-      <section style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 16 }}>
-        <div
-          style={{
-            background: card,
-            border: `1px solid ${border}`,
-            borderRadius: 20,
-            padding: 22,
-          }}
-        >
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: green, marginBottom: 12 }}>
-            Konkrete Friktionspunkte
+          <div
+            style={{
+              marginTop: 18,
+              padding: 14,
+              borderRadius: 14,
+              background: dk ? "rgba(96,165,250,0.08)" : "#f3f8ff",
+              border: `1px solid ${dk ? "rgba(96,165,250,0.18)" : "#d9eaff"}`,
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "#60a5fa", marginBottom: 8 }}>
+              Wichtig
+            </div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.65, color: muted }}>
+              Das ist jetzt absichtlich als echtes Arbeitsboard gebaut. Also eher: Welcher Fall kam rein, warum ist er wichtig, in welcher Stufe steht er und was bauen wir daraus.
+            </div>
           </div>
-          <h2 style={{ fontSize: 24, lineHeight: 1.1, color: fg, margin: 0 }}>Was iCura aktuell noch besser können muss</h2>
-          <p style={{ fontSize: 13, lineHeight: 1.65, color: muted, margin: "10px 0 18px" }}>
-            Keine erfundenen Live-Signale. Nur konkrete bekannte Baustellen aus dem echten Produktkontext.
-          </p>
-
-          <div style={{ display: "grid", gap: 12 }}>
-            {FRICTIONS.map((item) => {
-              const tone = statusTone(item.status);
-              return (
-                <article
-                  key={item.title}
-                  style={{
-                    border: `1px solid ${tone}30`,
-                    background: `${tone}10`,
-                    borderRadius: 16,
-                    padding: 16,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                    <h3 style={{ fontSize: 15, lineHeight: 1.25, color: fg, margin: 0 }}>{item.title}</h3>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        letterSpacing: 1.2,
-                        textTransform: "uppercase",
-                        color: tone,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {statusLabel(item.status)}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 12.5, lineHeight: 1.6, color: muted, margin: "10px 0 8px" }}>
-                    <strong style={{ color: fg }}>Warum wichtig:</strong> {item.why}
-                  </p>
-                  <p style={{ fontSize: 12.5, lineHeight: 1.6, color: muted, margin: "0 0 14px" }}>
-                    <strong style={{ color: fg }}>Nächster Schritt:</strong> {item.nextStep}
-                  </p>
-                  <Link
-                    href={item.href}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "9px 13px",
-                      borderRadius: 999,
-                      border: `1px solid ${tone}44`,
-                      background: "transparent",
-                      color: tone,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      textDecoration: "none",
-                    }}
-                  >
-                    {item.cta}
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 16 }}>
-          <section
-            style={{
-              background: card,
-              border: `1px solid ${border}`,
-              borderRadius: 20,
-              padding: 22,
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: yellow, marginBottom: 12 }}>
-              Ehrlicher Status
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: muted }}>
-              <strong style={{ color: fg }}>Noch nicht live vorhanden:</strong> eine echte automatische Feedback-Inbox, die unbekannte Voice-Fragen,
-              Fehlantworten und Wunschfunktionen selbstständig sammelt. Genau das ist der nächste große Ausbau für iCura.
-            </div>
-          </section>
-
-          <section
-            style={{
-              background: card,
-              border: `1px solid ${border}`,
-              borderRadius: 20,
-              padding: 22,
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: red, marginBottom: 12 }}>
-              Self-Improvement Pipeline
-            </div>
-            <div style={{ display: "grid", gap: 12 }}>
-              {PIPELINE.map((step, index) => (
-                <div key={step.title} style={{ border: `1px solid ${border}`, borderRadius: 14, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: fg, marginBottom: 6 }}>
-                    {step.title}
-                  </div>
-                  <div style={{ fontSize: 12.5, lineHeight: 1.65, color: muted }}>{step.text}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section
-            style={{
-              background: dk ? "rgba(74,222,128,0.08)" : "#f3fbf5",
-              border: `1px solid ${dk ? "rgba(74,222,128,0.16)" : "#d8f2df"}`,
-              borderRadius: 20,
-              padding: 22,
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: green, marginBottom: 12 }}>
-              Schnellzugriffe
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <Link href="/zahlungen" style={{ textDecoration: "none", padding: "10px 14px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${border}`, color: fg, fontSize: 12, fontWeight: 800 }}>Zahlungen öffnen</Link>
-              <Link href="/patienten" style={{ textDecoration: "none", padding: "10px 14px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${border}`, color: fg, fontSize: 12, fontWeight: 800 }}>Patienten öffnen</Link>
-              <Link href="/kasse" style={{ textDecoration: "none", padding: "10px 14px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${border}`, color: fg, fontSize: 12, fontWeight: 800 }}>Kasse öffnen</Link>
-              <Link href="/automatisierungen" style={{ textDecoration: "none", padding: "10px 14px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${border}`, color: fg, fontSize: 12, fontWeight: 800 }}>Automatisierungen öffnen</Link>
-            </div>
-          </section>
-        </div>
+        </aside>
       </section>
     </div>
   );
