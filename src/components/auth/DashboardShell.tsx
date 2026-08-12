@@ -77,6 +77,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
   {
     key: "navGroup.system",
     items: [
+      { href: "/icura-ops", icon: Brain, key: "nav.icuraOps" },
       { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
       { href: "/import", icon: Upload, key: "nav.import" },
       { href: "/einstellungen", icon: Settings, key: "nav.settings" },

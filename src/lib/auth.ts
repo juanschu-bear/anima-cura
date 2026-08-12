@@ -56,6 +56,7 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/rechnungen", roles: ["admin", "verwaltung"] },
   { path: "/offene-posten", roles: ["admin", "verwaltung"] },
   { path: "/intelligence", roles: ["admin", "verwaltung"] },
+  { path: "/icura-ops", roles: ["admin", "verwaltung"] },
   { path: "/nachrichten", roles: ["admin", "verwaltung"] },
   { path: "/automatisierungen", roles: ["admin", "verwaltung"] },
   { path: "/import", roles: ["admin", "verwaltung"] },
@@ -140,4 +141,3 @@ export function getDefaultDashboardPath(role: AppRole): string {
 export function isReadOnlyRole(role: AppRole): boolean {
   return role === "lesezugriff";
 }
-
