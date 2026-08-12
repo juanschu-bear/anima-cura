@@ -22,6 +22,12 @@ Sein Job:
 ### Zahlungen
 - zeigt einzelne Transaktionen, Zuordnungen, offene Treffer und Prueffaelle
 - wichtig: hier geht es um Bankbewegungen und Zahlungsabgleich, nicht um die Gesamthistorie offener Forderungen
+- iCura soll bei Zahlungsfragen unterscheiden zwischen:
+  - `Kasse`: direkt am Tresen erfasste Einnahmen oder Ausgaben
+  - `AnimaPay · QR`: bestaetigte Bankzahlung, die aus einem vorher erzeugten QR stammt
+  - `Bank`: normale zugeordnete Ueberweisung
+  - `wartet auf Geldeingang`: QR wurde erzeugt oder erfasst, aber die echte Ueberweisung ist noch nicht eingetroffen
+  - `bestätigt`: Bankbewegung ist da und zugeordnet
 
 ### Kasse
 - hier werden Praxis-Einnahmen und Ausgaben direkt am Tresen erfasst

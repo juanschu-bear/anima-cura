@@ -258,7 +258,7 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
     return { found: false, reason: "Kein Patient gefunden." };
   }
 
-  const [{ data: patient }, { data: offene }, { data: plan }, { data: raten }] = await Promise.all([
+  const [{ data: patient }, { data: offene }, { data: plan }, { data: raten }, { data: kasse }, { data: bank }] = await Promise.all([
     db
       .from("patients")
       .select("id, vorname, nachname, behandlung, behandlung_status, ivoris_nummer")
@@ -283,6 +283,19 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
       .eq("patient_id", patientId)
       .order("faellig_am", { ascending: false })
       .limit(12),
+    db
+      .from("kassen_zahlungen")
+      .select("id, betrag, zahlart, zweck, kassen_datum, transaktion_id, beleg_nr")
+      .eq("patient_id", patientId)
+      .order("kassen_datum", { ascending: false })
+      .limit(12),
+    db
+      .from("transaktionen")
+      .select("id, betrag, datum, verwendungszweck, matching_status, matching_details")
+      .eq("matched_patient_id", patientId)
+      .in("matching_status", ["auto", "manuell"])
+      .order("datum", { ascending: false })
+      .limit(12),
   ]);
 
   if (!patient || isBlockedPatientRecord(patient)) {
@@ -296,6 +309,53 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
   const teilbezahltCount = openItems.filter((item) => item.status === "teilbezahlt").length;
   const paidInstallments = (raten ?? []).filter((rate) => rate.status === "bezahlt").length;
   const openInstallments = (raten ?? []).filter((rate) => rate.status !== "bezahlt").length;
+  const geldbewegungen: Array<{
+    datum: string | null;
+    quelle: string;
+    zweck: string;
+    betrag: number;
+    status: string;
+    beleg: string | null;
+  }> = [];
+
+  for (const entry of kasse ?? []) {
+    if (entry.zahlart === "qr_ueberweisung" && entry.transaktion_id) continue;
+    geldbewegungen.push({
+      datum: entry.kassen_datum ?? null,
+      quelle:
+        entry.zahlart === "qr_ueberweisung"
+          ? "Kasse · QR-Überweisung"
+          : entry.zahlart === "girocard"
+          ? "Kasse · Girocard"
+          : entry.zahlart === "kreditkarte"
+          ? "Kasse · Kreditkarte"
+          : entry.zahlart === "bar"
+          ? "Kasse · Bar"
+          : `Kasse · ${entry.zahlart}`,
+      zweck: entry.zweck || "",
+      betrag: Number(entry.betrag || 0),
+      status: entry.zahlart === "qr_ueberweisung" && !entry.transaktion_id ? "wartet auf Geldeingang" : "erhalten",
+      beleg: entry.beleg_nr || null,
+    });
+  }
+
+  for (const entry of bank ?? []) {
+    geldbewegungen.push({
+      datum: entry.datum ?? null,
+      quelle:
+        entry.matching_details?.methode === "animapay_kasse"
+          ? "AnimaPay · QR"
+          : entry.matching_details?.methode === "animapay_aufladung"
+          ? "AnimaPay · Aufladung"
+          : "Bank",
+      zweck: entry.verwendungszweck || "",
+      betrag: Number(entry.betrag || 0),
+      status: "bestätigt",
+      beleg: null,
+    });
+  }
+
+  geldbewegungen.sort((a, b) => String(b.datum ?? "").localeCompare(String(a.datum ?? "")));
 
   return {
     found: true,
@@ -333,6 +393,12 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
           offen_count: openInstallments,
         }
       : null,
+    zahlungen: {
+      count: geldbewegungen.length,
+      latest: geldbewegungen.slice(0, 6),
+      wartend_qr_count: geldbewegungen.filter((entry) => entry.status === "wartet auf Geldeingang").length,
+      bestaetigt_count: geldbewegungen.filter((entry) => entry.status === "bestätigt" || entry.status === "erhalten").length,
+    },
   };
 }
 
