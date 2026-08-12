@@ -15,7 +15,7 @@ function praxisPassTokenGueltig(token: string | null): boolean {
   return !!erlaubt && !!token && token === erlaubt;
 }
 
-type Opt = { t: string; on?: boolean };
+type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
 type Gruppe = { label: string; req: boolean; type: "single" | "multi"; opts: Opt[] };
 type Struktur = { template: unknown[]; groups: Record<string, Gruppe>; [k: string]: unknown };
 type VorlageRow = {
@@ -28,6 +28,7 @@ type VorlageRow = {
   positionen: unknown;
 };
 type OptRow = {
+  id: string;
   behandlungsart: string;
   termin_typ: string;
   gruppe: string;
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
   // auswahl keep working). Only groups that already exist in the seed get extras.
   const { data: optData } = await supabase
     .from("doku_vorlagen_optionen")
-    .select("behandlungsart, termin_typ, gruppe, text, sort_index")
+    .select("id, behandlungsart, termin_typ, gruppe, text, sort_index")
     .eq("praxis_id", PRAXIS_ID)
     .eq("aktiv", true)
     .order("sort_index", { ascending: true })
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
         if (o.behandlungsart !== v.behandlungsart || o.termin_typ !== v.termin_typ) continue;
         const g = groups[o.gruppe];
         if (!g || !Array.isArray(g.opts)) continue; // group must exist in the seed
-        g.opts.push({ t: o.text });
+        g.opts.push({ t: o.text, id: o.id, quelle: "praxis" });
       }
     }
   }

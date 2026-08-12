@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useThema } from "./ScribeShell";
+import PraxisInboxWidget from "./PraxisInboxWidget";
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
-type Opt = { t: string; on?: boolean };
+type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
 type Gruppe = { label: string; req: boolean; type: "single" | "multi"; opts: Opt[] };
 type TemplateSeg = string | { g: string };
 type Struktur = {
@@ -98,6 +99,66 @@ function anzeigeName(v: Vorlage): string {
 
 function bereinigeZusatztext(wert: string): string {
   return wert.replace(/^\s*ausnahme\s*:?\s*/i, "").trim();
+}
+
+function istPraxisOption(opt: Opt | undefined): boolean {
+  return opt?.quelle === "praxis" && !!opt.id;
+}
+
+function tokenisiereText(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9äöüß]/gi, " ")
+    .split(/\s+/)
+    .map((teil) => teil.trim())
+    .filter((teil) => teil.length >= 4);
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function korrigiereWort(original: string, wortschatz: string[]): string {
+  const kern = original.match(/[A-Za-zÄÖÜäöüß0-9]+/)?.[0];
+  if (!kern || kern.length < 4) return original;
+  const lower = kern.toLowerCase();
+  if (wortschatz.includes(lower)) return original;
+  let kandidat = lower;
+  let distanz = Number.POSITIVE_INFINITY;
+  for (const eintrag of wortschatz) {
+    const diff = Math.abs(eintrag.length - lower.length);
+    if (diff > 2) continue;
+    const wert = levenshtein(lower, eintrag);
+    const limit = lower.length >= 8 ? 2 : 1;
+    if (wert <= limit && wert < distanz) {
+      kandidat = eintrag;
+      distanz = wert;
+    }
+  }
+  if (kandidat === lower) return original;
+  return original.replace(kern, kandidat);
+}
+
+function korrigiereFreitext(input: string, wortschatz: string[]): string {
+  return input
+    .split(/(\s+)/)
+    .map((teil) => (/\s+/.test(teil) ? teil : korrigiereWort(teil, wortschatz)))
+    .join("");
 }
 
 /* Häufige Kombis: eine Sitzung, mehrere Leistungen (Praxis-Begriffe) */
@@ -306,6 +367,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [leer, setLeer] = useState<Record<string, boolean>>({}); // key `${termin_typ}:${gruppe}` marked "keine Angabe"
   const [schieneAktuell, setSchieneAktuell] = useState("");
   const [schieneNotiz, setSchieneNotiz] = useState("");
+  const [naechsterTermin, setNaechsterTermin] = useState("");
+  const [ntVorschlag, setNtVorschlag] = useState<string | null>(null);
 
   const [sendet, setSendet] = useState(false);
   const [speichert, setSpeichert] = useState(false);
@@ -486,30 +549,16 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const abrechnungTitel = artVorlagen[0]?.struktur.abrechnung_titel ?? "Abrechnung";
   const abrechnungHinweis = artVorlagen[0]?.struktur.abrechnung_hinweis ?? "";
   const animaKopplung = artVorlagen[0]?.struktur.anima_kopplung ?? "";
-
-  const optionLokalAnhaengen = useCallback((m: Vorlage, g: string, text: string) => {
-    setVorlagen((alt) =>
-      alt.map((vorlage) => {
-        if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
-        const gruppe = vorlage.struktur?.groups?.[g];
-        if (!gruppe || !Array.isArray(gruppe.opts)) return vorlage;
-        if (gruppe.opts.some((opt) => opt.t === text)) return vorlage;
-        return {
-          ...vorlage,
-          struktur: {
-            ...vorlage.struktur,
-            groups: {
-              ...vorlage.struktur.groups,
-              [g]: {
-                ...gruppe,
-                opts: [...gruppe.opts, { t: text }],
-              },
-            },
-          },
-        };
-      }),
-    );
-  }, []);
+  const bausteinWortschatz = useMemo(() => {
+    const woerter = new Set<string>();
+    vorlagen.forEach((vorlage) => {
+      tokenisiereText(vorlage.name).forEach((wort) => woerter.add(wort));
+      Object.values(vorlage.struktur?.groups ?? {}).forEach((gruppe) => {
+        gruppe.opts.forEach((opt) => tokenisiereText(opt.t).forEach((wort) => woerter.add(wort)));
+      });
+    });
+    return Array.from(woerter);
+  }, [vorlagen]);
 
   async function eigenenTextSpeichern(m: Vorlage, g: string) {
     const text = optText.trim();
@@ -527,8 +576,30 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         }),
       });
       if (res.ok) {
+        const json = await res.json();
+        const optionId = json?.option?.id as string | undefined;
         const neuerIndex = m.struktur.groups[g]?.opts.length ?? -1;
-        optionLokalAnhaengen(m, g, text);
+        setVorlagen((alt) =>
+          alt.map((vorlage) => {
+            if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
+            const gruppe = vorlage.struktur?.groups?.[g];
+            if (!gruppe || !Array.isArray(gruppe.opts)) return vorlage;
+            if (gruppe.opts.some((opt) => opt.t === text)) return vorlage;
+            return {
+              ...vorlage,
+              struktur: {
+                ...vorlage.struktur,
+                groups: {
+                  ...vorlage.struktur.groups,
+                  [g]: {
+                    ...gruppe,
+                    opts: [...gruppe.opts, { t: text, id: optionId, quelle: "praxis" }],
+                  },
+                },
+              },
+            };
+          }),
+        );
         if (neuerIndex >= 0) {
           bearbeitet();
           setLeer((alt) => ({ ...alt, [`${m.termin_typ}:${g}`]: false }));
@@ -577,6 +648,75 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setLeer({});
     setSchieneAktuell("");
     setSchieneNotiz("");
+    setNaechsterTermin("");
+    setNtVorschlag(null);
+  }
+
+  async function eigenenBausteinLoeschen(m: Vorlage, g: string, opt: Opt, index: number) {
+    if (!opt.id || !istPraxisOption(opt) || optSpeichert) return;
+    if (typeof window !== "undefined" && !window.confirm(`Diesen eigenen Textbaustein wirklich löschen?\n\n${opt.t}`)) return;
+    setOptSpeichert(true);
+    try {
+      const vorher = m.struktur.groups[g]?.opts ?? [];
+      const markierteTexte = (auswahl[m.termin_typ]?.[g] ?? []).map((idx) => vorher[idx]?.t).filter(Boolean);
+      const res = await fetch("/api/doku/optionen", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: opt.id, aktiv: false }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        alert(json?.error ?? "Löschen fehlgeschlagen.");
+        return;
+      }
+      setVorlagen((alt) =>
+        alt.map((vorlage) => {
+          if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
+          const gruppe = vorlage.struktur?.groups?.[g];
+          if (!gruppe) return vorlage;
+          return {
+            ...vorlage,
+            struktur: {
+              ...vorlage.struktur,
+              groups: {
+                ...vorlage.struktur.groups,
+                [g]: {
+                  ...gruppe,
+                  opts: gruppe.opts.filter((_, idx) => idx !== index),
+                },
+              },
+            },
+          };
+        }),
+      );
+      bearbeitet();
+      setAuswahl((alt) => {
+        const neuerOpts = vorher.filter((_, idx) => idx !== index);
+        const neueIndizes = neuerOpts.reduce<number[]>((acc, eintrag, idx) => {
+          if (markierteTexte.includes(eintrag.t)) acc.push(idx);
+          return acc;
+        }, []);
+        return {
+          ...alt,
+          [m.termin_typ]: {
+            ...(alt[m.termin_typ] ?? {}),
+            [g]: neueIndizes,
+          },
+        };
+      });
+    } finally {
+      setOptSpeichert(false);
+    }
+  }
+
+  function ntPruefen(text: string) {
+    const sauber = text.trim();
+    if (!sauber) {
+      setNtVorschlag(null);
+      return;
+    }
+    const korrigiert = korrigiereFreitext(sauber, bausteinWortschatz);
+    setNtVorschlag(korrigiert !== sauber ? korrigiert : null);
   }
 
   /* Defaults je gewähltem Modul setzen */
@@ -741,9 +881,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     text += schieneText;
     const bereinigterZusatz = bereinigeZusatztext(ausnahme);
     if (bereinigterZusatz) text += ` ${bereinigterZusatz}`;
+    if (naechsterTermin.trim()) text += ` NT: ${naechsterTermin.trim()}.`;
     text = text.replace(/\s{2,}/g, " ").trim();
     return { segs, fehlt: Array.from(new Set(fehlt)), text };
-  }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz]);
+  }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz, naechsterTermin]);
 
   /* Positionen über alle Module auflösen */
   const positionen = useMemo(() => {
@@ -791,6 +932,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
+          naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           leistungen: module.map((m) => anzeigeName(m)),
         },
@@ -871,6 +1013,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
+          naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           leistungen: module.map((m) => anzeigeName(m)),
         },
@@ -931,6 +1074,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           schiene_notiz: schieneNotiz,
           schienen_bis: schienenBis,
           bogen,
+          naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           leistungen: module.map((m) => anzeigeName(m)),
         },
@@ -971,8 +1115,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     if (typeof v.schiene_aktuell === "string") setSchieneAktuell(v.schiene_aktuell);
     if (typeof v.schiene_notiz === "string") setSchieneNotiz(v.schiene_notiz);
     if (typeof v.bogen === "string") setBogen(v.bogen);
+    if (typeof v.naechster_termin === "string") setNaechsterTermin(v.naechster_termin);
     if (v.zahn_seiten && typeof v.zahn_seiten === "object") setSeiten(v.zahn_seiten as Record<number, Seite>);
     setAusnahme(bereinigeZusatztext(e.ausnahme_freitext ?? ""));
+    setNtVorschlag(null);
     setEntwurfId(e.id);
     setBestaetigt(null);
     setDirty(false);
@@ -1222,116 +1368,129 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         {/* ===== Patient & Termin ===== */}
         <p className="abschnitt">Termin</p>
         <div className="feld">
-          <span className="stufe">Patient</span>
-          {patient ? (
-            <div className="gewaehlt">
-              {patient.name}{patient.alter !== null && <span style={{ color: "var(--gedeckt)", fontWeight: 400 }}>&nbsp;· {patient.alter} J.</span>}
-              <button onClick={() => { setPatient(null); setSuche(""); resetSitzung(); }}>wechseln</button>
-            </div>
-          ) : (
-            <>
-              <input
-                type="text"
-                placeholder="Name suchen (mind. 2 Zeichen)"
-                value={suche}
-                onChange={(e) => setSuche(e.target.value)}
-                aria-label="Patient suchen"
-              />
-              {treffer.length > 0 && (
-                <ul className="suchliste">
-                  {treffer.map((t) => (
-                    <li key={t.id}>
-                      <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
-                    </li>
-                  ))}
-                </ul>
+          <div className="termin-raster">
+            <section className="termin-panel">
+              <span className="stufe">Patient</span>
+              {patient ? (
+                <div className="gewaehlt">
+                  {patient.name}{patient.alter !== null && <span style={{ color: "var(--gedeckt)", fontWeight: 400 }}>&nbsp;· {patient.alter} J.</span>}
+                  <button onClick={() => { setPatient(null); setSuche(""); resetSitzung(); }}>wechseln</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Name suchen (mind. 2 Zeichen)"
+                    value={suche}
+                    onChange={(e) => setSuche(e.target.value)}
+                    aria-label="Patient suchen"
+                  />
+                  {treffer.length > 0 && (
+                    <ul className="suchliste">
+                      {treffer.map((t) => (
+                        <li key={t.id}>
+                          <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="sync-zeile">
+                    <button type="button" className="wahl sync" disabled={syncLaeuft} onClick={patientenSynchronisieren}>
+                      {syncLaeuft ? "Synchronisiert…" : "↻ Patient fehlt? Mit ivoris synchronisieren"}
+                    </button>
+                    {syncInfo && <span className="sync-info">{syncInfo}</span>}
+                  </div>
+                </>
               )}
-              <div className="sync-zeile">
-                <button type="button" className="wahl sync" disabled={syncLaeuft} onClick={patientenSynchronisieren}>
-                  {syncLaeuft ? "Synchronisiert…" : "↻ Patient fehlt? Mit ivoris synchronisieren"}
-                </button>
-                {syncInfo && <span className="sync-info">{syncInfo}</span>}
+            </section>
+
+            <section className="termin-panel">
+              <div className="stufenkopf">
+                <span className="stufe">Behandlungsart</span>
+                <Link href="/behandlungen" className="neben klein vorlagen-link">
+                  Behandlungsarten verwalten
+                </Link>
               </div>
-            </>
-          )}
+              <div className="wahlzeile">
+                {Object.entries(ART_NAMEN).map(([k, n]) => (
+                  <button key={k} className="wahl" aria-pressed={art === k} onClick={() => artWechseln(k)}>{n}</button>
+                ))}
+              </div>
+            </section>
 
-          <span className="stufe">Behandlungsart</span>
-          <div className="wahlzeile">
-            {Object.entries(ART_NAMEN).map(([k, n]) => (
-              <button key={k} className="wahl" aria-pressed={art === k} onClick={() => artWechseln(k)}>{n}</button>
-            ))}
-          </div>
-
-          <span className="stufe">Leistungen in dieser Sitzung · stapelbar</span>
-          {KOMBIS[art]?.length > 0 && (
-            <div className="wahlzeile" style={{ marginBottom: 10 }}>
-              {KOMBIS[art].map((kombi) => (
+            <section className="termin-panel termin-panel-breit">
+              <span className="stufe">Leistungen in dieser Sitzung · stapelbar</span>
+              {KOMBIS[art]?.length > 0 && (
+                <div className="wahlzeile wahlzeile-kompakt">
+                  {KOMBIS[art].map((kombi) => (
+                    <button
+                      key={kombi.label}
+                      className="wahl kombi"
+                      aria-pressed={kombi.slugs.every((s) => gewaehlt.includes(s)) && gewaehlt.length === kombi.slugs.length}
+                      onClick={() => kombiWaehlen(kombi.slugs)}
+                    >
+                      ⊕ {kombi.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="terminwahl" ref={terminRef}>
                 <button
-                  key={kombi.label}
-                  className="wahl kombi"
-                  aria-pressed={kombi.slugs.every((s) => gewaehlt.includes(s)) && gewaehlt.length === kombi.slugs.length}
-                  onClick={() => kombiWaehlen(kombi.slugs)}
+                  type="button"
+                  className="terminwahl-trigger"
+                  aria-expanded={terminOffen}
+                  onClick={() => setTerminOffen((o) => !o)}
                 >
-                  ⊕ {kombi.label}
+                  <span>Terminart wählen{module.length > 1 ? ` · ${module.length} gewählt` : ""}</span>
+                  <span className="terminwahl-pfeil" aria-hidden>{terminOffen ? "▴" : "▾"}</span>
                 </button>
-              ))}
-            </div>
-          )}
-          <div className="terminwahl" ref={terminRef}>
-            <button
-              type="button"
-              className="terminwahl-trigger"
-              aria-expanded={terminOffen}
-              onClick={() => setTerminOffen((o) => !o)}
-            >
-              <span>Terminart wählen{module.length > 1 ? ` · ${module.length} gewählt` : ""}</span>
-              <span className="terminwahl-pfeil" aria-hidden>{terminOffen ? "▴" : "▾"}</span>
-            </button>
-            {terminOffen && (
-              <div className="terminwahl-menu" role="listbox" aria-multiselectable="true">
-                {leistungsSektionen.length === 0 && (
-                  <p className="terminwahl-leer">Keine passende Terminart</p>
+                {terminOffen && (
+                  <div className="terminwahl-menu" role="listbox" aria-multiselectable="true">
+                    {leistungsSektionen.length === 0 && (
+                      <p className="terminwahl-leer">Keine passende Terminart</p>
+                    )}
+                    {leistungsSektionen.map((phase) => (
+                      <div key={phase.name} className="terminwahl-gruppe">
+                        <p className="terminwahl-phase">{phase.name}</p>
+                        {phase.vorlagen.map((v) => {
+                          const aktiv = gewaehlt.includes(v.termin_typ);
+                          return (
+                            <button
+                              type="button"
+                              key={v.id}
+                              className={`terminwahl-zeile${aktiv ? " aktiv" : ""}`}
+                              role="option"
+                              aria-selected={aktiv}
+                              onClick={() => leistungToggle(v.termin_typ)}
+                            >
+                              <span className="terminwahl-haken" aria-hidden>{aktiv ? "✓" : ""}</span>
+                              <span>{anzeigeName(v)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {leistungsSektionen.map((phase) => (
-                  <div key={phase.name} className="terminwahl-gruppe">
-                    <p className="terminwahl-phase">{phase.name}</p>
-                    {phase.vorlagen.map((v) => {
-                      const aktiv = gewaehlt.includes(v.termin_typ);
-                      return (
+                {module.length > 0 && (
+                  <div className="terminwahl-chips">
+                    {module.map((v) => (
+                      <span key={v.id} className="terminwahl-chip">
+                        {anzeigeName(v)}
                         <button
                           type="button"
-                          key={v.id}
-                          className={`terminwahl-zeile${aktiv ? " aktiv" : ""}`}
-                          role="option"
-                          aria-selected={aktiv}
+                          className="terminwahl-chip-x"
+                          aria-label={`${anzeigeName(v)} entfernen`}
                           onClick={() => leistungToggle(v.termin_typ)}
                         >
-                          <span className="terminwahl-haken" aria-hidden>{aktiv ? "✓" : ""}</span>
-                          <span>{anzeigeName(v)}</span>
+                          ×
                         </button>
-                      );
-                    })}
+                      </span>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-            {module.length > 0 && (
-              <div className="terminwahl-chips">
-                {module.map((v) => (
-                  <span key={v.id} className="terminwahl-chip">
-                    {anzeigeName(v)}
-                    <button
-                      type="button"
-                      className="terminwahl-chip-x"
-                      aria-label={`${anzeigeName(v)} entfernen`}
-                      onClick={() => leistungToggle(v.termin_typ)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            </section>
           </div>
           {art === "multiband" && bogenkontrolleVorlage && !hatOkUkAuswahl && (
             <div className="vorlagen-hinweis okuk-hinweis">
@@ -1347,10 +1506,15 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           )}
           {kontext && <div className="kontext"><b>{ART_NAMEN[art]}:</b> {kontext}</div>}
           <div className="vorlagen-hinweis">
-            <span>Fehlt oben eine Terminart oder soll eine Vorlage angepasst werden?</span>
-            <Link href="/scribe/praxis-pass" className="neben klein vorlagen-link">
-              Terminarten &amp; Vorlagen bearbeiten
-            </Link>
+            <span>Fehlt oben eine Terminart, Vorlage oder Behandlungsart?</span>
+            <div className="vorlagen-linkgruppe">
+              <Link href="/scribe/praxis-pass" className="neben klein vorlagen-link">
+                Terminarten &amp; Vorlagen bearbeiten
+              </Link>
+              <Link href="/behandlungen" className="neben klein vorlagen-link">
+                Behandlungsarten hinzufügen
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -1460,14 +1624,25 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   {vieleOptionen && <div className="gunterlabel">Häufigste</div>}
                   <div className="wahlzeile">
                     {topOpts.map(({ o, i }) => (
-                      <button
-                        key={i}
-                        className="wahl bernstein"
-                        aria-pressed={(auswahl[m.termin_typ]?.[g] ?? []).includes(i)}
-                        onClick={() => toggleOpt(m.termin_typ, g, i)}
-                      >
-                        {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
-                      </button>
+                      <div key={i} className="wahlblock">
+                        <button
+                          className="wahl bernstein"
+                          aria-pressed={(auswahl[m.termin_typ]?.[g] ?? []).includes(i)}
+                          onClick={() => toggleOpt(m.termin_typ, g, i)}
+                        >
+                          {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
+                        </button>
+                        {istPraxisOption(o) && (
+                          <button
+                            type="button"
+                            className="wahl-loeschen"
+                            aria-label="Eigenen Textbaustein löschen"
+                            onClick={() => void eigenenBausteinLoeschen(m, g, o, i)}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     ))}
                     {!vieleOptionen && grp.req && (
                       <button
@@ -1496,14 +1671,25 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                         />
                         <div className="wahlzeile" style={{ marginTop: 8 }}>
                           {restGefiltert.map(({ o, i }) => (
-                            <button
-                              key={i}
-                              className="wahl bernstein"
-                              aria-pressed={(auswahl[m.termin_typ]?.[g] ?? []).includes(i)}
-                              onClick={() => toggleOpt(m.termin_typ, g, i)}
-                            >
-                              {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
-                            </button>
+                            <div key={i} className="wahlblock">
+                              <button
+                                className="wahl bernstein"
+                                aria-pressed={(auswahl[m.termin_typ]?.[g] ?? []).includes(i)}
+                                onClick={() => toggleOpt(m.termin_typ, g, i)}
+                              >
+                                {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
+                              </button>
+                              {istPraxisOption(o) && (
+                                <button
+                                  type="button"
+                                  className="wahl-loeschen"
+                                  aria-label="Eigenen Textbaustein löschen"
+                                  onClick={() => void eigenenBausteinLoeschen(m, g, o, i)}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
                           ))}
                           {grp.req && (
                             <button
@@ -1586,6 +1772,41 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             value={ausnahme}
             onChange={(e) => { bearbeitet(); setAusnahme(e.target.value); }}
           />
+          <div className="nt-block">
+            <div className="stufenkopf">
+              <span className="stufe">Nächster Termin</span>
+              <span className="nt-kuerzel">wird im Text als NT ergänzt</span>
+            </div>
+            <input
+              className="freitext"
+              style={{ marginTop: 0 }}
+              type="text"
+              placeholder="Was soll beim nächsten Termin gemacht werden?"
+              value={naechsterTermin}
+              onChange={(e) => {
+                bearbeitet();
+                setNaechsterTermin(e.target.value);
+                ntPruefen(e.target.value);
+              }}
+              onBlur={() => ntPruefen(naechsterTermin)}
+            />
+            {ntVorschlag && (
+              <div className="nt-hinweis">
+                <span>Vorschlag aus vorhandenen Bausteinen: {ntVorschlag}</span>
+                <button
+                  type="button"
+                  className="neben klein"
+                  onClick={() => {
+                    bearbeitet();
+                    setNaechsterTermin(ntVorschlag);
+                    setNtVorschlag(null);
+                  }}
+                >
+                  Vorschlag übernehmen
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="aktionen">
@@ -1765,6 +1986,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             </div>
           </div>
         )}
+
+        <PraxisInboxWidget />
 
         {detail && (
           <div className="deckel" onClick={() => setDetail(null)}>
