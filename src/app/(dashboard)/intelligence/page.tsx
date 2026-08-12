@@ -33,6 +33,14 @@ interface EngData {
 interface ActivityEvent { patient_name: string; patient_id: string; event_type: string; created_at: string; }
 interface PraxisData { reaction_time_days: number; success_rate_pct: number; actions_taken: number; signals_ignored: number; chat_response_time_min: number; messages_answered_pct: number; action_log: any[]; }
 interface SystemData { level: string; level_progress: number; next_level_events: number; accuracy: any; calibration: any[]; predictions: any[]; calibration_log: any[]; }
+interface ImprovementItem {
+  title: string;
+  detail: string;
+  owner: string;
+  impact: "hoch" | "mittel" | "niedrig";
+  target?: string;
+  cta?: string;
+}
 
 const TAB_NAMES: Record<string, string> = { home: "Start", journey: "Verlauf", progress: "Fortschritt", chat: "Chat", more: "Mehr" };
 const EVT: Record<string, { icon: string; label: string }> = {
@@ -47,7 +55,7 @@ export default function IntelligencePage() {
   const { theme } = useAppStore();
   const router = useRouter();
   const dk = theme === "dark";
-  const [tab, setTab] = useState<"patienten" | "praxis" | "system">("patienten");
+  const [tab, setTab] = useState<"icura" | "patienten" | "praxis" | "system">("icura");
   const [period, setPeriod] = useState(30);
   const [data, setData] = useState<EngData | null>(null);
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
@@ -87,6 +95,110 @@ export default function IntelligencePage() {
   const low = patients.filter(p => p.risk_level === "low");
   const gefaehrdetesVolumen = high.reduce((s, p) => s + (p.restschuld || 0), 0);
   const beobachtetesVolumen = med.reduce((s, p) => s + (p.restschuld || 0), 0);
+  const unansweredSignalCount = (praxis?.signals_ignored || 0) + (high.length || 0);
+  const activeReviewCount = Math.max(high.length + med.length, 0);
+  const missingGuidanceCount = [
+    (data?.by_type?.qrcode_view || 0) === 0 ? 1 : 0,
+    (data?.by_type?.chat_message || 0) < 5 ? 1 : 0,
+    (feed.length || 0) < 10 ? 1 : 0,
+  ].reduce((sum, value) => sum + value, 0);
+
+  const signalBoard = [
+    {
+      eyebrow: "Neu reingekommen",
+      value: String(feed.length),
+      title: "Live-Signale",
+      detail: "Patientenereignisse, Zahlungsinteraktionen und Nutzungsverhalten aus dem aktuellen Feed.",
+      color: blue,
+    },
+    {
+      eyebrow: "Braucht Review",
+      value: String(activeReviewCount),
+      title: "Priorisierte Fälle",
+      detail: "Patienten oder Muster, die aus Sicht von iCura aktiv geprüft werden sollten.",
+      color: yellow,
+    },
+    {
+      eyebrow: "Noch ungeklärt",
+      value: String(unansweredSignalCount),
+      title: "Offene Reaktion",
+      detail: "Warnungen ohne saubere Rückmeldung oder Fälle mit hohem Risiko.",
+      color: red,
+    },
+    {
+      eyebrow: "Knowledge-Gaps",
+      value: String(missingGuidanceCount),
+      title: "Verbesserungschancen",
+      detail: "Bereiche, in denen iCura fachlich oder operativ noch präziser werden sollte.",
+      color: purple,
+    },
+  ];
+
+  const reviewQueue = [
+    ...high.slice(0, 3).map((patient) => ({
+      title: patient.name,
+      reason: patient.observation || `${patient.signals?.length || 0} Signale · Restschuld ${patient.restschuld?.toLocaleString("de-DE") || 0} €`,
+      priority: "kritisch",
+      target: `/patienten/${patient.id}`,
+      cta: "Patient öffnen",
+    })),
+    ...med.slice(0, 2).map((patient) => ({
+      title: patient.name,
+      reason: patient.observation || `${patient.signals?.length || 0} Signale · im Beobachtungsbereich`,
+      priority: "beobachten",
+      target: `/patienten/${patient.id}`,
+      cta: "Verlauf prüfen",
+    })),
+    ...(praxis?.action_log || []).slice(0, 2).map((item: any, index: number) => ({
+      title: `${item.patient} · ${item.action === "ratengespraech" ? "Ratengespräch" : item.action}`,
+      reason: `${item.signal} · Ergebnis: ${item.result === "erfolg" ? "Erfolg" : item.result === "kein" ? "keine Reaktion" : "offen"}`,
+      priority: index === 0 ? "praxis" : "review",
+      target: "/mahnwesen",
+      cta: "Mahnwesen öffnen",
+    })),
+  ].slice(0, 6);
+
+  const improvementBacklog: ImprovementItem[] = [
+    {
+      title: "QR-Zahlungen und Kasse tief erklären",
+      detail: "iCura soll sicher durch Einnahme, QR-Überweisung, Leistung, Notiz und spätere Zuordnung führen.",
+      owner: "Voice Knowledge",
+      impact: "hoch",
+      target: "/kasse",
+      cta: "Kasse prüfen",
+    },
+    {
+      title: "Patienten- und Zahlungsfragen operativ beantworten",
+      detail: "Direkt Patient finden, letzte Geldbewegungen benennen und offene Posten von Transaktionen trennen.",
+      owner: "Tooling",
+      impact: "hoch",
+      target: "/zahlungen",
+      cta: "Zahlungen öffnen",
+    },
+    {
+      title: "Unknowns als Lernsignal einsammeln",
+      detail: "Wenn iCura etwas nicht weiß, soll daraus ein Review-Hinweis statt einer falschen Antwort entstehen.",
+      owner: "Self-Improvement",
+      impact: "hoch",
+      target: "/intelligence",
+      cta: "Hier ausbauen",
+    },
+    {
+      title: "AnimaSign-Status klar trennen",
+      detail: "Signatur offen, PDF offen, Ivoris-Sync offen und manuelle Prüfung müssen sprachlich sauber getrennt bleiben.",
+      owner: "Operations",
+      impact: "mittel",
+      target: "/animasign",
+      cta: "AnimaSign prüfen",
+    },
+  ];
+
+  const quickActions = [
+    { label: "Voice verbessern", href: "/intelligence", tone: purple },
+    { label: "Zahlungen prüfen", href: "/zahlungen", tone: yellow },
+    { label: "Offene Posten", href: "/offene-posten", tone: blue },
+    { label: "Automationen bauen", href: "/automatisierungen", tone: grn },
+  ];
 
   const sLabel = { fontSize: 10, fontWeight: 700 as const, textTransform: "uppercase" as const, letterSpacing: 1.5, color: grn, marginBottom: 14 };
   const cardS = { background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 22, marginBottom: 16 };
@@ -120,12 +232,139 @@ export default function IntelligencePage() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 2, marginBottom: 24, borderBottom: `1px solid ${border}` }}>
-        {(["patienten", "praxis", "system"] as const).map(t => (
+        {(["icura", "patienten", "praxis", "system"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ padding: "10px 20px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", border: "none", background: "transparent", color: tab === t ? grn : muted, borderBottom: `2px solid ${tab === t ? grn : "transparent"}`, transition: "all 0.2s" }}>
-            {t === "patienten" ? "Patienten" : t === "praxis" ? "Praxis" : "System"}
+            {t === "icura" ? "iCura Ops" : t === "patienten" ? "Patienten" : t === "praxis" ? "Praxis" : "System"}
           </button>
         ))}
       </div>
+
+      {tab === "icura" && (
+        <div>
+          <div style={{ ...cardS, background: dk ? "linear-gradient(135deg, rgba(9,14,24,0.98), rgba(20,18,35,0.98))" : "linear-gradient(135deg, #ffffff, #f7fafc)", borderColor: dk ? "rgba(167,139,250,0.2)" : "#e6ebf3" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: purple, marginBottom: 10 }}>iCura Self-Improvement</div>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, lineHeight: 1.05, letterSpacing: -0.7, color: fg, margin: 0 }}>Signale sammeln. Review priorisieren. Fähigkeiten ausbauen.</h2>
+                <p style={{ maxWidth: 720, fontSize: 14, color: muted, lineHeight: 1.65, margin: "12px 0 0" }}>
+                  Dieses Board ist das operative Gehirn für iCura. Es trennt eingehende Hinweise, echte Review-Fälle und konkrete Verbesserungen, damit aus Fragen, Fehlern und Praxisfeedback direkt bessere Assistenz entsteht.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {quickActions.map((action) => (
+                  <button
+                    key={action.href}
+                    type="button"
+                    onClick={() => router.push(action.href)}
+                    style={{ padding: "10px 14px", borderRadius: 999, border: `1px solid ${action.tone}55`, background: `${action.tone}12`, color: action.tone, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+              {signalBoard.map((item) => (
+                <div key={item.title} style={{ padding: 18, borderRadius: 14, border: `1px solid ${item.color}33`, background: dk ? "rgba(255,255,255,0.02)" : "#ffffff" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1.4, color: item.color, marginBottom: 12 }}>{item.eyebrow}</div>
+                  <div style={{ fontSize: 34, fontWeight: 800, fontFamily: "'Fraunces', serif", lineHeight: 1, color: item.color }}>{item.value}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: fg, marginTop: 10 }}>{item.title}</div>
+                  <div style={{ fontSize: 12, color: muted, lineHeight: 1.55, marginTop: 6 }}>{item.detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            <div style={cardS}>
+              <div style={sLabel}>Stufe 1 · Eingehende Signale</div>
+              <p style={{ fontSize: 12, color: muted, lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
+                Alles, was iCura als Kontext einsammeln sollte: App-Nutzung, Zahlungsinteraktion, Chat-Fragen und operative Reibung.
+              </p>
+              {feed.length === 0 ? (
+                <p style={{ fontSize: 12, color: muted, textAlign: "center", padding: 20 }}>Noch keine Signale vorhanden</p>
+              ) : (
+                feed.slice(0, 8).map((ev, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 10, border: `1px solid ${border}`, marginBottom: 8 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, display: "grid", placeItems: "center", background: dk ? "rgba(96,165,250,0.08)" : "#eef4ff", fontSize: 14 }}>
+                      {EVT[ev.event_type]?.icon || "📋"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: fg }}>{ev.patient_name}</div>
+                      <div style={{ fontSize: 11, color: muted }}>{EVT[ev.event_type]?.label || ev.event_type}</div>
+                    </div>
+                    <div style={{ fontSize: 10, color: muted, flexShrink: 0 }}>{timeAgo(ev.created_at)}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={cardS}>
+              <div style={sLabel}>Stufe 2 · Review Inbox</div>
+              <p style={{ fontSize: 12, color: muted, lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
+                Hier landen Fälle, die ein Mensch oder ein gezieltes Tooling prüfen sollte, bevor iCura daraus sichere Hilfe macht.
+              </p>
+              {reviewQueue.length === 0 ? (
+                <p style={{ fontSize: 12, color: muted, textAlign: "center", padding: 20 }}>Aktuell nichts priorisiert</p>
+              ) : (
+                reviewQueue.map((item, index) => {
+                  const tone = item.priority === "kritisch" ? red : item.priority === "beobachten" ? yellow : item.priority === "praxis" ? blue : purple;
+                  return (
+                    <div key={`${item.title}-${index}`} style={{ padding: "12px 14px", borderRadius: 12, border: `1px solid ${tone}2e`, background: `${tone}0d`, marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: fg }}>{item.title}</div>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: tone, textTransform: "uppercase", letterSpacing: 1.1 }}>{item.priority}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: muted, lineHeight: 1.55, marginTop: 6 }}>{item.reason}</div>
+                      {item.target && (
+                        <button
+                          type="button"
+                          onClick={() => router.push(item.target!)}
+                          style={{ marginTop: 10, padding: "8px 12px", borderRadius: 999, border: `1px solid ${tone}44`, background: "transparent", color: tone, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          {item.cta || "Öffnen"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div style={cardS}>
+              <div style={sLabel}>Stufe 3 · Verbesserungs-Backlog</div>
+              <p style={{ fontSize: 12, color: muted, lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
+                Das ist die konkrete Ausbau-Liste für iCura selbst: Wissen, Tooling, Navigation und sichere operative Antworten.
+              </p>
+              {improvementBacklog.map((item) => {
+                const tone = item.impact === "hoch" ? grn : item.impact === "mittel" ? yellow : muted;
+                return (
+                  <div key={item.title} style={{ padding: "12px 14px", borderRadius: 12, border: `1px solid ${border}`, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: fg }}>{item.title}</div>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: tone, textTransform: "uppercase", letterSpacing: 1.1 }}>{item.impact}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: muted, lineHeight: 1.55, marginTop: 6 }}>{item.detail}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 10 }}>
+                      <span style={{ fontSize: 10, color: muted }}>Owner: {item.owner}</span>
+                      {item.target && (
+                        <button
+                          type="button"
+                          onClick={() => router.push(item.target!)}
+                          style={{ padding: "8px 12px", borderRadius: 999, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.03)" : "#f8fafc", color: fg, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          {item.cta || "Öffnen"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ SÄULE 1: PATIENTEN ═══ */}
       {tab === "patienten" && (
