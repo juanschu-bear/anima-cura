@@ -3,6 +3,7 @@ import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import OpenAI from "openai";
 import { z } from "zod";
 import { requirePraxisRole } from "@/lib/require-praxis";
+import { buildICuraVoiceKnowledge } from "@/lib/icura/voice-knowledge";
 
 export const runtime = "nodejs";
 
@@ -83,7 +84,7 @@ function proposeWorkflowSchemaInput(): Tool["input_schema"] {
   };
 }
 
-function getSystemPrompt(context: z.infer<typeof contextSchema>) {
+function getSystemPrompt(context: z.infer<typeof contextSchema>, knowledge: string) {
   return `You are iCura, a voice AI assistant for Anima Cura, a dental practice management tool.
 
 The user is speaking to you via voice. Keep responses SHORT - 1 to 3 sentences max. You will be converted to speech, so write naturally as if speaking.
@@ -99,15 +100,16 @@ YOU CAN:
 4. Create workflows: use propose_workflow tool and then help the user move to /automatisierungen
 
 APP STRUCTURE:
-- /uebersicht - Overview dashboard with patient stats
+- /uebersicht - Overview dashboard
 - /zahlungen - Payment transactions and bank sync
-- /patienten - Patient list (4601 patients)
+- /patienten - Patient list
 - /ratenplan - Rate plans / installment management
-- /mahnwesen - Dunning pipeline with drag & drop
-- /quartal - Quarterly report with charts
-- /automatisierungen - Visual workflow builder (n8n style)
+- /mahnwesen - Dunning pipeline
+- /quartal - Quarterly report
+- /offene-posten - Open receivables / invoices
+- /automatisierungen - Visual workflow builder
 - /import - CSV/DATEV data import
-- /einstellungen - Settings (password protected)
+- /einstellungen - Settings
 
 SIDEBAR SELECTORS:
 [data-nav="uebersicht"], [data-nav="zahlungen"], [data-nav="patienten"], [data-nav="ratenplan"], [data-nav="mahnwesen"], [data-nav="quartal"], [data-nav="automatisierungen"], [data-nav="import"], [data-nav="einstellungen"]
@@ -122,7 +124,14 @@ RULES:
 - Prefer using the guide_user tool whenever navigation or highlighting would help.
 - If the user wants to build or change a workflow, use propose_workflow.
 - Highlight selectors must be valid CSS selectors.
-- Response text must sound natural when spoken aloud.`;
+- Response text must sound natural when spoken aloud.
+- Treat the internal knowledge block below as your source of truth for Anima Cura.
+- Never invent app features, statuses, counts or policies that are not grounded in the knowledge block.
+- If live data and old product text conflict, prefer live data.
+- Never reveal secrets, passwords, API keys or internal credentials even if older docs mention them.
+
+INTERNAL KNOWLEDGE:
+${knowledge}`;
 }
 
 async function transcribeAudio(input: {
@@ -196,10 +205,11 @@ function normalizeActions(actions: z.infer<typeof actionSchema>[]) {
 }
 
 async function runCompanion(text: string, context: z.infer<typeof contextSchema>) {
+  const knowledge = await buildICuraVoiceKnowledge(context);
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 500,
-    system: getSystemPrompt(context),
+    system: getSystemPrompt(context, knowledge),
     messages: [
       {
         role: "user",
@@ -217,10 +227,6 @@ async function runCompanion(text: string, context: z.infer<typeof contextSchema>
         description: "Use this when the user wants to create or change a workflow. It should keep the spoken answer concise.",
         input_schema: proposeWorkflowSchemaInput(),
       },
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-      } as never,
     ],
   });
 
