@@ -37,7 +37,7 @@ const ARTEN: Array<{ key: InboxArt; label: string; icon: typeof Lightbulb }> = [
 ];
 
 const KATEGORIEN = ["Praxis", "Ablauf", "Behandlung", "Abrechnung", "Design", "Wunsch", "Fehler"];
-const BEREICHE = ["Scribe", "Patientenakte", "Rezeption", "Team", "Abrechnung", "Terminlogik"];
+const BEREICHE = ["Scribe", "Textbausteine", "Terminarten", "Behandlungsarten", "Dokumentation", "Design"];
 const PRIORITAETEN = [
   { key: "niedrig", label: "Später" },
   { key: "mittel", label: "Normal" },
@@ -186,10 +186,11 @@ export default function PraxisInboxWidget() {
             <input
               className="praxis-inbox-input"
               type="text"
-              placeholder="Kurzer Titel (optional, wird sonst automatisch gebildet)"
+              placeholder="Kurzer Titel (optional)"
               value={form.titel}
               onChange={(e) => setForm((alt) => ({ ...alt, titel: e.target.value }))}
             />
+            <p className="praxis-inbox-minihelp">Wenn du keinen Titel einträgst, bildet Scribe ihn automatisch aus deinem Text.</p>
 
             <div className="praxis-inbox-grid">
               <div>
