@@ -1,6 +1,6 @@
 "use client";
 
-import { Lightbulb, MessageCircleMore, Sparkles, CircleAlert, ListTodo, CheckCheck, Loader2 } from "lucide-react";
+import { Lightbulb, MessageCircleMore, Sparkles, CircleAlert, ListTodo, CheckCheck, Loader2, Trash2, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useThema } from "./ScribeShell";
 
@@ -19,6 +19,8 @@ type InboxEintrag = {
   faellig_am: string;
   erstellt_von_name: string | null;
   erstellt_am: string;
+  in_arbeit_am?: string | null;
+  erledigt_am?: string | null;
   istHeute: boolean;
 };
 
@@ -62,6 +64,14 @@ const DEFAULT_FORM = {
 function formatFaelligkeit(iso: string): string {
   const datum = new Date(`${iso}T12:00:00`);
   return Number.isNaN(datum.getTime()) ? iso : datum.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+}
+
+function formatZeitpunkt(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const datum = new Date(iso);
+  return Number.isNaN(datum.getTime())
+    ? "—"
+    : datum.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function PraxisInboxWidget() {
@@ -132,8 +142,25 @@ export default function PraxisInboxWidget() {
     }
   }
 
+  async function loeschen(id: string) {
+    setFehler(null);
+    if (typeof window !== "undefined" && !window.confirm("Diesen Eintrag wirklich löschen?")) return;
+    try {
+      const res = await fetch("/api/scribe/inbox", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Eintrag konnte nicht gelöscht werden.");
+      await laden();
+    } catch (err) {
+      setFehler(err instanceof Error ? err.message : "Eintrag konnte nicht gelöscht werden.");
+    }
+  }
+
   const heuteListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status !== "erledigt" && eintrag.istHeute),
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "offen" && eintrag.istHeute),
     [daten],
   );
   const spaeterListe = useMemo(
@@ -294,8 +321,12 @@ export default function PraxisInboxWidget() {
                       <div className="praxis-item-actions">
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>In Arbeit</button>
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
+                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
+                    <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
                   </article>
                 ))
               )}
@@ -318,7 +349,13 @@ export default function PraxisInboxWidget() {
                       <div className="praxis-item-actions">
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Zurück offen</button>
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
+                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
+                          <Trash2 size={14} />
+                        </button>
                       </div>
+                    </div>
+                    <div className="praxis-item-zeiten">
+                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)}
                     </div>
                   </article>
                 ))
@@ -341,8 +378,14 @@ export default function PraxisInboxWidget() {
                     <strong>{eintrag.titel}</strong>
                     <div className="praxis-item-fuss">
                       <span>{eintrag.kategorie} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
-                      <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>Jetzt starten</button>
+                      <div className="praxis-item-actions">
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>Jetzt starten</button>
+                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
+                    <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
                   </article>
                 ))
               )}
@@ -355,13 +398,25 @@ export default function PraxisInboxWidget() {
                   <CheckCheck size={15} />
                 </div>
                 {erledigtListe.map((eintrag) => (
-                  <article key={eintrag.id} className="praxis-item kompakt erledigt">
-                    <strong>{eintrag.titel}</strong>
-                    <div className="praxis-item-fuss">
-                      <span>{eintrag.kategorie}</span>
-                      <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Wieder öffnen</button>
+                  <details key={eintrag.id} className="praxis-item kompakt erledigt praxis-item-details">
+                    <summary className="praxis-item-summary">
+                      <strong>{eintrag.titel}</strong>
+                      <span className="praxis-item-summary-right">
+                        <span>{eintrag.kategorie}</span>
+                        <ChevronDown size={15} />
+                      </span>
+                    </summary>
+                    {eintrag.text && <p>{eintrag.text}</p>}
+                    <div className="praxis-item-zeiten">
+                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)} · Erledigt: {formatZeitpunkt(eintrag.erledigt_am)}
                     </div>
-                  </article>
+                    <div className="praxis-item-actions" style={{ marginTop: 10 }}>
+                      <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)}>
+                        <Trash2 size={14} />
+                        Löschen
+                      </button>
+                    </div>
+                  </details>
                 ))}
               </div>
             )}

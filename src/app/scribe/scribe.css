@@ -808,7 +808,8 @@
   color:var(--primaer);opacity:1;font-weight:600;font-size:13.5px;padding:9px 17px}
 .scribe .wahl.plus:hover{background:var(--primaer);color:var(--auf-primaer);border-color:transparent;
   transform:translateY(-1px)}
-.eigen-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.scribe .wahl.plus{margin-top:2px}
+.eigen-editor { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .eigen-hinweis { font-size: 12px; color: var(--gedeckt); margin: 0; }
 .eigen-aktionen { display: flex; gap: 8px; }
 .scribe .nt-block{margin-top:18px;padding:14px 16px;border:1px dashed var(--kante-hover);border-radius:14px;
@@ -939,6 +940,12 @@
   border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#EAF2FD;cursor:pointer;
   border-radius:999px;padding:6px 10px;font-size:11.5px
 }
+.scribe .praxis-item-actions button.kritisch{color:#FFB4A6;border-color:rgba(255,151,126,.18)}
+.scribe .praxis-item-zeiten{margin-top:8px;font-size:11px;color:#95AFCA;line-height:1.5}
+.scribe .praxis-item-details summary{list-style:none;cursor:pointer}
+.scribe .praxis-item-details summary::-webkit-details-marker{display:none}
+.scribe .praxis-item-summary{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.scribe .praxis-item-summary-right{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:#95AFCA}
 .scribe .spin{animation:praxis-spin .9s linear infinite}
 @keyframes praxis-spin{to{transform:rotate(360deg)}}
 @media(max-width:720px){
@@ -977,7 +984,7 @@
 .scribe .wahl.weitere{border-style:solid;border-color:var(--primaer);background:var(--primaer-soft);
   color:var(--primaer);display:inline-flex}
 .scribe .wahl.weitere:hover{background:var(--primaer);color:var(--auf-primaer)}
-.scribe details.weitere-details{margin-top:10px}
+.scribe details.weitere-details{margin-top:12px;margin-bottom:14px}
 .scribe details.weitere-details summary{list-style:none;cursor:pointer}
 .scribe details.weitere-details summary::-webkit-details-marker{display:none}
 .scribe .weitere-panel{margin-top:10px;padding:12px;border:1px solid var(--kante);border-radius:12px;

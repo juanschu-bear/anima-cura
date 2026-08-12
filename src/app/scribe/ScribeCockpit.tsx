@@ -1709,7 +1709,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                     if (optOffen !== key) {
                       return (
                         <button className="wahl plus" onClick={() => { setOptOffen(key); setOptText(""); }}>
-                          + Eigener Text
+                          + Baustein hinzufügen
                         </button>
                       );
                     }
@@ -1718,7 +1718,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                         <input
                           className="freitext"
                           type="text"
-                          placeholder="Eigener Textbaustein"
+                          placeholder="Neuen Baustein eingeben"
                           value={optText}
                           autoFocus
                           maxLength={400}
@@ -1726,7 +1726,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                           onKeyDown={(e) => { if (e.key === "Enter") eigenenTextSpeichern(m, g); }}
                         />
                         <p className="eigen-hinweis">
-                          Bitte Rechtschreibung und Textbaustein prüfen. Der Text wird genau so gespeichert.
+                          Das ist kein freier Zusatztext, sondern ein neuer fester Auswahl-Baustein für diese Gruppe.
                         </p>
                         <div className="eigen-aktionen">
                           <button

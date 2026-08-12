@@ -33,6 +33,7 @@ type InboxEintrag = {
   erstellt_von: string | null;
   erstellt_von_name: string | null;
   erstellt_am: string;
+  in_arbeit_am: string | null;
   erledigt_am: string | null;
 };
 
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
     erstellt_von: user.id,
     erstellt_von_name: name,
     erstellt_am: new Date().toISOString(),
+    in_arbeit_am: null,
     erledigt_am: null,
   };
   const { error } = await speichereInbox(service, [eintrag, ...inbox]);
@@ -205,7 +207,18 @@ export async function PATCH(request: NextRequest) {
   const aktualisiert = {
     ...inbox[index],
     status: status as InboxStatus,
-    erledigt_am: status === "erledigt" ? new Date().toISOString() : null,
+    in_arbeit_am:
+      status === "in_arbeit"
+        ? inbox[index].in_arbeit_am ?? new Date().toISOString()
+        : status === "offen"
+          ? null
+          : inbox[index].in_arbeit_am,
+    erledigt_am:
+      status === "erledigt"
+        ? new Date().toISOString()
+        : status === "offen"
+          ? null
+          : inbox[index].erledigt_am,
   };
   const neu = inbox.slice();
   neu[index] = aktualisiert;
@@ -213,4 +226,22 @@ export async function PATCH(request: NextRequest) {
   const { error } = await speichereInbox(service, neu);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, eintrag: aktualisiert });
+}
+
+export async function DELETE(request: NextRequest) {
+  const { user } = await ladeUser();
+  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+
+  const body = (await request.json().catch(() => null)) as { id?: string } | null;
+  if (!body?.id) return NextResponse.json({ error: "id nötig" }, { status: 400 });
+
+  const service = createServerClient();
+  const inbox = await ladeInbox(service);
+  const neu = inbox.filter((eintrag) => eintrag.id !== body.id);
+  if (neu.length === inbox.length) {
+    return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  }
+  const { error } = await speichereInbox(service, neu);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
