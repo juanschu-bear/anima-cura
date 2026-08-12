@@ -137,7 +137,11 @@ export default function PraxisInboxWidget() {
     [daten],
   );
   const spaeterListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status !== "erledigt" && !eintrag.istHeute),
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "offen" && !eintrag.istHeute),
+    [daten],
+  );
+  const inArbeitListe = useMemo(
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "in_arbeit"),
     [daten],
   );
   const erledigtListe = useMemo(
@@ -299,9 +303,36 @@ export default function PraxisInboxWidget() {
 
             <div className="praxis-listenblock">
               <div className="praxis-listenblock-kopf">
-                <h4>Demnächst</h4>
+                <h4>In Arbeit</h4>
+                <span>{inArbeitListe.length}</span>
+              </div>
+              {inArbeitListe.length === 0 ? (
+                <p className="praxis-inbox-leer">Gerade ist noch nichts aktiv in Bearbeitung.</p>
+              ) : (
+                inArbeitListe.slice(0, 4).map((eintrag) => (
+                  <article key={eintrag.id} className="praxis-item kompakt">
+                    <strong>{eintrag.titel}</strong>
+                    {eintrag.text && <p>{eintrag.text}</p>}
+                    <div className="praxis-item-fuss">
+                      <span>{eintrag.kategorie} · {formatFaelligkeit(eintrag.faellig_am)}</span>
+                      <div className="praxis-item-actions">
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Zurück offen</button>
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <div className="praxis-listenblock">
+              <div className="praxis-listenblock-kopf">
+                <h4>Als Nächstes</h4>
                 <span>{spaeterListe.length}</span>
               </div>
+              <p className="praxis-inbox-leer" style={{ marginBottom: 8 }}>
+                Hier landen Einträge, die du auf <b>morgen</b> oder <b>diese Woche</b> gelegt hast.
+              </p>
               {spaeterListe.length === 0 ? (
                 <p className="praxis-inbox-leer">Nichts für später vorgemerkt.</p>
               ) : (
@@ -309,8 +340,8 @@ export default function PraxisInboxWidget() {
                   <article key={eintrag.id} className="praxis-item kompakt">
                     <strong>{eintrag.titel}</strong>
                     <div className="praxis-item-fuss">
-                      <span>{eintrag.kategorie} · {formatFaelligkeit(eintrag.faellig_am)}</span>
-                      <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Vorziehen</button>
+                      <span>{eintrag.kategorie} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
+                      <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>Jetzt starten</button>
                     </div>
                   </article>
                 ))
