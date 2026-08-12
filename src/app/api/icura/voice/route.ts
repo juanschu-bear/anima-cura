@@ -4,6 +4,8 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { buildICuraVoiceKnowledge } from "@/lib/icura/voice-knowledge";
+import { createServerClient } from "@/lib/db/supabase";
+import { isBlockedPatientRecord } from "@/lib/patient-blocklist";
 
 export const runtime = "nodejs";
 
@@ -37,6 +39,15 @@ const guideUserSchema = z.object({
 const proposeWorkflowSchema = z.object({
   responseText: z.string().min(1),
   rationale: z.string().optional(),
+});
+
+const patientLookupSchema = z.object({
+  query: z.string().min(2),
+});
+
+const patientFinancialSchema = z.object({
+  patientId: z.string().uuid().optional(),
+  query: z.string().min(2).optional(),
 });
 
 const voiceMap = {
@@ -81,6 +92,244 @@ function proposeWorkflowSchemaInput(): Tool["input_schema"] {
       rationale: { type: "string" },
     },
     required: ["responseText"],
+  };
+}
+
+function patientLookupSchemaInput(): Tool["input_schema"] {
+  return {
+    type: "object" as const,
+    properties: {
+      query: { type: "string" },
+    },
+    required: ["query"],
+  };
+}
+
+function patientFinancialSchemaInput(): Tool["input_schema"] {
+  return {
+    type: "object" as const,
+    properties: {
+      patientId: { type: "string" },
+      query: { type: "string" },
+    },
+  };
+}
+
+function normalizePatientSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildSearchVariants(input: string) {
+  const base = normalizePatientSearch(input);
+  const compact = base.replace(/\s+/g, " ").trim();
+  const variants = new Set<string>([compact]);
+  if (compact.includes("ae")) variants.add(compact.replace(/ae/g, "a"));
+  if (compact.includes("oe")) variants.add(compact.replace(/oe/g, "o"));
+  if (compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
+  if (compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
+  return Array.from(variants).filter(Boolean);
+}
+
+function buildSearchTokens(input: string) {
+  return Array.from(
+    new Set(
+      buildSearchVariants(input)
+        .flatMap((variant) => variant.split(/\s+/))
+        .map((token) => token.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function rankPatientMatch(patient: {
+  ivoris_nummer?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+}, search: string) {
+  const variants = buildSearchVariants(search);
+  const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
+  const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
+  const lastName = normalizePatientSearch(patient.nachname ?? "");
+  const firstName = normalizePatientSearch(patient.vorname ?? "");
+  const patientNumber = String(patient.ivoris_nummer ?? "").toLowerCase();
+
+  let best = Number.POSITIVE_INFINITY;
+  for (const variant of variants) {
+    if (patientNumber && patientNumber === variant) best = Math.min(best, 0);
+    else if (lastName && lastName === variant) best = Math.min(best, 1);
+    else if (fullName && fullName === variant) best = Math.min(best, 2);
+    else if (reversedName && reversedName === variant) best = Math.min(best, 3);
+    else if (patientNumber && patientNumber.includes(variant)) best = Math.min(best, 4);
+    else if (lastName && lastName.startsWith(variant)) best = Math.min(best, 5);
+    else if (fullName && fullName.startsWith(variant)) best = Math.min(best, 6);
+    else if (reversedName && reversedName.startsWith(variant)) best = Math.min(best, 7);
+    else if (lastName && lastName.includes(variant)) best = Math.min(best, 8);
+    else if (firstName && firstName.includes(variant)) best = Math.min(best, 9);
+    else if (fullName && fullName.includes(variant)) best = Math.min(best, 10);
+    else if (reversedName && reversedName.includes(variant)) best = Math.min(best, 11);
+  }
+
+  return best;
+}
+
+async function findPatients(query: string) {
+  const db = createServerClient();
+  const q = query.trim().toLowerCase();
+  const teile = buildSearchTokens(q);
+  if (teile.length === 0) {
+    return [];
+  }
+
+  const muster = Array.from(
+    new Set(
+      teile.flatMap((teil) => [
+        `vorname.ilike.%${teil}%`,
+        `nachname.ilike.%${teil}%`,
+        `email.ilike.%${teil}%`,
+        `ivoris_nummer.ilike.%${teil}%`,
+      ]),
+    ),
+  ).join(",");
+
+  const { data } = await db
+    .from("patients")
+    .select("id, ivoris_nummer, vorname, nachname, geburtsdatum, behandlung, behandlung_status, kasse, email")
+    .or(muster)
+    .limit(40);
+
+  const treffer = (data ?? []).filter((patient) => {
+    if (isBlockedPatientRecord(patient)) return false;
+    const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
+    const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
+    const email = normalizePatientSearch(patient.email ?? "");
+    const patientNumber = String(patient.ivoris_nummer ?? "").toLowerCase();
+    return teile.every(
+      (teil) =>
+        fullName.includes(teil) ||
+        reversedName.includes(teil) ||
+        email.includes(teil) ||
+        patientNumber.includes(teil),
+    );
+  });
+
+  treffer.sort((a, b) => {
+    const rankA = rankPatientMatch(a, q);
+    const rankB = rankPatientMatch(b, q);
+    if (rankA !== rankB) return rankA - rankB;
+    const lastNameCompare = String(a.nachname ?? "").localeCompare(String(b.nachname ?? ""), "de");
+    if (lastNameCompare !== 0) return lastNameCompare;
+    return String(a.vorname ?? "").localeCompare(String(b.vorname ?? ""), "de");
+  });
+
+  return treffer.slice(0, 5).map((p) => ({
+    id: p.id,
+    name: `${p.vorname ?? ""} ${p.nachname ?? ""}`.trim(),
+    ivoris_nummer: p.ivoris_nummer ?? null,
+    geburtsdatum: p.geburtsdatum ?? null,
+    behandlung: p.behandlung ?? null,
+    behandlung_status: p.behandlung_status ?? null,
+    kasse: p.kasse ?? null,
+    route: `/patienten/${p.id}`,
+  }));
+}
+
+async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancialSchema>) {
+  const db = createServerClient();
+  let patientId = input.patientId ?? null;
+
+  if (!patientId && input.query) {
+    const candidates = await findPatients(input.query);
+    patientId = candidates[0]?.id ?? null;
+  }
+
+  if (!patientId) {
+    return { found: false, reason: "Kein Patient gefunden." };
+  }
+
+  const [{ data: patient }, { data: offene }, { data: plan }, { data: raten }] = await Promise.all([
+    db
+      .from("patients")
+      .select("id, vorname, nachname, behandlung, behandlung_status, ivoris_nummer")
+      .eq("id", patientId)
+      .maybeSingle(),
+    db
+      .from("offene_posten")
+      .select("id, status, offen, gezahlt, betrag, typ, rechnung_datum, unser_zeichen")
+      .eq("patient_id", patientId)
+      .order("rechnung_datum", { ascending: false })
+      .limit(8),
+    db
+      .from("ratenplaene")
+      .select("id, status, gesamtbetrag, rate_betrag, anzahl_raten, start_datum")
+      .eq("patient_id", patientId)
+      .order("erstellt_am", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from("raten")
+      .select("id, status, betrag, faellig_am, bezahlt_am")
+      .eq("patient_id", patientId)
+      .order("faellig_am", { ascending: false })
+      .limit(12),
+  ]);
+
+  if (!patient || isBlockedPatientRecord(patient)) {
+    return { found: false, reason: "Patient nicht verfuegbar." };
+  }
+
+  const openItems = offene ?? [];
+  const totalOpen = openItems.reduce((sum, item) => sum + Number(item.offen || 0), 0);
+  const totalPaid = openItems.reduce((sum, item) => sum + Number(item.gezahlt || 0), 0);
+  const offeneCount = openItems.filter((item) => item.status === "offen").length;
+  const teilbezahltCount = openItems.filter((item) => item.status === "teilbezahlt").length;
+  const paidInstallments = (raten ?? []).filter((rate) => rate.status === "bezahlt").length;
+  const openInstallments = (raten ?? []).filter((rate) => rate.status !== "bezahlt").length;
+
+  return {
+    found: true,
+    patient: {
+      id: patient.id,
+      name: `${patient.vorname ?? ""} ${patient.nachname ?? ""}`.trim(),
+      ivoris_nummer: patient.ivoris_nummer ?? null,
+      behandlung: patient.behandlung ?? null,
+      behandlung_status: patient.behandlung_status ?? null,
+      route: `/patienten/${patient.id}`,
+    },
+    offene_posten: {
+      count: openItems.length,
+      offen_count: offeneCount,
+      teilbezahlt_count: teilbezahltCount,
+      total_open: totalOpen,
+      total_paid: totalPaid,
+      latest: openItems.slice(0, 3).map((item) => ({
+        status: item.status,
+        offen: item.offen ?? 0,
+        betrag: item.betrag ?? 0,
+        typ: item.typ ?? null,
+        rechnung_datum: item.rechnung_datum ?? null,
+        unser_zeichen: item.unser_zeichen ?? null,
+      })),
+    },
+    ratenplan: plan
+      ? {
+          status: plan.status ?? null,
+          gesamtbetrag: plan.gesamtbetrag ?? 0,
+          rate_betrag: plan.rate_betrag ?? 0,
+          anzahl_raten: plan.anzahl_raten ?? 0,
+          start_datum: plan.start_datum ?? null,
+          bezahlt_count: paidInstallments,
+          offen_count: openInstallments,
+        }
+      : null,
   };
 }
 
@@ -206,64 +455,122 @@ function normalizeActions(actions: z.infer<typeof actionSchema>[]) {
 
 async function runCompanion(text: string, context: z.infer<typeof contextSchema>) {
   const knowledge = await buildICuraVoiceKnowledge(context);
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 500,
-    system: getSystemPrompt(context, knowledge),
-    messages: [
-      {
-        role: "user",
-        content: text,
-      },
-    ],
-    tools: [
-      {
-        name: "guide_user",
-        description: "Guide the user through the app with optional navigation and UI highlighting.",
-        input_schema: guideUserSchemaInput(),
-      },
-      {
-        name: "propose_workflow",
-        description: "Use this when the user wants to create or change a workflow. It should keep the spoken answer concise.",
-        input_schema: proposeWorkflowSchemaInput(),
-      },
-    ],
-  });
+  const tools: Tool[] = [
+    {
+      name: "guide_user",
+      description: "Guide the user through the app with optional navigation and UI highlighting.",
+      input_schema: guideUserSchemaInput(),
+    },
+    {
+      name: "propose_workflow",
+      description: "Use this when the user wants to create or change a workflow. It should keep the spoken answer concise.",
+      input_schema: proposeWorkflowSchemaInput(),
+    },
+    {
+      name: "find_patient",
+      description: "Find a patient by name or IVORIS number and return the best matches including direct patient routes.",
+      input_schema: patientLookupSchemaInput(),
+    },
+    {
+      name: "get_patient_financials",
+      description: "Get patient-specific financial context: open receivables, partial payments and rate plan status.",
+      input_schema: patientFinancialSchemaInput(),
+    },
+  ];
 
-  const toolBlock = response.content.find((block) => block.type === "tool_use");
+  const messages: Anthropic.Messages.MessageParam[] = [
+    {
+      role: "user",
+      content: text,
+    },
+  ];
 
-  if (toolBlock?.type === "tool_use" && toolBlock.name === "guide_user") {
-    const parsed = guideUserSchema.safeParse(toolBlock.input);
-    if (!parsed.success) {
-      throw new Error("Die iCura-Aktion ist ungültig.");
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 700,
+      system: getSystemPrompt(context, knowledge),
+      messages,
+      tools,
+    });
+
+    const toolBlock = response.content.find((block) => block.type === "tool_use");
+
+    if (!toolBlock || toolBlock.type !== "tool_use") {
+      return {
+        text: extractTextContent(response.content),
+        actions: [],
+      };
     }
 
-    return {
-      text: parsed.data.responseText,
-      actions: normalizeActions(parsed.data.actions),
-    };
-  }
+    if (toolBlock.name === "guide_user") {
+      const parsed = guideUserSchema.safeParse(toolBlock.input);
+      if (!parsed.success) {
+        throw new Error("Die iCura-Aktion ist ungültig.");
+      }
 
-  if (toolBlock?.type === "tool_use" && toolBlock.name === "propose_workflow") {
-    const parsed = proposeWorkflowSchema.safeParse(toolBlock.input);
-    if (!parsed.success) {
-      throw new Error("Die Workflow-Antwort von iCura ist ungültig.");
+      return {
+        text: parsed.data.responseText,
+        actions: normalizeActions(parsed.data.actions),
+      };
     }
 
-    return {
-      text: parsed.data.responseText,
-      actions: normalizeActions([
+    if (toolBlock.name === "propose_workflow") {
+      const parsed = proposeWorkflowSchema.safeParse(toolBlock.input);
+      if (!parsed.success) {
+        throw new Error("Die Workflow-Antwort von iCura ist ungültig.");
+      }
+
+      return {
+        text: parsed.data.responseText,
+        actions: normalizeActions([
+          {
+            type: "navigate",
+            target: voiceMap.automations,
+            explanation: parsed.data.rationale || parsed.data.responseText,
+          },
+        ]),
+      };
+    }
+
+    let toolResult: unknown = { ok: false, error: "Unbekanntes Tool." };
+
+    if (toolBlock.name === "find_patient") {
+      const parsed = patientLookupSchema.safeParse(toolBlock.input);
+      if (!parsed.success) throw new Error("Patientensuche ungueltig.");
+      const results = await findPatients(parsed.data.query);
+      toolResult = {
+        ok: true,
+        results,
+      };
+    }
+
+    if (toolBlock.name === "get_patient_financials") {
+      const parsed = patientFinancialSchema.safeParse(toolBlock.input);
+      if (!parsed.success) throw new Error("Patientenfinanzen ungueltig.");
+      toolResult = await getPatientFinancialSnapshot(parsed.data);
+    }
+
+    messages.push({
+      role: "assistant",
+      content: response.content,
+    });
+    messages.push({
+      role: "user",
+      content: [
         {
-          type: "navigate",
-          target: voiceMap.automations,
-          explanation: parsed.data.rationale || parsed.data.responseText,
+          type: "tool_result",
+          tool_use_id: toolBlock.id,
+          content: JSON.stringify(toolResult),
         },
-      ]),
-    };
+      ],
+    });
   }
 
   return {
-    text: extractTextContent(response.content),
+    text: context.locale === "de"
+      ? "Ich habe die Information noch nicht sauber aufloesen koennen."
+      : "I could not resolve that cleanly yet.",
     actions: [],
   };
 }
