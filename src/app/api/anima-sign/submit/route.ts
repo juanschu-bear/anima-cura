@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerClient, createAdminClient } from "@/lib/db/supabase";
-import crypto from "crypto";
+import { createServerClient } from "@/lib/db/supabase";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
+import { ensurePatientPortalAccount } from "@/lib/services/patient-portal-account";
 import {
   createAndDistribute,
   type DocumensoField,
@@ -89,92 +89,6 @@ function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenP
   set("zusatzversicherung", asString(answers["zusatzversicherung"]));
 
   return patch;
-}
-
-function normalizeForEmail(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9.-]/g, "")
-    .replace(/\.{2,}/g, ".");
-}
-
-function generatePassword(length = 10): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
-  const bytes = crypto.randomBytes(length);
-  return Array.from(bytes).map(b => chars[b % chars.length]).join("");
-}
-
-async function createPatientAccount(
-  vorname: string | null,
-  nachname: string | null,
-  patientEmail: string | null,
-  patientId: string | null,
-): Promise<{ login_email: string; password: string; user_id: string } | null> {
-  if (!vorname || !nachname || !patientId) return null;
-
-  const admin = createAdminClient();
-  const base = normalizeForEmail(vorname) + "." + normalizeForEmail(nachname);
-  const password = generatePassword(10);
-
-  // Try base email, append number if duplicate
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const loginEmail = attempt === 0
-      ? base + "@animacura.de"
-      : base + (attempt + 1) + "@animacura.de";
-
-    const { data: authData, error } = await admin.auth.admin.createUser({
-      email: loginEmail,
-      password: password,
-      email_confirm: true,
-      app_metadata: {
-        role: "patient",
-      },
-      user_metadata: {
-        display_name: `${vorname} ${nachname}`,
-        full_name: `${vorname} ${nachname}`,
-        vorname,
-        nachname,
-        patient_email: patientEmail,
-        role: "patient",
-        patient_id: patientId,
-      },
-    });
-
-    if (!error && authData.user) {
-      const profilePayload = {
-        id: authData.user.id,
-        email: loginEmail,
-        display_name: `${vorname} ${nachname}`,
-        role: "patient",
-        patient_id: patientId,
-      };
-
-      const { error: profileError } = await admin
-        .from("user_profiles")
-        .upsert(profilePayload, { onConflict: "id" });
-
-      if (profileError) {
-        console.error("Patient profile linkage failed:", profileError.message);
-        await admin.auth.admin.deleteUser(authData.user.id);
-        return null;
-      }
-
-      return { login_email: loginEmail, password, user_id: authData.user.id };
-    }
-
-    // If error is NOT a duplicate, stop trying
-    const errorMessage = error?.message ?? "Unbekannter Fehler";
-    if (!errorMessage.includes("already") && !errorMessage.includes("exists")) {
-      console.error("Account creation failed:", errorMessage);
-      return null;
-    }
-    // Duplicate: try next number
-  }
-
-  console.error("Account creation: 10 attempts exhausted");
-  return null;
 }
 
 function scheduleFastRetryAt() {
@@ -293,13 +207,21 @@ export async function POST(request: Request) {
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
     const resolvedPatientId = abgleich?.patient_id || patientId;
-    const account = await createPatientAccount(vorname, nachname, email, resolvedPatientId || null);
+    const account = await ensurePatientPortalAccount({
+      vorname,
+      nachname,
+      patientEmail: email,
+      patientId: resolvedPatientId || null,
+    });
 
     // 1e) Account-Email in Submission speichern
-    if (account?.login_email) {
+    if (account.status === "created" || account.status === "existing") {
       await supabase
         .from("anamnese_submissions")
-        .update({ account_email: account.login_email, account_password: account.password })
+        .update({
+          account_email: account.login_email,
+          ...(account.status === "created" ? { account_password: account.password } : {}),
+        })
         .eq("id", submissionId);
 
       // Portal-Zugang und Versichertendaten aus dem Anamnesebogen im Patienten-Record setzen
