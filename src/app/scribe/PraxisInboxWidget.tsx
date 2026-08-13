@@ -61,6 +61,18 @@ const DEFAULT_FORM = {
   erinnerung: "heute" as "heute" | "morgen" | "diese_woche",
 };
 
+function slugifyLabel(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLocaleLowerCase("de-DE")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function formatFaelligkeit(iso: string): string {
   const datum = new Date(`${iso}T12:00:00`);
   return Number.isNaN(datum.getTime()) ? iso : datum.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
@@ -310,9 +322,13 @@ export default function PraxisInboxWidget() {
                 heuteListe.map((eintrag) => (
                   <article key={eintrag.id} className={`praxis-item prioritaet-${eintrag.prioritaet}`}>
                     <div className="praxis-item-meta">
-                      <span className="praxis-art">{eintrag.art}</span>
-                      <span className="praxis-kategorie">{eintrag.kategorie}</span>
-                      {eintrag.bereich && <span className="praxis-bereich">{eintrag.bereich}</span>}
+                      <span className={`praxis-art art-${slugifyLabel(eintrag.art)}`}>{eintrag.art}</span>
+                      <span className={`praxis-kategorie kategorie-${slugifyLabel(eintrag.kategorie)}`}>{eintrag.kategorie}</span>
+                      {eintrag.bereich && (
+                        <span className={`praxis-bereich bereich-${slugifyLabel(eintrag.bereich)}`}>
+                          {eintrag.bereich}
+                        </span>
+                      )}
                     </div>
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}

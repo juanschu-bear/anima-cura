@@ -938,11 +938,46 @@
 .scribe .praxis-item.prioritaet-hoch{box-shadow:0 0 0 1px rgba(242,181,68,.3) inset}
 .scribe .praxis-item-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
 .scribe .praxis-art,.scribe .praxis-kategorie,.scribe .praxis-bereich{
-  display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:10.5px;text-transform:capitalize
+  display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:10.5px;text-transform:capitalize;
+  border:1px solid transparent;box-shadow:0 8px 18px -14px rgba(0,0,0,.75)
 }
-.scribe .praxis-art{background:rgba(94,162,255,.14);color:#8FC5FF}
-.scribe .praxis-kategorie{background:rgba(255,255,255,.06);color:#DDEAF7}
-.scribe .praxis-bereich{background:rgba(242,181,68,.12);color:#F2B544}
+.scribe .praxis-art{background:rgba(94,162,255,.16);border-color:rgba(143,197,255,.18);color:#A9D3FF}
+.scribe .praxis-kategorie{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.08);color:#E4EEFA}
+.scribe .praxis-bereich{
+  background:linear-gradient(135deg,rgba(242,181,68,.18),rgba(242,181,68,.08));
+  border-color:rgba(242,181,68,.24);color:#F7C869;font-weight:700;letter-spacing:.02em
+}
+.scribe .praxis-bereich.bereich-terminarten{
+  background:linear-gradient(135deg,rgba(99,211,255,.30),rgba(46,111,230,.14));
+  border-color:rgba(115,220,255,.48);
+  color:#D8F6FF;
+  box-shadow:0 0 0 1px rgba(115,220,255,.12) inset,0 10px 24px -16px rgba(99,211,255,.8);
+}
+.scribe .praxis-bereich.bereich-behandlungsarten{
+  background:linear-gradient(135deg,rgba(123,216,166,.24),rgba(30,124,89,.12));
+  border-color:rgba(123,216,166,.38);
+  color:#D8FFEB;
+}
+.scribe .praxis-bereich.bereich-dokumentation{
+  background:linear-gradient(135deg,rgba(171,139,255,.24),rgba(90,64,170,.12));
+  border-color:rgba(171,139,255,.4);
+  color:#EEE2FF;
+}
+.scribe .praxis-bereich.bereich-textbausteine{
+  background:linear-gradient(135deg,rgba(255,132,181,.24),rgba(155,51,93,.12));
+  border-color:rgba(255,132,181,.34);
+  color:#FFE1EE;
+}
+.scribe .praxis-bereich.bereich-design{
+  background:linear-gradient(135deg,rgba(255,178,107,.24),rgba(175,98,29,.12));
+  border-color:rgba(255,178,107,.36);
+  color:#FFE7CA;
+}
+.scribe .praxis-bereich.bereich-scribe{
+  background:linear-gradient(135deg,rgba(255,196,92,.24),rgba(151,102,14,.12));
+  border-color:rgba(255,196,92,.34);
+  color:#FFE7B3;
+}
 .scribe .praxis-item strong{display:block;font-size:14px;line-height:1.35}
 .scribe .praxis-item p{margin:7px 0 0;font-size:12.5px;color:rgba(234,242,253,.72)}
 .scribe .praxis-item-fuss{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
