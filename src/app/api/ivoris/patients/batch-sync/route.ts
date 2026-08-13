@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
+import { findPotentialDuplicateCandidates } from "@/lib/services/ivoris-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
@@ -55,8 +56,8 @@ function normalizePatient(raw: any) {
 
   return {
     ivoris_id: ivorisId,
-    vorname: raw.Firstname || "",
-    nachname: raw.Lastname || "",
+    vorname: String(raw.Firstname || "").trim(),
+    nachname: String(raw.Lastname || "").trim(),
     geburtsdatum: raw.Birthday ? new Date(raw.Birthday).toISOString().slice(0, 10) : null,
     geschlecht: mapGender(raw.Gender),
     kasse: mapInsurance(raw.HealthInsurance),
@@ -70,6 +71,24 @@ function normalizePatient(raw: any) {
     ort: address?.City || null,
     land: address?.Country || "DE",
   };
+}
+
+type BatchPatientRow = NonNullable<ReturnType<typeof normalizePatient>>;
+
+type ExistingPatientCandidate = {
+  id: string;
+  ivoris_id: string | null;
+  vorname: string;
+  nachname: string;
+  geburtsdatum: string;
+};
+
+function buildPersonIdentityKey(patient: BatchPatientRow) {
+  return [
+    patient.vorname.trim().toLocaleLowerCase("de-DE"),
+    patient.nachname.trim().toLocaleLowerCase("de-DE"),
+    patient.geburtsdatum ?? "",
+  ].join("|");
 }
 
 export async function GET(request: Request) {
@@ -105,14 +124,98 @@ export async function GET(request: Request) {
 
     totalFetched += patients.length;
 
-    const rows: NonNullable<ReturnType<typeof normalizePatient>>[] = [];
+    const normalizedRows: BatchPatientRow[] = [];
     for (const raw of patients) {
       const normalized = normalizePatient(raw);
       if (!normalized) { totalSkipped++; continue; }
-      rows.push(normalized);
+      normalizedRows.push(normalized);
     }
 
-    if (rows.length === 0) continue;
+    if (normalizedRows.length === 0) continue;
+
+    const ivorisIds = normalizedRows.map((row) => row.ivoris_id);
+    const birthdays = Array.from(
+      new Set(normalizedRows.map((row) => row.geburtsdatum).filter((value): value is string => Boolean(value)))
+    );
+
+    const { data: existingRows, error: existingRowsError } = await db
+      .from("patients")
+      .select("id, ivoris_id, vorname, nachname, geburtsdatum")
+      .in("ivoris_id", ivorisIds);
+
+    if (existingRowsError) {
+      errors.push(`Existing-Lookup Seite ${page}: ${existingRowsError.message}`);
+      totalSkipped += normalizedRows.length;
+      continue;
+    }
+
+    const existingByIvorisId = new Set(
+      ((existingRows ?? []) as Array<{ ivoris_id: string | null }>)
+        .map((row) => row.ivoris_id)
+        .filter((value): value is string => Boolean(value))
+    );
+
+    let birthdayCandidates: ExistingPatientCandidate[] = [];
+    if (birthdays.length > 0) {
+      const { data: sameBirthdayRows, error: sameBirthdayError } = await db
+        .from("patients")
+        .select("id, ivoris_id, vorname, nachname, geburtsdatum")
+        .in("geburtsdatum", birthdays);
+
+      if (sameBirthdayError) {
+        errors.push(`Duplicate-Lookup Seite ${page}: ${sameBirthdayError.message}`);
+        totalSkipped += normalizedRows.length;
+        continue;
+      }
+
+      birthdayCandidates = (sameBirthdayRows ?? []) as ExistingPatientCandidate[];
+    }
+
+    const rows: BatchPatientRow[] = [];
+    const queuedIdentityKeys = new Set<string>();
+    for (const row of normalizedRows) {
+      const identityKey = buildPersonIdentityKey(row);
+
+      if (existingByIvorisId.has(row.ivoris_id)) {
+        rows.push(row);
+        queuedIdentityKeys.add(identityKey);
+        continue;
+      }
+
+      if (queuedIdentityKeys.has(identityKey)) {
+        totalSkipped += 1;
+        errors.push(
+          `Seite ${page}: eingehende Dublette übersprungen für ${row.vorname} ${row.nachname} (${row.geburtsdatum ?? "ohne Geburtsdatum"})`
+        );
+        continue;
+      }
+
+      const duplicateCandidates = row.geburtsdatum
+        ? findPotentialDuplicateCandidates(
+            {
+              ivoris_id: row.ivoris_id,
+              vorname: row.vorname,
+              nachname: row.nachname,
+              geburtsdatum: row.geburtsdatum,
+            },
+            birthdayCandidates
+          )
+        : [];
+
+      if (duplicateCandidates.length > 0) {
+        totalSkipped += 1;
+        errors.push(
+          `Seite ${page}: lokale Dublette übersprungen für ${row.vorname} ${row.nachname} (${row.geburtsdatum}) unter ${duplicateCandidates
+            .map((candidate) => candidate.ivoris_id)
+            .filter(Boolean)
+            .join(", ")}`
+        );
+        continue;
+      }
+
+      rows.push(row);
+      queuedIdentityKeys.add(identityKey);
+    }
 
     const { error } = await db
       .from("patients")

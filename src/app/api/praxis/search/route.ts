@@ -68,6 +68,27 @@ function rankPatientMatch(patient: any, search: string) {
   return best;
 }
 
+function buildPatientIdentityKey(patient: {
+  vorname?: string | null;
+  nachname?: string | null;
+  geburtsdatum?: string | null;
+}) {
+  return [
+    normalizePatientSearch(patient.vorname ?? ""),
+    normalizePatientSearch(patient.nachname ?? ""),
+    patient.geburtsdatum ?? "",
+  ].join("|");
+}
+
+function scorePatientDisplayQuality(patient: any) {
+  let score = 0;
+  if (patient.behandlung && patient.behandlung !== "Unbekannt") score += 8;
+  if (patient.ivoris_nummer) score += 4;
+  if (patient.email) score += 2;
+  if (patient.telefon || patient.mobiltelefon) score += 2;
+  return score;
+}
+
 export async function GET(request: NextRequest) {
   const supabase = createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -146,8 +167,26 @@ export async function GET(request: NextRequest) {
     return String(a.vorname ?? "").localeCompare(String(b.vorname ?? ""), "de");
   });
 
+  const uniquePatients = new Map<string, any>();
+  for (const patient of treffer) {
+    const identityKey = buildPatientIdentityKey(patient);
+    const current = uniquePatients.get(identityKey);
+    if (!current) {
+      uniquePatients.set(identityKey, patient);
+      continue;
+    }
+
+    const currentScore = scorePatientDisplayQuality(current);
+    const nextScore = scorePatientDisplayQuality(patient);
+    if (nextScore > currentScore) {
+      uniquePatients.set(identityKey, patient);
+    }
+  }
+
+  const collapsedTreffer = Array.from(uniquePatients.values());
+
   return NextResponse.json({
-    results: treffer.slice(0, 8).map(p => ({
+    results: collapsedTreffer.slice(0, 8).map(p => ({
       id: p.id,
       ivoris_nummer: p.ivoris_nummer ?? null,
       vorname: p.vorname ?? "",
