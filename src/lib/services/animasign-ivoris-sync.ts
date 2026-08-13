@@ -1320,15 +1320,47 @@ export async function runNextPendingAnimaSignStage(
     return { stage, found: false, reason: "Keine faellige Submission" };
   }
 
-  return {
-    stage,
-    found: true,
-    submissionId: next.id,
-    result: await syncAnimaSignSubmission(next.id, {
-      db,
-      stages: [stage],
-    }),
-  };
+  const retryCount =
+    stage === "patient"
+      ? (next.ivoris_sync_retry_count ?? 0)
+      : (next.ivoris_doc_retry_count ?? 0);
+  const attemptNo = retryCount + 1;
+
+  try {
+    return {
+      stage,
+      found: true,
+      submissionId: next.id,
+      result: await syncAnimaSignSubmission(next.id, {
+        db,
+        stages: [stage],
+      }),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const guardedMessage = `Worker hat unerwarteten ${stage}-Fehler abgefangen: ${message}`;
+
+    await writeSyncLog(db, next.id, stage, attemptNo, "error", guardedMessage, {
+      metadata: {
+        source: "runNextPendingAnimaSignStage",
+        unexpectedWorkerFailure: true,
+      },
+    });
+    await markStageFailure(db, next.id, stage, attemptNo, guardedMessage);
+
+    return {
+      stage,
+      found: true,
+      submissionId: next.id,
+      reason: guardedMessage,
+      result: {
+        submissionId: next.id,
+        patient: stage === "patient" ? "error" : "skipped",
+        document: stage === "document" ? "error" : "skipped",
+        errors: [guardedMessage],
+      },
+    };
+  }
 }
 
 export async function retryPendingAnimaSignSyncs(
