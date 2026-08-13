@@ -24,18 +24,19 @@ function requireEnv(name: string) {
   }
 }
 
-function validateWorkerEnv() {
+function validateWorkerEnv(options: { patientLimit: number; documentLimit: number }) {
   [
     "NEXT_PUBLIC_SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
     "IVORIS_APP",
+    "IVORIS_APP_VERSION",
     "IVORIS_API_KEY",
     "IVORIS_LINKNAME",
-    "IVORIS_PROFILE_ID",
-    "IVORIS_USERNAME",
-    "IVORIS_PASSWORD",
-    "IVORIS_RELAY_HOST",
   ].forEach(requireEnv);
+
+  if (options.documentLimit > 0) {
+    requireEnv("IVORIS_PROFILE_ID");
+  }
 }
 
 async function createWorkerAlert(stage: SyncStage, message: string) {
@@ -103,10 +104,9 @@ async function drainStage(
 }
 
 async function main() {
-  validateWorkerEnv();
-
   const patientLimit = readPositiveInt("ANIMASIGN_SYNC_WORKER_PATIENT_LIMIT", 3);
   const documentLimit = readPositiveInt("ANIMASIGN_SYNC_WORKER_DOCUMENT_LIMIT", 5);
+  validateWorkerEnv({ patientLimit, documentLimit });
   const db = createServerClient();
 
   console.log(
