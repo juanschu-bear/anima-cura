@@ -40,7 +40,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run AnimaSign sync worker
-        run: npx tsx scripts/animasign-sync-worker.ts
+        run: npm run animasign:sync-worker
