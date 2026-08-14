@@ -61,13 +61,20 @@ function formatDatumKurz(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("de-DE");
 }
 
+const SCRIBE_LISTEN_DATUM_KEY = "animascribe.listenDatum";
+const SCRIBE_LISTEN_SUCHE_KEY = "animascribe.listenSuche";
+
+function heutigesIsoDatum(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function beschreibePushFehlerPraxis(fehler: string | null | undefined): string {
   const text = fehler?.trim();
   if (!text) return "Nicht in ivoris angekommen. Wird automatisch erneut versucht.";
   if (text === "Patient hat keine ivoris_id") {
     return "Patient ist noch nicht mit ivoris verknüpft. Bitte intern prüfen.";
   }
-  if (text.includes("nicht stabil erreichbar") || text.includes("AddEntry fehlgeschlagen (503)")) {
+  if (istAutomatischBehebbarerPushFehler(text) || text.includes("AddEntry fehlgeschlagen")) {
     return "ivoris ist gerade vorübergehend nicht erreichbar. Wird automatisch erneut versucht.";
   }
   return "Übertragung gerade nicht möglich. Bitte später erneut senden.";
@@ -359,8 +366,16 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
-  const [listenDatum, setListenDatum] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [listenSuche, setListenSuche] = useState("");
+  const [listenDatum, setListenDatum] = useState<string>(() => {
+    if (typeof window === "undefined") return heutigesIsoDatum();
+    const gespeichert = window.localStorage.getItem(SCRIBE_LISTEN_DATUM_KEY)?.trim();
+    if (!gespeichert) return heutigesIsoDatum();
+    return gespeichert > heutigesIsoDatum() ? heutigesIsoDatum() : gespeichert;
+  });
+  const [listenSuche, setListenSuche] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(SCRIBE_LISTEN_SUCHE_KEY) ?? "";
+  });
 
   const [suche, setSuche] = useState("");
   const [treffer, setTreffer] = useState<PatientTreffer[]>([]);
@@ -420,6 +435,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       setHeute(json.eintraege ?? []);
     }
   }, [listenDatum]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SCRIBE_LISTEN_DATUM_KEY, listenDatum);
+  }, [listenDatum]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SCRIBE_LISTEN_SUCHE_KEY, listenSuche);
+  }, [listenSuche]);
 
   useEffect(() => {
     (async () => {
@@ -1340,7 +1363,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   className="tagwahl"
                   type="date"
                   value={listenDatum}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={heutigesIsoDatum()}
                   onChange={(e) => setListenDatum(e.target.value || listenDatum)}
                   aria-label="Datum wählen"
                 />
@@ -1348,9 +1371,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   <CalendarDays size={18} strokeWidth={2.2} />
                 </button>
               </div>
-              <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= new Date().toISOString().slice(0, 10)} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
-              {listenDatum !== new Date().toISOString().slice(0, 10) && (
-                <button className="heutbtn" onClick={() => setListenDatum(new Date().toISOString().slice(0, 10))}>Heute</button>
+              <button className="tagpfeil" aria-label="Tag vor" disabled={listenDatum >= heutigesIsoDatum()} onClick={() => setListenDatum((d) => verschiebeTag(d, 1))}>›</button>
+              {listenDatum !== heutigesIsoDatum() && (
+                <button className="heutbtn" onClick={() => setListenDatum(heutigesIsoDatum())}>Heute</button>
               )}
             </div>
             <input className="listensuche" type="text" placeholder="Patient filtern" value={listenSuche} onChange={(e) => setListenSuche(e.target.value)} aria-label="Tagesliste nach Patient filtern" />
@@ -1364,7 +1387,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             : heute;
           const offeneListe = gefiltert.filter((e) => e.status === "entwurf" || e.ivoris_push_status === "fehler");
           const erledigt = gefiltert.filter((e) => !(e.status === "entwurf" || e.ivoris_push_status === "fehler"));
-          const tagIstHeute = listenDatum === new Date().toISOString().slice(0, 10);
+          const tagIstHeute = listenDatum === heutigesIsoDatum();
 
           const Karte = (e: TagesEintrag) => {
             const p = wachePille(e);
