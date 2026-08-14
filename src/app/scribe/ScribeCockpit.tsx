@@ -73,6 +73,16 @@ function beschreibePushFehlerPraxis(fehler: string | null | undefined): string {
   return "Übertragung gerade nicht möglich. Bitte später erneut senden.";
 }
 
+function istAutomatischBehebbarerPushFehler(fehler: string | null | undefined): boolean {
+  const text = (fehler ?? "").trim();
+  return (
+    text.includes("(502)") ||
+    text.includes("(503)") ||
+    text.includes("(504)") ||
+    text.includes("nicht stabil erreichbar")
+  );
+}
+
 const ART_NAMEN: Record<string, string> = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" };
 const BOGEN = ["12er NiTi", "14er NiTi", "16er NiTi", "16×22 NiTi", "16×22 Stahl", "18er Stahl"];
 const FDI_OK = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -401,6 +411,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [aenderungsgrund, setAenderungsgrund] = useState("");
   const [syncLaeuft, setSyncLaeuft] = useState(false);
   const [syncInfo, setSyncInfo] = useState<string | null>(null);
+  const ivorisNachsyncRef = useRef<string | null>(null);
 
   const ladeHeute = useCallback(async () => {
     const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
@@ -425,6 +436,30 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
       await ladeHeute();
     })();
   }, [ladeHeute]);
+
+  useEffect(() => {
+    const fehlerEintraege = heute.filter(
+      (e) => e.ivoris_push_status === "fehler" && istAutomatischBehebbarerPushFehler(e.ivoris_fehler)
+    );
+    if (fehlerEintraege.length === 0) return;
+
+    const key = `${listenDatum}:${fehlerEintraege.map((e) => e.id).join(",")}`;
+    if (ivorisNachsyncRef.current === key) return;
+    ivorisNachsyncRef.current = key;
+
+    void (async () => {
+      const res = await fetch("/api/doku/ivoris-nachsync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ datum: listenDatum, limit: 20 }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      if ((json.recovered ?? 0) > 0) {
+        await ladeHeute();
+      }
+    })();
+  }, [heute, ladeHeute, listenDatum]);
 
   /* Patientensuche */
   useEffect(() => {
