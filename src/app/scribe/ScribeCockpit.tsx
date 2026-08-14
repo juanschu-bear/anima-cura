@@ -63,12 +63,12 @@ function formatDatumKurz(iso: string | null | undefined): string {
 
 function beschreibePushFehlerPraxis(fehler: string | null | undefined): string {
   const text = fehler?.trim();
-  if (!text) return "Nicht in ivoris angekommen. Bitte später erneut senden.";
+  if (!text) return "Nicht in ivoris angekommen. Wird automatisch erneut versucht.";
   if (text === "Patient hat keine ivoris_id") {
     return "Patient ist noch nicht mit ivoris verknüpft. Bitte intern prüfen.";
   }
   if (text.includes("nicht stabil erreichbar") || text.includes("AddEntry fehlgeschlagen (503)")) {
-    return "ivoris ist gerade vorübergehend nicht erreichbar. Bitte später erneut senden.";
+    return "ivoris ist gerade vorübergehend nicht erreichbar. Wird automatisch erneut versucht.";
   }
   return "Übertragung gerade nicht möglich. Bitte später erneut senden.";
 }

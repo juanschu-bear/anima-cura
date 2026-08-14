@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { runNextPendingAnimaSignStage } from "@/lib/services/animasign-ivoris-sync";
 import { reconcilePendingAnimaSignSignatures } from "@/lib/services/animasign-signature-reconciliation";
+import { retryPendingScribeIvorisPushes } from "@/lib/services/scribe-ivoris-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
     limit: 10,
     minAgeSeconds: 60,
   });
+  const scribe = await retryPendingScribeIvorisPushes({ db, limit: 20 });
 
   const patient = await runNextPendingAnimaSignStage("patient", { db });
   const document = {
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    scribe,
     signatureReconciliation,
     patient,
     document,
