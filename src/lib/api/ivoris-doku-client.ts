@@ -5,6 +5,8 @@
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TRANSIENT_IVORIS_STATUSES = new Set([502, 503, 504]);
+const ADD_ENTRY_RETRY_DELAY_MS = 900;
 
 type IvorisDokuCredentials = {
   app: string;
@@ -62,6 +64,111 @@ async function parseBestEffort(response: Response): Promise<unknown> {
   } catch {
     return text;
   }
+}
+
+function formatPayload(payload: unknown): string {
+  if (typeof payload === "string") return payload.trim() || "leer";
+  if (payload === null || payload === undefined) return "leer";
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return String(payload);
+  }
+}
+
+function normalizeLooseText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function pickString(candidate: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = candidate[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" || typeof value === "bigint") return String(value);
+  }
+  return null;
+}
+
+function matchesEntryPayload(
+  row: Record<string, unknown>,
+  input: Pick<IvorisKarteiEintragInput, "date" | "text" | "tooth">
+): string | null {
+  const dateValue = pickString(row, ["Date", "date", "EntryDate", "entryDate"]);
+  const textValue = pickString(row, ["Text", "text", "Content", "content", "Description", "description"]);
+  const toothValue = pickString(row, ["Tooth", "tooth", "ToothNo", "toothNo"]);
+  const entryId = pickString(row, ["EntryId", "entryId", "Id", "id"]);
+
+  if (!entryId) return null;
+  if (!dateValue?.startsWith(input.date)) return null;
+  if (normalizeLooseText(textValue) !== normalizeLooseText(input.text)) return null;
+  if (input.tooth && toothValue && toothValue !== input.tooth) return null;
+  if (input.tooth && !toothValue) return null;
+
+  return entryId;
+}
+
+function findExistingEntryId(
+  payload: unknown,
+  input: Pick<IvorisKarteiEintragInput, "date" | "text" | "tooth">
+): string | null {
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const found = findExistingEntryId(item, input);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const direct = matchesEntryPayload(candidate, input);
+  if (direct) return direct;
+
+  for (const key of ["entry", "entries", "data", "result", "items"]) {
+    const nested = findExistingEntryId(candidate[key], input);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postJson(url: URL, headers: Record<string, string>, body: string) {
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers,
+    body,
+    cache: "no-store",
+  });
+  const payload = await parseBestEffort(response);
+  return { response, payload };
+}
+
+async function findExistingKarteiEntryId(input: IvorisKarteiEintragInput): Promise<string | null> {
+  try {
+    const entries = await fetchIvorisKarteiEintraege(input.patientIvorisId);
+    return findExistingEntryId(entries, input);
+  } catch (error) {
+    console.warn(
+      `[IVORIS] AddEntry duplicate-check failed for patient=${input.patientIvorisId} date=${input.date}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
+function transientAddEntryMessage(status: number, payload: unknown): string {
+  const detail = formatPayload(payload);
+  const suffix = detail !== "leer" ? ` Detail: ${detail}` : "";
+  return `IVORIS ist gerade nicht stabil erreichbar (${status}). Der Eintrag wurde noch nicht sicher uebernommen. Bitte in 1-2 Minuten erneut versuchen.${suffix}`;
 }
 
 function assertNonEmptyString(value: unknown, field: string): string {
@@ -144,6 +251,7 @@ export async function addIvorisKarteiEintrag(
 ): Promise<IvorisKarteiEintragResult> {
   const creds = getCredentials();
   const url = buildUrl(creds, "/Documentation/v1/Entry");
+  const headers = buildHeaders(creds);
 
   const body = {
     entry: {
@@ -156,19 +264,39 @@ export async function addIvorisKarteiEintrag(
       Text: input.text,
     },
   };
+  const requestBody = JSON.stringify(body);
 
-  const response = await fetch(url.toString(), {
-    method: "POST",
-    headers: buildHeaders(creds),
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  const payload = await parseBestEffort(response);
-  if (!response.ok) {
-    throw new Error(
-      `IVORIS AddEntry fehlgeschlagen (${response.status}): ${typeof payload === "string" ? payload : JSON.stringify(payload)}`
+  let { response, payload } = await postJson(url, headers, requestBody);
+  if (!response.ok && TRANSIENT_IVORIS_STATUSES.has(response.status)) {
+    console.warn(
+      `[IVORIS] AddEntry transient response status=${response.status} patient=${input.patientIvorisId} date=${input.date} payload=${formatPayload(payload)}`
     );
+
+    const existingEntryId = await findExistingKarteiEntryId(input);
+    if (existingEntryId) {
+      console.info(
+        `[IVORIS] AddEntry recovered via duplicate-check entryId=${existingEntryId} patient=${input.patientIvorisId}`
+      );
+      return { entryId: existingEntryId };
+    }
+
+    await sleep(ADD_ENTRY_RETRY_DELAY_MS);
+    ({ response, payload } = await postJson(url, headers, requestBody));
+
+    if (!response.ok && TRANSIENT_IVORIS_STATUSES.has(response.status)) {
+      const recoveredEntryId = await findExistingKarteiEntryId(input);
+      if (recoveredEntryId) {
+        console.info(
+          `[IVORIS] AddEntry recovered after retry-check entryId=${recoveredEntryId} patient=${input.patientIvorisId}`
+        );
+        return { entryId: recoveredEntryId };
+      }
+      throw new Error(transientAddEntryMessage(response.status, payload));
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(`IVORIS AddEntry fehlgeschlagen (${response.status}): ${formatPayload(payload)}`);
   }
 
   // AddEntry liefert die Entry-Id als nackten JSON-String zurueck (verifiziert am 2026-06-10).

@@ -42,6 +42,7 @@ type TagesEintrag = {
   termin_typ: string | null;
   behandlungsart: string | null;
   ivoris_push_status: string;
+  ivoris_fehler?: string | null;
   bestaetigt_am: string | null;
   text: string;
   zaehne: string[];
@@ -58,6 +59,15 @@ function formatDatumKurz(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("de-DE");
+}
+
+function beschreibePushFehler(fehler: string | null | undefined): string {
+  const text = fehler?.trim();
+  if (!text) return "Technischer Übertragungsfehler. Bitte Eintrag öffnen und erneut nach ivoris senden.";
+  if (text === "Patient hat keine ivoris_id") {
+    return "Patient ist noch nicht sauber mit ivoris verknüpft. Bitte Zuordnung prüfen.";
+  }
+  return `Technischer Übertragungsfehler: ${text}`;
 }
 
 const ART_NAMEN: Record<string, string> = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" };
@@ -1323,12 +1333,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             const am = e.bestaetigt_am
               ? new Date(e.bestaetigt_am).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
               : "·";
+            const pushFehlerHinweis = e.ivoris_push_status === "fehler" ? beschreibePushFehler(e.ivoris_fehler) : null;
             return (
               <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))} onKeyDown={(ev) => ev.key === "Enter" && (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))}>
                 <div className="zeit">{am}</div>
                 <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
                 <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
                 <span className={`pille ${p.cls}`}>{p.text}</span>
+                {pushFehlerHinweis && <div className="wache-fehler">{pushFehlerHinweis}</div>}
               </div>
             );
           };
@@ -2022,6 +2034,13 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <p className="detailmeta" style={{ marginTop: 10 }}>
                 Nur Ansicht. Änderungen laufen über den Eintrag selbst als neue Version.
               </p>
+              {detail.ivoris_push_status === "fehler" && (
+                <p className="detailfehlerbox">
+                  <b>Hinweis:</b> Das ist kein Praxisfehler, sondern ein technisches Problem beim Schreiben nach ivoris.
+                  {" "}
+                  {beschreibePushFehler(detail.ivoris_fehler)}
+                </p>
+              )}
               <div className="aktionen" style={{ marginTop: 14 }}>
                 {detail.status === "bestaetigt" && detail.ivoris_push_status !== "gepusht" && (
                   <button className="haupt" onClick={detailPush} disabled={detailLaeuft}>
