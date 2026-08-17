@@ -159,6 +159,7 @@ export default function BehandlungslogikPage() {
   const [openCategory, setOpenCategory] = useState<Behandlungskategorie>("MB2");
   const [ruleIdea, setRuleIdea] = useState("");
   const [customRules, setCustomRules] = useState<StoredRule[]>([]);
+  const [openDecisionRuleKey, setOpenDecisionRuleKey] = useState<string>("base-0");
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [loadingRules, setLoadingRules] = useState(true);
@@ -698,20 +699,75 @@ export default function BehandlungslogikPage() {
                     </div>
                   )}
                   {allDecisionRules.map((rule, index) => (
-                    <details
-                      key={isStoredRule(rule) ? rule.id : `${rule.title}-${index}`}
-                      open={index === 0}
+                    (() => {
+                      const ruleKey = isStoredRule(rule) ? rule.id : `base-${index}`;
+                      const isOpen = openDecisionRuleKey === ruleKey;
+                      return (
+                    <div
+                      key={ruleKey}
                       style={{
                         borderRadius: 18,
-                        border: `1px solid ${border}`,
-                        background: dk ? "rgba(255,255,255,0.02)" : "#fbfdff",
+                        border: `1px solid ${isOpen ? "rgba(96,165,250,0.34)" : border}`,
+                        background: isOpen
+                          ? (dk ? "linear-gradient(145deg, rgba(96,165,250,0.09), rgba(255,255,255,0.03))" : "linear-gradient(145deg, rgba(96,165,250,0.08), #fbfdff)")
+                          : (dk ? "rgba(255,255,255,0.02)" : "#fbfdff"),
                         padding: 16,
+                        boxShadow: isOpen ? "0 14px 34px rgba(59,130,246,0.12)" : "none",
+                        transition: "border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease",
                       }}
                     >
-                      <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 14, fontWeight: 800, color: fg, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                        <span>{rule.title}</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenDecisionRuleKey(isOpen ? "" : ruleKey)}
+                          style={{
+                            flex: 1,
+                            textAlign: "left",
+                            background: "transparent",
+                            border: 0,
+                            padding: 0,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                            <div>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                <span style={{ borderRadius: 999, padding: "5px 9px", background: isOpen ? "rgba(96,165,250,0.14)" : (dk ? "rgba(255,255,255,0.04)" : "rgba(15,23,42,0.05)"), border: `1px solid ${isOpen ? "rgba(96,165,250,0.24)" : border}`, color: isOpen ? "#60a5fa" : muted, fontSize: 10.5, fontWeight: 900, letterSpacing: 1, textTransform: "uppercase" }}>
+                                  {isStoredRule(rule) ? "Praxis-Regel" : "Basis-Regel"}
+                                </span>
+                                {isStoredRule(rule) && (
+                                  <span style={{ fontSize: 11.5, color: muted }}>
+                                    gespeichert
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 14.5, fontWeight: 800, color: fg }}>{rule.title}</div>
+                              {!isOpen && (
+                                <div style={{ fontSize: 12.5, color: muted, lineHeight: 1.55, marginTop: 8, maxWidth: 720 }}>
+                                  {rule.body}
+                                </div>
+                              )}
+                            </div>
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 999,
+                                border: `1px solid ${isOpen ? "rgba(96,165,250,0.28)" : border}`,
+                                display: "grid",
+                                placeItems: "center",
+                                color: isOpen ? "#60a5fa" : muted,
+                                background: isOpen ? "rgba(96,165,250,0.08)" : "transparent",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <ChevronDown size={16} style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }} />
+                            </div>
+                          </div>
+                        </button>
                         {isStoredRule(rule) ? (
-                          <span style={{ display: "inline-flex", gap: 8 }}>
+                          <span style={{ display: "inline-flex", gap: 8, paddingTop: 2 }}>
                             <button
                               type="button"
                               onClick={(event) => {
@@ -739,18 +795,29 @@ export default function BehandlungslogikPage() {
                             </button>
                           </span>
                         ) : null}
-                      </summary>
-                      <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7, marginTop: 10 }}>{rule.body}</div>
-                      {Array.isArray(rule.impacts) && rule.impacts.length > 0 ? (
-                        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-                          {rule.impacts.map((impact) => (
-                            <div key={impact} style={{ borderRadius: 14, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#ffffff", padding: "10px 12px", fontSize: 12.5, lineHeight: 1.55, color: muted }}>
-                              {impact}
+                      </div>
+                      {isOpen && (
+                        <>
+                          <div style={{ height: 1, background: border, margin: "14px 0 12px" }} />
+                          <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7 }}>{rule.body}</div>
+                          {Array.isArray(rule.impacts) && rule.impacts.length > 0 ? (
+                            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                              {rule.impacts.map((impact) => (
+                                <div key={impact} style={{ borderRadius: 14, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#ffffff", padding: "10px 12px", fontSize: 12.5, lineHeight: 1.55, color: muted }}>
+                                  {impact}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </details>
+                          ) : (
+                            <div style={{ marginTop: 12, fontSize: 12.5, color: muted }}>
+                              Diese Regel ist eine zentrale Leitplanke ohne zusätzliche Impact-Notizen.
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                      );
+                    })()
                   ))}
                 </div>
               </div>
