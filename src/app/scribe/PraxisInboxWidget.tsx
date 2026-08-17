@@ -1,6 +1,7 @@
 "use client";
 
 import { Lightbulb, MessageCircleMore, Sparkles, CircleAlert, ListTodo, CheckCheck, Loader2, Trash2, ChevronDown } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useThema } from "./ScribeShell";
 
@@ -114,6 +115,12 @@ function InboxMeta({ eintrag }: { eintrag: InboxEintrag }) {
       )}
     </div>
   );
+}
+
+function istPersonImTeam(name: string | null | undefined, team: Array<{ id: string; name: string; role: string | null }>) {
+  const ziel = (name ?? "").trim().toLocaleLowerCase("de-DE");
+  if (!ziel) return false;
+  return team.some((person) => person.name.trim().toLocaleLowerCase("de-DE") === ziel);
 }
 
 export default function PraxisInboxWidget() {
@@ -296,6 +303,8 @@ export default function PraxisInboxWidget() {
 
   function renderKommentarbereich(eintrag: InboxEintrag) {
     const antwort = antworten[eintrag.id] ?? { text: "", mentionUserId: "" };
+    const team = daten?.team ?? [];
+    const erstellerIstImTeam = istPersonImTeam(eintrag.erstellt_von_name, team);
     return (
       <div className="praxis-thread">
         <div className="praxis-thread-kopf">
@@ -322,6 +331,11 @@ export default function PraxisInboxWidget() {
         ) : (
           <p className="praxis-inbox-leer">Noch keine Rückfrage oder Antwort hinterlegt.</p>
         )}
+        {!erstellerIstImTeam && eintrag.erstellt_von_name ? (
+          <div className="praxis-teamhinweis">
+            {eintrag.erstellt_von_name} ist als Name am Eintrag sichtbar, aber noch nicht als echter AnimaScribe-User hinterlegt. Erst nach einem echten Nutzerkonto kann die Person markiert werden und Benachrichtigungen erhalten.
+          </div>
+        ) : null}
         <div className="praxis-antwortbox">
           <textarea
             className="praxis-inbox-textarea klein"
@@ -466,6 +480,31 @@ export default function PraxisInboxWidget() {
                 <option value="">{(daten?.team?.length ?? 0) > 0 ? "Noch offen lassen" : "Noch kein Mitarbeiter hinterlegt"}</option>
                 {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
               </select>
+            </div>
+
+            <div className="praxis-teamstatus">
+              <div className="praxis-teamstatus-kopf">
+                <span className="praxis-inbox-label">Aktive Scribe-User</span>
+                <Link className="praxis-teamlink" href="/einstellungen">
+                  Team & Zugänge öffnen
+                </Link>
+              </div>
+              {(daten?.team?.length ?? 0) > 0 ? (
+                <div className="praxis-teamliste">
+                  {(daten?.team ?? []).map((person) => (
+                    <span key={person.id} className="praxis-teamchip">
+                      {person.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="praxis-inbox-leer">Gerade ist noch kein Praxis-User für AnimaScribe hinterlegt.</p>
+              )}
+              {!daten?.canManageTeam ? (
+                <p className="praxis-teaminfo">
+                  Neue User legst du in <b>Einstellungen → Team & Zugänge</b> an. Das direkte Anlegen in der Inbox ist nur für Admin oder Verwaltung sichtbar.
+                </p>
+              ) : null}
             </div>
 
             {daten?.canManageTeam ? (

@@ -949,6 +949,12 @@
 .scribe .praxis-inbox-grid.komprimiert{grid-template-columns:1fr 1fr}
 .scribe .praxis-teambox{margin-top:14px;padding:12px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
 .scribe .praxis-teamgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.scribe .praxis-teamstatus{margin-top:14px;padding:12px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.scribe .praxis-teamstatus-kopf{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.scribe .praxis-teamlink{font-size:11.5px;color:#8FC5FF;text-decoration:none}
+.scribe .praxis-teamliste{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.scribe .praxis-teamchip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(94,162,255,.12);border:1px solid rgba(143,197,255,.24);color:#D8F6FF;font-size:11.5px;font-weight:600}
+.scribe .praxis-teaminfo{margin:8px 0 0;font-size:11.5px;color:#95AFCA;line-height:1.45}
 .scribe .praxis-inbox-label{display:block;margin-bottom:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8EB0CF}
 .scribe .praxis-inbox-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
 .scribe .praxis-inbox-save,.scribe .praxis-inbox-refresh{
@@ -1099,6 +1105,7 @@
 .scribe .praxis-thread-kopf{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .scribe .praxis-thread-kopf span{font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#8EB0CF}
 .scribe .praxis-thread-unread{border:1px solid rgba(122,194,255,.28);background:rgba(94,162,255,.12);color:#D8F6FF;border-radius:999px;padding:4px 9px;font-size:11px;cursor:pointer}
+.scribe .praxis-teamhinweis{margin:10px 0 0;padding:10px 11px;border-radius:12px;background:rgba(255,196,92,.10);border:1px solid rgba(255,196,92,.18);color:#FFE7B3;font-size:11.5px;line-height:1.5}
 .scribe .praxis-kommentare{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .scribe .praxis-kommentar{padding:10px 11px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
 .scribe .praxis-kommentar-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
