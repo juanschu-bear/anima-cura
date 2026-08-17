@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, Sparkles, Target, WalletCards, FolderArchive, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Sparkles, Target, WalletCards, FolderArchive, ShieldCheck, PencilLine, Trash2, Loader2, CheckCircle2 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import {
   BEHANDLUNGSART_REGELN,
@@ -48,21 +48,25 @@ const DECISION_RULES = [
     title: "Aligner vs. alles andere",
     body:
       "Aligner werden primär über Privatlogik, Anfangszahlung um 450 €, Labor-/Materialkosten im Bereich 800–1.600 € und einen längeren Restzahlungsblock über meist 24 Monate erkannt.",
+    impacts: [],
   },
   {
     title: "MB1 vs. MB3",
     body:
       "67,82 € wiederkehrend spricht stark für MB1. 103,02 € wiederkehrend spricht stark für MB3. Das sind die klarsten festen Multiband-Signale im Bestand.",
+    impacts: [],
   },
   {
     title: "MB2 vs. H1/H2",
     body:
       "MB2 bedeutet nicht einfach ‚Spange zuerst‘, sondern ein Gesamtplan mit vorgeschalteter herausnehmbarer Apparatur und späterem Multiband-Teil. H1/H2 sind nur dann richtig, wenn kein späterer Multiband-Teil im selben Plan folgt.",
+    impacts: [],
   },
   {
     title: "Rolle des Alters",
     body:
       "Das Alter entscheidet nie allein, verstärkt aber die Tendenz: jüngere Patienten sprechen eher für H1, H2 oder MB2, ältere Jugendliche und Erwachsene eher für Aligner.",
+    impacts: [],
   },
 ];
 
@@ -71,6 +75,16 @@ type DraftRule = {
   body: string;
   impacts: string[];
 };
+
+type StoredRule = DraftRule & {
+  id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+function isStoredRule(rule: DraftRule | StoredRule): rule is StoredRule {
+  return typeof (rule as StoredRule).id === "string";
+}
 
 function clampConfidence(score: number) {
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -119,6 +133,19 @@ function buildDraftRule(input: string): DraftRule | null {
   };
 }
 
+function extractIdeaFromRule(rule: { body: string; title: string }) {
+  const prefix = "Interpretation der Idee:";
+  if (rule.body.startsWith(prefix)) {
+    return rule.body
+      .slice(prefix.length)
+      .replace("Diese Regel würde nicht blind entscheiden, sondern die bestehende Zahlungslogik gezielt schärfen und nur dort stärker gewichten, wo das Muster wirklich passt.", "")
+      .replace(/\s+/g, " ")
+      .replace(/\.\s*$/, "")
+      .trim();
+  }
+  return rule.title;
+}
+
 function scoreChipTone(score: number) {
   if (score >= 75) return { bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.28)", color: "#4ade80" };
   if (score >= 50) return { bg: "rgba(251,191,36,0.12)", border: "rgba(251,191,36,0.28)", color: "#fbbf24" };
@@ -131,7 +158,14 @@ export default function BehandlungslogikPage() {
   const [familyFilter, setFamilyFilter] = useState<FamilyFilter>("alle");
   const [openCategory, setOpenCategory] = useState<Behandlungskategorie>("MB2");
   const [ruleIdea, setRuleIdea] = useState("");
-  const [customRules, setCustomRules] = useState<{ title: string; body: string }[]>([]);
+  const [customRules, setCustomRules] = useState<StoredRule[]>([]);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
+  const [loadingRules, setLoadingRules] = useState(true);
+  const [savingRule, setSavingRule] = useState(false);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fg = dk ? "#eef2ff" : "#18243a";
   const muted = dk ? "#94a3b8" : "#66758d";
@@ -185,13 +219,206 @@ export default function BehandlungslogikPage() {
   );
 
   const draftRule = useMemo(() => buildDraftRule(ruleIdea), [ruleIdea]);
-  const allDecisionRules = useMemo(
-    () => [...DECISION_RULES, ...customRules],
-    [customRules],
+  const allDecisionRules = useMemo(() => [...DECISION_RULES, ...customRules], [customRules]);
+  const editingRule = useMemo(
+    () => customRules.find((rule) => rule.id === editingRuleId) ?? null,
+    [customRules, editingRuleId],
   );
 
+  useEffect(() => {
+    let active = true;
+    async function loadRules() {
+      setLoadingRules(true);
+      setError(null);
+      try {
+        const response = await fetch("/api/behandlungslogik/regeln", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error || "Regeln konnten nicht geladen werden.");
+        if (!active) return;
+        setCustomRules(Array.isArray(payload?.rules) ? payload.rules : []);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Regeln konnten nicht geladen werden.");
+      } finally {
+        if (active) setLoadingRules(false);
+      }
+    }
+    loadRules();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = window.setTimeout(() => setFeedback(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
+
+  async function saveDraftRule() {
+    const source = dialogMode === "edit" ? editingRule : null;
+    const nextDraft = draftRule;
+    if (!nextDraft) return;
+
+    setSavingRule(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/behandlungslogik/regeln", {
+        method: dialogMode === "edit" && source ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          dialogMode === "edit" && source
+            ? { id: source.id, title: nextDraft.title, body: nextDraft.body, impacts: nextDraft.impacts }
+            : { title: nextDraft.title, body: nextDraft.body, impacts: nextDraft.impacts },
+        ),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "Regel konnte nicht gespeichert werden.");
+
+      if (dialogMode === "edit" && source) {
+        setCustomRules((current) =>
+          current.map((rule) =>
+            rule.id === source.id
+              ? { ...rule, title: nextDraft.title, body: nextDraft.body, impacts: nextDraft.impacts, updated_at: new Date().toISOString() }
+              : rule,
+          ),
+        );
+        setFeedback("Trennregel aktualisiert.");
+      } else {
+        setCustomRules((current) => [payload.rule as StoredRule, ...current]);
+        setFeedback("Trennregel gespeichert.");
+      }
+
+      setDialogMode(null);
+      setEditingRuleId(null);
+      setRuleIdea("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Regel konnte nicht gespeichert werden.");
+    } finally {
+      setSavingRule(false);
+    }
+  }
+
+  async function deleteRule(ruleId: string) {
+    setDeletingRuleId(ruleId);
+    setError(null);
+    try {
+      const response = await fetch("/api/behandlungslogik/regeln", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: ruleId }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "Regel konnte nicht gelöscht werden.");
+      setCustomRules((current) => current.filter((rule) => rule.id !== ruleId));
+      setFeedback("Trennregel entfernt.");
+      if (editingRuleId === ruleId) {
+        setEditingRuleId(null);
+        setRuleIdea("");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Regel konnte nicht gelöscht werden.");
+    } finally {
+      setDeletingRuleId(null);
+    }
+  }
+
+  function startCreateFlow() {
+    setDialogMode("create");
+  }
+
+  function startEditFlow(rule: StoredRule) {
+    setEditingRuleId(rule.id);
+    setRuleIdea(extractIdeaFromRule(rule));
+    setDialogMode("edit");
+  }
+
+  function applyRuleSuggestionToEditor(rule: StoredRule) {
+    setEditingRuleId(rule.id);
+    setRuleIdea(extractIdeaFromRule(rule));
+  }
+
   return (
-    <div style={{ maxWidth: 1420, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1420, margin: "0 auto", position: "relative" }}>
+      {dialogMode && draftRule && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(3,7,18,0.62)",
+            backdropFilter: "blur(10px)",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: "min(760px, 100%)",
+              borderRadius: 28,
+              border: `1px solid ${border}`,
+              background: panel,
+              boxShadow: glow,
+              padding: 24,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: "#a78bfa", marginBottom: 8 }}>
+                  {dialogMode === "edit" ? "Regeländerung bestätigen" : "Neue Regel bestätigen"}
+                </div>
+                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, lineHeight: 1.04, color: fg, margin: 0 }}>
+                  {draftRule.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDialogMode(null)}
+                style={{ border: `1px solid ${border}`, background: "transparent", color: muted, borderRadius: 999, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Schließen
+              </button>
+            </div>
+
+            <div style={{ borderRadius: 20, border: `1px solid ${border}`, padding: 16, background: dk ? "rgba(255,255,255,0.03)" : "#fbfdff", marginBottom: 14 }}>
+              <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7 }}>{draftRule.body}</div>
+            </div>
+
+            <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+              {draftRule.impacts.map((impact) => (
+                <div key={impact} style={{ borderRadius: 16, border: `1px solid ${border}`, padding: "11px 13px", background: dk ? "rgba(255,255,255,0.02)" : "#ffffff", color: soft, fontSize: 13.5, lineHeight: 1.6 }}>
+                  {impact}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 12.5, color: muted }}>
+                Bitte nur bestätigen, wenn diese Formulierung wirklich die gemeinte Logik beschreibt.
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setDialogMode(null)}
+                  style={{ borderRadius: 999, border: `1px solid ${border}`, background: "transparent", color: muted, padding: "10px 14px", cursor: "pointer", fontWeight: 700, fontFamily: "inherit" }}
+                >
+                  Noch nicht
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDraftRule}
+                  disabled={savingRule}
+                  style={{ borderRadius: 999, border: "1px solid rgba(74,222,128,0.34)", background: "rgba(74,222,128,0.14)", color: "#4ade80", padding: "10px 14px", cursor: "pointer", fontWeight: 800, fontFamily: "inherit", opacity: savingRule ? 0.7 : 1 }}
+                >
+                  {savingRule ? "Speichert..." : dialogMode === "edit" ? "Änderung bestätigen" : "Als Regel speichern"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section
         style={{
           background: panel,
@@ -443,17 +670,36 @@ export default function BehandlungslogikPage() {
           <section style={{ background: card, border: `1px solid ${border}`, borderRadius: 24, padding: 22, boxShadow: glow }}>
             <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 6 }}>
-                  Zentrale Trennregeln
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: muted }}>
+                    Zentrale Trennregeln
+                  </div>
+                  {feedback && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, padding: "7px 11px", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.24)", color: "#4ade80", fontSize: 11.5, fontWeight: 800 }}>
+                      <CheckCircle2 size={14} />
+                      {feedback}
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontSize: 13.5, color: muted, lineHeight: 1.7, marginBottom: 14 }}>
                   Hier steht nicht nur die aktuelle Logik. Neue Regeln können zuerst als Idee formuliert, sprachlich geschärft
                   und mit erwarteter Auswirkung geprüft werden, bevor sie wirklich in die Engine wandern.
                 </div>
+                {error && (
+                  <div style={{ borderRadius: 16, border: "1px solid rgba(248,113,113,0.28)", background: "rgba(248,113,113,0.1)", color: "#fca5a5", padding: "12px 14px", fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
+                    {error}
+                  </div>
+                )}
                 <div style={{ display: "grid", gap: 12 }}>
+                  {loadingRules && (
+                    <div style={{ borderRadius: 18, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#fbfdff", padding: 16, color: muted, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 10 }}>
+                      <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                      Regeln werden geladen...
+                    </div>
+                  )}
                   {allDecisionRules.map((rule, index) => (
                     <details
-                      key={`${rule.title}-${index}`}
+                      key={isStoredRule(rule) ? rule.id : `${rule.title}-${index}`}
                       open={index === 0}
                       style={{
                         borderRadius: 18,
@@ -462,10 +708,48 @@ export default function BehandlungslogikPage() {
                         padding: 16,
                       }}
                     >
-                      <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 14, fontWeight: 800, color: fg }}>
-                        {rule.title}
+                      <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 14, fontWeight: 800, color: fg, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                        <span>{rule.title}</span>
+                        {isStoredRule(rule) ? (
+                          <span style={{ display: "inline-flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                startEditFlow(rule);
+                              }}
+                              style={{ borderRadius: 999, border: `1px solid ${border}`, background: "transparent", color: muted, padding: 8, cursor: "pointer" }}
+                              aria-label="Regel bearbeiten"
+                            >
+                              <PencilLine size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void deleteRule(rule.id);
+                              }}
+                              disabled={deletingRuleId === rule.id}
+                              style={{ borderRadius: 999, border: `1px solid ${border}`, background: "transparent", color: "#fca5a5", padding: 8, cursor: "pointer", opacity: deletingRuleId === rule.id ? 0.6 : 1 }}
+                              aria-label="Regel löschen"
+                            >
+                              {deletingRuleId === rule.id ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Trash2 size={14} />}
+                            </button>
+                          </span>
+                        ) : null}
                       </summary>
                       <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7, marginTop: 10 }}>{rule.body}</div>
+                      {Array.isArray(rule.impacts) && rule.impacts.length > 0 ? (
+                        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                          {rule.impacts.map((impact) => (
+                            <div key={impact} style={{ borderRadius: 14, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "#ffffff", padding: "10px 12px", fontSize: 12.5, lineHeight: 1.55, color: muted }}>
+                              {impact}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </details>
                   ))}
                 </div>
@@ -589,10 +873,7 @@ export default function BehandlungslogikPage() {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            setCustomRules((current) => [...current, { title: draftRule.title, body: draftRule.body }]);
-                            setRuleIdea("");
-                          }}
+                          onClick={startCreateFlow}
                           style={{
                             borderRadius: 999,
                             border: "1px solid rgba(74,222,128,0.34)",
@@ -605,10 +886,10 @@ export default function BehandlungslogikPage() {
                             fontFamily: "inherit",
                           }}
                         >
-                          Als Trennregel hinzufügen
+                          Als Trennregel prüfen
                         </button>
                         <div style={{ alignSelf: "center", fontSize: 12.5, color: muted }}>
-                          Nächster Ausbau: echte Bestätigungslogik, Diff-Vorschau und Folgen auf Top-1/Top-2 live berechnen.
+                          Nächster Ausbau: Diff-Vorschau und Folgen auf Top-1/Top-2 live berechnen.
                         </div>
                       </div>
                     </div>
@@ -619,6 +900,35 @@ export default function BehandlungslogikPage() {
                     </div>
                   )}
                 </div>
+
+                {customRules.length > 0 && (
+                  <div style={{ marginTop: 14, borderRadius: 18, border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.72)", padding: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: "#34d399", marginBottom: 10 }}>
+                      Gespeicherte Praxis-Erweiterungen
+                    </div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {customRules.slice(0, 4).map((rule) => (
+                        <div key={rule.id} style={{ borderRadius: 14, border: `1px solid ${border}`, padding: "11px 12px", background: dk ? "rgba(255,255,255,0.03)" : "#ffffff" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                            <div>
+                              <div style={{ fontSize: 13.5, fontWeight: 800, color: fg }}>{rule.title}</div>
+                              <div style={{ fontSize: 12.5, color: muted, marginTop: 5 }}>
+                                Zuletzt geändert {new Date(rule.updated_at).toLocaleDateString("de-DE")}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => applyRuleSuggestionToEditor(rule)}
+                              style={{ borderRadius: 999, border: `1px solid ${border}`, background: "transparent", color: "#60a5fa", padding: "8px 11px", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}
+                            >
+                              In Editor laden
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </section>
