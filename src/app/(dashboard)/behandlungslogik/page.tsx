@@ -339,7 +339,7 @@ export default function BehandlungslogikPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1420, margin: "0 auto", position: "relative" }}>
+    <div style={{ maxWidth: 1420, margin: "0 auto", position: "relative", paddingBottom: 132 }}>
       {dialogMode && draftRule && (
         <div
           style={{
