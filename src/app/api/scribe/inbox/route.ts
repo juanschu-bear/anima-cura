@@ -122,14 +122,14 @@ async function ladeUser() {
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("display_name, full_name, role")
+    .select("display_name, role")
     .eq("id", user.id)
     .maybeSingle();
 
   const name =
     profile?.display_name ||
-    profile?.full_name ||
     user.user_metadata?.full_name ||
+    user.user_metadata?.display_name ||
     user.email ||
     "Praxis";
 
@@ -139,7 +139,7 @@ async function ladeUser() {
 async function ladeTeam(service: ReturnType<typeof createServerClient>): Promise<TeamMitglied[]> {
   const { data } = await service
     .from("user_profiles")
-    .select("id, display_name, full_name, role, patient_id")
+    .select("id, display_name, role, patient_id, email")
     .is("patient_id", null)
     .order("display_name", { ascending: true });
 
@@ -147,7 +147,7 @@ async function ladeTeam(service: ReturnType<typeof createServerClient>): Promise
     .filter((eintrag) => eintrag.role !== "patient")
     .map((eintrag) => ({
       id: eintrag.id,
-      name: eintrag.display_name || eintrag.full_name || "Praxis",
+      name: eintrag.display_name || eintrag.email || "Praxis",
       role: eintrag.role ?? null,
     }));
 }

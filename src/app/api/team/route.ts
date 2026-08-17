@@ -27,16 +27,13 @@ export async function GET() {
   const service = createServerClient();
   const { data, error } = await service
     .from("user_profiles")
-    .select("id, email, display_name, full_name, role, kuerzel, permissions")
+    .select("id, email, display_name, role, kuerzel, permissions")
     .is("patient_id", null)
     .neq("role", "patient")
     .order("display_name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({
-    mitglieder: (data ?? []).map((eintrag) => ({
-      ...eintrag,
-      display_name: eintrag.display_name || eintrag.full_name,
-    })),
+    mitglieder: data ?? [],
     mail_domain: MAIL_DOMAIN,
   });
 }
