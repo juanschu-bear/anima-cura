@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
     if (users) {
       for (const u of users) {
-        if (u.email?.endsWith("@animacura.de")) {
+        if (u.email) {
           loginMap[u.email] = u.last_sign_in_at || null;
         }
       }

@@ -75,7 +75,11 @@ export async function POST(request: NextRequest) {
     app_metadata: { role: "patient" },
     user_metadata: {
       display_name: `${patient.vorname} ${patient.nachname}`,
+      full_name: `${patient.vorname} ${patient.nachname}`,
+      vorname: patient.vorname,
+      nachname: patient.nachname,
       role: "patient",
+      patient_id,
     },
   });
 
