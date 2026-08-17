@@ -150,6 +150,16 @@ function artName(value: string | null | undefined): string {
   return ART_NAMEN[value as keyof typeof ART_NAMEN] ?? value;
 }
 
+function farbKlasseFuerPhase(phase: string | null | undefined): string {
+  const wert = (phase ?? "").toLowerCase();
+  if (wert.includes("start") || wert.includes("diagnostik")) return "phase-start";
+  if (wert.includes("behandlungsbeginn")) return "phase-beginn";
+  if (wert.includes("verlauf")) return "phase-verlauf";
+  if (wert.includes("notfall")) return "phase-notfall";
+  if (wert.includes("weitere")) return "phase-weitere";
+  return "phase-standard";
+}
+
 function mergeEigeneTerminarten(vorlagenAusDb: Vorlage[], antworten: PraxisPassAntwort[]): Vorlage[] {
   const bekannteVorlagen = new Set(vorlagenAusDb.map((v) => `${v.behandlungsart}::${v.termin_typ}`));
   const eigeneAusDb: Vorlage[] = [];
@@ -1717,7 +1727,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   {KOMBIS[art].map((kombi) => (
                     <button
                       key={kombi.label}
-                      className="wahl kombi"
+                      className={`wahl kombi ${farbKlasseFuerPhase(phaseVon(kombi.slugs[0]))}`}
                       aria-pressed={kombi.slugs.every((s) => gewaehlt.includes(s)) && gewaehlt.length === kombi.slugs.length}
                       onClick={() => kombiWaehlen(kombi.slugs)}
                     >
@@ -1743,14 +1753,15 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                     )}
                     {leistungsSektionen.map((phase) => (
                       <div key={phase.name} className="terminwahl-gruppe">
-                        <p className="terminwahl-phase">{phase.name}</p>
+                        <p className={`terminwahl-phase ${farbKlasseFuerPhase(phase.name)}`}>{phase.name}</p>
                         {phase.vorlagen.map((v) => {
                           const aktiv = gewaehlt.includes(v.termin_typ);
+                          const farbklasse = farbKlasseFuerPhase(phasenZuordnung[v.termin_typ]);
                           return (
                             <button
                               type="button"
                               key={v.id}
-                              className={`terminwahl-zeile${aktiv ? " aktiv" : ""}`}
+                              className={`terminwahl-zeile ${farbklasse}${aktiv ? " aktiv" : ""}`}
                               role="option"
                               aria-selected={aktiv}
                               onClick={() => leistungToggle(v.termin_typ)}
@@ -1767,7 +1778,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 {module.length > 0 && (
                   <div className="terminwahl-chips">
                     {module.map((v) => (
-                      <span key={v.id} className="terminwahl-chip">
+                      <span key={v.id} className={`terminwahl-chip ${farbKlasseFuerPhase(phasenZuordnung[v.termin_typ])}`}>
                         {anzeigeName(v)}
                         <button
                           type="button"

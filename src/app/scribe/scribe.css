@@ -193,17 +193,39 @@
   box-shadow:0 16px 40px rgba(0,0,0,.35)}
 .scribe .terminwahl-phase{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--gedeckt);margin:8px 8px 4px;font-weight:600}
+.scribe .terminwahl-phase.phase-start{color:#8FC5FF}
+.scribe .terminwahl-phase.phase-beginn{color:#7BD8A6}
+.scribe .terminwahl-phase.phase-verlauf{color:#F7C869}
+.scribe .terminwahl-phase.phase-notfall{color:#FF9E8D}
+.scribe .terminwahl-phase.phase-weitere{color:#D6B8FF}
 .scribe .terminwahl-zeile{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 10px;
   border:0;border-radius:9px;background:transparent;color:var(--schrift);font-size:14px;cursor:pointer;
   transition:background .12s ease}
 .scribe .terminwahl-zeile:hover{background:var(--flaeche-flach)}
-.scribe .terminwahl-zeile.aktiv{background:var(--primaer-soft);color:var(--primaer);font-weight:600}
-.scribe .terminwahl-haken{display:inline-flex;justify-content:center;width:14px;color:var(--primaer);font-weight:700}
+.scribe .terminwahl-zeile.aktiv{font-weight:700}
+.scribe .terminwahl-zeile.phase-start.aktiv{background:rgba(94,162,255,.16);color:#8FC5FF}
+.scribe .terminwahl-zeile.phase-beginn.aktiv{background:rgba(123,216,166,.16);color:#B8F0D0}
+.scribe .terminwahl-zeile.phase-verlauf.aktiv{background:rgba(242,181,68,.16);color:#F7C869}
+.scribe .terminwahl-zeile.phase-notfall.aktiv{background:rgba(255,123,123,.14);color:#FFB4A6}
+.scribe .terminwahl-zeile.phase-weitere.aktiv{background:rgba(171,139,255,.16);color:#E6D5FF}
+.scribe .terminwahl-zeile.phase-standard.aktiv{background:var(--primaer-soft);color:var(--primaer)}
+.scribe .terminwahl-haken{display:inline-flex;justify-content:center;width:14px;font-weight:700}
+.scribe .terminwahl-zeile.phase-start .terminwahl-haken{color:#8FC5FF}
+.scribe .terminwahl-zeile.phase-beginn .terminwahl-haken{color:#7BD8A6}
+.scribe .terminwahl-zeile.phase-verlauf .terminwahl-haken{color:#F7C869}
+.scribe .terminwahl-zeile.phase-notfall .terminwahl-haken{color:#FF9E8D}
+.scribe .terminwahl-zeile.phase-weitere .terminwahl-haken{color:#D6B8FF}
+.scribe .terminwahl-zeile.phase-standard .terminwahl-haken{color:var(--primaer)}
 .scribe .terminwahl-leer{padding:10px;color:var(--gedeckt);font-size:13px}
 .scribe .terminwahl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .scribe .terminwahl-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;border-radius:999px;
   background:color-mix(in srgb, var(--primaer-soft) 72%, transparent);color:var(--primaer);font-size:13px;font-weight:700;
   border:1px solid color-mix(in srgb, var(--primaer) 26%, transparent);box-shadow:0 10px 24px -18px color-mix(in srgb, var(--primaer) 75%, transparent)}
+.scribe .terminwahl-chip.phase-start{background:rgba(94,162,255,.15);color:#A9D3FF;border-color:rgba(94,162,255,.26);box-shadow:0 10px 24px -18px rgba(94,162,255,.75)}
+.scribe .terminwahl-chip.phase-beginn{background:rgba(123,216,166,.15);color:#D8FFEB;border-color:rgba(123,216,166,.24);box-shadow:0 10px 24px -18px rgba(123,216,166,.7)}
+.scribe .terminwahl-chip.phase-verlauf{background:rgba(242,181,68,.16);color:#FFE7B3;border-color:rgba(242,181,68,.26);box-shadow:0 10px 24px -18px rgba(242,181,68,.72)}
+.scribe .terminwahl-chip.phase-notfall{background:rgba(255,123,123,.14);color:#FFD6D6;border-color:rgba(255,123,123,.24);box-shadow:0 10px 24px -18px rgba(255,123,123,.7)}
+.scribe .terminwahl-chip.phase-weitere{background:rgba(171,139,255,.15);color:#EEE2FF;border-color:rgba(171,139,255,.24);box-shadow:0 10px 24px -18px rgba(171,139,255,.7)}
 .scribe .terminwahl-chip-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
   border:0;border-radius:999px;background:transparent;color:var(--primaer);font-size:15px;line-height:1;cursor:pointer}
 .scribe .terminwahl-chip-x:hover{background:var(--primaer);color:var(--auf-primaer)}
@@ -254,6 +276,16 @@
   box-shadow:0 0 24px -6px var(--gold),0 0 0 1px var(--gold)}
 .scribe .wahl.kombi{border-style:dashed;border-color:var(--primaer);color:var(--primaer)}
 .scribe .wahl.kombi[aria-pressed="true"]{border-style:solid;color:var(--auf-primaer)}
+.scribe .wahl.kombi.phase-start{border-color:rgba(94,162,255,.5);color:#8FC5FF}
+.scribe .wahl.kombi.phase-start[aria-pressed="true"]{background:linear-gradient(135deg,#5EA2FF,#2E6FE6)}
+.scribe .wahl.kombi.phase-beginn{border-color:rgba(123,216,166,.5);color:#8BE4B1}
+.scribe .wahl.kombi.phase-beginn[aria-pressed="true"]{background:linear-gradient(135deg,#52C997,#1F8A62)}
+.scribe .wahl.kombi.phase-verlauf{border-color:rgba(242,181,68,.5);color:#F7C869}
+.scribe .wahl.kombi.phase-verlauf[aria-pressed="true"]{background:linear-gradient(135deg,#F2B544,#B97916);color:#231602}
+.scribe .wahl.kombi.phase-notfall{border-color:rgba(255,123,123,.5);color:#FFB4A6}
+.scribe .wahl.kombi.phase-notfall[aria-pressed="true"]{background:linear-gradient(135deg,#FF7B7B,#C74D4D)}
+.scribe .wahl.kombi.phase-weitere{border-color:rgba(171,139,255,.5);color:#D6B8FF}
+.scribe .wahl.kombi.phase-weitere[aria-pressed="true"]{background:linear-gradient(135deg,#AB8BFF,#6D54C7)}
 
 /* ===== Zahnschema ===== */
 .scribe .zahnschema{display:grid;grid-template-columns:repeat(16,24px);gap:3px}
