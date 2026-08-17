@@ -57,6 +57,7 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/offene-posten", roles: ["admin", "verwaltung"] },
   { path: "/intelligence", roles: ["admin", "verwaltung"] },
   { path: "/icura-ops", roles: ["admin", "verwaltung"] },
+  { path: "/behandlungslogik", roles: ["admin", "verwaltung"] },
   { path: "/nachrichten", roles: ["admin", "verwaltung"] },
   { path: "/automatisierungen", roles: ["admin", "verwaltung"] },
   { path: "/import", roles: ["admin", "verwaltung"] },

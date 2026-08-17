@@ -70,6 +70,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "nav.openItems": { de: "Offene Posten", en: "Open Items" },
   "nav.intelligence": { de: "Revenue Intelligence", en: "Revenue Intelligence" },
   "nav.icuraOps": { de: "iCura Ops", en: "iCura Ops" },
+  "nav.treatmentLogic": { de: "Behandlungslogik", en: "Treatment Logic" },
   "nav.messages": { de: "Nachrichten", en: "Messages" },
   "nav.automations": { de: "Automatisierungen", en: "Automations" },
   "nav.import": { de: "Datenimport", en: "Data Import" },
