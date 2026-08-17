@@ -27,6 +27,7 @@ interface Notif { id: string; typ: string; titel: string; text: string; gelesen:
 interface Doc { id: string; name: string; typ: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
+interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
@@ -82,6 +83,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
+  const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number } | null>(null);
@@ -219,7 +221,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   };
 
   const fetchAll = useCallback(async () => {
-    const ep = ["ratenplan", "behandlung", "badges", "nachrichten", "benachrichtigungen", "dokumente", "tipps", "zahlungen"];
+    const ep = ["ratenplan", "behandlung", "badges", "nachrichten", "benachrichtigungen", "dokumente", "tipps", "zahlungen", "rechnungen"];
     const results = await Promise.allSettled(ep.map(e => fetch("/api/patient/" + e)));
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
@@ -234,6 +236,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         if (i === 5) setDocs(j.dokumente || []);
         if (i === 6) setTipps(j.tipps || []);
         if (i === 7) setPays([...(j.ueberfaellige || []), ...(j.zahlungen || [])]);
+        if (i === 8) setRechnungen(j.rechnungen || []);
       } catch { /* ignore */ }
     }
     setLoading(false);
@@ -1124,6 +1127,51 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           )}
         </div>
       )}
+      {rechnungen.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ padding: "0 20px" }}>
+            <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
+              {lang === "en" ? "Invoices & claims" : lang === "es" ? "Facturas y cargos" : "Rechnungen & Forderungen"}
+            </p>
+          </div>
+          <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
+            {rechnungen.slice(0, 6).map((r, i) => {
+              const statusColor = r.status === "bezahlt" ? grn : r.status === "teilbezahlt" ? warn : fg;
+              const mainAmount = r.status === "bezahlt" ? r.betrag : r.offen;
+              const statusLabel =
+                r.status === "bezahlt"
+                  ? (lang === "en" ? "Paid" : lang === "es" ? "Pagado" : "Bezahlt")
+                  : r.status === "teilbezahlt"
+                    ? (lang === "en" ? "Partially paid" : lang === "es" ? "Parcialmente pagado" : "Teilbezahlt")
+                    : (lang === "en" ? "Open" : lang === "es" ? "Pendiente" : "Offen");
+              return (
+                <div key={r.id} style={{ padding: "14px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none", display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: fg }}>
+                      {r.unser_zeichen || r.rechnung_nr || (lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung")}
+                    </div>
+                    <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
+                      {[r.typ?.toUpperCase() || null, r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
+                    </div>
+                    <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>
+                      {statusLabel}
+                      {r.gezahlt > 0 && r.status !== "bezahlt" ? ` · ${lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} ${fmtEuro(r.gezahlt)}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ ...hd, fontSize: 18, fontWeight: 800, color: statusColor }}>{fmtEuro(mainAmount)}</div>
+                    <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>
+                      {r.status === "bezahlt"
+                        ? (r.bezahlt_am ? fmtShortL(r.bezahlt_am, lang) : statusLabel)
+                        : (lang === "en" ? "Still open" : lang === "es" ? "Aún pendiente" : "Noch offen")}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1808,11 +1856,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>{t("iban.amount", lang)}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: red, ...hd }}>{rp && rp.ueberfaellig ? rp.ueberfaellig.betrag.toFixed(2).replace(".", ",") : "150,00"} €</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: red, ...hd }}>{payingRate ? fmtEuro(payingRate.betrag) : (rp && rp.ueberfaellig ? fmtEuro(rp.ueberfaellig.betrag) : "—")}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: muted, marginBottom: 4 }}>{t("iban.reference", lang)}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>Rate {firstName} {patientName.split(" ").pop()}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>{payingRate?.verwendungszweck || "—"}</div>
                 </div>
               </div>
               <div style={{ padding: "20px 24px 32px" }}>
