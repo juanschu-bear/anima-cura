@@ -66,6 +66,59 @@ const DECISION_RULES = [
   },
 ];
 
+type DraftRule = {
+  title: string;
+  body: string;
+  impacts: string[];
+};
+
+function clampConfidence(score: number) {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function buildDraftRule(input: string): DraftRule | null {
+  const text = input.trim();
+  if (text.length < 8) return null;
+
+  const normalized = text.toLowerCase();
+  const impacts: string[] = [];
+
+  if (normalized.includes("aligner")) {
+    impacts.push("Aligner-Fälle würden bei Privatleistung und längeren 24-Monats-Mustern stärker priorisiert.");
+  }
+  if (normalized.includes("multiband") || normalized.includes("mb1") || normalized.includes("mb3")) {
+    impacts.push("Multiband-Fälle würden stärker auf feste Monatsraten wie 67,82 € oder 103,02 € geprüft.");
+  }
+  if (normalized.includes("spange") || normalized.includes("herausnehm")) {
+    impacts.push("Herausnehmbare Geräte und MB2 würden klarer gegen reine Multiband-Fälle abgegrenzt.");
+  }
+  if (normalized.includes("alter") || normalized.includes("kind") || normalized.includes("jugend")) {
+    impacts.push("Das Alter würde nur als Verstärker wirken, nie als alleiniger Beweis für die Behandlungsart.");
+  }
+  if (normalized.includes("rate") || normalized.includes("monat")) {
+    impacts.push("Die Ratenhöhe würde im Confidence-Modell stärker gewichtet und bei Top-1/Top-2-Vorschlägen sichtbarer.");
+  }
+  if (normalized.includes("erste zahl") || normalized.includes("anzahlung") || normalized.includes("labor")) {
+    impacts.push("Einmalige Startkosten und Laboranteile würden früher als Aligner-Signal erkannt.");
+  }
+
+  if (impacts.length === 0) {
+    impacts.push("Die Regel würde als zusätzliche Prüfung in die Vorsortierung einfließen und unklare Fälle transparenter machen.");
+    impacts.push("Vor einer echten Aktivierung müsste geprüft werden, welche Kategorien dadurch häufiger auf Top-1 oder Top-2 rutschen.");
+  }
+
+  const title =
+    text.length > 42
+      ? `${text.slice(0, 42).trim()}...`
+      : text;
+
+  return {
+    title,
+    body: `Interpretation der Idee: ${text}. Diese Regel würde nicht blind entscheiden, sondern die bestehende Zahlungslogik gezielt schärfen und nur dort stärker gewichten, wo das Muster wirklich passt.`,
+    impacts,
+  };
+}
+
 function scoreChipTone(score: number) {
   if (score >= 75) return { bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.28)", color: "#4ade80" };
   if (score >= 50) return { bg: "rgba(251,191,36,0.12)", border: "rgba(251,191,36,0.28)", color: "#fbbf24" };
@@ -77,6 +130,8 @@ export default function BehandlungslogikPage() {
   const dk = theme === "dark";
   const [familyFilter, setFamilyFilter] = useState<FamilyFilter>("alle");
   const [openCategory, setOpenCategory] = useState<Behandlungskategorie>("MB2");
+  const [ruleIdea, setRuleIdea] = useState("");
+  const [customRules, setCustomRules] = useState<{ title: string; body: string }[]>([]);
 
   const fg = dk ? "#eef2ff" : "#18243a";
   const muted = dk ? "#94a3b8" : "#66758d";
@@ -127,6 +182,12 @@ export default function BehandlungslogikPage() {
         }),
       })).sort((a, b) => b.score - a.score),
     [],
+  );
+
+  const draftRule = useMemo(() => buildDraftRule(ruleIdea), [ruleIdea]);
+  const allDecisionRules = useMemo(
+    () => [...DECISION_RULES, ...customRules],
+    [customRules],
   );
 
   return (
@@ -311,8 +372,9 @@ export default function BehandlungslogikPage() {
             if (regel.code !== openCategory) return null;
             const tone = FAMILY_TONES[regel.familie];
             const preview = topPreview.find((item) => item.code === regel.code);
-            const confidence = preview ? getConfidenceLabel(preview.score) : "unklar";
-            const confidenceTone = scoreChipTone(preview?.score ?? 0);
+            const previewScore = clampConfidence(preview?.score ?? 0);
+            const confidence = getConfidenceLabel(previewScore);
+            const confidenceTone = scoreChipTone(previewScore);
 
             return (
               <section key={regel.code} style={{ background: card, border: `1px solid ${border}`, borderRadius: 24, padding: 22, boxShadow: glow }}>
@@ -333,7 +395,7 @@ export default function BehandlungslogikPage() {
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.1, textTransform: "uppercase", color: confidenceTone.color, marginBottom: 8 }}>
                       Beispiel-Confidence
                     </div>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: fg, lineHeight: 1 }}>{preview?.score ?? 0}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: fg, lineHeight: 1 }}>{previewScore}%</div>
                     <div style={{ fontSize: 13, color: confidenceTone.color, fontWeight: 800, marginTop: 6 }}>{confidence}</div>
                   </div>
                 </div>
@@ -379,27 +441,185 @@ export default function BehandlungslogikPage() {
           })}
 
           <section style={{ background: card, border: `1px solid ${border}`, borderRadius: 24, padding: 22, boxShadow: glow }}>
-            <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 14 }}>
-              Zentrale Trennregeln
-            </div>
-            <div style={{ display: "grid", gap: 12 }}>
-              {DECISION_RULES.map((rule, index) => (
-                <details
-                  key={rule.title}
-                  open={index === 0}
+            <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 6 }}>
+                  Zentrale Trennregeln
+                </div>
+                <div style={{ fontSize: 13.5, color: muted, lineHeight: 1.7, marginBottom: 14 }}>
+                  Hier steht nicht nur die aktuelle Logik. Neue Regeln können zuerst als Idee formuliert, sprachlich geschärft
+                  und mit erwarteter Auswirkung geprüft werden, bevor sie wirklich in die Engine wandern.
+                </div>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {allDecisionRules.map((rule, index) => (
+                    <details
+                      key={`${rule.title}-${index}`}
+                      open={index === 0}
+                      style={{
+                        borderRadius: 18,
+                        border: `1px solid ${border}`,
+                        background: dk ? "rgba(255,255,255,0.02)" : "#fbfdff",
+                        padding: 16,
+                      }}
+                    >
+                      <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 14, fontWeight: 800, color: fg }}>
+                        {rule.title}
+                      </summary>
+                      <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7, marginTop: 10 }}>{rule.body}</div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 22,
+                  border: `1px solid ${border}`,
+                  background: dk ? "linear-gradient(145deg, rgba(96,165,250,0.08), rgba(168,85,247,0.06))" : "linear-gradient(145deg, rgba(96,165,250,0.08), rgba(168,85,247,0.05))",
+                  padding: 18,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: "#60a5fa" }}>
+                      Neue Trennregel skizzieren
+                    </div>
+                    <div style={{ fontSize: 13, color: muted, lineHeight: 1.65, marginTop: 6 }}>
+                      Idee eintippen, später auch diktieren: Das System formuliert daraus eine sauberere Regel und zeigt,
+                      was sie voraussichtlich auslösen würde.
+                    </div>
+                  </div>
+                  <div style={{ borderRadius: 999, padding: "8px 12px", border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.06)" : "#ffffff", fontSize: 11, fontWeight: 800, color: fg }}>
+                    Voice-ready
+                  </div>
+                </div>
+
+                <textarea
+                  value={ruleIdea}
+                  onChange={(event) => setRuleIdea(event.target.value)}
+                  placeholder="Beispiel: Wenn ein Patient privat ist und mit 450 € startet, danach aber 24 Monate mit Restzahlungen läuft, soll Aligner stärker priorisiert werden."
                   style={{
+                    width: "100%",
+                    minHeight: 124,
+                    resize: "vertical",
                     borderRadius: 18,
                     border: `1px solid ${border}`,
-                    background: dk ? "rgba(255,255,255,0.02)" : "#fbfdff",
+                    background: dk ? "rgba(8,12,22,0.78)" : "#ffffff",
+                    color: fg,
                     padding: 16,
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    fontFamily: "inherit",
+                    outline: "none",
                   }}
-                >
-                  <summary style={{ listStyle: "none", cursor: "pointer", fontSize: 14, fontWeight: 800, color: fg }}>
-                    {rule.title}
-                  </summary>
-                  <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7, marginTop: 10 }}>{rule.body}</div>
-                </details>
-              ))}
+                />
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12, marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRuleIdea("Wenn zuerst eine herausnehmbare Spange läuft und danach dieselbe Behandlung in Multiband übergeht, soll das eher als MB2 statt H1 oder H2 erkannt werden.")
+                    }
+                    style={{
+                      borderRadius: 999,
+                      border: `1px solid ${border}`,
+                      background: dk ? "rgba(255,255,255,0.05)" : "#ffffff",
+                      color: fg,
+                      padding: "9px 12px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Beispiel übernehmen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRuleIdea("")}
+                    style={{
+                      borderRadius: 999,
+                      border: `1px solid ${border}`,
+                      background: "transparent",
+                      color: muted,
+                      padding: "9px 12px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Leeren
+                  </button>
+                </div>
+
+                <div style={{ borderRadius: 18, border: `1px solid ${border}`, background: dk ? "rgba(8,12,22,0.58)" : "rgba(255,255,255,0.75)", padding: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: "#a78bfa", marginBottom: 10 }}>
+                    Ausformulierte Interpretation
+                  </div>
+                  {draftRule ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: fg }}>{draftRule.title}</div>
+                        <div style={{ fontSize: 13.5, color: soft, lineHeight: 1.7, marginTop: 6 }}>{draftRule.body}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: "#fbbf24", marginBottom: 8 }}>
+                          Was das auslösen könnte
+                        </div>
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {draftRule.impacts.map((impact) => (
+                            <div
+                              key={impact}
+                              style={{
+                                borderRadius: 14,
+                                border: `1px solid ${border}`,
+                                background: dk ? "rgba(255,255,255,0.03)" : "#ffffff",
+                                padding: "10px 12px",
+                                fontSize: 13,
+                                lineHeight: 1.6,
+                                color: soft,
+                              }}
+                            >
+                              {impact}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomRules((current) => [...current, { title: draftRule.title, body: draftRule.body }]);
+                            setRuleIdea("");
+                          }}
+                          style={{
+                            borderRadius: 999,
+                            border: "1px solid rgba(74,222,128,0.34)",
+                            background: "rgba(74,222,128,0.14)",
+                            color: "#4ade80",
+                            padding: "10px 14px",
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Als Trennregel hinzufügen
+                        </button>
+                        <div style={{ alignSelf: "center", fontSize: 12.5, color: muted }}>
+                          Nächster Ausbau: echte Bestätigungslogik, Diff-Vorschau und Folgen auf Top-1/Top-2 live berechnen.
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13.5, color: muted, lineHeight: 1.7 }}>
+                      Sobald hier eine Regelidee steht, formuliert der Bereich automatisch eine verständlichere Fassung und zeigt
+                      die wahrscheinlichen Auswirkungen auf die Zuordnung.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </div>
