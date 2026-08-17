@@ -12,6 +12,15 @@ import { isReadOnlyRole } from "@/lib/auth";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
 
+function normalizePersonValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("de-DE")
+    .replace(/\s+/g, " ");
+}
+
 function progressBlocks(total: number, paid: number, hasOverdue: boolean) {
   const max = Math.min(Math.max(total, 1), 36);
   return Array.from({ length: max }).map((_, idx) => {
@@ -75,6 +84,31 @@ export default function PatientenPage() {
     setSaving(true);
     setErrorMsg("");
     const supabase = createBrowserClient();
+    const normalizedVorname = normalizePersonValue(form.vorname);
+    const normalizedNachname = normalizePersonValue(form.nachname);
+    const { data: existingCandidates, error: existingLookupError } = await supabase
+      .from("patients")
+      .select("id, vorname, nachname, geburtsdatum")
+      .eq("geburtsdatum", form.geburtsdatum)
+      .limit(20);
+
+    if (existingLookupError) {
+      setSaving(false);
+      setErrorMsg(existingLookupError.message || t("patients.createError", locale));
+      return;
+    }
+
+    const duplicate = (existingCandidates || []).find((candidate) => (
+      normalizePersonValue(candidate.vorname || "") === normalizedVorname &&
+      normalizePersonValue(candidate.nachname || "") === normalizedNachname
+    ));
+
+    if (duplicate) {
+      setSaving(false);
+      setErrorMsg("Patient ist bereits vorhanden. Bitte bestehenden Eintrag verwenden statt neu anzulegen.");
+      return;
+    }
+
     const { error } = await supabase.from("patients").insert({
       vorname: form.vorname.trim(),
       nachname: form.nachname.trim(),

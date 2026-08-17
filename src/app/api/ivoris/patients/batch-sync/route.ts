@@ -203,6 +203,38 @@ export async function GET(request: Request) {
         : [];
 
       if (duplicateCandidates.length > 0) {
+        if (duplicateCandidates.length === 1 && !duplicateCandidates[0].ivoris_id) {
+          const candidate = duplicateCandidates[0];
+          const { error: linkError } = await db
+            .from("patients")
+            .update({
+              ivoris_id: row.ivoris_id,
+              vorname: row.vorname,
+              nachname: row.nachname,
+              geburtsdatum: row.geburtsdatum,
+              geschlecht: row.geschlecht,
+              kasse: row.kasse,
+              versichertennummer: row.versichertennummer,
+              behandlung: row.behandlung,
+              behandlung_start: row.behandlung_start,
+              telefon: row.telefon,
+              email: row.email,
+              strasse: row.strasse,
+              plz: row.plz,
+              ort: row.ort,
+              land: row.land,
+            })
+            .eq("id", candidate.id);
+
+          if (linkError) {
+            totalSkipped += 1;
+            errors.push(`Seite ${page}: Dublette konnte nicht verknuepft werden fuer ${row.vorname} ${row.nachname}: ${linkError.message}`);
+          } else {
+            totalUpserted += 1;
+          }
+          continue;
+        }
+
         totalSkipped += 1;
         errors.push(
           `Seite ${page}: lokale Dublette übersprungen für ${row.vorname} ${row.nachname} (${row.geburtsdatum}) unter ${duplicateCandidates

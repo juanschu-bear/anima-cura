@@ -264,6 +264,39 @@ export async function syncIvorisPatients(): Promise<{
     );
 
     if (duplicateCandidates.length) {
+      if (duplicateCandidates.length === 1 && !duplicateCandidates[0].ivoris_id) {
+        const candidate = duplicateCandidates[0];
+        const { error: linkError } = await db
+          .from("patients")
+          .update({
+            ivoris_id: patient.ivoris_id,
+            vorname: patient.vorname,
+            nachname: patient.nachname,
+            geburtsdatum: patient.geburtsdatum,
+            kasse: patient.kasse,
+            behandlung: patient.behandlung,
+            behandlung_start: patient.behandlung_start,
+            geschlecht: patient.geschlecht,
+            versichertennummer: patient.versichertennummer,
+            telefon: patient.telefon,
+            email: patient.email,
+            strasse: patient.strasse,
+            plz: patient.plz,
+            ort: patient.ort,
+            land: patient.land,
+            notizen: patient.notizen,
+          })
+          .eq("id", candidate.id);
+
+        if (linkError) {
+          skipped++;
+          errors.push(`Verknuepfung ${patient.ivoris_id}: ${linkError.message}`);
+        } else {
+          updated++;
+        }
+        continue;
+      }
+
       skipped++;
       errors.push(
         `Duplicate-Kandidat ${patient.ivoris_id}: ${patient.vorname} ${patient.nachname} (${patient.geburtsdatum}) bereits lokal vorhanden unter ${duplicateCandidates

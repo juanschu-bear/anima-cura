@@ -13,6 +13,8 @@ interface Position {
   datum?: string; region?: string; material?: number;
 }
 
+type MkvKieferModus = "ein" | "zwei";
+
 // GOZ Punktwert: 0,0562421 EUR pro Punkt
 const PW = 0.0562421;
 // BEMA KFO Punktwert Sachsen
@@ -189,6 +191,8 @@ export default function RechnungenPage() {
   const [startDatum, setStartDatum] = useState(new Date().toISOString().slice(0, 10));
   const [showGozPicker, setShowGozPicker] = useState(false);
   const [gozFilter, setGozFilter] = useState("");
+  const [mkvKieferModus, setMkvKieferModus] = useState<MkvKieferModus>("zwei");
+  const [mkvBetrag, setMkvBetrag] = useState("0");
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Live patient search
@@ -253,18 +257,44 @@ export default function RechnungenPage() {
 
   const generatePDF = () => {
     if (!selectedPatient) { alert("Bitte Patient auswaehlen"); return; }
-    if (positionen.length === 0) { alert("Bitte Positionen hinzufuegen"); return; }
+    const mkvTitel = mkvKieferModus === "ein"
+      ? "Mehrkostenvereinbarung Kieferorthopädie - ein Kiefer"
+      : "Mehrkostenvereinbarung Kieferorthopädie - zwei Kiefer";
+    const mkvCustomBetrag = Number(String(mkvBetrag).replace(",", "."));
+    const previewPositionen = positionen.length > 0
+      ? positionen
+      : (patientArt !== "privat" && mkvCustomBetrag > 0
+        ? [{
+            id: "mkv-1",
+            goz_nr: "MKV",
+            bezeichnung: mkvTitel,
+            faktor: 1,
+            anzahl: 1,
+            preis: mkvCustomBetrag,
+            gkv_abzug: 0,
+            endpreis: mkvCustomBetrag,
+            begruendung: "",
+            datum: "",
+            region: mkvKieferModus === "ein" ? "1 Kiefer" : "2 Kiefer",
+            material: 0,
+          }]
+        : []);
+    if (previewPositionen.length === 0) { alert("Bitte Positionen hinzufuegen oder MKV-Betrag eintragen"); return; }
+    const previewEndpreis = previewPositionen.reduce((s, p) => s + p.endpreis, 0);
+    const previewGKV = previewPositionen.reduce((s, p) => s + p.gkv_abzug, 0);
+    const previewBrutto = previewPositionen.reduce((s, p) => s + p.preis, 0);
     const data = {
       patient: selectedPatient,
       patientArt,
-      positionen,
-      gesamtEndpreis,
-      gesamtGKV,
-      gesamtBrutto,
+      positionen: previewPositionen,
+      gesamtEndpreis: previewEndpreis,
+      gesamtGKV: previewGKV,
+      gesamtBrutto: previewBrutto,
       ratenAnzahl,
-      rateProMonat,
+      rateProMonat: ratenAnzahl > 0 ? previewEndpreis / ratenAnzahl : 0,
       startDatum,
-      paketName: PAKETE.find(p => p.key === selectedPaket)?.name || "Individuell",
+      paketName: PAKETE.find(p => p.key === selectedPaket)?.name || mkvTitel,
+      mkvKieferModus,
     };
     sessionStorage.setItem("ac-rechnung-preview", JSON.stringify(data));
     window.open("/rechnungen/vorschau", "_blank");
@@ -317,6 +347,25 @@ export default function RechnungenPage() {
           {/* 2. Behandlungspaket */}
           <div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: grn, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>2. Behandlungspaket</div>
+            {patientArt !== "privat" && (
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, border: `1px solid ${border}`, background: dk ? "rgba(74,222,128,0.04)" : "rgba(34,197,94,0.03)" }}>
+                <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>MKV direkt für einen oder zwei Kiefer vorbereiten</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button type="button" onClick={() => setMkvKieferModus("ein")} style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${mkvKieferModus === "ein" ? grn : border}`, background: mkvKieferModus === "ein" ? (dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)") : "transparent", color: mkvKieferModus === "ein" ? grn : fg, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    Ein Kiefer
+                  </button>
+                  <button type="button" onClick={() => setMkvKieferModus("zwei")} style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${mkvKieferModus === "zwei" ? grn : border}`, background: mkvKieferModus === "zwei" ? (dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)") : "transparent", color: mkvKieferModus === "zwei" ? grn : fg, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    Zwei Kiefer
+                  </button>
+                </div>
+                <input
+                  value={mkvBetrag}
+                  onChange={e => setMkvBetrag(e.target.value)}
+                  placeholder="MKV-Betrag in EUR"
+                  style={{ width: 180, padding: "10px 12px", borderRadius: 10, border: `1px solid ${border}`, background: inputBg, color: fg, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {PAKETE.map(pk => (
                 <button key={pk.key} onClick={() => selectPaket(pk.key)} style={{

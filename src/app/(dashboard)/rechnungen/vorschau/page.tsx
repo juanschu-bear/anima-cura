@@ -17,6 +17,7 @@ interface PreviewData {
   rateProMonat: number;
   startDatum: string;
   paketName: string;
+  mkvKieferModus?: "ein" | "zwei";
 }
 
 export default function VorschauPage() {
