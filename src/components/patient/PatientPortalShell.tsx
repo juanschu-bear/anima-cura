@@ -427,6 +427,32 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const isOverdue = !!(rp && rp.ueberfaellig);
   const dl = rp && rp.naechste_rate ? daysTill(rp.naechste_rate.faellig_am) : 99;
   const pct = rp ? rp.prozent : 0;
+  const hasDocuments = docs.length > 0;
+  const hasPhases = phasen.length > 0;
+  const hasPayments = pays.length > 0 || (rp?.investiert ?? 0) > 0;
+  const hasOpenAmounts = (rp?.offen_betrag ?? 0) > 0;
+  const portalStage = hasPhases
+    ? "full"
+    : hasDocuments || hasPayments || hasOpenAmounts
+      ? "partial"
+      : "setup";
+  const portalStageTitle =
+    portalStage === "full"
+      ? (lang === "en" ? "Everything important is available" : lang === "es" ? "Todo lo importante ya está disponible" : "Alles Wichtige ist bereits verfügbar")
+      : portalStage === "partial"
+        ? (lang === "en" ? "Your portal is already filling up" : lang === "es" ? "Tu portal ya se está llenando" : "Dein Portal füllt sich bereits")
+        : (lang === "en" ? "Your portal is being prepared" : lang === "es" ? "Tu portal se está preparando" : "Dein Portal wird vorbereitet");
+  const portalStageText =
+    portalStage === "full"
+      ? (lang === "en" ? "You can already see your treatment, documents, payments and messages in one place." : lang === "es" ? "Ya puedes ver tu tratamiento, documentos, pagos y mensajes en un solo lugar." : "Du kannst bereits Behandlung, Dokumente, Zahlungen und Nachrichten an einem Ort sehen.")
+      : portalStage === "partial"
+        ? (lang === "en" ? "Some real information is already available. Missing areas will unlock automatically as soon as the practice has prepared them." : lang === "es" ? "Ya hay información real disponible. Las áreas que faltan se activarán automáticamente en cuanto la clínica las prepare." : "Einige echte Inhalte sind bereits verfügbar. Fehlende Bereiche schalten sich automatisch frei, sobald die Praxis sie vorbereitet hat.")
+        : (lang === "en" ? "Your access is active. Documents, treatment details and payment information will appear step by step as soon as they are released for you." : lang === "es" ? "Tu acceso ya está activo. Los documentos, detalles del tratamiento y la información de pago aparecerán paso a paso en cuanto se liberen para ti." : "Dein Zugang ist bereits aktiv. Dokumente, Behandlungsdetails und Zahlungsinfos erscheinen Schritt für Schritt, sobald sie für dich freigeschaltet werden.");
+  const portalStageChecklist = [
+    { label: lang === "en" ? "Documents" : lang === "es" ? "Documentos" : "Dokumente", ready: hasDocuments, tab: "more" as Tab },
+    { label: lang === "en" ? "Payments" : lang === "es" ? "Pagos" : "Zahlungen", ready: hasPayments || hasOpenAmounts, tab: "progress" as Tab },
+    { label: lang === "en" ? "Treatment plan" : lang === "es" ? "Plan de tratamiento" : "Behandlungsplan", ready: hasPhases, tab: "journey" as Tab },
+  ];
 
   // Phase-based blob colors - hex values for Framer Motion color transitions
   const getPhaseColors = () => {
@@ -476,10 +502,20 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: grn, marginBottom: 4 }}>Willkommen</div>
-              <h3 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg, marginBottom: 8 }}>Dein Portal ist bereit.</h3>
+              <h3 style={{ ...hd, fontSize: 21, fontWeight: 800, color: fg, marginBottom: 8 }}>{portalStageTitle}</h3>
               <p style={{ fontSize: 13, lineHeight: 1.6, color: soft, marginBottom: 14 }}>
-                Hier findest du Verträge, Anamnesebogen, Rechnungen und kannst der Praxis direkt schreiben. Ich springe dich auch direkt an die richtige Stelle.
+                {portalStageText}
               </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+                {portalStageChecklist.map((item) => (
+                  <button key={item.label} onClick={() => jumpToPortalTab(item.tab)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderRadius: 12, border: "1px solid " + border, padding: "10px 12px", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: fg }}>{item.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: item.ready ? grn : muted }}>
+                      {item.ready ? (lang === "en" ? "Available" : lang === "es" ? "Disponible" : "Verfügbar") : (lang === "en" ? "Follows soon" : lang === "es" ? "Próximamente" : "Folgt noch")}
+                    </span>
+                  </button>
+                ))}
+              </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <button onClick={() => jumpToPortalTab("more")} style={{ borderRadius: 999, border: "none", padding: "10px 14px", background: grn, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Zu Verträgen & Dokumenten</button>
                 <button onClick={() => jumpToPortalTab("progress")} style={{ borderRadius: 999, border: "1px solid " + border, padding: "10px 14px", background: "transparent", color: fg, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Zu Rechnungen & Raten</button>
@@ -768,6 +804,19 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       <div style={{ padding: "16px 20px 0" }}>
         <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
         <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
+      </div>
+      <div style={{ ...card, margin: "16px 20px 14px", padding: 16, background: dk ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.9)" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: portalStage === "full" ? grn : portalStage === "partial" ? warn : muted, marginBottom: 6 }}>
+          {portalStage === "full" ? "Portal vollständig aktiv" : portalStage === "partial" ? "Teilweise bereits aktiv" : "Freischaltung läuft"}
+        </div>
+        <div style={{ fontSize: 14, lineHeight: 1.6, color: soft, marginBottom: 12 }}>{portalStageText}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {portalStageChecklist.map((item) => (
+            <button key={item.label} onClick={() => jumpToPortalTab(item.tab)} style={{ borderRadius: 999, border: "1px solid " + border, padding: "8px 12px", background: item.ready ? (dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)") : "transparent", color: item.ready ? fg : muted, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              {item.ready ? "✓ " : ""}{item.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div style={{ ...card, margin: "16px 20px 14px", background: dk ? "rgba(74,222,128,0.04)" : "rgba(34,197,94,0.03)", border: "1px solid " + (dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)") }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
