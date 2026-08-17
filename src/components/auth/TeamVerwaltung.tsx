@@ -62,6 +62,7 @@ function PwFeld({
 
 export default function TeamVerwaltung() {
   const { authUser } = useAppStore();
+  const darfVerwalten = authUser?.role === "admin" || authUser?.role === "verwaltung";
   const istAdmin = authUser?.role === "admin";
 
   const [mitglieder, setMitglieder] = useState<Mitglied[]>([]);
@@ -70,7 +71,7 @@ export default function TeamVerwaltung() {
   const [laeuft, setLaeuft] = useState(false);
   const [geladen, setGeladen] = useState(false);
 
-  const [neu, setNeu] = useState({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
+  const [neu, setNeu] = useState({ name: "", lokal: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
   const [editId, setEditId] = useState<string | null>(null);
   const [editRolle, setEditRolle] = useState("verwaltung");
   const [editKuerzel, setEditKuerzel] = useState("");
@@ -94,8 +95,8 @@ export default function TeamVerwaltung() {
   }
 
   useEffect(() => {
-    if (istAdmin) laden();
-  }, [istAdmin]);
+    if (darfVerwalten) laden();
+  }, [darfVerwalten]);
 
   async function anlegen() {
     setHinweis(null);
@@ -111,7 +112,7 @@ export default function TeamVerwaltung() {
       setHinweis({ ok: false, text: json.error ?? "Anlegen fehlgeschlagen." });
       return;
     }
-    setNeu({ name: "", lokal: "", rolle: "verwaltung", kuerzel: "", passwort: "" });
+    setNeu({ name: "", lokal: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
     setHinweis({ ok: true, text: `${json.mitglied.email} angelegt.` });
     laden();
   }
@@ -168,12 +169,12 @@ export default function TeamVerwaltung() {
     setHinweis({ ok: true, text: "Passwort gesetzt." });
   }
 
-  if (!istAdmin) {
+  if (!darfVerwalten) {
     return (
       <section className="stat-card space-y-2">
         <h2 className="ac-section-title">Team &amp; Zugänge</h2>
         <p className="text-sm" style={{ color: "var(--ac-text-mute)" }}>
-          Die Benutzerverwaltung ist Administratoren vorbehalten.
+          Die Benutzerverwaltung ist Administratoren und Verwaltung vorbehalten.
         </p>
       </section>
     );
@@ -184,7 +185,7 @@ export default function TeamVerwaltung() {
       <div>
         <h2 className="ac-section-title">Team &amp; Zugänge</h2>
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-mute)" }}>
-          Zentrale Benutzerverwaltung für Anima Cura und Anima Scribe. Konten, Rollen, Kürzel, Passwörter und Modulrechte.
+          Ein zentrales Konto steuert Anima Cura und Anima Scribe gemeinsam. Hier legt ihr Praxis-User an und bestimmt Rolle, Scribe-Zugang und Modulrechte.
         </p>
       </div>
 
@@ -316,11 +317,14 @@ export default function TeamVerwaltung() {
             <span className="whitespace-nowrap text-sm" style={{ color: "var(--ac-text-mute)" }}>@{mailDomain}</span>
           </div>
           <select className="input" value={neu.rolle} onChange={(e) => setNeu({ ...neu, rolle: e.target.value })}>
-            {ROLLEN.map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
+            {ROLLEN.filter((r) => istAdmin || r.wert !== "admin").map((r) => <option key={r.wert} value={r.wert}>{r.label}</option>)}
           </select>
           <input className="input" value={neu.kuerzel} onChange={(e) => setNeu({ ...neu, kuerzel: e.target.value })} placeholder="Kürzel, z. B. ms" />
           <PwFeld wert={neu.passwort} setzen={(v) => setNeu({ ...neu, passwort: v })} platzhalter="Startpasswort (mind. 8 Zeichen)" />
         </div>
+        <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>
+          `Verwaltung` hat standardmäßig Scribe-Zugriff. `Lesezugriff` ist ideal für Studenten oder Mitarbeitende ohne Schreibrechte in Anima Cura; Scribe kann später gezielt freigegeben werden.
+        </p>
         <button className="btn-primary" disabled={laeuft} onClick={anlegen}>{laeuft ? "Arbeitet …" : "Anlegen"}</button>
       </div>
     </section>

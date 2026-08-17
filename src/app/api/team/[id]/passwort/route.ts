@@ -11,8 +11,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
   const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single();
-  if ((profile?.role as string | undefined) !== "admin") {
-    return NextResponse.json({ error: "Nur für Admins" }, { status: 403 });
+  const actorRole = (profile?.role as string | undefined) ?? null;
+  if (!["admin", "verwaltung"].includes(actorRole ?? "")) {
+    return NextResponse.json({ error: "Nur für Admin oder Verwaltung" }, { status: 403 });
   }
 
   let body: { passwort?: string };
@@ -23,6 +24,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (passwort.length < 8) return NextResponse.json({ error: "Passwort: mindestens 8 Zeichen." }, { status: 400 });
 
   const service = createServerClient();
+  const { data: zielProfil } = await service.from("user_profiles").select("role").eq("id", params.id).single();
+  const zielRole = (zielProfil?.role as string | undefined) ?? null;
+  if (actorRole === "verwaltung" && zielRole === "admin") {
+    return NextResponse.json({ error: "Admin-Passwörter können nur von Admins gesetzt werden." }, { status: 403 });
+  }
   const { error } = await service.auth.admin.updateUserById(params.id, { password: passwort });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

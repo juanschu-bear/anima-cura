@@ -9,15 +9,12 @@ export const dynamic = "force-dynamic";
 const MAIL_DOMAIN = process.env.PRAXIS_MAIL_DOMAIN ?? "praxis-schubert.de";
 const ROLLEN = ["admin", "verwaltung", "lesezugriff"];
 
-async function adminPruefen() {
+async function rolleLaden() {
   const supabase = createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { fehler: NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 }) };
+  if (!user) return { fehler: NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 }), rolle: null as string | null };
   const { data: profile } = await supabase.from("user_profiles").select("role").eq("id", user.id).single();
-  if ((profile?.role as string | undefined) !== "admin") {
-    return { fehler: NextResponse.json({ error: "Nur für Admins" }, { status: 403 }) };
-  }
-  return { fehler: null };
+  return { fehler: null, rolle: (profile?.role as string | undefined) ?? null };
 }
 
 // GET /api/team – alle Team-Konten (keine Patienten-Profile)
@@ -42,7 +39,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const praxisFehler = await requirePraxisRole(["admin", "verwaltung"]);
   if (praxisFehler) return praxisFehler;
-  const { fehler } = await adminPruefen();
+  const { fehler, rolle: actorRole } = await rolleLaden();
   if (fehler) return fehler;
 
   let body: { lokal?: string; name?: string; rolle?: string; kuerzel?: string; passwort?: string };
@@ -61,6 +58,9 @@ export async function POST(request: NextRequest) {
   }
   if (!name) return NextResponse.json({ error: "Name fehlt." }, { status: 400 });
   if (!ROLLEN.includes(rolle)) return NextResponse.json({ error: "Ungültige Rolle." }, { status: 400 });
+  if (actorRole === "verwaltung" && body.rolle === "admin") {
+    return NextResponse.json({ error: "Verwaltung darf keine Admin-Konten anlegen." }, { status: 403 });
+  }
   if (passwort.length < 8) return NextResponse.json({ error: "Passwort: mindestens 8 Zeichen." }, { status: 400 });
 
   const email = `${lokal}@${MAIL_DOMAIN}`;
