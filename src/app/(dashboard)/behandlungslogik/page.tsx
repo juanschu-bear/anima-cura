@@ -669,7 +669,7 @@ export default function BehandlungslogikPage() {
           })}
 
           <section style={{ background: card, border: `1px solid ${border}`, borderRadius: 24, padding: 22, boxShadow: glow }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 420px", gap: 18, alignItems: "start" }}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase", color: muted }}>
@@ -711,7 +711,7 @@ export default function BehandlungslogikPage() {
                         background: isOpen
                           ? (dk ? "linear-gradient(145deg, rgba(96,165,250,0.09), rgba(255,255,255,0.03))" : "linear-gradient(145deg, rgba(96,165,250,0.08), #fbfdff)")
                           : (dk ? "rgba(255,255,255,0.02)" : "#fbfdff"),
-                        padding: 16,
+                        padding: isOpen ? 16 : 14,
                         boxShadow: isOpen ? "0 14px 34px rgba(59,130,246,0.12)" : "none",
                         transition: "border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease",
                       }}
@@ -744,7 +744,19 @@ export default function BehandlungslogikPage() {
                               </div>
                               <div style={{ fontSize: 14.5, fontWeight: 800, color: fg }}>{rule.title}</div>
                               {!isOpen && (
-                                <div style={{ fontSize: 12.5, color: muted, lineHeight: 1.55, marginTop: 8, maxWidth: 720 }}>
+                                <div
+                                  style={{
+                                    fontSize: 12.5,
+                                    color: muted,
+                                    lineHeight: 1.55,
+                                    marginTop: 7,
+                                    maxWidth: 720,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical" as const,
+                                    overflow: "hidden",
+                                  }}
+                                >
                                   {rule.body}
                                 </div>
                               )}
@@ -824,6 +836,9 @@ export default function BehandlungslogikPage() {
 
               <div
                 style={{
+                  alignSelf: "start",
+                  position: "sticky",
+                  top: 24,
                   borderRadius: 22,
                   border: `1px solid ${border}`,
                   background: dk ? "linear-gradient(145deg, rgba(96,165,250,0.08), rgba(168,85,247,0.06))" : "linear-gradient(145deg, rgba(96,165,250,0.08), rgba(168,85,247,0.05))",
@@ -840,7 +855,7 @@ export default function BehandlungslogikPage() {
                       was sie voraussichtlich auslösen würde.
                     </div>
                   </div>
-                  <div style={{ borderRadius: 999, padding: "8px 12px", border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.06)" : "#ffffff", fontSize: 11, fontWeight: 800, color: fg }}>
+                  <div style={{ flexShrink: 0, borderRadius: 999, padding: "8px 12px", border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.06)" : "#ffffff", fontSize: 11, fontWeight: 800, color: fg }}>
                     Voice-ready
                   </div>
                 </div>
