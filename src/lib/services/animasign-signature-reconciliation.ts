@@ -1,6 +1,7 @@
 import { createServerClient } from "@/lib/db/supabase";
 import { downloadSignedPdf, getEnvelope } from "@/lib/documenso/client";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
+import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -10,6 +11,10 @@ type SubmissionForFinalize = {
   signed_pdf_path: string | null;
   signiert_am: string | null;
   documenso_envelope_id: string | null;
+  patient_id?: string | null;
+  matched_patient_id?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
 };
 
 export type ReconcileEntryResult = {
@@ -114,6 +119,15 @@ async function finalizeSignedSubmission(params: {
     throw new Error(`Submission-Update: ${updateError.message}`);
   }
 
+  await syncSignedAnamnesisToPatientDocuments(db, {
+    id: submission.id,
+    patient_id: submission.patient_id,
+    matched_patient_id: submission.matched_patient_id,
+    vorname: submission.vorname,
+    nachname: submission.nachname,
+    signiert_am: completedAt ?? submission.signiert_am ?? new Date().toISOString(),
+  });
+
   try {
     const syncResult = await syncAnimaSignSubmission(submission.id, {
       db,
@@ -168,7 +182,7 @@ export async function reconcilePendingAnimaSignSignatures(options: {
 
   const { data: submissions, error } = await db
     .from("anamnese_submissions")
-    .select("id, status, signed_pdf_path, signiert_am, documenso_envelope_id, created_at")
+    .select("id, status, signed_pdf_path, signiert_am, documenso_envelope_id, created_at, patient_id, matched_patient_id, vorname, nachname")
     .eq("status", "signatur_ausstehend")
     .is("signed_pdf_path", null)
     .not("documenso_envelope_id", "is", null)

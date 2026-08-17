@@ -18,17 +18,13 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   const serviceClient = createServerClient();
   const { data: profile } = await serviceClient
     .from("user_profiles")
-    .select("role")
+    .select("role, patient_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile || !["admin", "verwaltung"].includes(profile.role)) {
-    return NextResponse.json({ error: "Nur fuer Praxis-Mitarbeiter" }, { status: 403 });
-  }
-
   const { data: submission, error: submissionError } = await serviceClient
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, signed_pdf_path, status")
+    .select("id, vorname, nachname, signed_pdf_path, status, patient_id, matched_patient_id")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -38,6 +34,15 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 
   if (!submission) {
     return NextResponse.json({ error: "Einreichung nicht gefunden" }, { status: 404 });
+  }
+
+  const role = profile?.role ?? null;
+  const allowedPatientId = submission.matched_patient_id ?? submission.patient_id ?? null;
+  const isPraxisRole = role === "admin" || role === "verwaltung";
+  const isOwningPatient = role === "patient" && !!profile?.patient_id && !!allowedPatientId && profile.patient_id === allowedPatientId;
+
+  if (!isPraxisRole && !isOwningPatient) {
+    return NextResponse.json({ error: "Nicht berechtigt" }, { status: 403 });
   }
 
   if (!submission.signed_pdf_path) {

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { downloadSignedPdf } from "@/lib/documenso/client";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
+import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
   // Idempotenz: schon signiert -> nichts tun.
   const { data: existing } = await supabase
     .from("anamnese_submissions")
-    .select("status")
+    .select("status, patient_id, matched_patient_id, vorname, nachname, signiert_am")
     .eq("id", submissionId)
     .maybeSingle();
   if (!existing) {
@@ -124,6 +125,15 @@ export async function POST(request: Request) {
         signiert_am: payload.completedAt ?? new Date().toISOString(),
       })
       .eq("id", submissionId);
+
+    await syncSignedAnamnesisToPatientDocuments(supabase, {
+      id: submissionId,
+      patient_id: existing.patient_id,
+      matched_patient_id: existing.matched_patient_id,
+      vorname: existing.vorname,
+      nachname: existing.nachname,
+      signiert_am: payload.completedAt ?? existing.signiert_am ?? new Date().toISOString(),
+    });
 
     // Signiertes PDF in Ivoris-Karteikarte hochladen
     try {
