@@ -1,13 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Sparkles, Target, WalletCards, FolderArchive, ShieldCheck, PencilLine, Trash2, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Sparkles, Target, WalletCards, FolderArchive, ShieldCheck, PencilLine, Trash2, Loader2, CheckCircle2, Mic, Radio } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import {
   BEHANDLUNGSART_REGELN,
   getConfidenceLabel,
   type Behandlungskategorie,
 } from "@/lib/behandlungsart-classification";
+
+type BrowserSpeechRecognitionAlternative = {
+  transcript: string;
+};
+
+type BrowserSpeechRecognitionResult = ArrayLike<BrowserSpeechRecognitionAlternative>;
+
+type BrowserSpeechRecognitionEvent = {
+  results: ArrayLike<BrowserSpeechRecognitionResult>;
+  resultIndex?: number;
+};
+
+type BrowserSpeechRecognitionErrorEvent = {
+  error?: string;
+};
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+type SpeechWindow = Window & {
+  webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+};
 
 type FamilyFilter = "alle" | "aligner" | "multiband" | "removable";
 
@@ -153,7 +185,7 @@ function scoreChipTone(score: number) {
 }
 
 export default function BehandlungslogikPage() {
-  const { theme } = useAppStore();
+  const { theme, locale } = useAppStore();
   const dk = theme === "dark";
   const [familyFilter, setFamilyFilter] = useState<FamilyFilter>("alle");
   const [openCategory, setOpenCategory] = useState<Behandlungskategorie>("MB2");
@@ -167,6 +199,10 @@ export default function BehandlungslogikPage() {
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [voiceDraftState, setVoiceDraftState] = useState<"idle" | "listening">("idle");
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const dictationBaseTextRef = useRef("");
 
   const fg = dk ? "#eef2ff" : "#18243a";
   const muted = dk ? "#94a3b8" : "#66758d";
@@ -225,7 +261,6 @@ export default function BehandlungslogikPage() {
     () => customRules.find((rule) => rule.id === editingRuleId) ?? null,
     [customRules, editingRuleId],
   );
-
   useEffect(() => {
     let active = true;
     async function loadRules() {
@@ -255,6 +290,94 @@ export default function BehandlungslogikPage() {
     const timer = window.setTimeout(() => setFeedback(null), 2800);
     return () => window.clearTimeout(timer);
   }, [feedback]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setVoiceSupported(Boolean((window as SpeechWindow).webkitSpeechRecognition || (window as SpeechWindow).SpeechRecognition));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      speechRecognitionRef.current?.stop();
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
+  function stopVoiceDraft() {
+    speechRecognitionRef.current?.stop();
+    speechRecognitionRef.current = null;
+    setVoiceDraftState("idle");
+  }
+
+  function startVoiceDraft() {
+    if (typeof window === "undefined") return;
+    const SpeechRecognitionCtor =
+      (window as SpeechWindow).webkitSpeechRecognition ||
+      (window as SpeechWindow).SpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setError("Dieser Browser erlaubt hier keine Spracheingabe. In Chrome oder Safari mit Mikrofonfreigabe sollte es funktionieren.");
+      return;
+    }
+
+    setError(null);
+    try {
+      const recognition = new SpeechRecognitionCtor();
+      speechRecognitionRef.current = recognition;
+      dictationBaseTextRef.current = ruleIdea.trim();
+      recognition.lang = locale === "de" ? "de-DE" : "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const alternative = result?.[0];
+          if (alternative?.transcript) transcript += `${alternative.transcript} `;
+        }
+
+        if (transcript.trim()) {
+          const base = dictationBaseTextRef.current;
+          const spoken = transcript.replace(/\s+/g, " ").trim();
+          setRuleIdea([base, spoken].filter(Boolean).join(" ").trim());
+        }
+      };
+
+      recognition.onerror = (event) => {
+        const code = event.error || "unknown";
+        if (code === "not-allowed" || code === "service-not-allowed") {
+          setError("Mikrofonzugriff wurde blockiert. Bitte im Browser erlauben und noch einmal versuchen.");
+        } else if (code === "no-speech") {
+          setError("Es wurde keine Sprache erkannt. Sprich etwas näher ins Mikrofon und versuche es erneut.");
+        } else {
+          setError(`Spracheingabe konnte nicht gestartet werden (${code}).`);
+        }
+        setVoiceDraftState("idle");
+      };
+
+      recognition.onend = () => {
+        speechRecognitionRef.current = null;
+        setVoiceDraftState("idle");
+      };
+
+      recognition.start();
+      setVoiceDraftState("listening");
+      setFeedback(locale === "de" ? "Spracheingabe aktiv." : "Voice input active.");
+    } catch {
+      setError("Spracheingabe konnte hier nicht gestartet werden. Bitte Browser-Mikrofon prüfen.");
+      setVoiceDraftState("idle");
+    }
+  }
+
+  function toggleVoiceDraft() {
+    if (voiceDraftState === "listening") {
+      stopVoiceDraft();
+      setFeedback(locale === "de" ? "Spracheingabe beendet." : "Voice input stopped.");
+      return;
+    }
+    startVoiceDraft();
+  }
 
   async function saveDraftRule() {
     const source = dialogMode === "edit" ? editingRule : null;
@@ -855,9 +978,36 @@ export default function BehandlungslogikPage() {
                       was sie voraussichtlich auslösen würde.
                     </div>
                   </div>
-                  <div style={{ flexShrink: 0, borderRadius: 999, padding: "8px 12px", border: `1px solid ${border}`, background: dk ? "rgba(255,255,255,0.06)" : "#ffffff", fontSize: 11, fontWeight: 800, color: fg }}>
-                    Voice-ready
-                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleVoiceDraft}
+                    disabled={!voiceSupported}
+                    style={{
+                      flexShrink: 0,
+                      borderRadius: 999,
+                      padding: "8px 12px",
+                      border: `1px solid ${voiceDraftState === "listening" ? "rgba(74,222,128,0.32)" : border}`,
+                      background: voiceDraftState === "listening"
+                        ? "rgba(74,222,128,0.12)"
+                        : (dk ? "rgba(255,255,255,0.06)" : "#ffffff"),
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: voiceDraftState === "listening" ? "#4ade80" : fg,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      cursor: voiceSupported ? "pointer" : "not-allowed",
+                      fontFamily: "inherit",
+                      opacity: voiceSupported ? 1 : 0.55,
+                    }}
+                  >
+                    {voiceDraftState === "listening" ? <Radio size={14} /> : <Mic size={14} />}
+                    {voiceSupported
+                      ? voiceDraftState === "listening"
+                        ? "Hört zu"
+                        : "Voice-ready"
+                      : "Kein Mikro"}
+                  </button>
                 </div>
 
                 <textarea
