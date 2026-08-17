@@ -22,12 +22,26 @@ type InboxEintrag = {
   in_arbeit_am?: string | null;
   erledigt_am?: string | null;
   istHeute: boolean;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  unread_mentions?: number;
+  kommentare: Array<{
+    id: string;
+    text: string;
+    erstellt_von_name: string | null;
+    erstellt_am: string;
+    mention_user_id: string | null;
+    mention_name: string | null;
+  }>;
 };
 
 type ApiAntwort = {
   eintraege: InboxEintrag[];
   offenHeute: number;
   heute: string;
+  unreadCount: number;
+  currentUserId: string;
+  team: Array<{ id: string; name: string; role: string | null }>;
 };
 
 const ARTEN: Array<{ key: InboxArt; label: string; icon: typeof Lightbulb }> = [
@@ -59,6 +73,7 @@ const DEFAULT_FORM = {
   prioritaet: "mittel" as "niedrig" | "mittel" | "hoch",
   bereich: "Scribe",
   erinnerung: "heute" as "heute" | "morgen" | "diese_woche",
+  assigned_to: "",
 };
 
 function slugifyLabel(value: string | null | undefined) {
@@ -108,6 +123,7 @@ export default function PraxisInboxWidget() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [daten, setDaten] = useState<ApiAntwort | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [antworten, setAntworten] = useState<Record<string, { text: string; mentionUserId: string }>>({});
 
   async function laden() {
     setLaedt(true);
@@ -168,6 +184,55 @@ export default function PraxisInboxWidget() {
     }
   }
 
+  async function antwortSpeichern(id: string) {
+    const zustand = antworten[id];
+    if (!zustand?.text.trim()) return;
+    setFehler(null);
+    try {
+      const res = await fetch("/api/scribe/inbox", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, kommentar_text: zustand.text, mention_user_id: zustand.mentionUserId || null }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Antwort konnte nicht gespeichert werden.");
+      setAntworten((alt) => ({ ...alt, [id]: { text: "", mentionUserId: "" } }));
+      await laden();
+    } catch (err) {
+      setFehler(err instanceof Error ? err.message : "Antwort konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function zuweisen(id: string, assignedTo: string) {
+    setFehler(null);
+    try {
+      const res = await fetch("/api/scribe/inbox", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, assigned_to: assignedTo || null }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Zuweisung konnte nicht gespeichert werden.");
+      await laden();
+    } catch (err) {
+      setFehler(err instanceof Error ? err.message : "Zuweisung konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function mentionsAlsGelesen(id: string, unreadMentions: number | undefined) {
+    if (!unreadMentions) return;
+    try {
+      await fetch("/api/scribe/inbox", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, mark_mentions_read: true }),
+      });
+      await laden();
+    } catch {
+      // still usable without surfacing a blocking error
+    }
+  }
+
   async function loeschen(id: string) {
     setFehler(null);
     if (typeof window !== "undefined" && !window.confirm("Diesen Eintrag wirklich löschen?")) return;
@@ -201,6 +266,60 @@ export default function PraxisInboxWidget() {
     () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "erledigt").slice(0, 4),
     [daten],
   );
+
+  function renderKommentarbereich(eintrag: InboxEintrag) {
+    const antwort = antworten[eintrag.id] ?? { text: "", mentionUserId: "" };
+    return (
+      <div className="praxis-thread">
+        <div className="praxis-thread-kopf">
+          <span>Antworten & Rückfragen</span>
+          {eintrag.unread_mentions ? (
+            <button type="button" className="praxis-thread-unread" onClick={() => void mentionsAlsGelesen(eintrag.id, eintrag.unread_mentions)}>
+              {eintrag.unread_mentions} neu
+            </button>
+          ) : null}
+        </div>
+        {eintrag.kommentare.length > 0 ? (
+          <div className="praxis-kommentare">
+            {eintrag.kommentare.map((kommentar) => (
+              <div key={kommentar.id} className="praxis-kommentar">
+                <div className="praxis-kommentar-meta">
+                  <strong>{kommentar.erstellt_von_name || "Praxis"}</strong>
+                  <span>{formatZeitpunkt(kommentar.erstellt_am)}</span>
+                </div>
+                <p>{kommentar.text}</p>
+                {kommentar.mention_name && <div className="praxis-mention-chip">@{kommentar.mention_name}</div>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="praxis-inbox-leer">Noch keine Rückfrage oder Antwort hinterlegt.</p>
+        )}
+        <div className="praxis-antwortbox">
+          <textarea
+            className="praxis-inbox-textarea klein"
+            rows={2}
+            placeholder="Kurz antworten, nachfragen oder nächste Aktion festhalten"
+            value={antwort.text}
+            onChange={(e) => setAntworten((alt) => ({ ...alt, [eintrag.id]: { ...antwort, text: e.target.value } }))}
+          />
+          <div className="praxis-antwortzeile">
+            <select
+              className="praxis-inbox-select klein"
+              value={antwort.mentionUserId}
+              onChange={(e) => setAntworten((alt) => ({ ...alt, [eintrag.id]: { ...antwort, mentionUserId: e.target.value } }))}
+            >
+              <option value="">Niemand markieren</option>
+              {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>@{person.name}</option>)}
+            </select>
+            <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void antwortSpeichern(eintrag.id)}>
+              Antwort speichern
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`praxis-inbox${offen ? " offen" : ""}`} data-thema={thema}>
@@ -310,6 +429,18 @@ export default function PraxisInboxWidget() {
               </div>
             </div>
 
+            <div style={{ marginTop: 12 }}>
+              <span className="praxis-inbox-label">Zuständig</span>
+              <select
+                className="praxis-inbox-select"
+                value={form.assigned_to}
+                onChange={(e) => setForm((alt) => ({ ...alt, assigned_to: e.target.value }))}
+              >
+                <option value="">Noch offen lassen</option>
+                {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+              </select>
+            </div>
+
             <div className="praxis-inbox-actions">
               <button type="button" className="praxis-inbox-save" onClick={() => void speichern()} disabled={speichert}>
                 {speichert ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
@@ -338,6 +469,7 @@ export default function PraxisInboxWidget() {
                     <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
+                    {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
@@ -348,7 +480,14 @@ export default function PraxisInboxWidget() {
                         </button>
                       </div>
                     </div>
+                    <div className="praxis-zuweisung">
+                      <select className="praxis-inbox-select klein" value={eintrag.assigned_to ?? ""} onChange={(e) => void zuweisen(eintrag.id, e.target.value)}>
+                        <option value="">Zuständigkeit wählen</option>
+                        {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                      </select>
+                    </div>
                     <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
+                    {renderKommentarbereich(eintrag)}
                   </article>
                 ))
               )}
@@ -367,6 +506,7 @@ export default function PraxisInboxWidget() {
                     <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
+                    {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
@@ -380,6 +520,7 @@ export default function PraxisInboxWidget() {
                     <div className="praxis-item-zeiten">
                       Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)}
                     </div>
+                    {renderKommentarbereich(eintrag)}
                   </article>
                 ))
               )}
@@ -401,6 +542,7 @@ export default function PraxisInboxWidget() {
                     <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
+                    {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
@@ -411,6 +553,7 @@ export default function PraxisInboxWidget() {
                       </div>
                     </div>
                     <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
+                    {renderKommentarbereich(eintrag)}
                   </article>
                 ))
               )}
@@ -434,9 +577,11 @@ export default function PraxisInboxWidget() {
                       </span>
                     </summary>
                     {eintrag.text && <p>{eintrag.text}</p>}
+                    {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-zeiten">
                       Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)} · Erledigt: {formatZeitpunkt(eintrag.erledigt_am)}
                     </div>
+                    {renderKommentarbereich(eintrag)}
                     <div className="praxis-item-actions" style={{ marginTop: 10 }}>
                       <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)}>
                         <Trash2 size={14} />
@@ -460,7 +605,9 @@ export default function PraxisInboxWidget() {
           <strong>Praxis-Inbox</strong>
           <small>Idee, Frage oder Aufgabe</small>
         </span>
-        {(daten?.offenHeute ?? 0) > 0 && <span className="praxis-inbox-badge">{daten?.offenHeute}</span>}
+        {((daten?.unreadCount ?? 0) > 0 || (daten?.offenHeute ?? 0) > 0) && (
+          <span className="praxis-inbox-badge">{(daten?.unreadCount ?? 0) > 0 ? daten?.unreadCount : daten?.offenHeute}</span>
+        )}
       </button>
     </div>
   );
