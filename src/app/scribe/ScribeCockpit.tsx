@@ -990,7 +990,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         } else {
           const start: Record<string, number[]> = {};
           Object.entries(m.struktur.groups).forEach(([g, grp]) => {
-            start[g] = grp.opts.flatMap((o, i) => (o.on ? [i] : []));
+            start[g] = [];
           });
           neu[m.termin_typ] = start;
         }
