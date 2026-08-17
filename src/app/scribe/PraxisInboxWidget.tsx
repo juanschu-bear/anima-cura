@@ -86,6 +86,20 @@ function formatZeitpunkt(iso: string | null | undefined): string {
     : datum.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function InboxMeta({ eintrag }: { eintrag: InboxEintrag }) {
+  return (
+    <div className="praxis-item-meta">
+      <span className={`praxis-art art-${slugifyLabel(eintrag.art)}`}>{eintrag.art}</span>
+      <span className={`praxis-kategorie kategorie-${slugifyLabel(eintrag.kategorie)}`}>{eintrag.kategorie}</span>
+      {eintrag.bereich && (
+        <span className={`praxis-bereich bereich-${slugifyLabel(eintrag.bereich)}`}>
+          {eintrag.bereich}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function PraxisInboxWidget() {
   const { thema } = useThema();
   const [offen, setOffen] = useState(false);
@@ -321,15 +335,7 @@ export default function PraxisInboxWidget() {
               ) : (
                 heuteListe.map((eintrag) => (
                   <article key={eintrag.id} className={`praxis-item prioritaet-${eintrag.prioritaet}`}>
-                    <div className="praxis-item-meta">
-                      <span className={`praxis-art art-${slugifyLabel(eintrag.art)}`}>{eintrag.art}</span>
-                      <span className={`praxis-kategorie kategorie-${slugifyLabel(eintrag.kategorie)}`}>{eintrag.kategorie}</span>
-                      {eintrag.bereich && (
-                        <span className={`praxis-bereich bereich-${slugifyLabel(eintrag.bereich)}`}>
-                          {eintrag.bereich}
-                        </span>
-                      )}
-                    </div>
+                    <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
                     <div className="praxis-item-fuss">
@@ -358,10 +364,11 @@ export default function PraxisInboxWidget() {
               ) : (
                 inArbeitListe.slice(0, 4).map((eintrag) => (
                   <article key={eintrag.id} className="praxis-item kompakt">
+                    <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
                     <div className="praxis-item-fuss">
-                      <span>{eintrag.kategorie} · {formatFaelligkeit(eintrag.faellig_am)}</span>
+                      <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Zurück offen</button>
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
@@ -391,9 +398,11 @@ export default function PraxisInboxWidget() {
               ) : (
                 spaeterListe.slice(0, 4).map((eintrag) => (
                   <article key={eintrag.id} className="praxis-item kompakt">
+                    <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
+                    {eintrag.text && <p>{eintrag.text}</p>}
                     <div className="praxis-item-fuss">
-                      <span>{eintrag.kategorie} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
+                      <span>{eintrag.erstellt_von_name || "Praxis"} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>Jetzt starten</button>
                         <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
@@ -416,9 +425,11 @@ export default function PraxisInboxWidget() {
                 {erledigtListe.map((eintrag) => (
                   <details key={eintrag.id} className="praxis-item kompakt erledigt praxis-item-details">
                     <summary className="praxis-item-summary">
-                      <strong>{eintrag.titel}</strong>
+                      <div className="praxis-item-summary-copy">
+                        <InboxMeta eintrag={eintrag} />
+                        <strong>{eintrag.titel}</strong>
+                      </div>
                       <span className="praxis-item-summary-right">
-                        <span>{eintrag.kategorie}</span>
                         <ChevronDown size={15} />
                       </span>
                     </summary>

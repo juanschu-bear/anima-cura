@@ -956,7 +956,59 @@
   border:1px solid transparent;box-shadow:0 8px 18px -14px rgba(0,0,0,.75)
 }
 .scribe .praxis-art{background:rgba(94,162,255,.16);border-color:rgba(143,197,255,.18);color:#A9D3FF}
+.scribe .praxis-art.art-anliegen{
+  background:linear-gradient(135deg,rgba(94,162,255,.22),rgba(44,111,230,.12));
+  border-color:rgba(122,194,255,.34);
+  color:#CFE7FF;
+}
+.scribe .praxis-art.art-idee{
+  background:linear-gradient(135deg,rgba(255,196,92,.22),rgba(181,118,25,.12));
+  border-color:rgba(255,196,92,.34);
+  color:#FFE5A8;
+}
+.scribe .praxis-art.art-aufgabe{
+  background:linear-gradient(135deg,rgba(123,216,166,.22),rgba(32,123,88,.12));
+  border-color:rgba(123,216,166,.34);
+  color:#D8FFEB;
+}
+.scribe .praxis-art.art-frage{
+  background:linear-gradient(135deg,rgba(255,132,132,.22),rgba(161,55,55,.12));
+  border-color:rgba(255,149,149,.34);
+  color:#FFD6D6;
+}
+.scribe .praxis-art.art-inspiration{
+  background:linear-gradient(135deg,rgba(171,139,255,.22),rgba(90,64,170,.12));
+  border-color:rgba(171,139,255,.34);
+  color:#EEE2FF;
+}
 .scribe .praxis-kategorie{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.08);color:#E4EEFA}
+.scribe .praxis-kategorie.kategorie-praxis{
+  background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:#F2F7FD
+}
+.scribe .praxis-kategorie.kategorie-ablauf{
+  background:linear-gradient(135deg,rgba(99,211,255,.18),rgba(35,110,153,.10));
+  border-color:rgba(115,220,255,.26);color:#D8F6FF
+}
+.scribe .praxis-kategorie.kategorie-behandlung{
+  background:linear-gradient(135deg,rgba(123,216,166,.18),rgba(30,124,89,.10));
+  border-color:rgba(123,216,166,.24);color:#D8FFEB
+}
+.scribe .praxis-kategorie.kategorie-abrechnung{
+  background:linear-gradient(135deg,rgba(255,196,92,.18),rgba(151,102,14,.10));
+  border-color:rgba(255,196,92,.24);color:#FFE7B3
+}
+.scribe .praxis-kategorie.kategorie-design{
+  background:linear-gradient(135deg,rgba(255,178,107,.18),rgba(175,98,29,.10));
+  border-color:rgba(255,178,107,.24);color:#FFE7CA
+}
+.scribe .praxis-kategorie.kategorie-wunsch{
+  background:linear-gradient(135deg,rgba(171,139,255,.18),rgba(90,64,170,.10));
+  border-color:rgba(171,139,255,.24);color:#EEE2FF
+}
+.scribe .praxis-kategorie.kategorie-fehler{
+  background:linear-gradient(135deg,rgba(255,132,132,.18),rgba(161,55,55,.10));
+  border-color:rgba(255,149,149,.24);color:#FFD6D6
+}
 .scribe .praxis-bereich{
   background:linear-gradient(135deg,rgba(242,181,68,.18),rgba(242,181,68,.08));
   border-color:rgba(242,181,68,.24);color:#F7C869;font-weight:700;letter-spacing:.02em
@@ -1006,6 +1058,8 @@
 .scribe .praxis-item-details summary{list-style:none;cursor:pointer}
 .scribe .praxis-item-details summary::-webkit-details-marker{display:none}
 .scribe .praxis-item-summary{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.scribe .praxis-item-summary-copy{display:grid;gap:6px;min-width:0;flex:1}
+.scribe .praxis-item-summary-copy strong{margin:0}
 .scribe .praxis-item-summary-right{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:#95AFCA}
 .scribe .praxis-item-actions button.kritisch{color:#FFB4A6;border-color:rgba(255,151,126,.18)}
 .scribe .praxis-item-zeiten{margin-top:8px;font-size:11px;color:#95AFCA;line-height:1.5}
