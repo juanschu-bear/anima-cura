@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
@@ -55,6 +54,19 @@ type TagesEintrag = {
   patients: { id?: string; vorname: string; nachname: string; geburtsdatum?: string | null } | null;
 };
 
+type PraxisPassAntwort = {
+  behandlungsart: string;
+  termin_typ: string;
+  eigener_name?: string | null;
+  position?: number | null;
+};
+
+type EigeneArt = {
+  id: string;
+  name: string;
+  basis: "aligner" | "multiband" | "removable";
+};
+
 function formatDatumKurz(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -90,7 +102,13 @@ function istAutomatischBehebbarerPushFehler(fehler: string | null | undefined): 
   );
 }
 
-const ART_NAMEN: Record<string, string> = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" };
+const ART_NAMEN = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" } as const;
+const STANDARD_ARTEN = Object.entries(ART_NAMEN).map(([id, name]) => ({
+  id,
+  name,
+  basis: id as keyof typeof ART_NAMEN,
+  fix: true,
+}));
 const BOGEN = ["12er NiTi", "14er NiTi", "16er NiTi", "16×22 NiTi", "16×22 Stahl", "18er Stahl"];
 const FDI_OK = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const FDI_UK = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
@@ -125,6 +143,32 @@ function anzeigeName(v: Vorlage): string {
   const muster = v.struktur?.praxis_muster?.trim();
   if (istEigeneTerminart(v) && muster) return muster;
   return v.name;
+}
+
+function artName(value: string | null | undefined): string {
+  if (!value) return "";
+  return ART_NAMEN[value as keyof typeof ART_NAMEN] ?? value;
+}
+
+function mergeEigeneTerminarten(vorlagenAusDb: Vorlage[], antworten: PraxisPassAntwort[]): Vorlage[] {
+  const bekannteVorlagen = new Set(vorlagenAusDb.map((v) => `${v.behandlungsart}::${v.termin_typ}`));
+  const eigeneAusDb: Vorlage[] = [];
+
+  antworten.forEach((a) => {
+    const key = `${a.behandlungsart}::${a.termin_typ}`;
+    if (!a.eigener_name || bekannteVorlagen.has(key)) return;
+    eigeneAusDb.push({
+      id: `eigen-${a.behandlungsart}-${a.termin_typ}`,
+      behandlungsart: a.behandlungsart as Vorlage["behandlungsart"],
+      termin_typ: a.termin_typ,
+      name: a.eigener_name,
+      sort_index: a.position ?? 999,
+      struktur: { template: [], groups: {}, vars: [] },
+      positionen: [],
+    });
+  });
+
+  return [...vorlagenAusDb, ...eigeneAusDb];
 }
 
 function bereinigeZusatztext(wert: string): string {
@@ -364,6 +408,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [spickSuche, setSpickSuche] = useState("");
   const [spickBereich, setSpickBereich] = useState<string>("alle");
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
+  const [eigeneArten, setEigeneArten] = useState<EigeneArt[]>([]);
   const [ladefehler, setLadefehler] = useState<string | null>(null);
   const [heute, setHeute] = useState<TagesEintrag[]>([]);
   const [listenDatum, setListenDatum] = useState<string>(() => {
@@ -382,10 +427,17 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [patient, setPatient] = useState<PatientTreffer | null>(null);
 
   const [art, setArt] = useState<string>("aligner");
+  const [artAuswahlId, setArtAuswahlId] = useState<string>("aligner");
   const [gewaehlt, setGewaehlt] = useState<string[]>([]); // termin_typ-Slugs, stapelbar
   const [terminOffen, setTerminOffen] = useState(false); // Klapp-Menue der Terminarten
   const terminRef = useRef<HTMLDivElement>(null);
   const datumRef = useRef<HTMLInputElement>(null);
+  const [managerOffen, setManagerOffen] = useState<null | "arten" | "vorlagen">(null);
+  const [artenSpeichert, setArtenSpeichert] = useState(false);
+  const [managerHinweis, setManagerHinweis] = useState<string | null>(null);
+  const [neueArtName, setNeueArtName] = useState("");
+  const [neueArtBasis, setNeueArtBasis] = useState<"aligner" | "multiband" | "removable">("aligner");
+  const [neueTerminartName, setNeueTerminartName] = useState("");
 
   const [auswahl, setAuswahl] = useState<Record<string, Record<string, number[]>>>({});
   const [zaehne, setZaehne] = useState<number[]>([]);
@@ -446,16 +498,21 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/doku/vorlagen");
-      if (!res.ok) {
+      const [vorlagenRes, artenRes, passRes] = await Promise.all([
+        fetch("/api/doku/vorlagen"),
+        fetch("/api/doku/behandlungsarten"),
+        fetch("/api/praxis-pass"),
+      ]);
+      if (!vorlagenRes.ok) {
         setLadefehler("Vorlagen konnten nicht geladen werden. Seite neu laden.");
         return;
       }
-      const json = await res.json();
-      const liste: Vorlage[] = json.vorlagen ?? [];
+      const json = await vorlagenRes.json();
+      const artenJson = await artenRes.json().catch(() => ({}));
+      const passJson = await passRes.json().catch(() => ({}));
+      const liste: Vorlage[] = mergeEigeneTerminarten(json.vorlagen ?? [], passJson.antworten ?? []);
       setVorlagen(liste);
-      const erste = liste.filter((v) => v.behandlungsart === "aligner").sort((a, b) => a.sort_index - b.sort_index)[0];
-      if (erste) setGewaehlt([erste.termin_typ]);
+      setEigeneArten((artenJson.arten ?? []).filter((eintrag: EigeneArt) => !!eintrag?.id && !!eintrag?.name && !!eintrag?.basis));
       await ladeHeute();
     })();
   }, [ladeHeute]);
@@ -543,6 +600,16 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     }
   }
 
+  const artAuswahlen = useMemo(
+    () => [...STANDARD_ARTEN, ...eigeneArten.map((eintrag) => ({ ...eintrag, fix: false }))],
+    [eigeneArten]
+  );
+  const aktiveArtAuswahl = useMemo(
+    () => artAuswahlen.find((eintrag) => eintrag.id === artAuswahlId) ?? artAuswahlen.find((eintrag) => eintrag.id === art) ?? STANDARD_ARTEN[0],
+    [artAuswahlId, artAuswahlen, art]
+  );
+  const artAnzeigeName = aktiveArtAuswahl?.name ?? (ART_NAMEN[art as keyof typeof ART_NAMEN] ?? art);
+
   const artVorlagen = useMemo(
     () => vorlagen.filter((v) => v.behandlungsart === art).sort((a, b) => a.sort_index - b.sort_index),
     [vorlagen, art]
@@ -597,9 +664,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   useEffect(() => {
     setGewaehlt((alt) => {
       const erlaubt = alt.filter((slug) => sichtbareVorlagen.some((v) => v.termin_typ === slug));
-      if (erlaubt.length === alt.length) return alt;
-      if (erlaubt.length > 0) return erlaubt;
-      return sichtbareVorlagen[0] ? [sichtbareVorlagen[0].termin_typ] : [];
+      return erlaubt.length === alt.length ? alt : erlaubt;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sichtbareVorlagen.map((v) => v.id).join(",")]);
@@ -780,6 +845,121 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     }
   }
 
+  async function eigeneArtAnlegen() {
+    const name = neueArtName.trim();
+    if (!name || artenSpeichert) return;
+    setArtenSpeichert(true);
+    setManagerHinweis(null);
+    try {
+      const res = await fetch("/api/doku/behandlungsarten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, basis: neueArtBasis }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManagerHinweis(json.error ?? "Behandlungsart konnte nicht angelegt werden.");
+        return;
+      }
+      setEigeneArten((alt) => [...alt, json.art]);
+      setNeueArtName("");
+      setNeueArtBasis("aligner");
+      setManagerHinweis(`Behandlungsart „${json.art.name}“ hinzugefügt.`);
+    } finally {
+      setArtenSpeichert(false);
+    }
+  }
+
+  async function eigeneArtLoeschen(eintrag: EigeneArt) {
+    if (artenSpeichert) return;
+    if (typeof window !== "undefined" && !window.confirm(`Behandlungsart „${eintrag.name}“ wirklich löschen?`)) return;
+    setArtenSpeichert(true);
+    setManagerHinweis(null);
+    try {
+      const res = await fetch("/api/doku/behandlungsarten", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: eintrag.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManagerHinweis(json.error ?? "Behandlungsart konnte nicht gelöscht werden.");
+        return;
+      }
+      setEigeneArten((alt) => alt.filter((artItem) => artItem.id !== eintrag.id));
+      if (artAuswahlId === eintrag.id) artWechseln(eintrag.basis);
+      setManagerHinweis(`Behandlungsart „${eintrag.name}“ gelöscht.`);
+    } finally {
+      setArtenSpeichert(false);
+    }
+  }
+
+  async function eigeneTerminartAnlegen() {
+    const name = neueTerminartName.trim();
+    if (!name || artenSpeichert) return;
+    const slug = `eigen-${Date.now().toString(36)}`;
+    const basisVorlage = artVorlagen[0];
+    const neueVorlage: Vorlage = {
+      id: `eigen-${art}-${slug}`,
+      behandlungsart: art as Vorlage["behandlungsart"],
+      termin_typ: slug,
+      name,
+      sort_index: ((artVorlagen.length > 0 ? artVorlagen[artVorlagen.length - 1].sort_index : 0) ?? 0) + 1,
+      struktur: basisVorlage
+        ? JSON.parse(JSON.stringify(basisVorlage.struktur))
+        : { template: [], groups: {}, vars: [], kontext: "", anima_kopplung: "" },
+      positionen: basisVorlage ? JSON.parse(JSON.stringify(basisVorlage.positionen)) : [],
+    };
+
+    setArtenSpeichert(true);
+    setManagerHinweis(null);
+    try {
+      const res = await fetch("/api/praxis-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          umbenennen: { behandlungsart: art, termin_typ: slug, name },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManagerHinweis(json.error ?? "Terminart konnte nicht angelegt werden.");
+        return;
+      }
+      setVorlagen((alt) => [...alt, neueVorlage]);
+      setNeueTerminartName("");
+      setManagerHinweis(`Terminart „${name}“ hinzugefügt.`);
+      artWechseln(art, artAuswahlId);
+      setGewaehlt([slug]);
+    } finally {
+      setArtenSpeichert(false);
+    }
+  }
+
+  async function eigeneTerminartLoeschen(v: Vorlage) {
+    if (!istEigeneTerminart(v) || artenSpeichert) return;
+    if (typeof window !== "undefined" && !window.confirm(`Terminart „${v.name}“ wirklich löschen?`)) return;
+    setArtenSpeichert(true);
+    setManagerHinweis(null);
+    try {
+      const res = await fetch("/api/praxis-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loeschen: { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ } }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManagerHinweis(json.error ?? "Terminart konnte nicht gelöscht werden.");
+        return;
+      }
+      setVorlagen((alt) => alt.filter((eintrag) => !(eintrag.behandlungsart === v.behandlungsart && eintrag.termin_typ === v.termin_typ)));
+      setGewaehlt((alt) => alt.filter((slug) => slug !== v.termin_typ));
+      setManagerHinweis(`Terminart „${v.name}“ gelöscht.`);
+    } finally {
+      setArtenSpeichert(false);
+    }
+  }
+
   function ntPruefen(text: string) {
     const sauber = text.trim();
     if (!sauber) {
@@ -810,10 +990,11 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [module.map((m) => m.id).join(",")]);
 
-  function artWechseln(k: string) {
+  function artWechseln(k: string, auswahlId = k) {
     setArt(k);
-    const erste = vorlagen.filter((v) => v.behandlungsart === k).sort((a, b) => a.sort_index - b.sort_index)[0];
-    setGewaehlt(erste ? [erste.termin_typ] : []);
+    setArtAuswahlId(auswahlId);
+    setGewaehlt([]);
+    setTerminOffen(false);
     setZaehne([]);
     setSeiten({});
     setAusnahme("");
@@ -1041,8 +1222,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setZaehne([]);
     setSeiten({});
     setAusnahme("");
-    const erste = artVorlagen[0];
-    setGewaehlt(erste ? [erste.termin_typ] : []);
+    setGewaehlt([]);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1176,7 +1356,10 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setPatient({ id: e.patient_id, name: e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt", alter });
     setSuche("");
     setTreffer([]);
-    if (e.behandlungsart) setArt(e.behandlungsart);
+    if (e.behandlungsart) {
+      setArt(e.behandlungsart);
+      setArtAuswahlId(e.behandlungsart);
+    }
     setGewaehlt(e.termin_typ ? e.termin_typ.split("+") : []);
     setAuswahl(e.auswahl ?? {});
     setZaehne((e.zaehne ?? []).map(Number).filter((n) => !Number.isNaN(n)));
@@ -1399,7 +1582,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))} onKeyDown={(ev) => ev.key === "Enter" && (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))}>
                 <div className="zeit">{am}</div>
                 <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
-                <div className="was">{ART_NAMEN[e.behandlungsart ?? ""] ?? e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
+                <div className="was">{artName(e.behandlungsart) || e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
                 <span className={`pille ${p.cls}`}>{p.text}</span>
                 {pushFehlerHinweis && <div className="wache-fehler">{pushFehlerHinweis}</div>}
               </div>
@@ -1480,15 +1663,51 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             <section className="termin-panel">
               <div className="stufenkopf">
                 <span className="stufe">Behandlungsart</span>
-                <Link href="/behandlungen" className="neben klein vorlagen-link">
+                <button type="button" className="neben klein vorlagen-link" onClick={() => setManagerOffen((alt) => alt === "arten" ? null : "arten")}>
                   Behandlungsarten verwalten
-                </Link>
+                </button>
               </div>
               <div className="wahlzeile">
-                {Object.entries(ART_NAMEN).map(([k, n]) => (
-                  <button key={k} className="wahl" aria-pressed={art === k} onClick={() => artWechseln(k)}>{n}</button>
+                {artAuswahlen.map((eintrag) => (
+                  <span key={eintrag.id} className="art-chip-wrap">
+                    <button className="wahl" aria-pressed={artAuswahlId === eintrag.id} onClick={() => artWechseln(eintrag.basis, eintrag.id)}>{eintrag.name}</button>
+                    {!eintrag.fix && (
+                      <button
+                        type="button"
+                        className="art-chip-loeschen"
+                        aria-label={`${eintrag.name} löschen`}
+                        onClick={() => eigeneArtLoeschen(eintrag)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
                 ))}
               </div>
+              {managerOffen === "arten" && (
+                <div className="inline-manager">
+                  <div className="inline-manager-kopf">
+                    <strong>Behandlungsarten direkt hier verwalten</strong>
+                    <span>Die drei Standardarten bleiben fest. Eigene Ergänzungen können wieder gelöscht werden.</span>
+                  </div>
+                  <div className="inline-manager-grid">
+                    <input
+                      className="feld-input"
+                      type="text"
+                      placeholder="Neue Behandlungsart"
+                      value={neueArtName}
+                      onChange={(e) => setNeueArtName(e.target.value)}
+                    />
+                    <select className="feld-input" value={neueArtBasis} onChange={(e) => setNeueArtBasis(e.target.value as "aligner" | "multiband" | "removable")}>
+                      {STANDARD_ARTEN.map((eintrag) => <option key={eintrag.id} value={eintrag.basis}>Basiert auf {eintrag.name}</option>)}
+                    </select>
+                    <button type="button" className="neben klein vorlagen-link" disabled={artenSpeichert} onClick={eigeneArtAnlegen}>
+                      {artenSpeichert ? "Speichert…" : "Behandlungsart hinzufügen"}
+                    </button>
+                  </div>
+                  {managerHinweis && <p className="inline-manager-hinweis">{managerHinweis}</p>}
+                </div>
+              )}
             </section>
 
             <section className="termin-panel termin-panel-breit">
@@ -1577,18 +1796,53 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               </button>
             </div>
           )}
-          {kontext && <div className="kontext"><b>{ART_NAMEN[art]}:</b> {kontext}</div>}
+          {kontext && <div className="kontext"><b>{artAnzeigeName}:</b> {kontext}</div>}
           <div className="vorlagen-hinweis">
             <span>Fehlt oben eine Terminart, Vorlage oder Behandlungsart?</span>
             <div className="vorlagen-linkgruppe">
-              <Link href="/scribe/praxis-pass" className="neben klein vorlagen-link">
+              <button type="button" className="neben klein vorlagen-link" onClick={() => setManagerOffen((alt) => alt === "vorlagen" ? null : "vorlagen")}>
                 Terminarten &amp; Vorlagen bearbeiten
-              </Link>
-              <Link href="/behandlungen" className="neben klein vorlagen-link">
+              </button>
+              <button type="button" className="neben klein vorlagen-link" onClick={() => setManagerOffen((alt) => alt === "arten" ? null : "arten")}>
                 Behandlungsarten hinzufügen
-              </Link>
+              </button>
             </div>
           </div>
+          {managerOffen === "vorlagen" && (
+            <div className="inline-manager inline-manager-vorlagen">
+              <div className="inline-manager-kopf">
+                <strong>Terminarten intern erweitern</strong>
+                <span>Neue Terminarten bleiben in {artAnzeigeName} und erscheinen danach direkt oben in der Auswahl.</span>
+              </div>
+              <div className="inline-manager-grid">
+                <input
+                  className="feld-input"
+                  type="text"
+                  placeholder={`Neue Terminart für ${artAnzeigeName}`}
+                  value={neueTerminartName}
+                  onChange={(e) => setNeueTerminartName(e.target.value)}
+                />
+                <button type="button" className="neben klein vorlagen-link" disabled={artenSpeichert} onClick={eigeneTerminartAnlegen}>
+                  {artenSpeichert ? "Speichert…" : "Terminart hinzufügen"}
+                </button>
+              </div>
+              <div className="inline-manager-liste">
+                {artVorlagen.map((v) => (
+                  <div key={v.id} className="inline-manager-item">
+                    <button type="button" className="inline-manager-select" onClick={() => { setGewaehlt([v.termin_typ]); setTerminOffen(false); }}>
+                      {anzeigeName(v)}
+                    </button>
+                    {istEigeneTerminart(v) ? (
+                      <button type="button" className="inline-manager-delete" onClick={() => eigeneTerminartLoeschen(v)}>Löschen</button>
+                    ) : (
+                      <span className="inline-manager-fix">Standard</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {managerHinweis && <p className="inline-manager-hinweis">{managerHinweis}</p>}
+            </div>
+          )}
         </div>
 
         {/* ===== Eintrag ===== */}
@@ -1597,7 +1851,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
         <div className="karteikarte">
           <div className="kartenkopf">
-            {patient ? patient.name : "Kein Patient gewählt"} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ") || "Keine Leistung gewählt"}
+            {patient ? patient.name : "Kein Patient gewählt"} · {artAnzeigeName} · {module.map((m) => anzeigeName(m)).join(" + ") || "Keine Leistung gewählt"}
           </div>
           <div className="schreibflaeche">
             {komposition.segs.map((s, i) => (
@@ -1948,7 +2202,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
             {bestaetigt ? (
               <>
                 <div className="aktemeta">
-                  {formatDatumKurz(bestaetigt.terminDatum)} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {ART_NAMEN[art]} · {module.map((m) => anzeigeName(m)).join(" + ")}
+                  {formatDatumKurz(bestaetigt.terminDatum)} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {artAnzeigeName} · {module.map((m) => anzeigeName(m)).join(" + ")}
                 </div>
                 <div className="aktetext">{komposition.text}</div>
                 <div className="akteversion">
@@ -2068,7 +2322,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <div className="ohead">
                 <span className="otitel">
                   {detail.patients ? `${detail.patients.vorname} ${detail.patients.nachname}` : "Unbekannt"}
-                  {" · "}{ART_NAMEN[detail.behandlungsart ?? ""] ?? detail.behandlungsart}
+                  {" · "}{artName(detail.behandlungsart) || detail.behandlungsart}
                 </span>
                 <span className={`pille ${wachePille(detail).cls}`} style={{ position: "static" }}>{wachePille(detail).text}</span>
               </div>
