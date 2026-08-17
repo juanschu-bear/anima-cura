@@ -17,6 +17,8 @@ interface RpData {
   prozent: number; streak: number;
   naechste_rate: { betrag: number; faellig_am: string } | null;
   ueberfaellig: { betrag: number; faellig_am: string; anzahl: number } | null;
+  has_financial_data?: boolean;
+  financial_source?: "plan" | "patient_rates" | "open_items" | "none";
 }
 interface Phase { id: string; name: string; beschreibung: string | null; status: string; reihenfolge: number; start_datum: string | null; end_datum: string | null; video_url?: string | null }
 interface Badge { id: string; icon: string; titel: string; beschreibung: string; freigeschaltet: boolean }
@@ -645,7 +647,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
 
   // ═══ NEW PATIENT DETECTION ═══
-  const isNewPatient = !loading && phasen.length === 0 && (!rp || !rp.plan);
+  const hasFinancialData = Boolean(rp?.has_financial_data) || pays.length > 0;
+  const isNewPatient = !loading && phasen.length === 0 && !hasFinancialData && (!rp || !rp.plan);
 
   // ═══ WELCOME TIMELINE (shown when no treatment data yet) ═══
   const WelcomeTimeline = (
@@ -998,7 +1001,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <h1 style={{ ...hd, fontSize: 23, fontWeight: 800, marginBottom: 2, color: fg }}>{t("progress.title", lang)}</h1>
         <p style={{ fontSize: 13, color: muted, marginBottom: 16 }}>{t("progress.subtitle", lang)}</p>
       </div>
-      {isNewPatient && (
+      {!hasFinancialData && !rp?.plan && (
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>{String.fromCodePoint(0x1F4CA)}</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: fg, marginBottom: 8 }}>
@@ -1006,6 +1009,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
           <div style={{ fontSize: 13, color: muted, lineHeight: 1.6, maxWidth: "28ch", margin: "0 auto" }}>
             {lang === "en" ? "Your payment progress and statistics will appear here once your treatment plan is set up." : lang === "es" ? "Tu progreso y estad\u00edsticas aparecer\u00e1n aqu\u00ed cuando tu plan est\u00e9 configurado." : "Dein Zahlungsfortschritt und deine Statistiken erscheinen hier, sobald dein Behandlungsplan eingerichtet ist."}
+          </div>
+        </div>
+      )}
+      {hasFinancialData && !rp?.plan && (
+        <div style={{ ...card, margin: "0 20px 14px", padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: grn, marginBottom: 6 }}>
+            Finanzdaten bereits erkannt
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.6, color: soft }}>
+            Wir zeigen dir hier schon echte Zahlungen und offene Beträge aus deinem Patientenprofil, auch wenn der vollständige Behandlungs- oder Ratenplan noch nicht komplett freigeschaltet ist.
           </div>
         </div>
       )}
@@ -1027,7 +1040,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div style={{ width: 1, background: border }} />
         <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp ? rp.offen_betrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.open", lang)}</div></div>
         <div style={{ width: 1, background: border }} />
-        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp && rp.plan ? rp.plan.gesamtbetrag : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.total", lang)}</div></div>
+        <div style={{ flex: 1, textAlign: "center" }}><div style={{ ...hd, fontSize: 18, fontWeight: 800, color: fg }}>{fmtEuro(rp ? (rp.plan ? rp.plan.gesamtbetrag : (rp.investiert + rp.offen_betrag)) : 0)}</div><div style={{ ...lb, marginTop: 2 }}>{t("progress.total", lang)}</div></div>
       </div>
       {isOverdue && rp && rp.ueberfaellig && (
         <div>
@@ -1062,6 +1075,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
             <div style={{ width: 28, height: 1, background: dk ? "#444" : "#d0c8bc", margin: "4px 0" }} />
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: muted }}>{t("progress.of", lang)} {rp.raten_gesamt}</div>
+          </div>
+        </div>
+      )}
+      {!isOverdue && hasFinancialData && !rp?.naechste_rate && (
+        <div style={{ ...card, margin: "0 20px 14px", padding: 16 }}>
+          <div style={{ ...lb, color: muted, marginBottom: 6 }}>Status</div>
+          <div style={{ fontSize: 14, lineHeight: 1.6, color: soft }}>
+            Bereits verbuchte Zahlungen und offene Beträge sind sichtbar. Die nächste feste Rate erscheint automatisch, sobald der zugehörige Ratenplan vollständig hinterlegt ist.
           </div>
         </div>
       )}

@@ -16,8 +16,116 @@ export async function GET() {
     .eq("status", "aktiv")
     .maybeSingle();
 
+  const summarizeRates = (
+    rates: Array<{
+      betrag: number | string | null;
+      status: string | null;
+      bezahlt_betrag?: number | string | null;
+      bezahlt_am?: string | null;
+      faellig_am?: string | null;
+    }>,
+  ) => {
+    const bezahlt = rates.filter(r => r.status === "bezahlt");
+    const offen = rates.filter(r => r.status === "offen");
+    const ueberfaellig = rates.filter(r => r.status === "überfällig");
+    const teilbezahlt = rates.filter(r => r.status === "teilbezahlt");
+
+    const investiert = bezahlt.reduce((sum, r) => sum + Number(r.bezahlt_betrag ?? r.betrag ?? 0), 0)
+      + teilbezahlt.reduce((sum, r) => sum + Number(r.bezahlt_betrag ?? 0), 0);
+    const offenBetrag = [...offen, ...ueberfaellig].reduce((sum, r) => sum + Number(r.betrag ?? 0), 0)
+      + teilbezahlt.reduce((sum, r) => sum + Math.max(0, Number(r.betrag ?? 0) - Number(r.bezahlt_betrag ?? 0)), 0);
+    const naechsteRate = [...offen, ...teilbezahlt]
+      .filter(r => r.faellig_am)
+      .sort((a, b) => new Date(a.faellig_am!).getTime() - new Date(b.faellig_am!).getTime())[0] ?? null;
+    const aeltesteUeberfaellig = ueberfaellig
+      .filter(r => r.faellig_am)
+      .sort((a, b) => new Date(a.faellig_am!).getTime() - new Date(b.faellig_am!).getTime())[0] ?? null;
+
+    let streak = 0;
+    const bezahltChronologisch = [...bezahlt].sort((a, b) => new Date(a.faellig_am ?? 0).getTime() - new Date(b.faellig_am ?? 0).getTime());
+    for (let i = bezahltChronologisch.length - 1; i >= 0; i--) {
+      const rate = bezahltChronologisch[i];
+      if (rate.bezahlt_am && rate.faellig_am) {
+        const bezahltDate = new Date(rate.bezahlt_am);
+        const faelligDate = new Date(rate.faellig_am);
+        const diffDays = (bezahltDate.getTime() - faelligDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays <= 5) streak++;
+        else break;
+      }
+    }
+
+    return {
+      investiert,
+      offen_betrag: offenBetrag,
+      raten_bezahlt: bezahlt.length,
+      raten_gesamt: rates.length,
+      prozent: rates.length > 0 ? Math.round((bezahlt.length / rates.length) * 100) : 0,
+      streak,
+      naechste_rate: naechsteRate
+        ? {
+            betrag: Number(naechsteRate.betrag ?? 0),
+            faellig_am: naechsteRate.faellig_am!,
+          }
+        : null,
+      ueberfaellig: aeltesteUeberfaellig
+        ? {
+            betrag: Number(aeltesteUeberfaellig.betrag ?? 0),
+            faellig_am: aeltesteUeberfaellig.faellig_am!,
+            anzahl: ueberfaellig.length,
+          }
+        : null,
+    };
+  };
+
   if (!plan) {
-    return NextResponse.json({ error: "Kein aktiver Ratenplan" }, { status: 404 });
+    const [{ data: patientRates }, { data: offenePosten }, { data: transaktionen }] = await Promise.all([
+      supabase
+        .from("raten")
+        .select("id, rate_nummer, betrag, faellig_am, status, bezahlt_am, bezahlt_betrag")
+        .eq("patient_id", patient.patientId)
+        .order("faellig_am", { ascending: true }),
+      supabase
+        .from("offene_posten")
+        .select("id, offen, status, rechnung_datum")
+        .eq("patient_id", patient.patientId)
+        .in("status", ["offen", "teilbezahlt"]),
+      supabase
+        .from("transaktionen")
+        .select("id, betrag, datum")
+        .eq("matched_patient_id", patient.patientId)
+        .gt("betrag", 0)
+        .in("matching_status", ["auto", "manuell"]),
+    ]);
+
+    const rates = patientRates ?? [];
+    if (rates.length > 0) {
+      return NextResponse.json({
+        plan: null,
+        has_financial_data: true,
+        financial_source: "patient_rates",
+        ...summarizeRates(rates),
+      });
+    }
+
+    const offene = offenePosten ?? [];
+    const zahlungen = transaktionen ?? [];
+    const offenBetrag = offene.reduce((sum, item) => sum + Number(item.offen ?? 0), 0);
+    const investiert = zahlungen.reduce((sum, tx) => sum + Number(tx.betrag ?? 0), 0);
+    const total = investiert + offenBetrag;
+
+    return NextResponse.json({
+      plan: null,
+      has_financial_data: investiert > 0 || offenBetrag > 0,
+      financial_source: (investiert > 0 || offenBetrag > 0) ? "open_items" : "none",
+      investiert,
+      offen_betrag: offenBetrag,
+      raten_bezahlt: zahlungen.length,
+      raten_gesamt: zahlungen.length + offene.length,
+      prozent: total > 0 ? Math.round((investiert / total) * 100) : 0,
+      streak: 0,
+      naechste_rate: null,
+      ueberfaellig: null,
+    });
   }
 
   // Get all rates for this plan
@@ -27,36 +135,7 @@ export async function GET() {
     .eq("ratenplan_id", plan.id)
     .order("rate_nummer", { ascending: true });
 
-  const allRates = raten ?? [];
-  const bezahlt = allRates.filter(r => r.status === "bezahlt");
-  const offen = allRates.filter(r => r.status === "offen");
-  const ueberfaellig = allRates.filter(r => r.status === "überfällig");
-
-  const investiert = bezahlt.reduce((sum, r) => sum + Number(r.bezahlt_betrag ?? r.betrag), 0);
-  const offenBetrag = [...offen, ...ueberfaellig].reduce((sum, r) => sum + Number(r.betrag), 0);
-
-  // Next due rate
-  const naechsteRate = offen.length > 0 ? offen[0] : null;
-
-  // Overdue info
-  const aeltesteUeberfaellig = ueberfaellig.length > 0 ? ueberfaellig[0] : null;
-
-  // Streak: consecutive paid rates from the end
-  let streak = 0;
-  for (let i = bezahlt.length - 1; i >= 0; i--) {
-    const rate = bezahlt[i];
-    if (rate.bezahlt_am && rate.faellig_am) {
-      const bezahltDate = new Date(rate.bezahlt_am);
-      const faelligDate = new Date(rate.faellig_am);
-      // Paid within 5 days of due date counts as punctual
-      const diffDays = (bezahltDate.getTime() - faelligDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (diffDays <= 5) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-  }
+  const summary = summarizeRates(raten ?? []);
 
   return NextResponse.json({
     plan: {
@@ -67,24 +146,8 @@ export async function GET() {
       start_datum: plan.start_datum,
       rhythmus: plan.rhythmus,
     },
-    investiert,
-    offen_betrag: offenBetrag,
-    raten_bezahlt: bezahlt.length,
-    raten_gesamt: allRates.length,
-    prozent: allRates.length > 0 ? Math.round((bezahlt.length / allRates.length) * 100) : 0,
-    streak,
-    naechste_rate: naechsteRate
-      ? {
-          betrag: Number(naechsteRate.betrag),
-          faellig_am: naechsteRate.faellig_am,
-        }
-      : null,
-    ueberfaellig: aeltesteUeberfaellig
-      ? {
-          betrag: Number(aeltesteUeberfaellig.betrag),
-          faellig_am: aeltesteUeberfaellig.faellig_am,
-          anzahl: ueberfaellig.length,
-        }
-      : null,
+    has_financial_data: true,
+    financial_source: "plan",
+    ...summary,
   });
 }
