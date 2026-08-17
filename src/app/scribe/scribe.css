@@ -947,12 +947,15 @@
 }
 .scribe .praxis-inbox-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px}
 .scribe .praxis-inbox-grid.komprimiert{grid-template-columns:1fr 1fr}
+.scribe .praxis-teambox{margin-top:14px;padding:12px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.scribe .praxis-teamgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .scribe .praxis-inbox-label{display:block;margin-bottom:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8EB0CF}
 .scribe .praxis-inbox-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
 .scribe .praxis-inbox-save,.scribe .praxis-inbox-refresh{
   display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;border-radius:14px;padding:11px 14px;font-weight:600
 }
 .scribe .praxis-inbox-save{background:linear-gradient(135deg,#7CC4FF,#2E6FE6);color:#071527}
+.scribe .praxis-inbox-save.team{justify-content:center}
 .scribe .praxis-inbox-refresh{background:rgba(255,255,255,.06);color:#D7E7F7;border:1px solid rgba(255,255,255,.08)}
 .scribe .praxis-inbox-fehler{margin:10px 0 0;color:#FF977E;font-size:12.5px}
 .scribe .praxis-inbox-liste{display:flex;flex-direction:column;gap:12px}
@@ -1125,6 +1128,7 @@
   .scribe .praxis-inbox-trigger-copy{display:none}
   .scribe .praxis-inbox-panel{right:-4px;bottom:68px;width:min(100vw - 20px,430px)}
   .scribe .praxis-inbox-grid,.scribe .praxis-inbox-grid.komprimiert{grid-template-columns:1fr}
+  .scribe .praxis-teamgrid{grid-template-columns:1fr}
 }
 
 /* "keine Angabe"-Button (Pflichtgruppe ohne passende Option) */

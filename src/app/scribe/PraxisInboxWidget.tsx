@@ -42,6 +42,7 @@ type ApiAntwort = {
   unreadCount: number;
   currentUserId: string;
   team: Array<{ id: string; name: string; role: string | null }>;
+  canManageTeam?: boolean;
 };
 
 const ARTEN: Array<{ key: InboxArt; label: string; icon: typeof Lightbulb }> = [
@@ -124,6 +125,8 @@ export default function PraxisInboxWidget() {
   const [daten, setDaten] = useState<ApiAntwort | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [antworten, setAntworten] = useState<Record<string, { text: string; mentionUserId: string }>>({});
+  const [teamForm, setTeamForm] = useState({ lokal: "", name: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
+  const [teamSpeichert, setTeamSpeichert] = useState(false);
 
   async function laden() {
     setLaedt(true);
@@ -219,6 +222,30 @@ export default function PraxisInboxWidget() {
     }
   }
 
+  async function teammitgliedAnlegen() {
+    if (!teamForm.lokal.trim() || !teamForm.name.trim() || !teamForm.passwort.trim()) {
+      setFehler("Für neuen User bitte Name, Login und Passwort eintragen.");
+      return;
+    }
+    setTeamSpeichert(true);
+    setFehler(null);
+    try {
+      const res = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamForm),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "User konnte nicht angelegt werden.");
+      setTeamForm({ lokal: "", name: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
+      await laden();
+    } catch (err) {
+      setFehler(err instanceof Error ? err.message : "User konnte nicht angelegt werden.");
+    } finally {
+      setTeamSpeichert(false);
+    }
+  }
+
   async function mentionsAlsGelesen(id: string, unreadMentions: number | undefined) {
     if (!unreadMentions) return;
     try {
@@ -309,7 +336,7 @@ export default function PraxisInboxWidget() {
               value={antwort.mentionUserId}
               onChange={(e) => setAntworten((alt) => ({ ...alt, [eintrag.id]: { ...antwort, mentionUserId: e.target.value } }))}
             >
-              <option value="">Niemand markieren</option>
+              <option value="">{(daten?.team?.length ?? 0) > 0 ? "Niemand markieren" : "Noch kein Mitarbeiter hinterlegt"}</option>
               {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>@{person.name}</option>)}
             </select>
             <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void antwortSpeichern(eintrag.id)}>
@@ -436,10 +463,31 @@ export default function PraxisInboxWidget() {
                 value={form.assigned_to}
                 onChange={(e) => setForm((alt) => ({ ...alt, assigned_to: e.target.value }))}
               >
-                <option value="">Noch offen lassen</option>
+                <option value="">{(daten?.team?.length ?? 0) > 0 ? "Noch offen lassen" : "Noch kein Mitarbeiter hinterlegt"}</option>
                 {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
               </select>
             </div>
+
+            {daten?.canManageTeam ? (
+              <div className="praxis-teambox">
+                <span className="praxis-inbox-label">Neuen User anlegen</span>
+                <div className="praxis-teamgrid">
+                  <input className="praxis-inbox-input" type="text" placeholder="Login vor dem @" value={teamForm.lokal} onChange={(e) => setTeamForm((alt) => ({ ...alt, lokal: e.target.value }))} />
+                  <input className="praxis-inbox-input" type="text" placeholder="Name" value={teamForm.name} onChange={(e) => setTeamForm((alt) => ({ ...alt, name: e.target.value }))} />
+                  <select className="praxis-inbox-select" value={teamForm.rolle} onChange={(e) => setTeamForm((alt) => ({ ...alt, rolle: e.target.value }))}>
+                    <option value="lesezugriff">Lesezugriff / Student</option>
+                    <option value="verwaltung">Verwaltung / Mitarbeiter</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <input className="praxis-inbox-input" type="text" placeholder="Kürzel optional" value={teamForm.kuerzel} onChange={(e) => setTeamForm((alt) => ({ ...alt, kuerzel: e.target.value }))} />
+                  <input className="praxis-inbox-input" type="text" placeholder="Startpasswort" value={teamForm.passwort} onChange={(e) => setTeamForm((alt) => ({ ...alt, passwort: e.target.value }))} />
+                  <button type="button" className="praxis-inbox-save team" onClick={() => void teammitgliedAnlegen()} disabled={teamSpeichert}>
+                    {teamSpeichert ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+                    User anlegen
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="praxis-inbox-actions">
               <button type="button" className="praxis-inbox-save" onClick={() => void speichern()} disabled={speichert}>
@@ -482,7 +530,7 @@ export default function PraxisInboxWidget() {
                     </div>
                     <div className="praxis-zuweisung">
                       <select className="praxis-inbox-select klein" value={eintrag.assigned_to ?? ""} onChange={(e) => void zuweisen(eintrag.id, e.target.value)}>
-                        <option value="">Zuständigkeit wählen</option>
+                        <option value="">{(daten?.team?.length ?? 0) > 0 ? "Zuständigkeit wählen" : "Noch kein Mitarbeiter hinterlegt"}</option>
                         {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
                       </select>
                     </div>

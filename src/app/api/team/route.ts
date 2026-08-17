@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,20 +22,29 @@ async function adminPruefen() {
 
 // GET /api/team – alle Team-Konten (keine Patienten-Profile)
 export async function GET() {
-  const { fehler } = await adminPruefen();
-  if (fehler) return fehler;
+  const praxisFehler = await requirePraxisRole(["admin", "verwaltung", "lesezugriff"]);
+  if (praxisFehler) return praxisFehler;
   const service = createServerClient();
   const { data, error } = await service
     .from("user_profiles")
-    .select("id, email, display_name, role, kuerzel, permissions")
+    .select("id, email, display_name, full_name, role, kuerzel, permissions")
     .is("patient_id", null)
+    .neq("role", "patient")
     .order("display_name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ mitglieder: data ?? [], mail_domain: MAIL_DOMAIN });
+  return NextResponse.json({
+    mitglieder: (data ?? []).map((eintrag) => ({
+      ...eintrag,
+      display_name: eintrag.display_name || eintrag.full_name,
+    })),
+    mail_domain: MAIL_DOMAIN,
+  });
 }
 
 // POST /api/team – neues Teammitglied anlegen
 export async function POST(request: NextRequest) {
+  const praxisFehler = await requirePraxisRole(["admin", "verwaltung"]);
+  if (praxisFehler) return praxisFehler;
   const { fehler } = await adminPruefen();
   if (fehler) return fehler;
 

@@ -118,11 +118,11 @@ async function ladeUser() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { user: null, name: "" };
+  if (!user) return { user: null, name: "", role: null };
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("display_name, full_name")
+    .select("display_name, full_name, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -133,20 +133,23 @@ async function ladeUser() {
     user.email ||
     "Praxis";
 
-  return { user, name };
+  return { user, name, role: profile?.role ?? null };
 }
 
 async function ladeTeam(service: ReturnType<typeof createServerClient>): Promise<TeamMitglied[]> {
   const { data } = await service
     .from("user_profiles")
-    .select("id, display_name, full_name, role")
+    .select("id, display_name, full_name, role, patient_id")
+    .is("patient_id", null)
     .order("display_name", { ascending: true });
 
-  return (data ?? []).map((eintrag) => ({
-    id: eintrag.id,
-    name: eintrag.display_name || eintrag.full_name || "Praxis",
-    role: eintrag.role ?? null,
-  }));
+  return (data ?? [])
+    .filter((eintrag) => eintrag.role !== "patient")
+    .map((eintrag) => ({
+      id: eintrag.id,
+      name: eintrag.display_name || eintrag.full_name || "Praxis",
+      role: eintrag.role ?? null,
+    }));
 }
 
 function statusGewicht(status: InboxStatus): number {
@@ -156,7 +159,7 @@ function statusGewicht(status: InboxStatus): number {
 }
 
 export async function GET() {
-  const { user } = await ladeUser();
+  const { user, name, role } = await ladeUser();
   if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 
   const service = createServerClient();
@@ -183,7 +186,17 @@ export async function GET() {
   const offenHeute = eintraege.filter((eintrag) => eintrag.istHeute).length;
   const unreadCount = eintraege.reduce((summe, eintrag: any) => summe + (eintrag.unread_mentions ?? 0), 0);
 
-  return NextResponse.json({ eintraege, offenHeute, heute, unreadCount, team, currentUserId: user.id });
+  const teamMitFallback = team.length > 0 ? team : [{ id: user.id, name, role }];
+
+  return NextResponse.json({
+    eintraege,
+    offenHeute,
+    heute,
+    unreadCount,
+    team: teamMitFallback,
+    currentUserId: user.id,
+    canManageTeam: role === "admin" || role === "verwaltung",
+  });
 }
 
 export async function POST(request: NextRequest) {
