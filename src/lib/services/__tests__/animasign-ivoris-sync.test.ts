@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildIdentityFingerprint,
+  decideIdentityClaimAction,
   decideExactLocalPatientCandidate,
   namesMatchSubmission,
   shouldReusePriorSubmissionMatch,
@@ -113,4 +115,57 @@ test("forces manual review when exact local identity exists more than once", () 
   );
 
   assert.equal(decision.kind, "manual_review");
+});
+
+test("builds a stable identity fingerprint from normalized name and birthday", () => {
+  const left = buildIdentityFingerprint({
+    vorname: " Félix ",
+    nachname: " Liegel",
+    geburtsdatum: "2014-07-11",
+  });
+
+  const right = buildIdentityFingerprint({
+    vorname: "felix",
+    nachname: "liegel",
+    geburtsdatum: "2014-07-11T10:15:00.000Z",
+  });
+
+  assert.equal(typeof left, "string");
+  assert.equal(left, right);
+});
+
+test("blocks create when another submission already owns the same pending identity claim", () => {
+  const decision = decideIdentityClaimAction(
+    {
+      fingerprint: "abc",
+      patient_id: null,
+      ivoris_id: null,
+      last_submission_id: "submission-older",
+      status: "pending",
+      note: null,
+    },
+    "submission-new"
+  );
+
+  assert.equal(decision.kind, "manual_review");
+});
+
+test("reuses existing ivoris id from identity claim instead of creating again", () => {
+  const decision = decideIdentityClaimAction(
+    {
+      fingerprint: "abc",
+      patient_id: "patient-1",
+      ivoris_id: "11111111-1111-4111-8111-111111111111",
+      last_submission_id: "submission-older",
+      status: "resolved",
+      note: null,
+    },
+    "submission-new"
+  );
+
+  assert.equal(decision.kind, "reuse");
+  if (decision.kind === "reuse") {
+    assert.equal(decision.ivorisId, "11111111-1111-4111-8111-111111111111");
+    assert.equal(decision.patientId, "patient-1");
+  }
 });

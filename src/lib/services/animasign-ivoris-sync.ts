@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import {
   createIvorisPatient,
@@ -67,6 +68,71 @@ type LocalPatientMatchDecision =
   | { kind: "reuse"; candidate: LocalPatientCandidate; reason: "contact" | "identity" }
   | { kind: "none" }
   | { kind: "manual_review"; reason: string };
+
+type IdentityClaimRow = {
+  fingerprint: string;
+  patient_id: string | null;
+  ivoris_id: string | null;
+  last_submission_id: string | null;
+  status: "pending" | "resolved" | "manual_review" | "error";
+  note: string | null;
+};
+
+export function buildIdentityFingerprint(
+  submission: Pick<SubmissionRow, "vorname" | "nachname" | "geburtsdatum">
+) {
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+
+  if (!birthday || !firstname || !lastname) {
+    return null;
+  }
+
+  return createHash("sha256")
+    .update(`${firstname}|${lastname}|${birthday}`)
+    .digest("hex");
+}
+
+export function decideIdentityClaimAction(
+  claim: IdentityClaimRow | null,
+  submissionId: string
+): { kind: "allow_create" } | { kind: "reuse"; ivorisId: string; patientId: string | null } | { kind: "manual_review"; reason: string } {
+  if (!claim) {
+    return { kind: "allow_create" };
+  }
+
+  if (claim.ivoris_id) {
+    return {
+      kind: "reuse",
+      ivorisId: claim.ivoris_id,
+      patientId: claim.patient_id ?? null,
+    };
+  }
+
+  if (claim.patient_id) {
+    return {
+      kind: "manual_review",
+      reason: "Lokaler Bestandspatient ist fuer diese Identitaet bereits bekannt, aber ohne sichere ivoris_id darf keine weitere Neu-Anlage passieren.",
+    };
+  }
+
+  if (claim.status === "pending" && claim.last_submission_id && claim.last_submission_id !== submissionId) {
+    return {
+      kind: "manual_review",
+      reason: "Fuer diese Identitaet laeuft bereits eine andere AnimaSign-Einreichung. Automatische Neu-Anlage wird blockiert, bis der Fall sauber aufgeloest ist.",
+    };
+  }
+
+  if (claim.status === "manual_review") {
+    return {
+      kind: "manual_review",
+      reason: claim.note || "Dieser Identitaetsfall wurde bereits zur manuellen Pruefung angehalten.",
+    };
+  }
+
+  return { kind: "allow_create" };
+}
 
 type IvorisContactSnapshot = {
   Email?: string;
@@ -159,6 +225,19 @@ function normalizePhoneValue(value: unknown): string | null {
   }
 
   return digits;
+}
+
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505"
+  );
+}
+
+function identityClaimKey(fingerprint: string) {
+  return `animasign_identity_claim:${fingerprint}`;
 }
 
 function sanitizeFilenamePart(value: string | null | undefined): string {
@@ -671,6 +750,104 @@ async function patchSubmissionResolvedPatient(
   }
 }
 
+async function loadIdentityClaim(
+  db: DbClient,
+  fingerprint: string
+): Promise<IdentityClaimRow | null> {
+  const { data, error } = await db
+    .from("einstellungen")
+    .select("value")
+    .eq("key", identityClaimKey(fingerprint))
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Identity-Claim konnte nicht geladen werden: ${error.message}`);
+  }
+
+  const value = data?.value;
+  if (!value || typeof value !== "object") return null;
+  const claim = value as Partial<IdentityClaimRow>;
+  if (typeof claim.fingerprint !== "string") return null;
+  return {
+    fingerprint: claim.fingerprint,
+    patient_id: claim.patient_id ?? null,
+    ivoris_id: claim.ivoris_id ?? null,
+    last_submission_id: claim.last_submission_id ?? null,
+    status: claim.status ?? "pending",
+    note: claim.note ?? null,
+  };
+}
+
+async function claimSubmissionIdentity(
+  db: DbClient,
+  submission: SubmissionRow
+): Promise<{ fingerprint: string; claim: IdentityClaimRow | null }> {
+  const fingerprint = buildIdentityFingerprint(submission);
+  if (!fingerprint) {
+    return { fingerprint: "", claim: null };
+  }
+
+  try {
+    const { error } = await db.from("einstellungen").insert({
+      key: identityClaimKey(fingerprint),
+      value: {
+        fingerprint,
+        vorname: submission.vorname ?? "",
+        nachname: submission.nachname ?? "",
+        geburtsdatum: toIsoDateOrNull(submission.geburtsdatum),
+        first_submission_id: submission.id,
+        last_submission_id: submission.id,
+        patient_id: null,
+        ivoris_id: null,
+        status: "pending",
+        note: null,
+      },
+    });
+
+    if (error) {
+      if (!isUniqueViolation(error)) {
+        throw error;
+      }
+    }
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw new Error(`Identity-Claim konnte nicht reserviert werden: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  return {
+    fingerprint,
+    claim: await loadIdentityClaim(db, fingerprint),
+  };
+}
+
+async function updateIdentityClaim(
+  db: DbClient,
+  fingerprint: string | null,
+  patch: Record<string, unknown>
+) {
+  if (!fingerprint) return;
+
+  const current = await loadIdentityClaim(db, fingerprint);
+  if (!current) return;
+
+  const { error } = await db
+    .from("einstellungen")
+    .update({
+      value: {
+        ...current,
+        ...patch,
+        fingerprint,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("key", identityClaimKey(fingerprint));
+
+  if (error) {
+    console.error("[ANIMASIGN][IVORIS] failed to update identity claim:", error.message);
+  }
+}
+
 async function findExactLocalPatientCandidate(
   db: DbClient,
   submission: SubmissionRow
@@ -897,6 +1074,35 @@ async function findReusableIvorisPatientIdForNewSubmission(
   db: DbClient,
   submission: SubmissionRow
 ): Promise<string | null> {
+  const identityFingerprint = buildIdentityFingerprint(submission);
+  if (identityFingerprint) {
+    const currentClaim = await loadIdentityClaim(db, identityFingerprint);
+    const claimDecision = decideIdentityClaimAction(currentClaim, submission.id);
+
+    if (claimDecision.kind === "reuse") {
+      if (claimDecision.patientId) {
+        await patchSubmissionResolvedPatient(
+          db,
+          submission.id,
+          claimDecision.patientId,
+          claimDecision.ivorisId
+        );
+      }
+      await patchSubmissionIvorisPatientId(db, submission.id, claimDecision.ivorisId);
+      console.log(
+        `[ANIMASIGN][IVORIS] reused identity claim ivoris_patient_id=${claimDecision.ivorisId} for submission=${submission.id}`
+      );
+      return claimDecision.ivorisId;
+    }
+
+    if (claimDecision.kind === "manual_review") {
+      throw new ManualReviewRequiredError(
+        `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${toIsoDateOrNull(submission.geburtsdatum) ?? "ohne Geburtstag"}). ${claimDecision.reason}`,
+        "patient"
+      );
+    }
+  }
+
   const localPatient = await findExactLocalPatientCandidate(db, submission);
   if (localPatient?.id) {
     await patchSubmissionResolvedPatient(
@@ -905,6 +1111,15 @@ async function findReusableIvorisPatientIdForNewSubmission(
       localPatient.id,
       localPatient.ivoris_id ?? null
     );
+    await updateIdentityClaim(db, identityFingerprint, {
+      patient_id: localPatient.id,
+      ivoris_id: localPatient.ivoris_id ?? null,
+      last_submission_id: submission.id,
+      status: localPatient.ivoris_id ? "resolved" : "manual_review",
+      note: localPatient.ivoris_id
+        ? "Lokaler Bestandspatient wiederverwendet."
+        : "Lokaler Bestandspatient eindeutig erkannt, aber ohne ivoris_id.",
+    });
   }
 
   if (localPatient?.id && localPatient.ivoris_id) {
@@ -1017,6 +1232,34 @@ async function findReusableIvorisPatientIdForNewSubmission(
     );
   }
 
+  const identityReservation = await claimSubmissionIdentity(db, submission);
+  if (identityReservation.fingerprint) {
+    const claimDecision = decideIdentityClaimAction(identityReservation.claim, submission.id);
+    if (claimDecision.kind === "reuse") {
+      if (claimDecision.patientId) {
+        await patchSubmissionResolvedPatient(
+          db,
+          submission.id,
+          claimDecision.patientId,
+          claimDecision.ivorisId
+        );
+      }
+      await patchSubmissionIvorisPatientId(db, submission.id, claimDecision.ivorisId);
+      return claimDecision.ivorisId;
+    }
+    if (claimDecision.kind === "manual_review") {
+      await updateIdentityClaim(db, identityReservation.fingerprint, {
+        last_submission_id: submission.id,
+        status: "manual_review",
+        note: claimDecision.reason,
+      });
+      throw new ManualReviewRequiredError(
+        `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). ${claimDecision.reason}`,
+        "patient"
+      );
+    }
+  }
+
   return null;
 }
 
@@ -1116,8 +1359,15 @@ async function syncNewPatient(
 ): Promise<{ status: SyncStatus; ivorisId: string | null; requestPayload: IvorisPatientInput }> {
   const payload = buildCreateInput(submission);
   const reusableIvorisId = await findReusableIvorisPatientIdForNewSubmission(db, submission);
+  const identityFingerprint = buildIdentityFingerprint(submission);
 
   if (reusableIvorisId) {
+    await updateIdentityClaim(db, identityFingerprint, {
+      ivoris_id: reusableIvorisId,
+      last_submission_id: submission.id,
+      status: "resolved",
+      note: "Bereits vorhandene Ivoris-Person wiederverwendet.",
+    });
     return { status: "skipped", ivorisId: reusableIvorisId, requestPayload: payload };
   }
 
@@ -1134,6 +1384,14 @@ async function syncNewPatient(
       throw new Error(`Lokaler Patient konnte nicht mit ivoris_id verknuepft werden: ${error.message}`);
     }
   }
+
+  await updateIdentityClaim(db, identityFingerprint, {
+    patient_id: resolvedPatientId ?? null,
+    ivoris_id: ivorisId,
+    last_submission_id: submission.id,
+    status: "resolved",
+    note: "Ivoris-Neuanlage erfolgreich abgeschlossen.",
+  });
 
   await patchSubmissionIvorisPatientId(db, submission.id, ivorisId);
   return { status: "success", ivorisId, requestPayload: payload };
