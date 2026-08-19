@@ -63,6 +63,11 @@ type LocalPatientCandidate = {
   telefon?: string | null;
 };
 
+type LocalPatientMatchDecision =
+  | { kind: "reuse"; candidate: LocalPatientCandidate; reason: "contact" | "identity" }
+  | { kind: "none" }
+  | { kind: "manual_review"; reason: string };
+
 type IvorisContactSnapshot = {
   Email?: string;
   Phone?: string;
@@ -364,6 +369,51 @@ function extractSubmissionPhoneCandidates(submission: SubmissionRow) {
   return Array.from(new Set(values));
 }
 
+export function decideExactLocalPatientCandidate(
+  submission: Pick<SubmissionRow, "vorname" | "nachname" | "email" | "geburtsdatum" | "answers">,
+  candidates: LocalPatientCandidate[]
+): LocalPatientMatchDecision {
+  const birthday = toIsoDateOrNull(submission.geburtsdatum);
+  const firstname = normalizeMatchValue(submission.vorname);
+  const lastname = normalizeMatchValue(submission.nachname);
+  const email = normalizeEmailValue(submission.email);
+  const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission as SubmissionRow));
+
+  if (!birthday || !firstname || !lastname) {
+    return { kind: "none" };
+  }
+
+  const exactIdentityMatches = candidates.filter((candidate) => {
+    if (toIsoDateOrNull(candidate.geburtsdatum ?? null) !== birthday) return false;
+    if (normalizeMatchValue(candidate.vorname) !== firstname) return false;
+    if (normalizeMatchValue(candidate.nachname) !== lastname) return false;
+    return true;
+  });
+
+  if (exactIdentityMatches.length > 1) {
+    return {
+      kind: "manual_review",
+      reason: `Lokaler Patient ist nicht eindeutig: ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}) kommt mehrfach im Bestand vor.`,
+    };
+  }
+
+  if (exactIdentityMatches.length !== 1) {
+    return { kind: "none" };
+  }
+
+  const candidate = exactIdentityMatches[0];
+  const patientEmail = normalizeEmailValue(candidate.email);
+  const patientPhone = normalizePhoneValue(candidate.telefon);
+  const sameEmail = Boolean(email && patientEmail && email === patientEmail);
+  const samePhone = Boolean(patientPhone && phoneCandidates.has(patientPhone));
+
+  if (sameEmail || samePhone) {
+    return { kind: "reuse", candidate, reason: "contact" };
+  }
+
+  return { kind: "reuse", candidate, reason: "identity" };
+}
+
 function sameValue(left: string | undefined, right: string | undefined) {
   return (left ?? "").trim() === (right ?? "").trim();
 }
@@ -645,20 +695,16 @@ async function findExactLocalPatientCandidate(
     throw new Error(`Lokale Patienten konnten nicht geladen werden: ${error.message}`);
   }
 
-  const candidates = (data ?? []).filter((entry) => {
-    const patient = entry as LocalPatientCandidate;
-    if (normalizeMatchValue(patient.vorname) !== firstname) return false;
-    if (normalizeMatchValue(patient.nachname) !== lastname) return false;
+  const decision = decideExactLocalPatientCandidate(
+    submission,
+    (data ?? []) as LocalPatientCandidate[]
+  );
 
-    const patientEmail = normalizeEmailValue(patient.email);
-    const patientPhone = normalizePhoneValue(patient.telefon);
-    const sameEmail = Boolean(email && patientEmail && email === patientEmail);
-    const samePhone = Boolean(patientPhone && phoneCandidates.has(patientPhone));
+  if (decision.kind === "manual_review") {
+    throw new ManualReviewRequiredError(decision.reason, "patient");
+  }
 
-    return sameEmail || samePhone;
-  }) as LocalPatientCandidate[];
-
-  return candidates.length === 1 ? candidates[0] : null;
+  return decision.kind === "reuse" ? decision.candidate : null;
 }
 
 async function findReusableIvorisPatientIdFromPriorSubmissions(
@@ -852,6 +898,15 @@ async function findReusableIvorisPatientIdForNewSubmission(
   submission: SubmissionRow
 ): Promise<string | null> {
   const localPatient = await findExactLocalPatientCandidate(db, submission);
+  if (localPatient?.id) {
+    await patchSubmissionResolvedPatient(
+      db,
+      submission.id,
+      localPatient.id,
+      localPatient.ivoris_id ?? null
+    );
+  }
+
   if (localPatient?.id && localPatient.ivoris_id) {
     await patchSubmissionResolvedPatient(
       db,
@@ -951,6 +1006,13 @@ async function findReusableIvorisPatientIdForNewSubmission(
   if (decision.kind === "manual_review") {
     throw new ManualReviewRequiredError(
       `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Ivoris liefert mehrere moegliche Treffer. Treffer: ${decision.summary.join(", ") || "keine"}.`,
+      "patient"
+    );
+  }
+
+  if (localPatient?.id && !localPatient.ivoris_id) {
+    throw new ManualReviewRequiredError(
+      `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Lokaler Bestandspatient wurde eindeutig erkannt, aber ohne belastbare ivoris_id darf kein neuer Ivoris-Patient automatisch angelegt werden.`,
       "patient"
     );
   }
