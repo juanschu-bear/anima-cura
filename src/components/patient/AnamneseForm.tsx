@@ -573,8 +573,8 @@ export function AnamneseForm({ patientId }: Props) {
 
   const PFLICHT: Record<StepName, string[]> = {
     versicherung: ["versicherungsart", "krankenkasse"],
-    patient: ["patient_vorname", "patient_nachname", "patient_geburtsdatum", "patient_geschlecht", "patient_telefon", "patient_strasse", "patient_hausnummer", "patient_plz", "patient_wohnort", "patient_email", "patient_mobil"],
-    versicherter: ["vp_vorname", "vp_nachname", "vp_telefon"],
+    patient: ["patient_vorname", "patient_nachname", "patient_anrede", "patient_geburtsdatum", "patient_geschlecht", "patient_telefon", "patient_strasse", "patient_hausnummer", "patient_plz", "patient_wohnort", "patient_email", "patient_mobil"],
+    versicherter: ["vp_vorname", "vp_nachname", "vp_anrede", "vp_telefon"],
     zahler: ["ist_selbstzahler", "ist_vn"],
     behandlung: ["besuchsgrund"],
     gesundheit: [...MEDS.map((m) => m.key), "g_zaehneputzen"],
@@ -600,8 +600,10 @@ export function AnamneseForm({ patientId }: Props) {
   const PRUEFUNG: Record<string, (v: string) => PruefErgebnis> = {
     patient_vorname: pruefeName,
     patient_nachname: pruefeName,
+    patient_anrede: (v) => pruefeText(v, 2),
     vp_vorname: pruefeName,
     vp_nachname: pruefeName,
+    vp_anrede: (v) => pruefeText(v, 2),
     zahler_vorname: pruefeName,
     zahler_nachname: pruefeName,
     vn_vorname: pruefeName,
@@ -800,6 +802,7 @@ export function AnamneseForm({ patientId }: Props) {
             <div className="grid">
               <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("patient_vorname").trim()} value={txt("patient_vorname")} onChange={(e) => set("patient_vorname", e.target.value)} />{gruende["patient_vorname"] ? <span className="fehlt-grund">{gruende["patient_vorname"]}</span> : null}</div>
               <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("patient_nachname").trim()} value={txt("patient_nachname")} onChange={(e) => set("patient_nachname", e.target.value)} />{gruende["patient_nachname"] ? <span className="fehlt-grund">{gruende["patient_nachname"]}</span> : null}</div>
+              <div className="field"><label>Anrede <span className="req">*</span></label><select className={ff("patient_anrede").trim()} value={txt("patient_anrede")} onChange={(e) => set("patient_anrede", e.target.value)}><option value="">Bitte wählen</option><option>Herr</option><option>Frau</option><option>Fräulein</option><option>Divers</option></select>{gruende["patient_anrede"] ? <span className="fehlt-grund">{gruende["patient_anrede"]}</span> : null}</div>
               <div className="field col-2"><label>Geburtsdatum <span className="req">*</span></label><input type="date" className={ff("patient_geburtsdatum").trim()} value={txt("patient_geburtsdatum")} onChange={(e) => set("patient_geburtsdatum", e.target.value)} />{gruende["patient_geburtsdatum"] ? <span className="fehlt-grund">{gruende["patient_geburtsdatum"]}</span> : null}<span className="hint">Daraus richten wir den Bogen automatisch passend für Sie ein.</span></div>
               <div className="field"><label>Geschlecht <span className="req">*</span></label><select className={ff("patient_geschlecht").trim()} value={txt("patient_geschlecht")} onChange={(e) => set("patient_geschlecht", e.target.value)}><option value="">Bitte wählen</option><option>Männlich</option><option>Weiblich</option><option>Divers</option></select></div>
               <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("patient_telefon").trim()} value={txt("patient_telefon")} onChange={(e) => set("patient_telefon", e.target.value)} />{gruende["patient_telefon"] ? <span className="fehlt-grund">{gruende["patient_telefon"]}</span> : null}</div>
@@ -825,6 +828,7 @@ export function AnamneseForm({ patientId }: Props) {
             <div className="grid">
               <div className="field"><label>Vorname <span className="req">*</span></label><input type="text" className={ff("vp_vorname").trim()} value={txt("vp_vorname")} onChange={(e) => set("vp_vorname", e.target.value)} />{gruende["vp_vorname"] ? <span className="fehlt-grund">{gruende["vp_vorname"]}</span> : null}</div>
               <div className="field"><label>Nachname <span className="req">*</span></label><input type="text" className={ff("vp_nachname").trim()} value={txt("vp_nachname")} onChange={(e) => set("vp_nachname", e.target.value)} />{gruende["vp_nachname"] ? <span className="fehlt-grund">{gruende["vp_nachname"]}</span> : null}</div>
+              <div className="field"><label>Anrede <span className="req">*</span></label><select className={ff("vp_anrede").trim()} value={txt("vp_anrede")} onChange={(e) => set("vp_anrede", e.target.value)}><option value="">Bitte wählen</option><option>Herr</option><option>Frau</option><option>Fräulein</option><option>Divers</option></select>{gruende["vp_anrede"] ? <span className="fehlt-grund">{gruende["vp_anrede"]}</span> : null}</div>
               <div className="field"><label>Geburtsdatum</label><input type="date" value={txt("vp_geburtsdatum")} onChange={(e) => set("vp_geburtsdatum", e.target.value)} /></div>
               <div className="field"><label>Telefonnummer <span className="req">*</span></label><input type="tel" className={ff("vp_telefon").trim()} value={txt("vp_telefon")} onChange={(e) => set("vp_telefon", e.target.value)} />{gruende["vp_telefon"] ? <span className="fehlt-grund">{gruende["vp_telefon"]}</span> : null}</div>
               <div className="field"><label>Straße</label><input type="text" value={txt("vp_strasse")} onChange={(e) => set("vp_strasse", e.target.value)} /></div>
@@ -838,6 +842,7 @@ export function AnamneseForm({ patientId }: Props) {
               <div className="followup show"><div className="grid">
                 <div className="field"><label>Vorname</label><input type="text" value={txt("vp2_vorname")} onChange={(e) => set("vp2_vorname", e.target.value)} /></div>
                 <div className="field"><label>Nachname</label><input type="text" value={txt("vp2_nachname")} onChange={(e) => set("vp2_nachname", e.target.value)} /></div>
+                <div className="field"><label>Anrede</label><select value={txt("vp2_anrede")} onChange={(e) => set("vp2_anrede", e.target.value)}><option value="">Bitte wählen</option><option>Herr</option><option>Frau</option><option>Fräulein</option><option>Divers</option></select></div>
                 <div className="field"><label>Telefonnummer</label><input type="tel" value={txt("vp2_telefon")} onChange={(e) => set("vp2_telefon", e.target.value)} /></div>
                 <div className="field"><label>E-Mail-Adresse</label><input type="email" value={txt("vp2_email")} onChange={(e) => set("vp2_email", e.target.value)} /></div>
               </div></div>

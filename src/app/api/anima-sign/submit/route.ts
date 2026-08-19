@@ -29,9 +29,41 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
+function normalizeAnrede(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (v === "herr") return "Herr";
+  if (v === "frau") return "Frau";
+  if (v === "fräulein" || v === "fraeulein") return "Fräulein";
+  if (v === "divers") return "Divers";
+  return value.trim();
+}
+
+function fallbackAnredeFromGeschlecht(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (v.startsWith("m")) return "Herr";
+  if (v.startsWith("w")) return "Frau";
+  if (v.startsWith("d")) return "Divers";
+  return null;
+}
+
+function normalizePatientGender(value: string | null): "m" | "w" | "d" | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (v.startsWith("m")) return "m";
+  if (v.startsWith("w")) return "w";
+  if (v.startsWith("d")) return "d";
+  return null;
+}
+
 type VersichertenPatch = {
+  anrede?: string;
+  geschlecht?: "m" | "w" | "d";
+  mobiltelefon?: string;
   versicherter_vorname?: string;
   versicherter_nachname?: string;
+  versicherter_anrede?: string;
   versicherter_geburtsdatum?: string;
   versicherter_strasse?: string;
   versicherter_plz?: string;
@@ -40,6 +72,7 @@ type VersichertenPatch = {
   versicherter_email?: string;
   eb2_vorname?: string;
   eb2_nachname?: string;
+  eb2_anrede?: string;
   eb2_telefon?: string;
   eb2_email?: string;
   versicherungsart?: string;
@@ -61,12 +94,25 @@ function normalizeVersicherungsart(value: string | null): string | null {
 // Nur vorhandene Werte werden gesetzt, damit ein Re-Sync bestehende Daten nicht leert.
 function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenPatch {
   const patch: VersichertenPatch = {};
-  const set = (key: keyof VersichertenPatch, value: string | null): void => {
+  const set = <K extends keyof VersichertenPatch>(
+    key: K,
+    value: VersichertenPatch[K] | null
+  ): void => {
     if (value !== null) patch[key] = value;
   };
 
+  set(
+    "anrede",
+    normalizeAnrede(asString(answers["patient_anrede"])) ??
+      fallbackAnredeFromGeschlecht(asString(answers["patient_geschlecht"]))
+  );
+  const gender = normalizePatientGender(asString(answers["patient_geschlecht"]));
+  if (gender) patch.geschlecht = gender;
+  set("mobiltelefon", asString(answers["patient_mobil"]));
+
   set("versicherter_vorname", asString(answers["vp_vorname"]));
   set("versicherter_nachname", asString(answers["vp_nachname"]));
+  set("versicherter_anrede", normalizeAnrede(asString(answers["vp_anrede"])));
   set("versicherter_geburtsdatum", asString(answers["vp_geburtsdatum"]));
 
   const strasse = asString(answers["vp_strasse"]);
@@ -81,6 +127,7 @@ function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenP
 
   set("eb2_vorname", asString(answers["vp2_vorname"]));
   set("eb2_nachname", asString(answers["vp2_nachname"]));
+  set("eb2_anrede", normalizeAnrede(asString(answers["vp2_anrede"])));
   set("eb2_telefon", asString(answers["vp2_telefon"]));
   set("eb2_email", asString(answers["vp2_email"]));
 
@@ -126,6 +173,10 @@ export async function POST(request: Request) {
         patient_id: patientId,
         vorname,
         nachname,
+        patient_anrede:
+          normalizeAnrede(asString(answers["patient_anrede"])) ??
+          fallbackAnredeFromGeschlecht(asString(answers["patient_geschlecht"])),
+        versicherter_anrede: normalizeAnrede(asString(answers["vp_anrede"])),
         email,
         geburtsdatum,
         answers,

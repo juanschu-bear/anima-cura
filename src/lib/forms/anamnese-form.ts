@@ -58,6 +58,13 @@ export const anamneseFormJson = {
         { "type": "text", "name": "patient_vorname", "title": "Vorname", "isRequired": true },
         { "type": "text", "name": "patient_nachname", "title": "Nachname", "isRequired": true, "startWithNewLine": false },
         {
+          "type": "dropdown",
+          "name": "patient_anrede",
+          "title": "Anrede",
+          "isRequired": true,
+          "choices": ["Herr", "Frau", "Fräulein", "Divers"]
+        },
+        {
           "type": "text",
           "name": "patient_geburtsdatum",
           "title": "Geburtsdatum",
@@ -103,6 +110,13 @@ export const anamneseFormJson = {
         },
         { "type": "text", "name": "vp_vorname", "title": "Vorname", "isRequired": true },
         { "type": "text", "name": "vp_nachname", "title": "Nachname", "isRequired": true, "startWithNewLine": false },
+        {
+          "type": "dropdown",
+          "name": "vp_anrede",
+          "title": "Anrede",
+          "isRequired": true,
+          "choices": ["Herr", "Frau", "Fräulein", "Divers"]
+        },
         { "type": "text", "name": "vp_geburtsdatum", "title": "Geburtsdatum", "inputType": "date" },
         { "type": "text", "name": "vp_telefon", "title": "Telefonnummer", "inputType": "tel", "isRequired": true, "startWithNewLine": false },
         { "type": "text", "name": "vp_strasse", "title": "Straße" },
@@ -124,6 +138,12 @@ export const anamneseFormJson = {
           "elements": [
             { "type": "text", "name": "vp2_vorname", "title": "Vorname" },
             { "type": "text", "name": "vp2_nachname", "title": "Nachname", "startWithNewLine": false },
+            {
+              "type": "dropdown",
+              "name": "vp2_anrede",
+              "title": "Anrede",
+              "choices": ["Herr", "Frau", "Fräulein", "Divers"]
+            },
             { "type": "text", "name": "vp2_telefon", "title": "Telefonnummer", "inputType": "tel" },
             { "type": "text", "name": "vp2_email", "title": "E-Mail-Adresse", "inputType": "email", "startWithNewLine": false, "validators": [{ "type": "email" }] }
           ]
