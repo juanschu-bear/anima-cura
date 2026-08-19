@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:animus && npm run test:animasign-dupguard",
     "sync:animus-react": "node scripts/sync-animus-react.mjs",
     "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
     "test:animasign-dupguard": "tsx scripts/test-animasign-duplicate-guard.ts && tsx --test src/lib/services/__tests__/animasign-ivoris-directory.test.ts",
