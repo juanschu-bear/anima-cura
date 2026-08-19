@@ -3,6 +3,7 @@ import {
   runNextPendingAnimaSignStage,
   type NextStageSyncResult,
 } from "@/lib/services/animasign-ivoris-sync";
+import { retryPendingScribeIvorisPushes } from "@/lib/services/scribe-ivoris-retry";
 
 type SyncStage = "patient" | "document";
 type WorkerFatal = {
@@ -106,12 +107,19 @@ async function drainStage(
 async function main() {
   const patientLimit = readPositiveInt("ANIMASIGN_SYNC_WORKER_PATIENT_LIMIT", 3);
   const documentLimit = readPositiveInt("ANIMASIGN_SYNC_WORKER_DOCUMENT_LIMIT", 5);
+  const scribeRetryLimit = readPositiveInt("SCRIBE_IVORIS_RETRY_LIMIT", 20);
   validateWorkerEnv({ patientLimit, documentLimit });
   const db = createServerClient();
 
   console.log(
-    `[AnimaSignSyncWorker] start patientLimit=${patientLimit} documentLimit=${documentLimit}`
+    `[AnimaSignSyncWorker] start patientLimit=${patientLimit} documentLimit=${documentLimit} scribeRetryLimit=${scribeRetryLimit}`
   );
+
+  const scribeRetry = await retryPendingScribeIvorisPushes({
+    db,
+    limit: scribeRetryLimit,
+  });
+  console.log("[AnimaSignSyncWorker] scribe retry", JSON.stringify(scribeRetry, null, 2));
 
   const patientDrain = await drainStage("patient", patientLimit, db);
   const documentDrain = await drainStage("document", documentLimit, db);
@@ -133,6 +141,11 @@ async function main() {
       success: documentRuns.filter((entry) => entry.result?.document === "success").length,
       skipped: documentRuns.filter((entry) => entry.result?.document === "skipped").length,
       errors: documentRuns.filter((entry) => entry.result?.document === "error").length,
+    },
+    scribe: {
+      processed: scribeRetry.processed,
+      recovered: scribeRetry.recovered,
+      failed: scribeRetry.failed,
     },
     fatalStages: fatals,
   };
