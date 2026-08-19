@@ -9,38 +9,47 @@ type RetryOptions = {
   limit?: number;
 };
 
-function istTransienterPushFehler(fehler: string | null | undefined): boolean {
+function istAutomatischWiederholbarerPushFehler(fehler: string | null | undefined): boolean {
   const text = (fehler ?? "").trim();
   return (
     text.includes("(502)") ||
     text.includes("(503)") ||
     text.includes("(504)") ||
-    text.includes("nicht stabil erreichbar")
+    text.includes("nicht stabil erreichbar") ||
+    text === 'IVORIS AddEntry fehlgeschlagen (500): {"message":"An error has occurred."}'
   );
 }
 
 export async function retryPendingScribeIvorisPushes(options: RetryOptions = {}) {
   const db = options.db ?? createServerClient();
-  const datum =
-    options.datum && /^\d{4}-\d{2}-\d{2}$/.test(options.datum)
-      ? options.datum
-      : new Date().toISOString().slice(0, 10);
+  const datum = options.datum && /^\d{4}-\d{2}-\d{2}$/.test(options.datum) ? options.datum : null;
   const limit = Math.max(1, Math.min(50, options.limit ?? 20));
 
-  const { data, error } = await db
+  let query = db
     .from("doku_eintraege")
-    .select("id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_fehler, patients ( ivoris_id, vorname, nachname )")
+    .select(
+      "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, patients ( ivoris_id, vorname, nachname )"
+    )
     .eq("status", "bestaetigt")
-    .eq("ivoris_push_status", "fehler")
-    .eq("termin_datum", datum)
+    .in("ivoris_push_status", ["ausstehend", "fehler"])
     .order("bestaetigt_am", { ascending: true })
     .limit(limit);
 
+  if (datum) {
+    query = query.eq("termin_datum", datum);
+  }
+
+  const { data, error } = await query;
+
   if (error) throw new Error(error.message);
 
-  const kandidaten = (data ?? []).filter((eintrag) =>
-    istTransienterPushFehler((eintrag as { ivoris_fehler?: string | null }).ivoris_fehler)
-  );
+  const kandidaten = (data ?? []).filter((eintrag) => {
+    const pushStatus = (eintrag as { ivoris_push_status?: string | null }).ivoris_push_status;
+    const fehler = (eintrag as { ivoris_fehler?: string | null }).ivoris_fehler;
+    if (pushStatus === "ausstehend") return true;
+    if (pushStatus !== "fehler") return false;
+    return istAutomatischWiederholbarerPushFehler(fehler);
+  });
 
   let recovered = 0;
   let failed = 0;
@@ -98,7 +107,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   }
 
   return {
-    datum,
+    datum: datum ?? "alle",
     processed: kandidaten.length,
     recovered,
     failed,
