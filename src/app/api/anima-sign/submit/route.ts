@@ -142,6 +142,73 @@ function scheduleFastRetryAt() {
   return new Date(Date.now() + 5 * 60_000).toISOString();
 }
 
+function extractMissingColumn(message: string | null | undefined): string | null {
+  if (!message) return null;
+  const match = message.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] ?? null;
+}
+
+async function insertSubmissionWithSchemaFallback(
+  supabase: ReturnType<typeof createServerClient>,
+  payload: Record<string, unknown>
+) {
+  let currentPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { data, error } = await supabase
+      .from("anamnese_submissions")
+      .insert(currentPayload)
+      .select("id")
+      .single();
+
+    if (!error && data) {
+      return { data, error: null as null };
+    }
+
+    const missingColumn = extractMissingColumn(error?.message);
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return { data: null, error };
+    }
+
+    delete currentPayload[missingColumn];
+  }
+
+  return {
+    data: null,
+    error: { message: "Schema-Fallback fuer anamnese_submissions erschöpft." },
+  };
+}
+
+async function updatePatientWithSchemaFallback(
+  supabase: ReturnType<typeof createServerClient>,
+  patientId: string,
+  payload: Record<string, unknown>
+) {
+  let currentPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { error } = await supabase
+      .from("patients")
+      .update(currentPayload)
+      .eq("id", patientId);
+
+    if (!error) {
+      return { error: null as null };
+    }
+
+    const missingColumn = extractMissingColumn(error.message);
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return { error };
+    }
+
+    delete currentPayload[missingColumn];
+  }
+
+  return {
+    error: { message: "Schema-Fallback fuer patients erschöpft." },
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SubmitBody;
@@ -167,9 +234,9 @@ export async function POST(request: Request) {
     const geburtsdatum = asString(answers["patient_geburtsdatum"]);
 
     // 1) Einreichung speichern
-    const { data: sub, error: insertError } = await supabase
-      .from("anamnese_submissions")
-      .insert({
+    const { data: sub, error: insertError } = await insertSubmissionWithSchemaFallback(
+      supabase,
+      {
         patient_id: patientId,
         vorname,
         nachname,
@@ -181,9 +248,8 @@ export async function POST(request: Request) {
         geburtsdatum,
         answers,
         status: "signiert",
-      })
-      .select("id")
-      .single();
+      }
+    );
 
     if (insertError || !sub) {
       return NextResponse.json(
@@ -277,10 +343,10 @@ export async function POST(request: Request) {
 
       // Portal-Zugang und Versichertendaten aus dem Anamnesebogen im Patienten-Record setzen
       if (resolvedPatientId) {
-        await supabase
-          .from("patients")
-          .update({ portal_zugang: true, ...buildVersichertenPatch(answers) })
-          .eq("id", resolvedPatientId);
+        await updatePatientWithSchemaFallback(supabase, resolvedPatientId, {
+          portal_zugang: true,
+          ...buildVersichertenPatch(answers),
+        });
       }
 
       // Willkommens-Email senden (nicht-blockierend)
