@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildFallbackExistingPatientUpdateOperations,
   buildIdentityFingerprint,
   decideIdentityClaimAction,
   decideExactLocalPatientCandidate,
+  isTransientIvorisAvailabilityError,
   namesMatchSubmission,
   shouldReusePriorSubmissionMatch,
 } from "../animasign-ivoris-sync";
@@ -168,4 +170,47 @@ test("reuses existing ivoris id from identity claim instead of creating again", 
     assert.equal(decision.ivorisId, "11111111-1111-4111-8111-111111111111");
     assert.equal(decision.patientId, "patient-1");
   }
+});
+
+test("detects transient ivoris availability errors", () => {
+  assert.equal(
+    isTransientIvorisAvailabilityError(
+      new Error("IVORIS GetPatient abc fehlgeschlagen (503): null")
+    ),
+    true
+  );
+  assert.equal(
+    isTransientIvorisAvailabilityError(
+      new Error("IVORIS UpdatePatient abc fehlgeschlagen (400): bad request")
+    ),
+    false
+  );
+});
+
+test("builds fallback existing-patient operations from submission data", () => {
+  const operations = buildFallbackExistingPatientUpdateOperations({
+    vorname: "Emma",
+    nachname: "Muller",
+    email: "emma@example.com",
+    geburtsdatum: "2012-04-01",
+    answers: {
+      patient_telefon: "01701234567",
+      patient_mobil: "01707654321",
+      patient_strasse: "Musterweg 7",
+      patient_plz: "04109",
+      patient_wohnort: "Leipzig",
+    },
+  });
+
+  assert.equal(operations.length, 4);
+  assert.equal(
+    operations.some(
+      (operation) =>
+        operation.Firstname === "Emma" &&
+        operation.Lastname === "Muller" &&
+        operation.Birthday === "2012-04-01" &&
+        operation.Email === "emma@example.com"
+    ),
+    true
+  );
 });

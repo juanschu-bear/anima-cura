@@ -1,6 +1,8 @@
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TRANSIENT_IVORIS_STATUSES = new Set([502, 503, 504]);
+const IVORIS_RETRY_DELAYS_MS = [600, 1200] as const;
 
 type IvorisCredentials = {
   app: string;
@@ -112,6 +114,50 @@ function buildHeaders(creds: IvorisCredentials) {
   return headers;
 }
 
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientStatus(status: number) {
+  return TRANSIENT_IVORIS_STATUSES.has(status);
+}
+
+async function fetchJsonWithTransientRetry(
+  url: URL,
+  options: RequestInit,
+  context: string
+) : Promise<{ response: Response; payload: unknown }> {
+  let lastResponse: Response | null = null;
+  let lastPayload: unknown = null;
+
+  for (let attempt = 0; attempt <= IVORIS_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await fetch(url.toString(), {
+      ...options,
+      cache: "no-store",
+    });
+    const payload = await parseBestEffortResponse(response);
+
+    if (response.ok || !isTransientStatus(response.status) || attempt === IVORIS_RETRY_DELAYS_MS.length) {
+      return { response, payload };
+    }
+
+    console.warn(
+      `[IVORIS] transient ${context} status=${response.status} attempt=${attempt + 1} payload=${formatPayload(
+        payload
+      )}`
+    );
+    lastResponse = response;
+    lastPayload = payload;
+    await sleep(IVORIS_RETRY_DELAYS_MS[attempt]);
+  }
+
+  if (!lastResponse) {
+    throw new Error(`IVORIS ${context} konnte nicht gestartet werden.`);
+  }
+
+  return { response: lastResponse, payload: lastPayload };
+}
+
 export async function fetchIvorisDocumentation() {
   const creds = getIvorisCredentials();
   const baseUrl = buildBaseUrl(creds.linkname);
@@ -121,7 +167,6 @@ export async function fetchIvorisDocumentation() {
   const response = await fetch(url.toString(), {
     method: "GET",
     headers: buildHeaders(creds),
-    cache: "no-store",
   });
 
   const payload = await parseBestEffortResponse(response);
@@ -285,12 +330,14 @@ export async function fetchIvorisPatientById(id: string) {
     url.searchParams.set("mandantIndex", mandantIndex);
   }
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: buildHeaders(creds),
-    cache: "no-store",
-  });
-  const payload = await parseBestEffortResponse(response);
+  const { response, payload } = await fetchJsonWithTransientRetry(
+    url,
+    {
+      method: "GET",
+      headers: buildHeaders(creds),
+    },
+    `GetPatient ${id}`
+  );
   if (!response.ok) {
     throw new Error(`IVORIS GetPatient ${id} fehlgeschlagen (${response.status}): ${formatPayload(payload)}`);
   }
@@ -342,14 +389,15 @@ export async function updateIvorisPatient(
 
   console.log(`[IVORIS] UpdatePatient request ${ivorisId}: ${JSON.stringify(body)}`);
 
-  const response = await fetch(url.toString(), {
-    method: "PUT",
-    headers: buildHeaders(creds),
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  const payload = await parseBestEffortResponse(response);
+  const { response, payload } = await fetchJsonWithTransientRetry(
+    url,
+    {
+      method: "PUT",
+      headers: buildHeaders(creds),
+      body: JSON.stringify(body),
+    },
+    `UpdatePatient ${ivorisId}`
+  );
   if (!response.ok) {
     console.error(
       `[IVORIS] UpdatePatient response ${ivorisId}: status=${response.status} payload=${formatPayload(payload)}`
@@ -381,15 +429,16 @@ export async function createIvorisPatient(
     },
   };
 
-  const response = await fetch(url.toString(), {
-    method: "POST",
-    headers: buildHeaders(creds),
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
   console.log(`[IVORIS] AddPatient request: ${JSON.stringify(body)}`);
-  const payload = await parseBestEffortResponse(response);
+  const { response, payload } = await fetchJsonWithTransientRetry(
+    url,
+    {
+      method: "POST",
+      headers: buildHeaders(creds),
+      body: JSON.stringify(body),
+    },
+    "AddPatient"
+  );
   if (!response.ok) {
     console.error(
       `[IVORIS] AddPatient response: status=${response.status} payload=${formatPayload(payload)}`

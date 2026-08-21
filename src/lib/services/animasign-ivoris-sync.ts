@@ -154,6 +154,16 @@ type IvorisContactSnapshot = {
   };
 };
 
+export function isTransientIvorisAvailabilityError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("(502)") ||
+    message.includes("(503)") ||
+    message.includes("(504)") ||
+    message.includes("nicht stabil erreichbar")
+  );
+}
+
 type SyncAttemptContext = {
   requestPayload?: unknown;
   responsePayload?: unknown;
@@ -581,6 +591,13 @@ function buildExistingPatientUpdateOperations(
     ...base,
     ...operation,
   }));
+}
+
+export function buildFallbackExistingPatientUpdateOperations(
+  submission: Pick<SubmissionRow, "vorname" | "nachname" | "email" | "geburtsdatum" | "answers">
+) {
+  const currentData: IvorisContactSnapshot = {};
+  return buildExistingPatientUpdateOperations(currentData, submission as SubmissionRow);
 }
 
 function retryColumn(stage: SyncStage) {
@@ -1355,15 +1372,34 @@ async function syncExistingPatient(
 
   await patchSubmissionIvorisPatientId(db, submission.id, patient.ivoris_id);
 
-  const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
-  const currentContacts = extractCurrentContacts(currentPatient);
-  const operations = buildExistingPatientUpdateOperations(currentContacts, submission);
+  let operations: Array<Partial<IvorisPatientInput>> = [];
+  let metadata: Record<string, unknown> = { operations: 0 };
+
+  try {
+    const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
+    const currentContacts = extractCurrentContacts(currentPatient);
+    operations = buildExistingPatientUpdateOperations(currentContacts, submission);
+  } catch (error) {
+    if (!isTransientIvorisAvailabilityError(error)) {
+      throw error;
+    }
+
+    operations = buildFallbackExistingPatientUpdateOperations(submission);
+    metadata = {
+      operations: operations.length,
+      usedSubmissionFallback: true,
+      fallbackReason: error instanceof Error ? error.message : String(error),
+    };
+    console.warn(
+      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} using submission fallback after transient GetPatient failure`
+    );
+  }
 
   if (operations.length === 0) {
     console.log(
       `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} no contact delta`
     );
-    return { status: "skipped", ivorisId: patient.ivoris_id, metadata: { operations: 0 } };
+    return { status: "skipped", ivorisId: patient.ivoris_id, metadata };
   }
 
   console.log(
@@ -1389,7 +1425,10 @@ async function syncExistingPatient(
   return {
     status: "success",
     ivorisId: patient.ivoris_id,
-    metadata: { operations: operations.length },
+    metadata: {
+      ...metadata,
+      operations: operations.length,
+    },
   };
 }
 

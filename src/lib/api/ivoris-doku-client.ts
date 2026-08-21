@@ -7,6 +7,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRANSIENT_IVORIS_STATUSES = new Set([502, 503, 504]);
 const ADD_ENTRY_RETRY_DELAY_MS = 900;
+const ADD_DOCUMENT_RETRY_DELAYS_MS = [800, 1600] as const;
 
 type IvorisDokuCredentials = {
   app: string;
@@ -376,13 +377,6 @@ export async function addIvorisDocument(
     );
   }
 
-  const response = await fetch(url.toString(), {
-    method: "POST",
-    headers: buildHeaders(creds),
-    body: requestBody,
-    cache: "no-store",
-  });
-
   console.log(
     `[IVORIS] AddDocument request patient=${patientId}: ${JSON.stringify({
       document: {
@@ -391,7 +385,30 @@ export async function addIvorisDocument(
       },
     })}`
   );
-  const payload = await parseBestEffort(response);
+  let response: Response | null = null;
+  let payload: unknown = null;
+  for (let attempt = 0; attempt <= ADD_DOCUMENT_RETRY_DELAYS_MS.length; attempt += 1) {
+    response = await fetch(url.toString(), {
+      method: "POST",
+      headers: buildHeaders(creds),
+      body: requestBody,
+      cache: "no-store",
+    });
+    payload = await parseBestEffort(response);
+
+    if (response.ok || !TRANSIENT_IVORIS_STATUSES.has(response.status) || attempt === ADD_DOCUMENT_RETRY_DELAYS_MS.length) {
+      break;
+    }
+
+    console.warn(
+      `[IVORIS] AddDocument transient response patient=${patientId}: status=${response.status} attempt=${attempt + 1} payload=${formatPayload(payload)}`
+    );
+    await sleep(ADD_DOCUMENT_RETRY_DELAYS_MS[attempt]);
+  }
+
+  if (!response) {
+    throw new Error("IVORIS AddDocument konnte nicht gestartet werden.");
+  }
   if (!response.ok) {
     console.error(
       `[IVORIS] AddDocument response patient=${patientId}: status=${response.status} payload=${
