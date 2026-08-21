@@ -7,11 +7,15 @@ import {
   type IvorisPatientInput,
   updateIvorisPatient,
 } from "@/lib/api/ivoris-client";
-import { addIvorisDocument } from "@/lib/api/ivoris-doku-client";
+import {
+  addIvorisDocument,
+  addIvorisKarteiEintrag,
+} from "@/lib/api/ivoris-doku-client";
 import {
   decideIvorisDirectoryAction,
   type DirectoryStrategyResult,
 } from "@/lib/services/animasign-ivoris-directory";
+import { buildAnamnesisSummaryText } from "@/lib/services/animasign-anamnesis-summary";
 import { formatManualReviewError } from "@/lib/services/animasign-sync-status";
 
 const SYNC_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
@@ -135,6 +139,10 @@ export function decideIdentityClaimAction(
 }
 
 type IvorisContactSnapshot = {
+  Firstname?: string;
+  Lastname?: string;
+  Birthday?: string;
+  Gender?: string;
   Email?: string;
   Phone?: string;
   Mobile?: string;
@@ -342,6 +350,10 @@ function extractCurrentContacts(payload: unknown): IvorisContactSnapshot {
       : null;
 
   return {
+    ...(asString(patient.Firstname) ? { Firstname: asString(patient.Firstname) ?? undefined } : {}),
+    ...(asString(patient.Lastname) ? { Lastname: asString(patient.Lastname) ?? undefined } : {}),
+    ...(asString(patient.Birthday) ? { Birthday: asString(patient.Birthday) ?? undefined } : {}),
+    ...(asString(patient.Gender) ? { Gender: asString(patient.Gender) ?? undefined } : {}),
     ...(asString(patient.Email) ? { Email: asString(patient.Email) ?? undefined } : {}),
     ...(asString(patient.Phone) ? { Phone: asString(patient.Phone) ?? undefined } : {}),
     ...(asString(patient.Mobile) ? { Mobile: asString(patient.Mobile) ?? undefined } : {}),
@@ -533,6 +545,42 @@ function buildSingleFieldOperations(
   }
 
   return operations;
+}
+
+function buildExistingPatientUpdateBase(
+  currentData: IvorisContactSnapshot,
+  submission: SubmissionRow
+): Pick<IvorisPatientInput, "Firstname" | "Lastname" | "Birthday"> &
+  Partial<Pick<IvorisPatientInput, "Gender">> {
+  const birthday =
+    asString(currentData.Birthday) ??
+    toIsoDateOrNull(submission.geburtsdatum) ??
+    submission.geburtsdatum ??
+    "";
+  const firstname = asString(currentData.Firstname) ?? asString(submission.vorname) ?? "";
+  const lastname = asString(currentData.Lastname) ?? asString(submission.nachname) ?? "";
+  const gender = asString(currentData.Gender);
+
+  return {
+    Firstname: firstname,
+    Lastname: lastname,
+    Birthday: birthday,
+    ...(gender ? { Gender: gender } : {}),
+  };
+}
+
+function buildExistingPatientUpdateOperations(
+  currentData: IvorisContactSnapshot,
+  submission: SubmissionRow
+) {
+  const requestedContacts = buildContactUpdate(submission);
+  const operations = buildSingleFieldOperations(requestedContacts, currentData);
+  const base = buildExistingPatientUpdateBase(currentData, submission);
+
+  return operations.map((operation) => ({
+    ...base,
+    ...operation,
+  }));
 }
 
 function retryColumn(stage: SyncStage) {
@@ -1309,8 +1357,7 @@ async function syncExistingPatient(
 
   const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
   const currentContacts = extractCurrentContacts(currentPatient);
-  const requestedContacts = buildContactUpdate(submission);
-  const operations = buildSingleFieldOperations(requestedContacts, currentContacts);
+  const operations = buildExistingPatientUpdateOperations(currentContacts, submission);
 
   if (operations.length === 0) {
     console.log(
@@ -1330,17 +1377,10 @@ async function syncExistingPatient(
       await updateIvorisPatient(patient.ivoris_id, operation);
     } catch (error) {
       if (isIvorisIdentityConstraintError(error)) {
-        return {
-          status: "success",
-          ivorisId: patient.ivoris_id,
-          metadata: {
-            operations: operations.length,
-            warning:
-              `Ivoris blockiert das Kontakt-/Adressupdate fuer den Bestandspatienten ${submission.vorname ?? ""} ${submission.nachname ?? ""}. ` +
-              "Patientenzuordnung bleibt bestehen; Dokument-Sync darf weiterlaufen.",
-            warningCode: "IVORIS_CONTACT_UPDATE_BLOCKED",
-          },
-        };
+        throw new Error(
+          `IVORIS blockiert das Kontakt-/Adressupdate fuer den Bestandspatienten ${submission.vorname ?? ""} ${submission.nachname ?? ""}. ` +
+            "Die Stammdaten wurden nicht uebernommen; erneuter Sync oder manuelle Pruefung noetig."
+        );
       }
       throw error;
     }
@@ -1469,6 +1509,14 @@ async function syncDocumentStage(
     const base64 = Buffer.from(fileBytes).toString("base64");
     const docDate = formatIsoDate(submission.signiert_am ?? submission.created_at);
     const docName = `Anamnesebogen_${sanitizeFilenamePart(submission.nachname)}_${docDate}.pdf`;
+    const summaryText = buildAnamnesisSummaryText(submission);
+
+    await addIvorisKarteiEintrag({
+      patientIvorisId: patient,
+      date: docDate,
+      text: summaryText,
+      type: "Note",
+    });
 
     console.log(
       `[ANIMASIGN][IVORIS] doc sync submission=${submission.id} patient=${patient} blobType=${
@@ -1486,6 +1534,7 @@ async function syncDocumentStage(
     await writeSyncLog(db, submission.id, "document", attemptNo, "success", null, {
       requestPayload: {
         patientIvorisId: patient,
+        summaryLength: summaryText.length,
         name: docName,
         date: docDate,
         pdfPath,
