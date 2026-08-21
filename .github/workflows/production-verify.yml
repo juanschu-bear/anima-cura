@@ -34,3 +34,6 @@ jobs:
 
       - name: Verify live production schema
         run: npm run check:schema
+
+      - name: Verify AnimaSign integrity
+        run: npm run check:animasign

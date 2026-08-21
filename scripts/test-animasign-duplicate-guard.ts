@@ -206,6 +206,22 @@ async function testAmbiguousPriorSubmissionIds() {
 }
 
 async function main() {
+  if (process.env.RUN_LIVE_ANIMASIGN_DUPGUARD_TEST !== "true") {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          skipped: true,
+          reason:
+            "Live duplicate-guard integration test is opt-in only. Set RUN_LIVE_ANIMASIGN_DUPGUARD_TEST=true to execute against production-backed services.",
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
   const results = [];
   results.push(await testReusePriorSubmissionId());
   results.push(await testAmbiguousPriorSubmissionIds());

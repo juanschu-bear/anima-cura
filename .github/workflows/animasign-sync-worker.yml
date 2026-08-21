@@ -27,8 +27,8 @@ jobs:
       IVORIS_PATIENTS_PATH: ${{ secrets.IVORIS_PATIENTS_PATH }}
       IVORIS_PATIENTS_METHOD: ${{ secrets.IVORIS_PATIENTS_METHOD }}
       IVORIS_MANDANT_INDEX: ${{ secrets.IVORIS_MANDANT_INDEX }}
-      ANIMASIGN_SYNC_WORKER_PATIENT_LIMIT: "3"
-      ANIMASIGN_SYNC_WORKER_DOCUMENT_LIMIT: "5"
+      ANIMASIGN_SYNC_WORKER_PATIENT_LIMIT: "25"
+      ANIMASIGN_SYNC_WORKER_DOCUMENT_LIMIT: "25"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,3 +47,6 @@ jobs:
 
       - name: Run AnimaSign sync worker
         run: npm run animasign:sync-worker
+
+      - name: Verify AnimaSign integrity
+        run: npm run check:animasign
