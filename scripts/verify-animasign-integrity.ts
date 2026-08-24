@@ -27,6 +27,7 @@ type SubmissionRow = {
 type SyncLogRow = {
   submission_id: string;
   created_at: string;
+  status: string;
   metadata: Record<string, unknown> | null;
 };
 
@@ -94,9 +95,8 @@ async function main() {
       .limit(5000),
     db
       .from("animasign_sync_log")
-      .select("submission_id, created_at, metadata")
+      .select("submission_id, created_at, status, metadata")
       .eq("stage", "patient")
-      .eq("status", "success")
       .order("created_at", { ascending: false })
       .limit(5000),
     db
@@ -141,22 +141,24 @@ async function main() {
     manualReviewRows
   );
 
-  const latestWarningBySubmission = new Map<string, SyncLogRow>();
+  const latestPatientLogBySubmission = new Map<string, SyncLogRow>();
   for (const row of (warningSuccessLogs.data ?? []) as SyncLogRow[]) {
-    const warningCode = row.metadata?.warningCode;
-    if (warningCode !== "IVORIS_CONTACT_UPDATE_BLOCKED") continue;
-    if (!latestWarningBySubmission.has(row.submission_id)) {
-      latestWarningBySubmission.set(row.submission_id, row);
+    if (!latestPatientLogBySubmission.has(row.submission_id)) {
+      latestPatientLogBySubmission.set(row.submission_id, row);
     }
   }
 
   const currentFalseGreens = patientRowsData
     .filter((row) => row.ivoris_synced === true)
-    .filter((row) => latestWarningBySubmission.has(row.id))
+    .filter((row) => {
+      const latestLog = latestPatientLogBySubmission.get(row.id);
+      if (!latestLog || latestLog.status !== "success") return false;
+      return latestLog.metadata?.warningCode === "IVORIS_CONTACT_UPDATE_BLOCKED";
+    })
     .map((row) => ({
       ...row,
-      latestWarningAt: latestWarningBySubmission.get(row.id)?.created_at ?? null,
-      latestWarningMetadata: latestWarningBySubmission.get(row.id)?.metadata ?? null,
+      latestWarningAt: latestPatientLogBySubmission.get(row.id)?.created_at ?? null,
+      latestWarningMetadata: latestPatientLogBySubmission.get(row.id)?.metadata ?? null,
     }));
   pushProblem(problems, "false_green_contact_blocked", "critical", currentFalseGreens);
 
