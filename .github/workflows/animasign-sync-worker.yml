@@ -45,6 +45,9 @@ jobs:
       - name: Verify live schema compatibility
         run: npm run check:schema
 
+      - name: Repair legacy false-green states
+        run: npm run repair:animasign-false-greens
+
       - name: Run AnimaSign sync worker
         run: npm run animasign:sync-worker
 
