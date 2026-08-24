@@ -53,3 +53,6 @@ jobs:
 
       - name: Verify AnimaSign integrity
         run: npm run check:animasign
+
+      - name: Run AnimaSign supervisor
+        run: npm run check:animasign-supervisor

@@ -1779,6 +1779,7 @@ export async function retryPendingAnimaSignSyncs(
 ) {
   const db = options.db ?? createServerClient();
   const limit = options.limit ?? 25;
+  const fetchWindow = Math.max(limit * 12, 300);
   const { data, error } = await db
     .from("anamnese_submissions")
     .select(
@@ -1786,7 +1787,7 @@ export async function retryPendingAnimaSignSyncs(
     )
     .or("ivoris_synced.eq.false,ivoris_doc_synced.eq.false")
     .order("created_at", { ascending: true })
-    .limit(limit);
+    .limit(fetchWindow);
 
   if (error) {
     throw new Error(`Pending AnimaSign Syncs konnten nicht geladen werden: ${error.message}`);
@@ -1794,7 +1795,7 @@ export async function retryPendingAnimaSignSyncs(
 
   const summaries: SubmissionSyncResult[] = [];
 
-  for (const row of (data ?? []) as Array<
+  const pendingRows = ((data ?? []) as Array<
     Pick<
       SubmissionRow,
       | "id"
@@ -1806,7 +1807,20 @@ export async function retryPendingAnimaSignSyncs(
       | "ivoris_doc_failed_permanently"
       | "signed_pdf_path"
     >
-  >) {
+  >).filter((row) => {
+    const patientDue =
+      row.ivoris_synced === false &&
+      row.ivoris_sync_failed_permanently !== true &&
+      isRetryDue(row.ivoris_sync_next_retry_at);
+    const documentDue =
+      row.ivoris_doc_synced === false &&
+      row.ivoris_doc_failed_permanently !== true &&
+      Boolean(row.signed_pdf_path) &&
+      isRetryDue(row.ivoris_doc_next_retry_at);
+    return patientDue || documentDue;
+  });
+
+  for (const row of pendingRows.slice(0, limit)) {
     const stages: SyncStage[] = [];
 
     if (

@@ -12,6 +12,7 @@
     "test": "npm run test:animus && npm run test:animasign-dupguard",
     "check:schema": "tsx scripts/check-production-schema.ts",
     "check:animasign": "tsx scripts/verify-animasign-integrity.ts",
+    "check:animasign-supervisor": "tsx scripts/animasign-supervisor.ts",
     "verify:prod": "npm run typecheck && npm run test && npm run check:schema && npm run check:animasign",
     "sync:animus-react": "node scripts/sync-animus-react.mjs",
     "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
