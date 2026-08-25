@@ -178,18 +178,14 @@ export default function PatientLoginForm() {
     }
 
     if (user) {
-      const authRole = getAuthRole(user);
+      const repairResponse = await fetch("/api/patient/repair-access", {
+        method: "POST",
+      });
 
-      if (authRole === "patient") {
-        const repairResponse = await fetch("/api/patient/repair-access", {
-          method: "POST",
-        });
-
-        if (repairResponse.ok) {
-          router.replace("/patient/portal");
-          router.refresh();
-          return;
-        }
+      if (repairResponse.ok) {
+        router.replace("/patient/portal");
+        router.refresh();
+        return;
       }
 
       const { data: profile } = await supabase

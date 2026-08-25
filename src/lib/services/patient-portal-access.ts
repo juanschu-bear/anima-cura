@@ -174,10 +174,6 @@ async function resolvePatientIdFromSubmissions(user: User, submissions: PortalSu
 }
 
 export async function repairPatientPortalAccess(user: User): Promise<PatientPortalAccessRepairResult> {
-  if (readPatientRole(user) !== "patient") {
-    return { status: "not_patient", reason: "auth_user_not_marked_as_patient" };
-  }
-
   const admin = createAdminClient();
 
   const { data: existingProfile } = await admin
@@ -198,6 +194,11 @@ export async function repairPatientPortalAccess(user: User): Promise<PatientPort
     .eq("account_email", user.email ?? "")
     .order("created_at", { ascending: false })
     .limit(10);
+
+  const userRole = readPatientRole(user);
+  if (userRole !== "patient" && (!submissions || submissions.length === 0)) {
+    return { status: "not_patient", reason: "auth_user_not_marked_as_patient" };
+  }
 
   const resolved = await resolvePatientIdFromSubmissions(user, submissions ?? []);
   if (!resolved.patientId) {
