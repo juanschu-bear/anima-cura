@@ -45,6 +45,18 @@ export default function PatientLoginForm() {
     return role === "patient" && patientId.length > 0;
   };
 
+  const getAuthRole = (user: {
+    app_metadata?: Record<string, unknown> | null;
+    user_metadata?: Record<string, unknown> | null;
+  } | null) => {
+    if (!user) return null;
+    return typeof user.app_metadata?.role === "string"
+      ? user.app_metadata.role
+      : typeof user.user_metadata?.role === "string"
+        ? user.user_metadata.role
+        : null;
+  };
+
   // ---- Animated "plexus" network background (canvas, client-only) ----
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -166,6 +178,20 @@ export default function PatientLoginForm() {
     }
 
     if (user) {
+      const authRole = getAuthRole(user);
+
+      if (authRole === "patient") {
+        const repairResponse = await fetch("/api/patient/repair-access", {
+          method: "POST",
+        });
+
+        if (repairResponse.ok) {
+          router.replace("/patient/portal");
+          router.refresh();
+          return;
+        }
+      }
+
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("role, patient_id")

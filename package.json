@@ -26,6 +26,7 @@
     "repair:offene-posten": "tsx scripts/repair-offene-posten.ts",
     "repair:animasign-pdfs": "tsx scripts/repair-animasign-signed-pdfs.ts",
     "repair:animasign-false-greens": "tsx scripts/repair-animasign-false-greens.ts",
+    "repair:patient-portal-access": "tsx scripts/repair-patient-portal-access.ts",
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",
     "cron:reports": "tsx src/lib/services/report-generator.ts"
   },

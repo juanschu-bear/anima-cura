@@ -2,6 +2,7 @@ import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
+import { repairPatientPortalAccess } from "@/lib/services/patient-portal-access";
 
 export interface AuthenticatedPatient {
   userId: string;
@@ -68,6 +69,26 @@ export async function getAuthenticatedPatient(): Promise<AuthenticatedPatient | 
       email: user.email ?? "",
       name: profile.display_name || metadataPatient?.displayName || "Patient",
     };
+  }
+
+  if (readPatientAuthMetadata(user)?.role === "patient") {
+    const repairResult = await repairPatientPortalAccess(user);
+    if (repairResult.status === "already_ok" || repairResult.status === "repaired") {
+      const { data: healedProfile } = await serviceClient
+        .from("user_profiles")
+        .select("role, patient_id, display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (healedProfile?.role === "patient" && healedProfile.patient_id) {
+        return {
+          userId: user.id,
+          patientId: healedProfile.patient_id,
+          email: user.email ?? "",
+          name: healedProfile.display_name || metadataPatient?.displayName || "Patient",
+        };
+      }
+    }
   }
 
   if (!metadataPatient) return null;
