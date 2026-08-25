@@ -31,8 +31,45 @@ interface EngData {
   breakdown?: any;
 }
 interface ActivityEvent { patient_name: string; patient_id: string; event_type: string; created_at: string; }
-interface PraxisData { reaction_time_days: number; success_rate_pct: number; actions_taken: number; signals_ignored: number; chat_response_time_min: number; messages_answered_pct: number; action_log: any[]; }
-interface SystemData { level: string; level_progress: number; next_level_events: number; accuracy: any; calibration: any[]; predictions: any[]; calibration_log: any[]; }
+interface PraxisActionLogEntry {
+  date: string;
+  patient: string;
+  signal: string;
+  action: "antwort" | "offen";
+  result: "erfolg" | "offen";
+  reaction_days: number | null;
+}
+interface PraxisData {
+  live: boolean;
+  notice: string | null;
+  reaction_time_days: number | null;
+  success_rate_pct: number;
+  actions_taken: number;
+  signals_ignored: number;
+  chat_response_time_min: number | null;
+  messages_answered_pct: number;
+  action_log: PraxisActionLogEntry[];
+}
+interface SystemData {
+  live: boolean;
+  notice: string | null;
+  level: string;
+  level_progress: number;
+  next_level_events: number;
+  total_events: number;
+  recent_events: number;
+  active_patients_30d: number;
+  accuracy: {
+    available: boolean;
+    hit_rate: number | null;
+    false_alarms: number | null;
+    missed: number | null;
+    avg_deviation_days: number | null;
+  };
+  calibration: any[];
+  predictions: any[];
+  calibration_log: any[];
+}
 
 const TAB_NAMES: Record<string, string> = { home: "Start", journey: "Verlauf", progress: "Fortschritt", chat: "Chat", more: "Mehr" };
 const EVT: Record<string, { icon: string; label: string }> = {
@@ -80,6 +117,7 @@ export default function IntelligencePage() {
 
   const riskColor = (l?: string) => l === "high" ? red : l === "medium" ? yellow : grn;
   const timeAgo = (iso: string) => { const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000); if (m < 60) return `vor ${m}m`; const h = Math.floor(m / 60); return h < 24 ? `vor ${h}h` : `vor ${Math.floor(h / 24)}d`; };
+  const metricValue = (value: number | null, suffix = "") => value == null ? "Noch offen" : `${value}${suffix}`;
 
   const patients = (data?.top_patients || []).sort((a, b) => (b.financial_risk || 0) - (a.financial_risk || 0));
   const high = patients.filter(p => p.risk_level === "high");
@@ -337,12 +375,17 @@ export default function IntelligencePage() {
           <div style={cardS}>
             <div style={sLabel}>Meta-Intelligence: Wie gut reagiert die Praxis?</div>
             <p style={{ fontSize: 13, color: muted, marginBottom: 20, lineHeight: 1.5 }}>Revenue Intelligence bewertet nicht nur Patienten, sondern auch wie effektiv die Praxis auf Warnsignale reagiert.</p>
+            {praxis.notice && (
+              <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, background: dk ? "rgba(96,165,250,0.06)" : "#f5f9ff", color: muted, fontSize: 12, marginBottom: 16 }}>
+                {praxis.notice}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               {[
-                { value: `${praxis.reaction_time_days} Tage`, label: "Ø Reaktionszeit", sub: "Praxen die innerhalb von 24h reagieren, verhindern 40% mehr Zahlungsausfälle.", color: yellow },
-                { value: `${praxis.success_rate_pct}%`, label: "Erfolgsquote", sub: `Von ${praxis.actions_taken} Maßnahmen führten ${Math.round(praxis.actions_taken * praxis.success_rate_pct / 100)} zum Erfolg.`, color: grn },
-                { value: String(praxis.actions_taken), label: "Maßnahmen ergriffen (30 Tage)", sub: "Anrufe, Nachrichten, Ratengespräche und Mahnungen.", color: fg },
-                { value: String(praxis.signals_ignored), label: "Signale ignoriert", sub: "Patienten bei denen das System warnte, aber nichts passierte.", color: red },
+                { value: metricValue(praxis.reaction_time_days, " Tage"), label: "Ø Reaktionszeit", sub: "Gemessen auf echte Patienten-Nachrichten mit späterer Praxis-Antwort.", color: yellow },
+                { value: `${praxis.messages_answered_pct}%`, label: "Antwortquote", sub: `Von ${praxis.action_log.length} erkannten Kontaktfällen wurden ${praxis.messages_answered_pct}% beantwortet.`, color: grn },
+                { value: String(praxis.actions_taken), label: "Praxis-Antworten (30 Tage)", sub: "Tatsächlich versendete Praxis-Nachrichten im Patientenportal.", color: fg },
+                { value: String(praxis.signals_ignored), label: "Offene Signale >24h", sub: "Patienten-Nachrichten, die nach 24h noch ohne Antwort waren.", color: red },
               ].map((k, i) => (
                 <div key={i} style={{ padding: 20, borderRadius: 14, border: `1px solid ${border}`, background: card }}>
                   <div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Fraunces',serif", color: k.color }}>{k.value}</div>
@@ -355,29 +398,33 @@ export default function IntelligencePage() {
 
           <div style={cardS}>
             <div style={sLabel}>Maßnahmen-Protokoll</div>
+            {praxis.action_log.length === 0 ? (
+              <p style={{ fontSize: 12, color: muted, textAlign: "center", padding: 20 }}>Noch keine belastbaren Praxis-Reaktionsfälle im Patientenportal.</p>
+            ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead><tr>{["Datum", "Patient", "Warnsignal", "Maßnahme", "Ergebnis", "Reaktion"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: muted, borderBottom: `1px solid ${border}` }}>{h}</th>)}</tr></thead>
               <tbody>
-                {praxis.action_log.map((a: any, i: number) => (
+                {praxis.action_log.map((a, i: number) => (
                   <tr key={i}>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${border}`, color: muted }}>{a.date}</td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${border}`, fontWeight: 600 }}>{a.patient}</td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${border}`, fontSize: 11 }}>{a.signal}</td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${border}` }}>
-                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: a.action === "anruf" ? "rgba(74,222,128,0.08)" : a.action === "nachricht" ? "rgba(96,165,250,0.08)" : a.action === "ratengespraech" ? "rgba(167,139,250,0.08)" : "rgba(251,191,36,0.08)", color: a.action === "anruf" ? grn : a.action === "nachricht" ? blue : a.action === "ratengespraech" ? purple : yellow }}>{a.action === "ratengespraech" ? "Ratengespräch" : a.action.charAt(0).toUpperCase() + a.action.slice(1)}</span>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: a.action === "antwort" ? "rgba(74,222,128,0.08)" : "rgba(251,191,36,0.08)", color: a.action === "antwort" ? grn : yellow }}>{a.action === "antwort" ? "Antwort" : "Offen"}</span>
                     </td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${border}` }}>
-                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: a.result === "erfolg" ? "rgba(74,222,128,0.08)" : a.result === "kein" ? "rgba(248,113,113,0.08)" : dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: a.result === "erfolg" ? grn : a.result === "kein" ? red : muted }}>{a.result === "erfolg" ? "Erfolg ✓" : a.result === "kein" ? "Keine Reaktion" : "Offen"}</span>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: a.result === "erfolg" ? "rgba(74,222,128,0.08)" : dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: a.result === "erfolg" ? grn : muted }}>{a.result === "erfolg" ? "Beantwortet ✓" : "Offen"}</span>
                     </td>
-                    <td style={{ padding: "10px", borderBottom: `1px solid ${border}` }}>{a.reaction_days} Tage</td>
+                    <td style={{ padding: "10px", borderBottom: `1px solid ${border}` }}>{a.reaction_days == null ? "Noch offen" : `${a.reaction_days} Tage`}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div style={cardS}><div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Fraunces',serif", color: grn }}>{praxis.chat_response_time_min} min</div><div style={{ fontSize: 11, color: muted, fontWeight: 600, marginTop: 4 }}>Ø Chat-Antwortzeit</div></div>
+            <div style={cardS}><div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Fraunces',serif", color: grn }}>{metricValue(praxis.chat_response_time_min, " min")}</div><div style={{ fontSize: 11, color: muted, fontWeight: 600, marginTop: 4 }}>Ø Chat-Antwortzeit</div></div>
             <div style={cardS}><div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Fraunces',serif" }}>{praxis.messages_answered_pct}%</div><div style={{ fontSize: 11, color: muted, fontWeight: 600, marginTop: 4 }}>Nachrichten beantwortet</div></div>
           </div>
         </div>
@@ -386,6 +433,12 @@ export default function IntelligencePage() {
       {/* ═══ SÄULE 3: SYSTEM ═══ */}
       {tab === "system" && system && (
         <div>
+          {system.notice && (
+            <div style={{ ...cardS, borderColor: dk ? "rgba(96,165,250,0.18)" : "#d7e6ff", background: dk ? "rgba(10,14,22,0.92)" : "#f7fbff" }}>
+              <div style={sLabel}>System-Hinweis</div>
+              <p style={{ fontSize: 13, color: muted, lineHeight: 1.6, margin: 0 }}>{system.notice}</p>
+            </div>
+          )}
           {/* Evolution */}
           <div style={cardS}>
             <div style={sLabel}>Intelligence-Evolution</div>
@@ -403,50 +456,54 @@ export default function IntelligencePage() {
           {/* Accuracy */}
           <div style={cardS}>
             <div style={sLabel}>Vorhersage-Qualität</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-              <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: grn }}>{system.accuracy.hit_rate}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Trefferquote</div></div>
-              <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: yellow }}>{system.accuracy.false_alarms}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Fehlalarme</div></div>
-              <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: red }}>{system.accuracy.missed}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Verpasst</div></div>
-              <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif" }}>±{system.accuracy.avg_deviation_days}</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Ø Abweichung (Tage)</div></div>
-            </div>
+            {system.accuracy.available ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: grn }}>{system.accuracy.hit_rate}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Trefferquote</div></div>
+                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: yellow }}>{system.accuracy.false_alarms}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Fehlalarme</div></div>
+                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif", color: red }}>{system.accuracy.missed}%</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Verpasst</div></div>
+                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${border}`, background: card, textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Fraunces',serif" }}>±{system.accuracy.avg_deviation_days}</div><div style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: "uppercase", marginTop: 4 }}>Ø Abweichung (Tage)</div></div>
+              </div>
+            ) : (
+              <p style={{ fontSize: 12, color: muted, margin: 0 }}>Noch keine echten Prediction-Outcomes vorhanden. Sobald reale Vorhersagen mit echten Ergebnissen geloggt werden, erscheinen hier belastbare Qualitätswerte statt Demo-Zahlen.</p>
+            )}
           </div>
 
           {/* Calibration curve */}
           <div style={cardS}>
             <div style={sLabel}>Konfidenz-Kalibrierung</div>
             <p style={{ fontSize: 12, color: muted, marginBottom: 16, lineHeight: 1.5 }}>Wenn das System "80%" sagt, passiert es auch in ~80% der Fälle?</p>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 140, padding: "0 10px" }}>
+            {system.calibration.length > 0 ? <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 140, padding: "0 10px" }}>
               {system.calibration.map((c: any, i: number) => (
                 <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                   <div style={{ width: "70%", height: `${c.actual}%`, borderRadius: "4px 4px 0 0", background: `linear-gradient(180deg,rgba(74,222,128,${0.3 + i * 0.1}),rgba(74,222,128,0.08))`, minHeight: 2 }} />
                   <span style={{ fontSize: 9, color: muted, fontWeight: 600 }}>{c.range}</span>
                 </div>
               ))}
-            </div>
+            </div> : <p style={{ fontSize: 12, color: muted, margin: 0 }}>Noch keine Kalibrierungsdaten vorhanden.</p>}
           </div>
 
           {/* Predictions */}
           <div style={cardS}>
             <div style={sLabel}>Vorhersage-Protokoll</div>
-            {system.predictions.map((p: any, i: number) => (
+            {system.predictions.length > 0 ? system.predictions.map((p: any, i: number) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: `1px solid ${border}`, marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 130, color: fg }}>{p.patient}</span>
                 <span style={{ fontSize: 11, color: muted, flex: 1 }}>{p.text}</span>
                 <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Fraunces',serif", minWidth: 45, textAlign: "right", color: p.confidence >= 80 ? grn : p.confidence >= 60 ? yellow : red }}>{p.confidence}%</span>
                 <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 5, fontWeight: 700, minWidth: 80, textAlign: "center", background: p.result === "richtig" ? "rgba(74,222,128,0.08)" : p.result === "falsch" ? "rgba(248,113,113,0.08)" : dk ? "rgba(255,255,255,0.04)" : "#f0f1f5", color: p.result === "richtig" ? grn : p.result === "falsch" ? red : muted }}>{p.result === "richtig" ? "Richtig ✓" : p.result === "falsch" ? "Falsch ✗" : "Offen ⏳"}</span>
               </div>
-            ))}
+            )) : <p style={{ fontSize: 12, color: muted, margin: 0 }}>Noch keine echten Vorhersagefälle protokolliert.</p>}
           </div>
 
           {/* Calibration log */}
           <div style={cardS}>
             <div style={sLabel}>Kalibrierungs-Log</div>
-            {system.calibration_log.map((l: any, i: number) => (
+            {system.calibration_log.length > 0 ? system.calibration_log.map((l: any, i: number) => (
               <div key={i} style={{ padding: "10px 14px", borderRadius: 8, border: `1px solid ${border}`, marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}>
                 <div style={{ color: muted, fontSize: 10, marginBottom: 4 }}>Kalibrierung #{system.calibration_log.length - i} · {l.date}</div>
                 {l.text}
               </div>
-            ))}
+            )) : <p style={{ fontSize: 12, color: muted, margin: 0 }}>Noch kein echter Kalibrierungsverlauf vorhanden.</p>}
           </div>
         </div>
       )}
