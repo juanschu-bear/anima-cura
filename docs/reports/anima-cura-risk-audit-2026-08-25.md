@@ -57,14 +57,20 @@ Fix:
 ### A. Historische Submission-Dubletten in `anamnese_submissions`
 
 Status:
-- Noch vorhanden.
-- Betrifft Einreichungen, nicht mehr lokale `patients`-Dubletten.
+- Historische Altlasten noch vorhanden.
+- Neue identische Einreichungen werden jetzt serverseitig über einen Replay-Fingerprint und eine Pending-Reservation abgefangen.
+- Betrifft damit aktuell vor allem alte Einreichungen, nicht mehr die laufende Submit-Kette.
 
 Risiko:
 - Mehrfach eingereichte Anamnesebögen können im operativen Blick weiter als Altlast auftauchen.
 
-Empfehlung:
-- Nächster Schritt ist ein dedizierter Submission-Dedupe-/Idempotency-Guard auf `/api/anima-sign/submit`.
+Fix:
+- Auf `/api/anima-sign/submit` wurde ein dedizierter Idempotency-/Replay-Guard ergänzt.
+- Logisch identische Einreichungen (gleiche Stammdaten, gleicher Inhalts-Fingerprint) werden innerhalb eines kurzen Fensters nicht erneut als neue Submission angelegt.
+- Gleichzeitige Doppel-Submits werden über eine Pending-Reservation in `einstellungen` abgefangen.
+
+Rest:
+- Die bereits vorhandenen historischen Submission-Dubletten sind dokumentiert und bleiben vorerst als Altlast sichtbar, bis eine separate Bereinigungsrunde auch Storage-/Documenso-Referenzen mitberücksichtigt.
 
 ### B. Drei manuelle Ivoris-Review-Fälle mit Mehrfachtreffern
 

@@ -12,6 +12,7 @@ import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
 import { P12Signer } from "@signpdf/signer-p12";
 import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
+import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,6 +24,25 @@ type SubmitBody = {
   patientId?: string | null;
   answers?: Record<string, unknown>;
   schema?: { meds?: unknown; consents?: unknown } | null;
+};
+
+type SubmissionReplayRow = {
+  id: string;
+  status: string | null;
+  account_email?: string | null;
+  account_password?: string | null;
+  matched_patient_id?: string | null;
+  patient_id?: string | null;
+  documenso_envelope_id?: string | null;
+  documenso_recipient_token?: string | null;
+};
+
+type SubmitIntentState = {
+  fingerprint: string;
+  submission_id: string | null;
+  status: "pending" | "resolved";
+  created_at: string;
+  updated_at?: string;
 };
 
 function asString(value: unknown): string | null {
@@ -119,6 +139,230 @@ function extractMissingColumn(message: string | null | undefined): string | null
   return match?.[1] ?? null;
 }
 
+function documensoHost() {
+  return (process.env.DOCUMENSO_BASE_URL ?? "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v2$/, "");
+}
+
+function buildSigningUrlFromToken(token: string | null | undefined) {
+  const host = documensoHost();
+  if (!host || !token) return null;
+  return `${host}/sign/${encodeURIComponent(token)}`;
+}
+
+function submitIntentKey(fingerprint: string) {
+  return `animasign_submit_intent:${fingerprint}`;
+}
+
+async function loadSubmitIntent(
+  supabase: ReturnType<typeof createServerClient>,
+  fingerprint: string
+): Promise<SubmitIntentState | null> {
+  const { data, error } = await supabase
+    .from("einstellungen")
+    .select("value")
+    .eq("key", submitIntentKey(fingerprint))
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Submit-Intent konnte nicht geladen werden: ${error.message}`);
+  }
+
+  const value = data?.value;
+  if (!value || typeof value !== "object") return null;
+
+  const intent = value as Partial<SubmitIntentState>;
+  if (intent.fingerprint !== fingerprint || typeof intent.created_at !== "string") {
+    return null;
+  }
+
+  return {
+    fingerprint,
+    submission_id: intent.submission_id ?? null,
+    status: intent.status === "resolved" ? "resolved" : "pending",
+    created_at: intent.created_at,
+    updated_at: intent.updated_at,
+  };
+}
+
+async function reserveSubmitIntent(
+  supabase: ReturnType<typeof createServerClient>,
+  fingerprint: string
+): Promise<{ intent: SubmitIntentState | null; created: boolean }> {
+  const now = new Date().toISOString();
+  let created = false;
+  try {
+    const { error } = await supabase.from("einstellungen").insert({
+      key: submitIntentKey(fingerprint),
+      value: {
+        fingerprint,
+        submission_id: null,
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+      },
+    });
+
+    if (error && !error.message.toLowerCase().includes("duplicate")) {
+      throw error;
+    }
+    if (!error) {
+      created = true;
+    }
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.toLowerCase().includes("duplicate")) {
+      throw new Error(
+        `Submit-Intent konnte nicht reserviert werden: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return {
+    intent: await loadSubmitIntent(supabase, fingerprint),
+    created,
+  };
+}
+
+async function finalizeSubmitIntent(
+  supabase: ReturnType<typeof createServerClient>,
+  fingerprint: string,
+  submissionId: string
+) {
+  const current = await loadSubmitIntent(supabase, fingerprint);
+  if (!current) return;
+
+  await supabase
+    .from("einstellungen")
+    .update({
+      value: {
+        ...current,
+        fingerprint,
+        submission_id: submissionId,
+        status: "resolved",
+        updated_at: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("key", submitIntentKey(fingerprint));
+}
+
+async function loadReplayableSubmission(
+  supabase: ReturnType<typeof createServerClient>,
+  submissionId: string
+): Promise<SubmissionReplayRow | null> {
+  const { data, error } = await supabase
+    .from("anamnese_submissions")
+    .select(
+      "id, status, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token"
+    )
+    .eq("id", submissionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Replay-Submission konnte nicht geladen werden: ${error.message}`);
+  }
+
+  return data as SubmissionReplayRow | null;
+}
+
+function buildReplayResponse(submission: SubmissionReplayRow) {
+  const signingUrl = buildSigningUrlFromToken(submission.documenso_recipient_token);
+  return NextResponse.json({
+    ok: true,
+    replayed: true,
+    id: submission.id,
+    token: submission.documenso_recipient_token ?? null,
+    host: documensoHost(),
+    signingUrl,
+    abgleich: submission.matched_patient_id || submission.patient_id
+      ? {
+          is_new: !submission.matched_patient_id,
+          patient_id: submission.matched_patient_id ?? submission.patient_id ?? null,
+        }
+      : null,
+    account: submission.account_email
+      ? {
+          status: "existing",
+          login_email: submission.account_email,
+          password: submission.account_password ?? null,
+        }
+      : null,
+  });
+}
+
+async function waitForResolvedSubmitIntent(
+  supabase: ReturnType<typeof createServerClient>,
+  fingerprint: string
+) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const current = await loadSubmitIntent(supabase, fingerprint);
+    if (current?.submission_id) {
+      const replay = await loadReplayableSubmission(supabase, current.submission_id);
+      if (replay) return replay;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return null;
+}
+
+async function findRecentMatchingSubmission(
+  supabase: ReturnType<typeof createServerClient>,
+  params: {
+    vorname: string | null;
+    nachname: string | null;
+    geburtsdatum: string | null;
+    answers: Record<string, unknown>;
+    email: string | null;
+  }
+) {
+  if (!params.vorname || !params.nachname || !params.geburtsdatum) {
+    return null;
+  }
+
+  const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const fingerprint = buildSubmissionReplayFingerprint({
+    vorname: params.vorname,
+    nachname: params.nachname,
+    geburtsdatum: params.geburtsdatum,
+    email: params.email,
+    answers: params.answers,
+  });
+
+  const { data, error } = await supabase
+    .from("anamnese_submissions")
+    .select(
+      "id, created_at, vorname, nachname, geburtsdatum, email, answers, status, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token"
+    )
+    .eq("vorname", params.vorname)
+    .eq("nachname", params.nachname)
+    .eq("geburtsdatum", params.geburtsdatum)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    throw new Error(`Recent-Submission-Abgleich fehlgeschlagen: ${error.message}`);
+  }
+
+  for (const row of data ?? []) {
+    const rowFingerprint = buildSubmissionReplayFingerprint({
+      vorname: row.vorname ?? null,
+      nachname: row.nachname ?? null,
+      geburtsdatum: row.geburtsdatum ?? null,
+      email: row.email ?? null,
+      answers: (row.answers as Record<string, unknown> | null) ?? {},
+    });
+
+    if (rowFingerprint === fingerprint) {
+      return row as SubmissionReplayRow;
+    }
+  }
+
+  return null;
+}
+
 async function insertSubmissionWithSchemaFallback(
   supabase: ReturnType<typeof createServerClient>,
   payload: Record<string, unknown>
@@ -203,6 +447,66 @@ export async function POST(request: Request) {
     const nachname = asString(answers["patient_nachname"]);
     const email = asString(answers["patient_email"]);
     const geburtsdatum = asString(answers["patient_geburtsdatum"]);
+    const replayFingerprint =
+      vorname && nachname && geburtsdatum
+        ? buildSubmissionReplayFingerprint({
+            vorname,
+            nachname,
+            geburtsdatum,
+            email,
+            answers,
+          })
+        : null;
+
+    if (replayFingerprint) {
+      const existingIntent = await loadSubmitIntent(supabase, replayFingerprint);
+      if (existingIntent?.submission_id) {
+        const replay = await loadReplayableSubmission(
+          supabase,
+          existingIntent.submission_id
+        );
+        if (replay) {
+          return buildReplayResponse(replay);
+        }
+      }
+
+      if (existingIntent?.status === "pending") {
+        const replay = await waitForResolvedSubmitIntent(supabase, replayFingerprint);
+        if (replay) {
+          return buildReplayResponse(replay);
+        }
+      } else {
+        const reservation = await reserveSubmitIntent(supabase, replayFingerprint);
+        if (!reservation.created && reservation.intent?.status === "pending") {
+          const replay = await waitForResolvedSubmitIntent(supabase, replayFingerprint);
+          if (replay) {
+            return buildReplayResponse(replay);
+          }
+        }
+
+        if (reservation.intent?.submission_id) {
+          const replay = await loadReplayableSubmission(
+            supabase,
+            reservation.intent.submission_id
+          );
+          if (replay) {
+            return buildReplayResponse(replay);
+          }
+        }
+      }
+
+      const recentReplay = await findRecentMatchingSubmission(supabase, {
+        vorname,
+        nachname,
+        geburtsdatum,
+        email,
+        answers,
+      });
+      if (recentReplay) {
+        await finalizeSubmitIntent(supabase, replayFingerprint, recentReplay.id);
+        return buildReplayResponse(recentReplay);
+      }
+    }
 
     // 1) Einreichung speichern
     const { data: sub, error: insertError } = await insertSubmissionWithSchemaFallback(
@@ -229,6 +533,9 @@ export async function POST(request: Request) {
     }
 
     const submissionId = sub.id as string;
+    if (replayFingerprint) {
+      await finalizeSubmitIntent(supabase, replayFingerprint, submissionId);
+    }
 
     // 1b) Bestandspatienten-Abgleich: prüfen ob Patient existiert, Daten updaten
     const { data: abgleich } = await supabase.rpc(
@@ -459,16 +766,11 @@ export async function POST(request: Request) {
 
       // Host fuer die Einbettung (Basis ohne /api/v2), damit der Client weiss,
       // welche Documenso-Instanz das Signier-Fenster laedt.
-      const documensoHost = (process.env.DOCUMENSO_BASE_URL ?? "")
-        .trim()
-        .replace(/\/+$/, "")
-        .replace(/\/api\/v2$/, "");
-
       return NextResponse.json({
         ok: true,
         id: submissionId,
         token: signing.token,
-        host: documensoHost,
+        host: documensoHost(),
         signingUrl: signing.signingUrl,
         abgleich: abgleich ?? null,
         account: account ?? null,
