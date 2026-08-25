@@ -93,6 +93,24 @@ function hasWorkerEnv() {
   ].every((key) => Boolean(process.env[key]?.trim()));
 }
 
+function shouldEscalate(previous: SupervisorState | null, next: SupervisorMetrics) {
+  if (!previous) return true;
+  if (previous.status !== "degraded") return true;
+
+  const prev = previous.summary;
+  const previousTopError = prev.latestErrorGroups[0]?.error ?? null;
+  const nextTopError = next.latestErrorGroups[0]?.error ?? null;
+
+  return (
+    next.patientPending > prev.patientPending ||
+    next.documentPending > prev.documentPending ||
+    next.retryDuePatient > prev.retryDuePatient ||
+    next.retryDueDocument > prev.retryDueDocument ||
+    next.permanentFailures > prev.permanentFailures ||
+    (nextTopError !== null && nextTopError !== previousTopError)
+  );
+}
+
 async function loadMetrics(db: DbClient): Promise<SupervisorMetrics> {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const [submissionsRes, logsRes] = await Promise.all([
@@ -260,9 +278,7 @@ async function main() {
     updated_at: new Date().toISOString(),
   };
 
-  const shouldAlert =
-    degraded &&
-    (!previous || previous.signature !== signature || previous.status !== "degraded");
+  const shouldAlert = degraded && shouldEscalate(previous, after);
 
   if (shouldAlert) {
     await createAlert(db, after);
