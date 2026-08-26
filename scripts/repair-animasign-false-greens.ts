@@ -9,9 +9,8 @@ async function collectFalseGreenSubmissionIds() {
   const db = createServerClient();
   const { data, error } = await db
     .from("animasign_sync_log")
-    .select("submission_id, metadata, created_at")
+    .select("submission_id, status, metadata, created_at")
     .eq("stage", "patient")
-    .eq("status", "success")
     .order("created_at", { ascending: false })
     .limit(5000);
 
@@ -22,15 +21,19 @@ async function collectFalseGreenSubmissionIds() {
   const ids: string[] = [];
   const seen = new Set<string>();
   for (const row of data ?? []) {
+    if (seen.has(row.submission_id)) {
+      continue;
+    }
+
+    seen.add(row.submission_id);
     const metadata = row.metadata;
     if (
+      row.status === "success" &&
       metadata &&
       typeof metadata === "object" &&
       (metadata as Record<string, unknown>).warningCode ===
-        "IVORIS_CONTACT_UPDATE_BLOCKED" &&
-      !seen.has(row.submission_id)
+        "IVORIS_CONTACT_UPDATE_BLOCKED"
     ) {
-      seen.add(row.submission_id);
       ids.push(row.submission_id);
     }
   }
