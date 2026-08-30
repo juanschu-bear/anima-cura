@@ -117,6 +117,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body.aktion === "notiz_speichern") {
+    const zieltyp = body.zieltyp === "kasse" ? "kasse" : "transaktion";
+    const zielId = typeof body.zielId === "string" ? body.zielId : "";
+    const notiz = typeof body.notiz === "string" ? body.notiz.trim() : "";
+    if (!zielId) return NextResponse.json({ error: "zielId noetig" }, { status: 400 });
+    if (notiz.length > 1000) {
+      return NextResponse.json({ error: "Notiz darf hoechstens 1000 Zeichen lang sein" }, { status: 400 });
+    }
+
+    if (zieltyp === "kasse") {
+      const { error } = await service
+        .from("kassen_zahlungen")
+        .update({ notiz: notiz || null })
+        .eq("id", zielId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, notiz: notiz || null });
+    }
+
+    const { data: tx, error: txError } = await service
+      .from("transaktionen")
+      .select("matching_details")
+      .eq("id", zielId)
+      .single();
+    if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
+    const details = tx?.matching_details && typeof tx.matching_details === "object"
+      ? { ...tx.matching_details }
+      : {};
+    if (notiz) {
+      (details as Record<string, unknown>).praxis_notiz = notiz;
+    } else {
+      delete (details as Record<string, unknown>).praxis_notiz;
+    }
+
+    const { error } = await service
+      .from("transaktionen")
+      .update({ matching_details: details, geprueft_am: STAMPEL() })
+      .eq("id", zielId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, notiz: notiz || null });
+  }
+
   // Vorschau: wie viele sichere Vorschlaege wuerde der Stapel bei dieser Schwelle bestaetigen.
   if (body.aktion === "stapel_vorschau") {
     const minScore = Number(body.minScore ?? 80);

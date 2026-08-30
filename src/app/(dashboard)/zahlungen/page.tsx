@@ -4,10 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePatienten, useTransaktionen, useTransaktionenStats } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
-import { ArrowRight, Check, CreditCard, Search, X } from "lucide-react";
+import { ArrowRight, Check, CreditCard, MessageSquareQuote, Search, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+
+function getTransactionNote(tx: any): string {
+  if (typeof tx?.notiz === "string" && tx.notiz.trim()) return tx.notiz.trim();
+  if (typeof tx?.matching_details?.praxis_notiz === "string" && tx.matching_details.praxis_notiz.trim()) {
+    return tx.matching_details.praxis_notiz.trim();
+  }
+  return "";
+}
 
 export default function ZahlungenPage() {
   const router = useRouter();
@@ -50,6 +58,16 @@ export default function ZahlungenPage() {
   const [statusHelpPos, setStatusHelpPos] = useState<{ left: number; top: number } | null>(null);
   const [clientTx, setClientTx] = useState<any[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [noteModal, setNoteModal] = useState<{
+    typ: "transaktion" | "kasse";
+    id: string;
+    titel: string;
+    subtitle: string;
+    amountLabel: string;
+    notiz: string;
+  } | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -201,6 +219,65 @@ export default function ZahlungenPage() {
     const guess = name.includes(",") ? name.split(",")[0] : name.split(/\s+/)[0] || "";
     setPatSearch(guess.trim());
     setMatchModal(tx);
+  }
+
+  function openNoteModal(input: {
+    typ: "transaktion" | "kasse";
+    id: string;
+    titel: string;
+    subtitle: string;
+    amountLabel: string;
+    notiz?: string | null;
+  }) {
+    setNoteModal({
+      typ: input.typ,
+      id: input.id,
+      titel: input.titel,
+      subtitle: input.subtitle,
+      amountLabel: input.amountLabel,
+      notiz: input.notiz || "",
+    });
+    setNoteDraft(input.notiz || "");
+  }
+
+  async function handleSaveNote() {
+    if (!noteModal || noteSaving) return;
+    setNoteSaving(true);
+    const { ok, json } = await aktionSenden({
+      aktion: "notiz_speichern",
+      zieltyp: noteModal.typ,
+      zielId: noteModal.id,
+      notiz: noteDraft,
+    });
+    setNoteSaving(false);
+    if (!ok) {
+      setSyncHint(json.error ?? "Notiz konnte nicht gespeichert werden.");
+      return;
+    }
+    const savedNote = typeof json.notiz === "string" ? json.notiz : null;
+    if (noteModal.typ === "kasse") {
+      setKassenListe((prev) => prev.map((entry) => (
+        entry.id === noteModal.id ? { ...entry, notiz: savedNote } : entry
+      )));
+    } else {
+      setClientTx((prev) => prev.map((tx) => (
+        tx.id === noteModal.id
+          ? {
+              ...tx,
+              matching_details: savedNote
+                ? { ...(tx.matching_details || {}), praxis_notiz: savedNote }
+                : (() => {
+                    const next = { ...(tx.matching_details || {}) };
+                    delete next.praxis_notiz;
+                    return next;
+                  })(),
+            }
+          : tx
+      )));
+    }
+    setSyncHint(savedNote ? "Notiz zur Zahlung gespeichert." : "Notiz von der Zahlung entfernt.");
+    setNoteModal(null);
+    setNoteDraft("");
   }
 
   function openStatusHelp(id: string, el: HTMLElement) {
@@ -619,6 +696,11 @@ export default function ZahlungenPage() {
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
                   {z.zweck || "—"}
                   {z.beleg_nr ? <span className="block text-[11px]" style={{ color: "var(--ac-text-mute)" }}>{z.beleg_nr}</span> : null}
+                  {z.notiz ? (
+                    <span className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold" style={{ borderColor: "#f0bf7e55", color: "#f0bf7e" }}>
+                      Notiz: {z.notiz}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="table-cell py-3">
                   {(() => {
@@ -631,7 +713,29 @@ export default function ZahlungenPage() {
                   })()}
                 </td>
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
-                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-mute)" }}>—</td>
+                <td className="table-cell py-3">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openNoteModal({
+                          typ: "kasse",
+                          id: z.id,
+                          titel: `${z.patients?.nachname || "Unbekannt"}, ${z.patients?.vorname || ""}`.trim(),
+                          subtitle: z.zweck || "Kein Verwendungszweck hinterlegt",
+                          amountLabel: `+${Number(z.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`,
+                          notiz: z.notiz || "",
+                        });
+                      }}
+                      type="button"
+                      className="rounded-lg p-1.5 transition-colors hover:bg-amber-400/10"
+                      style={{ color: z.notiz ? "#f0bf7e" : "var(--ac-text-mute)" }}
+                      title="Interne Notiz"
+                    >
+                      <MessageSquareQuote size={14} />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
             {visibleTransactions.map((tx) => (
@@ -660,7 +764,14 @@ export default function ZahlungenPage() {
                   })()}
                 </td>
                 <td className="table-cell py-3 text-right text-sm font-semibold text-[#4ca43f]">+{Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
-                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>{tx.verwendungszweck || "—"}</td>
+                <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text-soft)" }}>
+                  {tx.verwendungszweck || "—"}
+                  {getTransactionNote(tx) ? (
+                    <span className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold" style={{ borderColor: "#f0bf7e55", color: "#f0bf7e" }}>
+                      Notiz: {getTransactionNote(tx)}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="table-cell py-3">
                   <div className="flex flex-col items-start gap-1">
                     <button
@@ -706,6 +817,25 @@ export default function ZahlungenPage() {
                 </td>
                 <td className="table-cell py-3">
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openNoteModal({
+                          typ: "transaktion",
+                          id: tx.id,
+                          titel: tx.absender_name || "Unbekannt",
+                          subtitle: tx.verwendungszweck || "Kein Verwendungszweck hinterlegt",
+                          amountLabel: `+${Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`,
+                          notiz: getTransactionNote(tx),
+                        });
+                      }}
+                      type="button"
+                      className="rounded-lg p-1.5 transition-colors hover:bg-amber-400/10"
+                      style={{ color: getTransactionNote(tx) ? "#f0bf7e" : "var(--ac-text-mute)" }}
+                      title="Interne Notiz"
+                    >
+                      <MessageSquareQuote size={14} />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -955,6 +1085,55 @@ export default function ZahlungenPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={!!noteModal}
+        onClose={() => {
+          setNoteModal(null);
+          setNoteDraft("");
+        }}
+        title="Notiz zur Zahlung"
+        size="md"
+      >
+        {noteModal ? (
+          <div className="space-y-4">
+            <div className="rounded-lg p-4" style={{ background: "var(--ac-surface-muted)" }}>
+              <p className="text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{noteModal.titel}</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ac-text-mute)" }}>{noteModal.subtitle}</p>
+              <p className="mt-2 text-lg font-bold" style={{ color: "var(--ac-text)" }}>{noteModal.amountLabel}</p>
+            </div>
+            <div>
+              <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--ac-text-mute)" }}>
+                Interne Praxis-Notiz
+              </label>
+              <textarea
+                className="input min-h-[132px] w-full resize-y py-3"
+                maxLength={1000}
+                placeholder="z. B. Testzahlung von Frau Dr. Schubert, nicht steuerrelevant / für Abstimmung markieren"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+              />
+              <div className="mt-2 text-right text-xs" style={{ color: "var(--ac-text-mute)" }}>
+                {noteDraft.trim().length}/1000
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setNoteDraft("");
+                }}
+              >
+                Notiz leeren
+              </button>
+              <button type="button" className="btn-primary" disabled={noteSaving} onClick={handleSaveNote}>
+                {noteSaving ? "Speichere …" : "Notiz speichern"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

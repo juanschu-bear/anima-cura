@@ -34,7 +34,7 @@ export default function PatientDetailPage() {
     (async () => {
       const [kasse, bank] = await Promise.all([
         supabaseDetail.from("kassen_zahlungen")
-          .select("id, betrag, zahlart, zweck, kassen_datum, transaktion_id, beleg_nr")
+          .select("id, betrag, zahlart, zweck, kassen_datum, transaktion_id, beleg_nr, notiz")
           .eq("patient_id", pid)
           .order("kassen_datum", { ascending: false })
           .limit(25),
@@ -55,6 +55,7 @@ export default function PatientDetailPage() {
           datum: k.kassen_datum,
           quelle: `Kasse · ${KASSE_ZAHLART[k.zahlart] || k.zahlart}`,
           zweck: k.zweck || "",
+          notiz: k.notiz || "",
           betrag: Number(k.betrag),
           status: k.zahlart === "qr_ueberweisung" && !k.transaktion_id ? "wartet auf Geldeingang" : "erhalten",
           beleg: k.beleg_nr || null,
@@ -68,6 +69,7 @@ export default function PatientDetailPage() {
             : b.matching_details?.methode === "animapay_aufladung" ? "AnimaPay · Aufladung"
             : "Bank",
           zweck: b.verwendungszweck || "",
+          notiz: typeof b.matching_details?.praxis_notiz === "string" ? b.matching_details.praxis_notiz : "",
           betrag: Number(b.betrag),
           status: "bestätigt",
           beleg: null,
@@ -322,7 +324,10 @@ export default function PatientDetailPage() {
                   <tr key={g.id} className="hover:bg-surface-50/70">
                     <td className="table-cell text-sm">{new Date(g.datum).toLocaleDateString("de-DE")}</td>
                     <td className="table-cell text-sm">{g.quelle}{g.beleg ? <span className="block text-[11px] text-praxis-400">{g.beleg}</span> : null}</td>
-                    <td className="table-cell max-w-[280px] truncate text-sm text-praxis-500">{g.zweck}</td>
+                    <td className="table-cell max-w-[280px] text-sm text-praxis-500">
+                      <div className="truncate">{g.zweck}</div>
+                      {g.notiz ? <div className="mt-1 text-[11px] font-medium text-amber-600">Notiz: {g.notiz}</div> : null}
+                    </td>
                     <td className="table-cell text-right text-base font-bold">{g.betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
                     <td className="table-cell text-sm">{g.status === "wartet auf Geldeingang" ? <span className="text-praxis-400">{g.status}</span> : <span style={{ color: "#4ca43f", fontWeight: 600 }}>{g.status}</span>}</td>
                   </tr>
