@@ -25,9 +25,11 @@ export async function POST(request: NextRequest) {
   // Parse form data
   const formData = await request.formData();
   const patientId = formData.get("patient_id") as string;
-  const name = formData.get("name") as string;
+  const rawName = formData.get("name") as string;
   const typ = formData.get("typ") as string || "sonstiges";
   const file = formData.get("file") as File | null;
+  const fallbackName = file?.name ? file.name.replace(/\.[^.]+$/, "") : "";
+  const name = String(rawName || fallbackName || "").trim();
 
   if (!patientId || !name) {
     return NextResponse.json({ error: "patient_id und name sind erforderlich" }, { status: 400 });

@@ -63,6 +63,11 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docMsg, setDocMsg] = useState("");
 
+  function suggestedDocName(file: File | null) {
+    if (!file?.name) return "";
+    return file.name.replace(/\.[^.]+$/, "");
+  }
+
   const fetchData = useCallback(async () => {
     const [accessRes, phasenRes, docsRes] = await Promise.allSettled([
       fetch(`/api/patient/admin/invite?patient_id=${patientId}`),
@@ -135,13 +140,17 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   };
 
   const handleUploadDoc = async () => {
-    if (!docName) return;
+    const finalName = docName.trim() || suggestedDocName(docFile);
+    if (!finalName) {
+      setDocMsg("✗ Bitte Dokumentname eingeben oder eine Datei auswählen");
+      return;
+    }
     setUploadingDoc(true);
     setDocMsg("");
     try {
       const formData = new FormData();
       formData.append("patient_id", patientId);
-      formData.append("name", docName);
+      formData.append("name", finalName);
       formData.append("typ", docTyp);
       if (docFile) formData.append("file", docFile);
 
@@ -270,12 +279,23 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
             <select value={docTyp} onChange={e => setDocTyp(e.target.value)} className={inputStyle}>
               {docTypes.map(dt => <option key={dt.value} value={dt.value}>{dt.label}</option>)}
             </select>
-            <input type="file" onChange={e => setDocFile(e.target.files?.[0] || null)} className="text-sm text-praxis-500 file:mr-2 file:rounded-md file:border-0 file:bg-[#5d4fd8] file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white" />
+            <input
+              type="file"
+              onChange={e => {
+                const nextFile = e.target.files?.[0] || null;
+                setDocFile(nextFile);
+                if (nextFile && !docName.trim()) setDocName(suggestedDocName(nextFile));
+              }}
+              className="text-sm text-praxis-500 file:mr-2 file:rounded-md file:border-0 file:bg-[#5d4fd8] file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
+            />
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleUploadDoc} disabled={uploadingDoc || !docName} className={btnStyle}>
+            <button onClick={handleUploadDoc} disabled={uploadingDoc || (!docName.trim() && !docFile)} className={btnStyle}>
               {uploadingDoc ? "Wird hochgeladen..." : "Dokument speichern"}
             </button>
+            {!docName.trim() && docFile ? (
+              <span className="text-xs text-praxis-400">Dokumentname wird automatisch aus dem Dateinamen übernommen.</span>
+            ) : null}
             {docMsg && <span className={`text-sm ${docMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{docMsg}</span>}
           </div>
         </div>
