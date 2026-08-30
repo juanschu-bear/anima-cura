@@ -21,6 +21,15 @@ async function berechtigung() {
 
 const STAMPEL = () => new Date().toISOString();
 
+function rateStatusAfterUnlink(faelligAm: string | null) {
+  if (!faelligAm) return "offen";
+  const due = new Date(faelligAm);
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return due < today ? "überfällig" : "offen";
+}
+
 export async function POST(request: NextRequest) {
   const { fehler } = await berechtigung();
   if (fehler) return fehler;
@@ -156,6 +165,89 @@ export async function POST(request: NextRequest) {
       .eq("id", zielId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, notiz: notiz || null });
+  }
+
+  if (body.aktion === "loeschen") {
+    const zieltyp = body.zieltyp === "kasse" ? "kasse" : "transaktion";
+    const zielId = typeof body.zielId === "string" ? body.zielId : "";
+    if (!zielId) return NextResponse.json({ error: "zielId noetig" }, { status: 400 });
+
+    if (zieltyp === "kasse") {
+      const { data: kasse, error: leseErr } = await service
+        .from("kassen_zahlungen")
+        .select("id, transaktion_id, zahlart")
+        .eq("id", zielId)
+        .maybeSingle();
+      if (leseErr) return NextResponse.json({ error: leseErr.message }, { status: 500 });
+      if (!kasse) return NextResponse.json({ error: "Kassenzeile nicht gefunden" }, { status: 404 });
+      if (kasse.transaktion_id) {
+        return NextResponse.json({ error: "Diese Zahlung ist mit einem echten Geldeingang verknuepft und darf nicht geloescht werden" }, { status: 400 });
+      }
+      const { data, error } = await service
+        .from("kassen_zahlungen")
+        .delete()
+        .eq("id", zielId)
+        .select("id");
+      if (error || !data?.length) {
+        return NextResponse.json({ error: error?.message || "Kassenzeile konnte nicht geloescht werden" }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    const { data: tx, error: txErr } = await service
+      .from("transaktionen")
+      .select("id, finapi_id, matching_details")
+      .eq("id", zielId)
+      .maybeSingle();
+    if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
+    if (!tx) return NextResponse.json({ error: "Transaktion nicht gefunden" }, { status: 404 });
+    if (tx.finapi_id) {
+      return NextResponse.json({ error: "Echte Bank-Sync-Transaktionen duerfen nicht geloescht werden" }, { status: 400 });
+    }
+    if (tx.matching_details?.booking_mode === "offene_posten") {
+      return NextResponse.json({ error: "Diese Transaktion hat bereits offene Posten beeinflusst und darf nicht geloescht werden" }, { status: 400 });
+    }
+
+    const { data: linkedRates, error: ratesErr } = await service
+      .from("raten")
+      .select("id, faellig_am")
+      .eq("transaktion_id", zielId);
+    if (ratesErr) return NextResponse.json({ error: ratesErr.message }, { status: 500 });
+
+    for (const rate of linkedRates || []) {
+      const nextStatus = rateStatusAfterUnlink(rate.faellig_am ?? null);
+      const { error } = await service
+        .from("raten")
+        .update({
+          transaktion_id: null,
+          bezahlt_am: null,
+          bezahlt_betrag: null,
+          status: nextStatus,
+        })
+        .eq("id", rate.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: balanceLinks, error: balanceErr } = await service
+      .from("anima_balance_buchungen")
+      .select("id")
+      .eq("referenz_transaktion_id", zielId)
+      .limit(1);
+    if (balanceErr) return NextResponse.json({ error: balanceErr.message }, { status: 500 });
+    if ((balanceLinks?.length || 0) > 0) {
+      return NextResponse.json({ error: "Diese Transaktion ist bereits in Anima Balance verbucht und darf nicht geloescht werden" }, { status: 400 });
+    }
+
+    const { data, error } = await service
+      .from("transaktionen")
+      .delete()
+      .eq("id", zielId)
+      .is("finapi_id", null)
+      .select("id");
+    if (error || !data?.length) {
+      return NextResponse.json({ error: error?.message || "Transaktion konnte nicht geloescht werden" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   // Vorschau: wie viele sichere Vorschlaege wuerde der Stapel bei dieser Schwelle bestaetigen.

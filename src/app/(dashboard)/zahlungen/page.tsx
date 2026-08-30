@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePatienten, useTransaktionen, useTransaktionenStats } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
-import { ArrowRight, Check, CreditCard, MessageSquareQuote, Search, X } from "lucide-react";
+import { ArrowRight, Check, CreditCard, Lock, MessageSquareQuote, Search, Trash2, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
@@ -278,6 +278,41 @@ export default function ZahlungenPage() {
     setSyncHint(savedNote ? "Notiz zur Zahlung gespeichert." : "Notiz von der Zahlung entfernt.");
     setNoteModal(null);
     setNoteDraft("");
+  }
+
+  function canDeleteKassenEintrag(z: any) {
+    return !z?.transaktion_id;
+  }
+
+  function canDeleteTransaktion(tx: any) {
+    if (tx?.finapi_id) return false;
+    if (tx?.matching_details?.booking_mode === "offene_posten") return false;
+    if (tx?.matching_details?.methode === "animapay_aufladung") return false;
+    return true;
+  }
+
+  async function handleDeleteEntry(input: { typ: "kasse" | "transaktion"; id: string }) {
+    if (typeof window !== "undefined" && !window.confirm("Diesen Zahlungseintrag wirklich löschen? Echte Bank-Sync-Daten bleiben gesperrt.")) {
+      return;
+    }
+    const { ok, json } = await aktionSenden({
+      aktion: "loeschen",
+      zieltyp: input.typ,
+      zielId: input.id,
+    });
+    if (!ok) {
+      setSyncHint(json.error ?? "Löschen fehlgeschlagen.");
+      return;
+    }
+    if (input.typ === "kasse") {
+      setKassenListe((prev) => prev.filter((entry) => entry.id !== input.id));
+      setSyncHint("Kassen-Testeintrag gelöscht.");
+    } else {
+      setClientTx((prev) => prev.filter((tx) => tx.id !== input.id));
+      setSyncHint("Manueller Test-Zahlungseintrag gelöscht.");
+    }
+    refetch();
+    refetchStats();
   }
 
   function openStatusHelp(id: string, el: HTMLElement) {
@@ -734,6 +769,28 @@ export default function ZahlungenPage() {
                     >
                       <MessageSquareQuote size={14} />
                     </button>
+                    {canDeleteKassenEintrag(z) ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDeleteEntry({ typ: "kasse", id: z.id });
+                        }}
+                        type="button"
+                        className="rounded-lg p-1.5 transition-colors hover:bg-red-500/10"
+                        style={{ color: "#f08a8a" }}
+                        title="Test- oder Fehleintrag löschen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : (
+                      <span
+                        className="rounded-lg p-1.5"
+                        style={{ color: "var(--ac-text-mute)" }}
+                        title="Gesperrt: mit echtem Geldeingang verknüpft"
+                      >
+                        <Lock size={14} />
+                      </span>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -836,6 +893,28 @@ export default function ZahlungenPage() {
                     >
                       <MessageSquareQuote size={14} />
                     </button>
+                    {canDeleteTransaktion(tx) ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDeleteEntry({ typ: "transaktion", id: tx.id });
+                        }}
+                        type="button"
+                        className="rounded-lg p-1.5 transition-colors hover:bg-red-500/10"
+                        style={{ color: "#f08a8a" }}
+                        title="Manuellen Testeintrag löschen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : (
+                      <span
+                        className="rounded-lg p-1.5"
+                        style={{ color: "var(--ac-text-mute)" }}
+                        title="Gesperrt: echte Bank-Sync-Transaktion oder bereits fest verbucht"
+                      >
+                        <Lock size={14} />
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
