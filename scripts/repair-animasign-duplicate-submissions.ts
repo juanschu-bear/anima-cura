@@ -67,7 +67,7 @@ async function main() {
   const preview: unknown[] = [];
   let patched = 0;
 
-  for (const [key, rows] of groups.entries()) {
+  for (const [key, rows] of Array.from(groups.entries())) {
     if (rows.length < 2) continue;
 
     const signed = rows.filter(isSigned).sort((a, b) => b.created_at.localeCompare(a.created_at));

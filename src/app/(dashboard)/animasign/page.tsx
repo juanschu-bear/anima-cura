@@ -26,6 +26,36 @@ interface Submission {
   last_login: string | null;
 }
 
+interface DuplicateReviewGroup {
+  key: string;
+  patient_name: string;
+  geburtsdatum: string | null;
+  total: number;
+  signed_count: number;
+  pending_count: number;
+  can_auto_close: boolean;
+  canonical_submission_id: string | null;
+  rows: Array<{
+    id: string;
+    created_at: string;
+    status: string | null;
+    signed_pdf_path: string | null;
+    ivoris_patient_id: string | null;
+    matched_patient_id: string | null;
+  }>;
+}
+
+interface ManualReviewItem {
+  id: string;
+  patient_name: string;
+  geburtsdatum: string | null;
+  created_at: string;
+  status: string | null;
+  reason: string | null;
+  matched_patient_id: string | null;
+  ivoris_patient_id: string | null;
+}
+
 type StatusPresentation = {
   label: string;
   color: string;
@@ -68,6 +98,10 @@ export default function AnimaSignPage() {
   const [resolveHits, setResolveHits] = useState<PatientHit[]>([]);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveIvorisId, setResolveIvorisId] = useState("");
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateReviewGroup[]>([]);
+  const [manualReviewItems, setManualReviewItems] = useState<ManualReviewItem[]>([]);
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [closingGroupKey, setClosingGroupKey] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -105,6 +139,26 @@ export default function AnimaSignPage() {
   }, [resolveSearch, resolveTarget]);
 
   useEffect(() => { void fetchData(); const iv = setInterval(() => { void fetchData(); }, 120_000); return () => clearInterval(iv); }, [fetchData]);
+
+  const fetchReviewQueue = useCallback(async () => {
+    setQueueLoading(true);
+    try {
+      const res = await fetch("/api/anima-sign/review-queue");
+      const data = await res.json();
+      setDuplicateGroups(data.duplicateGroups || []);
+      setManualReviewItems(data.manualReview || []);
+    } catch (error) {
+      console.error("[AnimaSign][review-queue]", error);
+      setDuplicateGroups([]);
+      setManualReviewItems([]);
+    } finally {
+      setQueueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchReviewQueue();
+  }, [fetchReviewQueue]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -267,10 +321,42 @@ export default function AnimaSignPage() {
       setResolveHits([]);
       setResolveIvorisId("");
       void fetchData();
+      void fetchReviewQueue();
     } catch (error) {
       alert(error instanceof Error ? error.message : "Zuordnung fehlgeschlagen.");
     } finally {
       setResolveSaving(false);
+    }
+  };
+
+  const closeDuplicateGroup = async (group: DuplicateReviewGroup) => {
+    if (!group.can_auto_close || !group.canonical_submission_id) return;
+    const closeIds = group.rows
+      .filter((row) => row.id !== group.canonical_submission_id && !row.signed_pdf_path && (row.status === "signatur_ausstehend" || row.status === "offen"))
+      .map((row) => row.id);
+    if (closeIds.length === 0) return;
+
+    setClosingGroupKey(group.key);
+    try {
+      const res = await fetch("/api/anima-sign/review-queue/resolve-duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keepSubmissionId: group.canonical_submission_id,
+          closeSubmissionIds: closeIds,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "Dubletten konnten nicht geschlossen werden.");
+      }
+      alert(`Dubletten bereinigt. Referenzfall bleibt ${group.canonical_submission_id}.`);
+      void fetchData();
+      void fetchReviewQueue();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Dubletten konnten nicht geschlossen werden.");
+    } finally {
+      setClosingGroupKey(null);
     }
   };
 
@@ -307,6 +393,138 @@ export default function AnimaSignPage() {
           <div style={{ height: "100%", borderRadius: 999, background: `linear-gradient(90deg,${blue},${green})`, width: `${rate}%`, transition: "width .6s" }} />
         </div>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: green }}>{rate}%</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, marginBottom: 24 }}>
+        <div style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Sichere Dubletten-Auflösung
+              </div>
+              <div style={{ fontSize: 13, color: muted, marginTop: 4 }}>
+                Fälle mit klarer Referenzeinreichung können hier ohne Blindflug bereinigt werden.
+              </div>
+            </div>
+            <button onClick={() => void fetchReviewQueue()} style={{ background: bg2, border: `1px solid ${lineS}`, borderRadius: 10, padding: "8px 12px", color: ink, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Aktualisieren
+            </button>
+          </div>
+
+          {queueLoading ? (
+            <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Review-Queue wird geladen…</div>
+          ) : duplicateGroups.length === 0 ? (
+            <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Keine offenen Dublettengruppen im Beobachtungsfenster.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {duplicateGroups.map((group) => (
+                <div key={group.key} style={{ border: `1px solid ${line}`, borderRadius: 14, padding: 14, background: bg2 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: ink }}>{group.patient_name}</div>
+                      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>
+                        {group.geburtsdatum || "Geburtsdatum unbekannt"} · {group.total} Einreichungen · {group.signed_count} signiert · {group.pending_count} offen
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "5px 9px", borderRadius: 999, background: group.can_auto_close ? greenBg : goldBg, color: group.can_auto_close ? green : gold }}>
+                      {group.can_auto_close ? "Sicher schließbar" : "Manuell prüfen"}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                    {group.rows.map((row) => (
+                      <div key={row.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: ink, borderTop: `1px solid ${line}`, paddingTop: 8 }}>
+                        <span>{row.id.slice(0, 8)} · {row.status || "unbekannt"}</span>
+                        <span style={{ color: muted }}>{fmtDate(row.created_at)} {fmtTime(row.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {group.can_auto_close && group.canonical_submission_id && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 12 }}>
+                      <div style={{ fontSize: 12, color: muted }}>
+                        Referenzfall: <span style={{ color: ink, fontWeight: 700 }}>{group.canonical_submission_id.slice(0, 8)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={closingGroupKey === group.key}
+                        onClick={() => void closeDuplicateGroup(group)}
+                        style={{
+                          padding: "9px 12px",
+                          borderRadius: 10,
+                          border: `1px solid ${green}`,
+                          background: greenBg,
+                          color: green,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: closingGroupKey === group.key ? "wait" : "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {closingGroupKey === group.key ? "Bereinige…" : "Offene Dubletten schließen"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: cardBg, border: `1px solid ${line}`, borderRadius: 14, padding: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+            Manuelle Prüffälle
+          </div>
+          <div style={{ fontSize: 13, color: muted, marginBottom: 12 }}>
+            Diese Fälle bleiben absichtlich unter menschlicher Kontrolle, wenn Ivoris mehrere plausible Treffer liefert.
+          </div>
+          {queueLoading ? (
+            <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Prüffälle werden geladen…</div>
+          ) : manualReviewItems.length === 0 ? (
+            <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Keine offenen Prüffälle.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {manualReviewItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    const [firstName = "", ...rest] = item.patient_name.split(" ");
+                    setResolveTarget({
+                      id: item.id,
+                      vorname: firstName,
+                      nachname: rest.join(" "),
+                      email: null,
+                      created_at: item.created_at,
+                      status: item.status || "fehler",
+                      is_existing: Boolean(item.matched_patient_id),
+                      matched_patient_id: item.matched_patient_id,
+                      account_email: null,
+                      signed_pdf_path: null,
+                      ivoris_synced: false,
+                      ivoris_sync_error: item.reason,
+                      ivoris_doc_synced: false,
+                      ivoris_sync_failed_permanently: true,
+                      ivoris_doc_failed_permanently: false,
+                      ivoris_manual_review: true,
+                      ivoris_manual_review_reason: item.reason,
+                      has_logged_in: false,
+                      last_login: null,
+                    });
+                    setResolveSearch(item.patient_name);
+                    setResolveIvorisId(item.ivoris_patient_id || "");
+                    setResolveHits([]);
+                  }}
+                  style={{ textAlign: "left", border: `1px solid ${line}`, borderRadius: 14, background: bg2, padding: 14, color: ink, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{item.patient_name}</div>
+                  <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>
+                    {item.geburtsdatum || "Geburtsdatum unbekannt"} · {fmtDate(item.created_at)}
+                  </div>
+                  <div style={{ fontSize: 12, color: ink, marginTop: 8, lineHeight: 1.5 }}>{item.reason || "Manuelle Auflösung erforderlich."}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
