@@ -139,10 +139,11 @@ function buildSearchVariants(input: string) {
   const base = normalizePatientSearch(input);
   const compact = base.replace(/\s+/g, " ").trim();
   const variants = new Set<string>([compact]);
-  if (compact.includes("ae")) variants.add(compact.replace(/ae/g, "a"));
-  if (compact.includes("oe")) variants.add(compact.replace(/oe/g, "o"));
-  if (compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
-  if (compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
+  const raw = input.toLowerCase();
+  if (/[ä]/.test(raw) && compact.includes("ae")) variants.add(compact.replace(/ae/g, "a"));
+  if (/[ö]/.test(raw) && compact.includes("oe")) variants.add(compact.replace(/oe/g, "o"));
+  if (/[ü]/.test(raw) && compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
+  if (/[ß]/.test(raw) && compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
   return Array.from(variants).filter(Boolean);
 }
 
@@ -155,6 +156,10 @@ function buildSearchTokens(input: string) {
         .filter(Boolean),
     ),
   );
+}
+
+function buildDatabaseSearchTokens(input: string) {
+  return buildSearchTokens(input);
 }
 
 function rankPatientMatch(patient: {
@@ -191,7 +196,7 @@ function rankPatientMatch(patient: {
 async function findPatients(query: string) {
   const db = createServerClient();
   const q = query.trim().toLowerCase();
-  const teile = buildSearchTokens(q);
+  const teile = buildDatabaseSearchTokens(q);
   if (teile.length === 0) {
     return [];
   }
