@@ -7,6 +7,7 @@ import {
   decideExactLocalPatientCandidate,
   isTransientIvorisAvailabilityError,
   namesMatchSubmission,
+  shouldPushIvorisSummary,
   shouldReusePriorSubmissionMatch,
 } from "../animasign-ivoris-sync";
 
@@ -211,6 +212,35 @@ test("builds fallback existing-patient operations from submission data", () => {
         operation.Birthday === "2012-04-01" &&
         operation.Email === "emma@example.com"
     ),
+    true
+  );
+});
+
+test("does not push ivoris summary twice when a retry sees the same summary hash", () => {
+  assert.equal(
+    shouldPushIvorisSummary({
+      alreadySynced: true,
+      previousHash: "abc",
+      nextHash: "abc",
+    }),
+    false
+  );
+
+  assert.equal(
+    shouldPushIvorisSummary({
+      alreadySynced: false,
+      previousHash: "abc",
+      nextHash: "abc",
+    }),
+    false
+  );
+
+  assert.equal(
+    shouldPushIvorisSummary({
+      alreadySynced: false,
+      previousHash: null,
+      nextHash: "new-hash",
+    }),
     true
   );
 });

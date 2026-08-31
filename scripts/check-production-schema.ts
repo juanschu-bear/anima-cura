@@ -44,12 +44,12 @@ async function main() {
     runSelectCheck(
       "anamnese_submissions core",
       "anamnese_submissions",
-      "id,patient_id,vorname,nachname,geburtsdatum,email,answers,status,account_email,matched_patient_id,is_existing,ivoris_synced,ivoris_sync_error",
+      "id,patient_id,vorname,nachname,geburtsdatum,email,answers,status,account_email,matched_patient_id,is_existing,patient_anrede,versicherter_anrede,ivoris_synced,ivoris_sync_error,ivoris_summary_synced,ivoris_summary_hash",
     ),
     runSelectCheck(
       "patients anima sign fields",
       "patients",
-      "id,ivoris_id,vorname,nachname,geburtsdatum,geschlecht,telefon,email,strasse,plz,ort,mobiltelefon,versicherter_vorname,versicherter_nachname,versicherter_geburtsdatum,versicherter_strasse,versicherter_plz,versicherter_ort,versicherter_telefon,versicherter_email,eb2_vorname,eb2_nachname,eb2_telefon,eb2_email,versicherungsart,krankenkasse,zusatzversicherung",
+      "id,ivoris_id,vorname,nachname,geburtsdatum,anrede,geschlecht,telefon,email,strasse,plz,ort,mobiltelefon,versicherter_vorname,versicherter_nachname,versicherter_anrede,versicherter_geburtsdatum,versicherter_strasse,versicherter_plz,versicherter_ort,versicherter_telefon,versicherter_email,eb2_vorname,eb2_nachname,eb2_anrede,eb2_telefon,eb2_email,versicherungsart,krankenkasse,zusatzversicherung",
     ),
     runSelectCheck(
       "patient portal core",

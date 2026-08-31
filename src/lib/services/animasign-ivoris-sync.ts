@@ -51,6 +51,9 @@ type SubmissionRow = {
   ivoris_doc_next_retry_at?: string | null;
   ivoris_sync_failed_permanently?: boolean | null;
   ivoris_doc_failed_permanently?: boolean | null;
+  ivoris_summary_synced?: boolean | null;
+  ivoris_summary_synced_at?: string | null;
+  ivoris_summary_hash?: string | null;
 };
 
 type PatientRow = {
@@ -264,6 +267,20 @@ function sanitizeFilenamePart(value: string | null | undefined): string {
     .replace(/[^A-Za-z0-9\u00C0-\u017F_-]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "") || "Patient";
+}
+
+function buildSummaryHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function shouldPushIvorisSummary(params: {
+  alreadySynced: boolean | null | undefined;
+  previousHash: string | null | undefined;
+  nextHash: string;
+}) {
+  if (params.alreadySynced) return false;
+  if (params.previousHash && params.previousHash === params.nextHash) return false;
+  return true;
 }
 
 function formatIsoDate(value: string | null | undefined): string {
@@ -740,7 +757,7 @@ async function loadSubmission(
   const { data, error } = await db
     .from("anamnese_submissions")
     .select(
-      "id, patient_id, matched_patient_id, is_existing, vorname, nachname, email, geburtsdatum, answers, signed_pdf_path, signiert_am, created_at, ivoris_synced, ivoris_doc_synced, ivoris_sync_error, ivoris_patient_id, ivoris_document_id, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently"
+      "id, patient_id, matched_patient_id, is_existing, vorname, nachname, email, geburtsdatum, answers, signed_pdf_path, signiert_am, created_at, ivoris_synced, ivoris_doc_synced, ivoris_sync_error, ivoris_patient_id, ivoris_document_id, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_summary_synced, ivoris_summary_synced_at, ivoris_summary_hash"
     )
     .eq("id", submissionId)
     .single();
@@ -1549,13 +1566,37 @@ async function syncDocumentStage(
     const docDate = formatIsoDate(submission.signiert_am ?? submission.created_at);
     const docName = `Anamnesebogen_${sanitizeFilenamePart(submission.nachname)}_${docDate}.pdf`;
     const summaryText = buildAnamnesisSummaryText(submission);
+    const summaryHash = buildSummaryHash(summaryText);
 
-    await addIvorisKarteiEintrag({
-      patientIvorisId: patient,
-      date: docDate,
-      text: summaryText,
-      type: "Note",
-    });
+    if (
+      shouldPushIvorisSummary({
+        alreadySynced: submission.ivoris_summary_synced,
+        previousHash: submission.ivoris_summary_hash,
+        nextHash: summaryHash,
+      })
+    ) {
+      await addIvorisKarteiEintrag({
+        patientIvorisId: patient,
+        date: docDate,
+        text: summaryText,
+        type: "Note",
+      });
+
+      const { error: summaryMarkError } = await db
+        .from("anamnese_submissions")
+        .update({
+          ivoris_summary_synced: true,
+          ivoris_summary_synced_at: new Date().toISOString(),
+          ivoris_summary_hash: summaryHash,
+        })
+        .eq("id", submission.id);
+
+      if (summaryMarkError) {
+        throw new Error(
+          `Karteiblatt-Markierung konnte nicht gespeichert werden: ${summaryMarkError.message}`
+        );
+      }
+    }
 
     console.log(
       `[ANIMASIGN][IVORIS] doc sync submission=${submission.id} patient=${patient} blobType=${
@@ -1574,6 +1615,7 @@ async function syncDocumentStage(
       requestPayload: {
         patientIvorisId: patient,
         summaryLength: summaryText.length,
+        summaryHash,
         name: docName,
         date: docDate,
         pdfPath,

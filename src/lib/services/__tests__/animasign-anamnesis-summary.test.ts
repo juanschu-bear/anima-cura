@@ -34,7 +34,9 @@ test("buildAnamnesisSummaryText includes core intake data and positive findings"
   assert.match(text, /Besuchsgrund: Kieferorthopäde Tochter/);
   assert.match(text, /Versicherung: Gesetzlich versichert · AOK Plus · Zusatzversicherung \(Dkv\)/);
   assert.match(text, /Versicherte Person: Frau Nicole Kurth/);
-  assert.match(text, /Kontakt: 017630765510 · nicole\.kurth@gmx\.de/);
-  assert.match(text, /Hinweise: .*HNO-Behandlung.*Naechtliches Zaehneknirschen.*Atmung: Nase.*Zaehneputzen: 2× täglich/);
+  assert.match(text, /Medizinische Hinweise: .*HNO-Behandlung.*Naechtliches Zaehneknirschen.*Atmung: Nase/);
+  assert.match(text, /Kontaktdaten und Versicherungsdaten wurden zur Stammdatenuebernahme uebergeben\./);
+  assert.doesNotMatch(text, /Kontakt:/);
+  assert.doesNotMatch(text, /Zaehneputzen:/);
   assert.doesNotMatch(text, /Allergien \/ Unvertraeglichkeiten/);
 });

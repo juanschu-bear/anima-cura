@@ -59,10 +59,18 @@ function normalizePatientGender(value: string | null): "m" | "w" | "d" | null {
 }
 
 type VersichertenPatch = {
+  anrede?: string;
   geschlecht?: "m" | "w" | "d";
+  telefon?: string;
+  email?: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
   mobiltelefon?: string;
+  eb2_anrede?: string;
   versicherter_vorname?: string;
   versicherter_nachname?: string;
+  versicherter_anrede?: string;
   versicherter_geburtsdatum?: string;
   versicherter_strasse?: string;
   versicherter_plz?: string;
@@ -88,7 +96,7 @@ function normalizeVersicherungsart(value: string | null): string | null {
   return value;
 }
 
-// Baut aus den Anamnesebogen-Antworten die lokalen Versichertenfelder.
+// Baut aus den Anamnesebogen-Antworten die relevanten lokalen Stammdaten.
 // Nur vorhandene Werte werden gesetzt, damit ein Re-Sync bestehende Daten nicht leert.
 function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenPatch {
   const patch: VersichertenPatch = {};
@@ -100,11 +108,26 @@ function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenP
   };
 
   const gender = normalizePatientGender(asString(answers["patient_geschlecht"]));
+  set("anrede", asString(answers["patient_anrede"]));
   if (gender) patch.geschlecht = gender;
+  set("telefon", asString(answers["patient_telefon"]));
+  set("email", asString(answers["patient_email"]));
   set("mobiltelefon", asString(answers["patient_mobil"]));
+
+  const patientStrasse = asString(answers["patient_strasse"]);
+  const patientHausnummer = asString(answers["patient_hausnummer"]);
+  const patientAdresse = [patientStrasse, patientHausnummer]
+    .filter((p): p is string => p !== null)
+    .join(" ")
+    .trim();
+  if (patientAdresse !== "") patch.strasse = patientAdresse;
+
+  set("plz", asString(answers["patient_plz"]));
+  set("ort", asString(answers["patient_wohnort"]));
 
   set("versicherter_vorname", asString(answers["vp_vorname"]));
   set("versicherter_nachname", asString(answers["vp_nachname"]));
+  set("versicherter_anrede", asString(answers["vp_anrede"]));
   set("versicherter_geburtsdatum", asString(answers["vp_geburtsdatum"]));
 
   const strasse = asString(answers["vp_strasse"]);
@@ -119,6 +142,7 @@ function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenP
 
   set("eb2_vorname", asString(answers["vp2_vorname"]));
   set("eb2_nachname", asString(answers["vp2_nachname"]));
+  set("eb2_anrede", asString(answers["vp2_anrede"]));
   set("eb2_telefon", asString(answers["vp2_telefon"]));
   set("eb2_email", asString(answers["vp2_email"]));
 
@@ -517,6 +541,8 @@ export async function POST(request: Request) {
         nachname,
         email,
         geburtsdatum,
+        patient_anrede: asString(answers["patient_anrede"]),
+        versicherter_anrede: asString(answers["vp_anrede"]),
         answers,
         status: "signiert",
       }
@@ -598,6 +624,17 @@ export async function POST(request: Request) {
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
     const resolvedPatientId = abgleich?.patient_id || patientId;
+
+    // Relevante Stammdaten immer lokal nachziehen, auch wenn der Portal-Account
+    // gerade nicht erstellt werden kann. Sonst fehlt der Praxis genau die
+    // Übernahme, die sie im Patientenstamm erwartet.
+    if (resolvedPatientId) {
+      await updatePatientWithSchemaFallback(supabase, resolvedPatientId, {
+        portal_zugang: true,
+        ...buildVersichertenPatch(answers),
+      });
+    }
+
     const account = await ensurePatientPortalAccount({
       vorname,
       nachname,
@@ -614,14 +651,6 @@ export async function POST(request: Request) {
           ...(account.status === "created" ? { account_password: account.password } : {}),
         })
         .eq("id", submissionId);
-
-      // Portal-Zugang und Versichertendaten aus dem Anamnesebogen im Patienten-Record setzen
-      if (resolvedPatientId) {
-        await updatePatientWithSchemaFallback(supabase, resolvedPatientId, {
-          portal_zugang: true,
-          ...buildVersichertenPatch(answers),
-        });
-      }
 
       // Willkommens-Email senden (nicht-blockierend)
       if (email && vorname) {

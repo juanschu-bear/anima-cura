@@ -80,15 +80,6 @@ export function buildAnamnesisSummaryText(submission: SubmissionLike): string {
     lines.push(`Versicherte Person: ${insuredName}`);
   }
 
-  const contactBits = [
-    asString(answers["vp_telefon"]) ?? asString(answers["patient_telefon"]),
-    asString(answers["vp_email"]) ?? asString(answers["patient_email"]),
-  ].filter((value): value is string => Boolean(value));
-
-  if (contactBits.length > 0) {
-    lines.push(`Kontakt: ${contactBits.join(" · ")}`);
-  }
-
   const findings: string[] = [];
   pushYesLine(findings, "Aktuelle aerztliche Behandlung", answers["g_behandlung_aktuell"]);
   pushYesLine(findings, "Allgemeine Erkrankungen", answers["g_erkrankungen"]);
@@ -111,14 +102,11 @@ export function buildAnamnesisSummaryText(submission: SubmissionLike): string {
     findings.push(`Atmung: ${breathing}`);
   }
 
-  const brushing = asString(answers["g_zaehneputzen"]);
-  if (brushing) {
-    findings.push(`Zaehneputzen: ${brushing}`);
+  if (findings.length > 0) {
+    lines.push(`Medizinische Hinweise: ${findings.join(" · ")}`);
   }
 
-  if (findings.length > 0) {
-    lines.push(`Hinweise: ${findings.join(" · ")}`);
-  }
+  lines.push("Kontaktdaten und Versicherungsdaten wurden zur Stammdatenuebernahme uebergeben.");
 
   return lines.join("\n");
 }
