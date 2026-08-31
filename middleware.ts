@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getDefaultDashboardPath } from "@/lib/auth";
 
 type CookieMutation = {
   name: string;
@@ -97,7 +98,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect logged-in praxis users away from praxis login
   if (pathname === "/login" && user && userRole && userRole !== "patient") {
-    return NextResponse.redirect(new URL("/uebersicht", request.url));
+    return NextResponse.redirect(new URL(getDefaultDashboardPath(userRole as never), request.url));
   }
 
   // Redirect logged-in patient users away from patient login
@@ -112,7 +113,7 @@ export async function middleware(request: NextRequest) {
 
   // Praxis user trying to access patient portal -> redirect to dashboard
   if (isPatient && user && userRole && userRole !== "patient") {
-    return NextResponse.redirect(new URL("/uebersicht", request.url));
+    return NextResponse.redirect(new URL(getDefaultDashboardPath(userRole as never), request.url));
   }
 
   // Protect dashboard routes - no auth

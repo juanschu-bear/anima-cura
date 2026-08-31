@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Receipt } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { resolveOpenItemAmount, resolveOpenItemStatus } from "@/lib/open-items";
 
 interface OffenerPosten {
   id: string;
@@ -56,7 +57,13 @@ export default function OffenePostenPage() {
         setErrorMsg(error.message || t("openItems.error", locale));
         setPosten([]);
       } else {
-        setPosten((data ?? []) as OffenerPosten[]);
+        setPosten(
+          ((data ?? []) as OffenerPosten[]).map((item) => ({
+            ...item,
+            offen: resolveOpenItemAmount(item),
+            status: resolveOpenItemStatus(item),
+          })),
+        );
       }
       setLoading(false);
     })();
@@ -68,7 +75,7 @@ export default function OffenePostenPage() {
   const metrics = useMemo(() => {
     const openTotal = posten
       .filter((p) => OPEN_LIKE.has(p.status))
-      .reduce((sum, p) => sum + Number(p.offen || 0), 0);
+      .reduce((sum, p) => sum + resolveOpenItemAmount(p), 0);
     const openCount = posten.filter((p) => p.status === "offen").length;
     const partialCount = posten.filter((p) => p.status === "teilbezahlt").length;
     const paidCount = posten.filter((p) => p.status === "bezahlt").length;

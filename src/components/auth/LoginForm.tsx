@@ -14,12 +14,13 @@ import {
   Info,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { getDefaultDashboardPath } from "@/lib/auth";
 import { pruefeEmail } from "@/lib/validation/feldpruefung";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/uebersicht";
+  const nextPath = searchParams.get("next") || "/zahlungen";
   const reason = searchParams.get("reason");
   const reduceMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -158,6 +159,14 @@ export default function LoginForm() {
         setLoading(false);
         return;
       }
+      const fallbackPath =
+        role === "admin" || role === "verwaltung" || role === "lesezugriff"
+          ? getDefaultDashboardPath(role)
+          : "/zahlungen";
+      window.localStorage.setItem("ac-last-activity", String(Date.now()));
+      router.replace(searchParams.get("next") || fallbackPath);
+      router.refresh();
+      return;
     }
 
     window.localStorage.setItem("ac-last-activity", String(Date.now()));

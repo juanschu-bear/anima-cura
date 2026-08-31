@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { hasReliablePatientIdentity, isSafeDunningRate } from "@/lib/patient-safety";
+import { resolveOpenItemAmount, resolveOpenItemStatus } from "@/lib/open-items";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,11 +86,12 @@ export async function GET(request: NextRequest) {
     const avgVerzoegerung = verz.length > 0 ? Math.round(verz.reduce((s, v) => s + v, 0) / verz.length * 10) / 10 : 0;
     const mahnquote = faelligCount > 0 ? Math.round((mArr.length / faelligCount) * 100) : 0;
     const receivableOpenRows = receivableArr.filter((item) => {
-      if (!["offen", "teilbezahlt", "überfällig"].includes(item.status)) return false;
+      const effectiveStatus = resolveOpenItemStatus(item);
+      if (!["offen", "teilbezahlt", "überfällig"].includes(effectiveStatus)) return false;
       return hasReliablePatientIdentity(patientById.get(item.patient_id));
     });
     const offenePosten = receivableOpenRows.reduce((sum, item) => {
-      return sum + Number(item.offen ?? Math.max(0, Number(item.betrag || 0) - Number((item as any).gezahlt || 0)));
+      return sum + resolveOpenItemAmount(item);
     }, 0);
 
     const quarterFinance = {
@@ -129,8 +131,9 @@ export async function GET(request: NextRequest) {
     }
 
     for (const item of receivableArr) {
-      if (!["offen", "teilbezahlt", "überfällig"].includes(item.status)) continue;
-      const amount = Number(item.offen ?? Math.max(0, Number(item.betrag || 0) - Number((item as any).gezahlt || 0)));
+      const effectiveStatus = resolveOpenItemStatus(item);
+      if (!["offen", "teilbezahlt", "überfällig"].includes(effectiveStatus)) continue;
+      const amount = resolveOpenItemAmount(item);
       const kasse = item.patient_id ? kasseMap[item.patient_id] : undefined;
       const invoiceDate = item.rechnung_datum || null;
       const isQuarterReceivable = Boolean(invoiceDate && invoiceDate >= from && invoiceDate <= to);
@@ -144,7 +147,7 @@ export async function GET(request: NextRequest) {
         quarterFinance.offen_unklar += amount;
       }
 
-      if (item.status === "teilbezahlt") {
+      if (effectiveStatus === "teilbezahlt") {
         quarterFinance.teilbezahlt_gesamt += amount;
         if (isQuarterReceivable) {
           quarterFinance.teilbezahlt_rechnungen_im_quartal += 1;
@@ -190,7 +193,7 @@ export async function GET(request: NextRequest) {
     receivableOpenRows.forEach(r => {
       const basisDatum = r.rechnung_datum || r.bezahlt_am || null;
       const tage = basisDatum ? Math.floor((now - new Date(basisDatum).getTime()) / 864e5) : 0;
-      const b = Number(r.offen ?? Math.max(0, Number(r.betrag || 0) - Number((r as any).gezahlt || 0)));
+      const b = resolveOpenItemAmount(r);
       if (tage < 30) { forderungsalter.unter30.count++; forderungsalter.unter30.betrag += b; }
       else if (tage <= 60) { forderungsalter.bis60.count++; forderungsalter.bis60.betrag += b; }
       else { forderungsalter.ueber60.count++; forderungsalter.ueber60.betrag += b; }
@@ -198,8 +201,8 @@ export async function GET(request: NextRequest) {
 
     // Alle echten offenen Posten aus IVORIS / offene_posten.
     const alleOffene = [...receivableOpenRows].sort((a, b) => {
-      const av = Number(a.offen ?? Math.max(0, Number(a.betrag || 0) - Number((a as any).gezahlt || 0)));
-      const bv = Number(b.offen ?? Math.max(0, Number(b.betrag || 0) - Number((b as any).gezahlt || 0)));
+      const av = resolveOpenItemAmount(a);
+      const bv = resolveOpenItemAmount(b);
       return bv - av;
     });
 
@@ -219,7 +222,7 @@ export async function GET(request: NextRequest) {
       mahnstufen, mahnDetails: mahnDetailsMapped, forderungsalter,
       offenePostenListe: alleOffene.map(r => {
         const referenceDate = r.rechnung_datum || r.bezahlt_am || null;
-        const amount = Number(r.offen ?? Math.max(0, Number(r.betrag || 0) - Number((r as any).gezahlt || 0)));
+        const amount = resolveOpenItemAmount(r);
         return {
           id: r.id,
           betrag: amount,

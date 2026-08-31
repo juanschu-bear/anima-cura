@@ -43,7 +43,7 @@ export const DEFAULT_AUTH_USERS: DefaultAuthUser[] = [
 ];
 
 const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
-  { path: "/uebersicht", roles: ["admin", "verwaltung", "lesezugriff"] },
+  { path: "/uebersicht", roles: ["admin"] },
   { path: "/zahlungen", roles: ["admin", "verwaltung"] },
   { path: "/kasse", roles: ["admin", "verwaltung"] },
   { path: "/patienten", roles: ["admin", "verwaltung", "lesezugriff"] },
@@ -136,7 +136,9 @@ export function getAccessiblePaths(role: AppRole): string[] {
 }
 
 export function getDefaultDashboardPath(role: AppRole): string {
-  return getAccessiblePaths(role)[0] ?? "/uebersicht";
+  if (role === "admin" || role === "verwaltung") return "/zahlungen";
+  if (role === "lesezugriff") return "/patienten";
+  return getAccessiblePaths(role)[0] ?? "/zahlungen";
 }
 
 export function isReadOnlyRole(role: AppRole): boolean {
