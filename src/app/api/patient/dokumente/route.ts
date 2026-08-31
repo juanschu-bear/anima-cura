@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
+import { decodePatientDocumentRecord } from "@/lib/patient-document-types";
 
 export async function GET() {
   const patient = await requirePatient();
@@ -19,12 +20,6 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    dokumente: (docs ?? []).map(d => ({
-      id: d.id,
-      name: d.name,
-      typ: d.typ,
-      file_url: d.file_url,
-      hochgeladen_am: d.hochgeladen_am,
-    })),
+    dokumente: (docs ?? []).map((d) => decodePatientDocumentRecord(d)),
   });
 }

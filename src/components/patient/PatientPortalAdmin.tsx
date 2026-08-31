@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { patientDocumentTypeOptions } from "@/lib/patient-document-types";
 
 interface Props {
   patientId: string;
@@ -21,6 +22,7 @@ interface Doc {
   id: string;
   name: string;
   typ: string;
+  anzeige_typ?: string;
   file_url: string | null;
   hochgeladen_am: string;
 }
@@ -31,13 +33,7 @@ const phaseStatuses = [
   { value: "abgeschlossen", label: "Abgeschlossen" },
 ];
 
-const docTypes = [
-  { value: "kostenplan", label: "Heil- und Kostenplan" },
-  { value: "vertrag", label: "Behandlungsvertrag" },
-  { value: "ratenzahlung", label: "Ratenzahlungsvereinbarung" },
-  { value: "datenschutz", label: "Datenschutzerklärung" },
-  { value: "sonstiges", label: "Sonstiges" },
-];
+const docTypes = patientDocumentTypeOptions;
 
 export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const [portalAccess, setPortalAccess] = useState<{ has_access: boolean; portal: { email: string } | null }>({ has_access: false, portal: null });
@@ -58,7 +54,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
 
   // Doc form
   const [docName, setDocName] = useState("");
-  const [docTyp, setDocTyp] = useState("sonstiges");
+  const [docTyp, setDocTyp] = useState("anfangsdiagnostik");
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docMsg, setDocMsg] = useState("");
@@ -159,7 +155,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
         const d = await res.json();
         setDocs(prev => [d.dokument, ...prev]);
         setDocName("");
-        setDocTyp("sonstiges");
+        setDocTyp("anfangsdiagnostik");
         setDocFile(null);
         setDocMsg("✓ Dokument hinzugefügt");
       } else {
@@ -261,7 +257,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
               <div key={d.id} className="flex items-center justify-between rounded-lg border border-surface-200 px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-praxis-700">{d.name}</p>
-                  <p className="text-xs text-praxis-400">{d.typ} · {new Date(d.hochgeladen_am).toLocaleDateString("de-DE")}</p>
+                  <p className="text-xs text-praxis-400">{d.anzeige_typ || d.typ} · {new Date(d.hochgeladen_am).toLocaleDateString("de-DE")}</p>
                 </div>
                 {d.file_url && (
                   <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-[#5d4fd8] hover:underline">
@@ -274,6 +270,9 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
         )}
         <div className="border-t border-surface-200 pt-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-praxis-400">Dokument hinzufügen</p>
+          <p className="text-sm text-praxis-500">
+            Nach dem Speichern erscheint das Dokument direkt im Patientenportal unter den Dokumenten des zugehörigen Patienten.
+          </p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <input value={docName} onChange={e => setDocName(e.target.value)} placeholder="Dokumentname" className={inputStyle} />
             <select value={docTyp} onChange={e => setDocTyp(e.target.value)} className={inputStyle}>
@@ -281,6 +280,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
             </select>
             <input
               type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
               onChange={e => {
                 const nextFile = e.target.files?.[0] || null;
                 setDocFile(nextFile);
@@ -290,12 +290,17 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
             />
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleUploadDoc} disabled={uploadingDoc || (!docName.trim() && !docFile)} className={btnStyle}>
+            <button onClick={handleUploadDoc} disabled={uploadingDoc || !docFile || !docTyp} className={btnStyle}>
               {uploadingDoc ? "Wird hochgeladen..." : "Dokument speichern"}
             </button>
             {!docName.trim() && docFile ? (
               <span className="text-xs text-praxis-400">Dokumentname wird automatisch aus dem Dateinamen übernommen.</span>
             ) : null}
+            {docFile ? (
+              <span className="text-xs text-praxis-400">Ausgewählt: {docFile.name}</span>
+            ) : (
+              <span className="text-xs text-red-500">Bitte zuerst eine Datei auswählen.</span>
+            )}
             {docMsg && <span className={`text-sm ${docMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{docMsg}</span>}
           </div>
         </div>

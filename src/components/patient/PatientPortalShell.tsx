@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { getPatientDocumentTypeOption } from "@/lib/patient-document-types";
 import AnimaPayOverlay from "@/components/patient/AnimaPayOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
@@ -24,7 +25,7 @@ interface Phase { id: string; name: string; beschreibung: string | null; status:
 interface Badge { id: string; icon: string; titel: string; beschreibung: string; freigeschaltet: boolean }
 interface Msg { id: string; sender_type: string; sender_name: string | null; text: string; created_at: string }
 interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; geoeffnet_am?: string | null; bestaetigt_am?: string | null; created_at: string }
-interface Doc { id: string; name: string; typ: string; file_url: string | null; hochgeladen_am: string }
+interface Doc { id: string; name: string; typ: string; anzeige_typ?: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
 interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null }
@@ -36,7 +37,8 @@ const fmtShortL = (d: string, l: string) => { try { return new Date(d).toLocaleD
 const fmtTimeL = (d: string, l: string) => { try { return new Date(d).toLocaleTimeString(getLocale(l), { hour: "2-digit", minute: "2-digit" }); } catch { return d; } };
 const fmtEuro = (n: number) => n.toLocaleString("de-DE") + " €";
 const daysTill = (d: string) => Math.max(0, Math.ceil((new Date(d).getTime() - Date.now()) / 864e5));
-const docIc: Record<string, string> = { kostenplan: "📋", vertrag: "📝", ratenzahlung: "📝", datenschutz: "🔒", sonstiges: "📄" };
+const docLabel = (doc: Doc) => doc.anzeige_typ || getPatientDocumentTypeOption(doc.typ).label;
+const docIcon = (doc: Doc) => getPatientDocumentTypeOption(doc.typ).icon;
 
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
@@ -766,10 +768,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
           {docs.map(d => (
             <div key={d.id} onClick={() => { setDocDrawer(d); hapticLight(); }} style={{ ...card, margin: "0 0 10px", display: "flex", gap: 14, alignItems: "center", cursor: "pointer" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)", display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>{docIc[d.typ] || "\u{1F4C4}"}</div>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)", display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>{docIcon(d)}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", marginTop: 2 }}>{fmtDateL(d.hochgeladen_am, lang)}</div>
+                <div style={{ fontSize: 11, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", marginTop: 2 }}>{docLabel(d)} · {fmtDateL(d.hochgeladen_am, lang)}</div>
               </div>
             </div>
           ))}
@@ -1308,7 +1310,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       {docs.map(d => (
         <div key={d.id} onClick={() => { setDocDrawer(d); hapticMedium(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, margin: "0 20px 8px", cursor: "pointer", background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", transition: "transform 0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 20 }}>{docIc[d.typ] || "📄"}</span>
+            <span style={{ fontSize: 20 }}>{docIcon(d)}</span>
             <div><div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{d.name}</div><div style={{ fontSize: 11, color: muted }}>{fmtDateL(d.hochgeladen_am, lang)}</div></div>
           </div>
           <span style={{ fontSize: 16, color: muted }}>↗</span>
@@ -1684,7 +1686,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               {/* Header */}
               <div style={{ padding: "4px 24px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15, duration: 0.3 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: grn, marginBottom: 4 }}>{docDrawer.typ.charAt(0).toUpperCase() + docDrawer.typ.slice(1)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: grn, marginBottom: 4 }}>{docLabel(docDrawer)}</div>
                   <h3 style={{ ...hd, fontSize: 20, fontWeight: 800, color: fg }}>{docDrawer.name}</h3>
                   <p style={{ fontSize: 12, color: muted, marginTop: 2 }}>{t("doc.uploadedOn", lang)} {fmtDateL(docDrawer.hochgeladen_am, lang)}</p>
                 </motion.div>

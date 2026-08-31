@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
+import { decodePatientDocumentRecord } from "@/lib/patient-document-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +43,10 @@ export async function GET() {
       ...rp,
       raten: (raten || []).filter(r => true), // All rates belong to this patient
     })),
-    dokumente: (dokumente || []).map(d => ({ name: d.name, typ: d.typ, hochgeladen_am: d.created_at })),
+    dokumente: (dokumente || []).map((d) => {
+      const parsed = decodePatientDocumentRecord({ ...d, file_url: null, hochgeladen_am: d.created_at });
+      return { name: parsed.name, typ: parsed.anzeige_typ, hochgeladen_am: d.created_at };
+    }),
     chat_nachrichten: (nachrichten || []).map(n => ({ von: n.sender, text: n.text, datum: n.created_at })),
     benachrichtigungen: notifications || [],
     badges: badges || [],
