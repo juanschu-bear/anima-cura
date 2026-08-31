@@ -25,6 +25,8 @@
     "cron:matching": "tsx src/lib/services/matching-engine.ts",
     "repair:offene-posten": "tsx scripts/repair-offene-posten.ts",
     "repair:animasign-pdfs": "tsx scripts/repair-animasign-signed-pdfs.ts",
+    "repair:animasign-signed-paths": "tsx scripts/repair-animasign-signed-paths.ts",
+    "repair:animasign-local-links": "tsx scripts/repair-animasign-local-links.ts",
     "repair:animasign-false-greens": "tsx scripts/repair-animasign-false-greens.ts",
     "repair:animasign-duplicate-submissions": "tsx scripts/repair-animasign-duplicate-submissions.ts",
     "repair:patient-portal-access": "tsx scripts/repair-patient-portal-access.ts",

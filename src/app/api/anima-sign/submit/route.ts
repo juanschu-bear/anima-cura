@@ -14,6 +14,10 @@ import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
 import { classifyRecentIdentitySubmission } from "@/lib/services/animasign-submit-resume";
+import {
+  buildSubmissionPatientPatch,
+  ensureLinkedLocalPatientForSubmission,
+} from "@/lib/services/animasign-local-patient-link";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,110 +82,6 @@ function toIsoDateOrNull(value: string | null | undefined): string | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
-}
-
-function normalizePatientGender(value: string | null): "m" | "w" | "d" | null {
-  if (!value) return null;
-  const v = value.trim().toLowerCase();
-  if (v.startsWith("m")) return "m";
-  if (v.startsWith("w")) return "w";
-  if (v.startsWith("d")) return "d";
-  return null;
-}
-
-type VersichertenPatch = {
-  anrede?: string;
-  geschlecht?: "m" | "w" | "d";
-  telefon?: string;
-  email?: string;
-  strasse?: string;
-  plz?: string;
-  ort?: string;
-  mobiltelefon?: string;
-  eb2_anrede?: string;
-  versicherter_vorname?: string;
-  versicherter_nachname?: string;
-  versicherter_anrede?: string;
-  versicherter_geburtsdatum?: string;
-  versicherter_strasse?: string;
-  versicherter_plz?: string;
-  versicherter_ort?: string;
-  versicherter_telefon?: string;
-  versicherter_email?: string;
-  eb2_vorname?: string;
-  eb2_nachname?: string;
-  eb2_telefon?: string;
-  eb2_email?: string;
-  versicherungsart?: string;
-  krankenkasse?: string;
-  zusatzversicherung?: string;
-};
-
-function normalizeVersicherungsart(value: string | null): string | null {
-  if (!value) return null;
-  const v = value.toLowerCase();
-  if (v.includes("gesetzlich")) return "gesetzlich";
-  if (v.includes("privat")) return "privat";
-  if (v.includes("beihilfe")) return "beihilfe";
-  if (v.includes("selbstzahler")) return "selbstzahler";
-  return value;
-}
-
-// Baut aus den Anamnesebogen-Antworten die relevanten lokalen Stammdaten.
-// Nur vorhandene Werte werden gesetzt, damit ein Re-Sync bestehende Daten nicht leert.
-function buildVersichertenPatch(answers: Record<string, unknown>): VersichertenPatch {
-  const patch: VersichertenPatch = {};
-  const set = <K extends keyof VersichertenPatch>(
-    key: K,
-    value: VersichertenPatch[K] | null
-  ): void => {
-    if (value !== null) patch[key] = value;
-  };
-
-  const gender = normalizePatientGender(asString(answers["patient_geschlecht"]));
-  set("anrede", asString(answers["patient_anrede"]));
-  if (gender) patch.geschlecht = gender;
-  set("telefon", asString(answers["patient_telefon"]));
-  set("email", asString(answers["patient_email"]));
-  set("mobiltelefon", asString(answers["patient_mobil"]));
-
-  const patientStrasse = asString(answers["patient_strasse"]);
-  const patientHausnummer = asString(answers["patient_hausnummer"]);
-  const patientAdresse = [patientStrasse, patientHausnummer]
-    .filter((p): p is string => p !== null)
-    .join(" ")
-    .trim();
-  if (patientAdresse !== "") patch.strasse = patientAdresse;
-
-  set("plz", asString(answers["patient_plz"]));
-  set("ort", asString(answers["patient_wohnort"]));
-
-  set("versicherter_vorname", asString(answers["vp_vorname"]));
-  set("versicherter_nachname", asString(answers["vp_nachname"]));
-  set("versicherter_anrede", asString(answers["vp_anrede"]));
-  set("versicherter_geburtsdatum", asString(answers["vp_geburtsdatum"]));
-
-  const strasse = asString(answers["vp_strasse"]);
-  const hausnummer = asString(answers["vp_hausnummer"]);
-  const adresse = [strasse, hausnummer].filter((p): p is string => p !== null).join(" ").trim();
-  if (adresse !== "") patch.versicherter_strasse = adresse;
-
-  set("versicherter_plz", asString(answers["vp_plz"]));
-  set("versicherter_ort", asString(answers["vp_wohnort"]));
-  set("versicherter_telefon", asString(answers["vp_telefon"]));
-  set("versicherter_email", asString(answers["vp_email"]));
-
-  set("eb2_vorname", asString(answers["vp2_vorname"]));
-  set("eb2_nachname", asString(answers["vp2_nachname"]));
-  set("eb2_anrede", asString(answers["vp2_anrede"]));
-  set("eb2_telefon", asString(answers["vp2_telefon"]));
-  set("eb2_email", asString(answers["vp2_email"]));
-
-  set("versicherungsart", normalizeVersicherungsart(asString(answers["versicherungsart"])));
-  set("krankenkasse", asString(answers["krankenkasse"]));
-  set("zusatzversicherung", asString(answers["zusatzversicherung"]));
-
-  return patch;
 }
 
 function scheduleFastRetryAt() {
@@ -815,7 +715,18 @@ export async function POST(request: Request) {
     }
 
     // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const resolvedPatientId = abgleich?.patient_id || patientId;
+    const resolvedPatientId = await ensureLinkedLocalPatientForSubmission(supabase, {
+      submissionId,
+      patientId,
+      matchedPatientId: abgleich?.patient_id ?? null,
+      ivorisId: null,
+      vorname,
+      nachname,
+      geburtsdatum,
+      email,
+      createdAt: new Date().toISOString(),
+      answers,
+    });
 
     // Relevante Stammdaten immer lokal nachziehen, auch wenn der Portal-Account
     // gerade nicht erstellt werden kann. Sonst fehlt der Praxis genau die
@@ -823,7 +734,7 @@ export async function POST(request: Request) {
     if (resolvedPatientId) {
       await updatePatientWithSchemaFallback(supabase, resolvedPatientId, {
         portal_zugang: true,
-        ...buildVersichertenPatch(answers),
+        ...buildSubmissionPatientPatch(answers),
       });
     }
 

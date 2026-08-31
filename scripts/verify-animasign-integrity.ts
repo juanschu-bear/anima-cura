@@ -17,6 +17,8 @@ type SubmissionRow = {
   geburtsdatum?: string | null;
   status?: string | null;
   signed_pdf_path?: string | null;
+  patient_id?: string | null;
+  matched_patient_id?: string | null;
   ivoris_synced?: boolean | null;
   ivoris_doc_synced?: boolean | null;
   ivoris_patient_id?: string | null;
@@ -90,7 +92,7 @@ async function main() {
     db
       .from("anamnese_submissions")
       .select(
-        "id, created_at, vorname, nachname, geburtsdatum, ivoris_synced, ivoris_patient_id, ivoris_sync_error"
+        "id, created_at, vorname, nachname, geburtsdatum, patient_id, matched_patient_id, ivoris_synced, ivoris_patient_id, ivoris_sync_error, status, signed_pdf_path"
       )
       .limit(5000),
     db
@@ -123,6 +125,13 @@ async function main() {
   pushProblem(problems, "doc_synced_without_document_id", "critical", docRows);
 
   const patientRowsData = (patientRows.data ?? []) as SubmissionRow[];
+  const localLinkMissing = patientRowsData.filter(
+    (row) =>
+      row.status === "signiert" &&
+      (!row.patient_id || !row.matched_patient_id)
+  );
+  pushProblem(problems, "local_patient_link_missing", "critical", localLinkMissing);
+
   const patientSyncedWithoutId = patientRowsData.filter(
     (row) => row.ivoris_synced === true && !row.ivoris_patient_id
   );
@@ -161,6 +170,19 @@ async function main() {
       latestWarningMetadata: latestPatientLogBySubmission.get(row.id)?.metadata ?? null,
     }));
   pushProblem(problems, "false_green_contact_blocked", "critical", currentFalseGreens);
+
+  const signedPdfWrongPath = patientRowsData.filter(
+    (row) =>
+      row.status === "signiert" &&
+      typeof row.signed_pdf_path === "string" &&
+      row.signed_pdf_path.endsWith("/Anamnesebogen.pdf")
+  );
+  pushProblem(
+    problems,
+    "signed_pdf_points_to_unsigned_file",
+    "critical",
+    signedPdfWrongPath
+  );
 
   const patientGroups = new Map<string, Array<Record<string, unknown>>>();
   for (const row of duplicatePatients.data ?? []) {

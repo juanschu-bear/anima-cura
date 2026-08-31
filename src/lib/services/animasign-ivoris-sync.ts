@@ -291,6 +291,10 @@ export function shouldPushIvorisSummary(params: {
   return true;
 }
 
+function shouldWriteIvorisSummaryNote() {
+  return process.env.ANIMASIGN_PUSH_IVORIS_SUMMARY === "true";
+}
+
 function formatIsoDate(value: string | null | undefined): string {
   if (!value) return new Date().toISOString().slice(0, 10);
   const parsed = new Date(value);
@@ -1635,20 +1639,24 @@ async function syncDocumentStage(
       contentBase64: base64,
     });
 
-    if (
-      shouldPushIvorisSummary({
-        alreadySynced: submission.ivoris_summary_synced,
-        previousHash: submission.ivoris_summary_hash,
-        nextHash: summaryHash,
-      })
-    ) {
+    const shouldPersistSummaryMarker = shouldPushIvorisSummary({
+      alreadySynced: submission.ivoris_summary_synced,
+      previousHash: submission.ivoris_summary_hash,
+      nextHash: summaryHash,
+    });
+    const shouldPushSummaryNote =
+      shouldPersistSummaryMarker && shouldWriteIvorisSummaryNote();
+
+    if (shouldPushSummaryNote) {
       await addIvorisKarteiEintrag({
         patientIvorisId: patient,
         date: docDate,
         text: summaryText,
         type: "Note",
       });
+    }
 
+    if (shouldPersistSummaryMarker) {
       const summaryPatch: Record<string, unknown> = {
         ivoris_summary_synced: true,
         ivoris_summary_synced_at: new Date().toISOString(),
