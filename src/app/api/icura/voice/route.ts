@@ -26,7 +26,7 @@ const contextSchema = z.object({
 });
 
 const actionSchema = z.object({
-  type: z.enum(["navigate", "highlight"]),
+  type: z.enum(["navigate", "highlight", "open_patient_document_upload"]),
   target: z.string().min(1),
   explanation: z.string().default(""),
 });
@@ -65,6 +65,18 @@ const voiceMap = {
   import: "/import",
 } as const;
 
+function documentUploadActionSchemaInput(): Tool["input_schema"] {
+  return {
+    type: "object" as const,
+    properties: {
+      type: { type: "string", enum: ["navigate", "highlight", "open_patient_document_upload"] },
+      target: { type: "string" },
+      explanation: { type: "string" },
+    },
+    required: ["type", "target", "explanation"],
+  };
+}
+
 function guideUserSchemaInput(): Tool["input_schema"] {
   return {
     type: "object" as const,
@@ -72,15 +84,7 @@ function guideUserSchemaInput(): Tool["input_schema"] {
       responseText: { type: "string" },
       actions: {
         type: "array" as const,
-        items: {
-          type: "object" as const,
-          properties: {
-            type: { type: "string", enum: ["navigate", "highlight"] },
-            target: { type: "string" },
-            explanation: { type: "string" },
-          },
-          required: ["type", "target", "explanation"],
-        },
+        items: documentUploadActionSchemaInput(),
       },
     },
     required: ["responseText", "actions"],
@@ -415,7 +419,8 @@ YOU CAN:
 1. Answer questions about the app
 2. Navigate the user: use guide_user tool with action "navigate" and target path
 3. Highlight UI elements: use guide_user tool with action "highlight" and CSS selector
-4. Create workflows: use propose_workflow tool and then help the user move to /automatisierungen
+4. Open the patient document upload popup: use guide_user tool with action "open_patient_document_upload"
+5. Create workflows: use propose_workflow tool and then help the user move to /automatisierungen
 
 APP STRUCTURE:
 - /uebersicht - Overview dashboard
@@ -441,6 +446,9 @@ PERSONALITY:
 
 RULES:
 - Prefer using the guide_user tool whenever navigation or highlighting would help.
+- If the user wants to add, upload, save or attach a document for a patient, use open_patient_document_upload.
+- For document upload requests, prefer calling find_patient first if a patient name or number was spoken. Then pass a JSON string as the action target, for example {"patientId":"...","patientName":"..."}.
+- If patient identity is unclear, still open the document upload popup and tell the user to type the patient name to avoid dictation mistakes.
 - If the user wants to build or change a workflow, use propose_workflow.
 - Highlight selectors must be valid CSS selectors.
 - Response text must sound natural when spoken aloud.
@@ -612,6 +620,15 @@ async function runCompanion(text: string, context: z.infer<typeof contextSchema>
       toolResult = {
         ok: true,
         results,
+        best_match_for_document_upload: results[0]
+          ? JSON.stringify({
+              patientId: results[0].id,
+              patientName: results[0].name,
+              patientQuery: parsed.data.query,
+            })
+          : JSON.stringify({
+              patientQuery: parsed.data.query,
+            }),
       };
     }
 

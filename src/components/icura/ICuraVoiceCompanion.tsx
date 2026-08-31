@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2, Mic, Radio, Volume2 } from "lucide-react";
+import { FilePlus2, Loader2, Mic, Radio, Volume2 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
+import ICuraPatientDocumentUploadModal from "@/components/icura/ICuraPatientDocumentUploadModal";
 
 type VoiceState = "idle" | "listening" | "processing" | "speaking";
 
 type CompanionAction = {
-  type: "navigate" | "highlight";
+  type: "navigate" | "highlight" | "open_patient_document_upload";
   target: string;
   explanation: string;
+};
+
+type DocumentUploadPrefill = {
+  patientId?: string | null;
+  patientName?: string | null;
+  patientQuery?: string | null;
 };
 
 type BubbleState = {
@@ -69,6 +76,8 @@ export default function ICuraVoiceCompanion() {
   });
   const [highlight, setHighlight] = useState<HighlightState>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
+  const [documentUploadPrefill, setDocumentUploadPrefill] = useState<DocumentUploadPrefill | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -147,6 +156,11 @@ export default function ICuraVoiceCompanion() {
       highlightTimeoutRef.current = null;
     }
     setHighlight(null);
+  }, []);
+
+  const openDocumentUpload = useCallback((prefill?: DocumentUploadPrefill | null) => {
+    setDocumentUploadPrefill(prefill ?? null);
+    setDocumentUploadOpen(true);
   }, []);
 
   const stopCurrentInteraction = useCallback(
@@ -256,9 +270,20 @@ export default function ICuraVoiceCompanion() {
           applyHighlight(action.target);
           await new Promise((resolve) => window.setTimeout(resolve, 350));
         }
+
+        if (action.type === "open_patient_document_upload") {
+          let parsedPrefill: DocumentUploadPrefill | null = null;
+          try {
+            parsedPrefill = action.target ? (JSON.parse(action.target) as DocumentUploadPrefill) : null;
+          } catch {
+            parsedPrefill = action.target ? { patientQuery: action.target } : null;
+          }
+          openDocumentUpload(parsedPrefill);
+          await new Promise((resolve) => window.setTimeout(resolve, 200));
+        }
       }
     },
-    [applyHighlight, router]
+    [applyHighlight, openDocumentUpload, router]
   );
 
   const sendAudioToBackend = useCallback(
@@ -534,8 +559,38 @@ export default function ICuraVoiceCompanion() {
     await startRecording("toggle");
   }, [startRecording, stopCurrentInteraction]);
 
+  const handleOpenUploadShortcut = useCallback(() => {
+    stopCurrentInteraction();
+    showBubble(
+      "assistant",
+      locale === "de"
+        ? "Gerne. Tippen Sie den Patientennamen am besten direkt ein, dann öffne ich den Dokument-Upload sauber."
+        : "Sure. Type the patient name directly and I will open the document upload cleanly.",
+      5000
+    );
+    openDocumentUpload();
+  }, [locale, openDocumentUpload, showBubble, stopCurrentInteraction]);
+
   return (
     <>
+      <ICuraPatientDocumentUploadModal
+        open={documentUploadOpen}
+        prefill={documentUploadPrefill}
+        onClose={() => {
+          setDocumentUploadOpen(false);
+          setDocumentUploadPrefill(null);
+        }}
+        onUploaded={({ patientName, documentName, type }) => {
+          showBubble(
+            "assistant",
+            locale === "de"
+              ? `${type.label} wurde für ${patientName} gespeichert: ${documentName}.`
+              : `${type.label} was saved for ${patientName}: ${documentName}.`,
+            5000
+          );
+        }}
+      />
+
       <div className="icura-voice-root" aria-live="polite">
         {bubble.visible && bubble.text ? (
           <div
@@ -561,6 +616,15 @@ export default function ICuraVoiceCompanion() {
             />
           </div>
         ) : null}
+
+        <button
+          type="button"
+          className="icura-assist-chip"
+          onClick={handleOpenUploadShortcut}
+        >
+          <FilePlus2 size={16} />
+          {locale === "de" ? "Dokument hochladen" : "Upload document"}
+        </button>
 
         <button
           type="button"
@@ -684,6 +748,31 @@ export default function ICuraVoiceCompanion() {
             inset 0 1px 0 rgba(255, 255, 255, 0.22);
           transition: transform 140ms ease, box-shadow 180ms ease, filter 180ms ease;
           touch-action: none;
+        }
+
+        .icura-assist-chip {
+          pointer-events: auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 40px;
+          border-radius: 999px;
+          border: 1px solid rgba(122, 146, 191, 0.28);
+          padding: 0 14px;
+          background: rgba(16, 22, 34, 0.86);
+          color: #eef3ff;
+          backdrop-filter: blur(18px);
+          box-shadow: 0 14px 30px rgba(6, 10, 18, 0.24);
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          transition: transform 140ms ease, border-color 180ms ease, background 180ms ease;
+        }
+
+        .icura-assist-chip:hover {
+          transform: translateY(-1px);
+          border-color: rgba(108, 144, 255, 0.58);
+          background: rgba(21, 30, 48, 0.94);
         }
 
         .icura-button:hover {
