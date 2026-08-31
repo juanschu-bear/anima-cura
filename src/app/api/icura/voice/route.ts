@@ -531,7 +531,94 @@ function normalizeActions(actions: z.infer<typeof actionSchema>[]) {
   return normalized;
 }
 
+function looksLikeDocumentUploadIntent(text: string) {
+  const normalized = normalizePatientSearch(text);
+  const uploadSignals = [
+    "dokument",
+    "datei",
+    "hochladen",
+    "hinzufugen",
+    "hinzufuegen",
+    "speichern",
+    "anhangen",
+    "anhaengen",
+    "patientenakte",
+    "app stellen",
+  ];
+  return uploadSignals.some((signal) => normalized.includes(signal));
+}
+
+function extractLikelyPatientQuery(text: string) {
+  const normalized = text
+    .replace(/[“”"']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const patterns = [
+    /\b(?:fuer|für|bei|zu|dem patienten|den patienten|patient)\s+([A-ZÄÖÜ][a-zäöüß-]+(?:\s+[A-ZÄÖÜ][a-zäöüß-]+){0,3})/,
+    /\b([A-ZÄÖÜ][a-zäöüß-]+,\s*[A-ZÄÖÜ][a-zäöüß-]+)/,
+    /\b([A-ZÄÖÜ][a-zäöüß-]+\s+[A-ZÄÖÜ][a-zäöüß-]+)\b/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const candidate = match?.[1]?.replace(/\s+/g, " ").trim();
+    if (candidate && candidate.length >= 4) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function maybeHandleDocumentUploadIntent(
+  transcript: string,
+  context: z.infer<typeof contextSchema>,
+) {
+  if (!looksLikeDocumentUploadIntent(transcript)) {
+    return null;
+  }
+
+  const patientQuery = extractLikelyPatientQuery(transcript);
+  const results = patientQuery ? await findPatients(patientQuery) : [];
+  const best = results[0];
+  const target = JSON.stringify(
+    best
+      ? {
+          patientId: best.id,
+          patientName: best.name,
+          patientQuery,
+        }
+      : patientQuery
+        ? { patientQuery }
+        : {},
+  );
+
+  return {
+    text:
+      context.locale === "de"
+        ? best
+          ? `Ich öffne den Dokument-Upload direkt für ${best.name}. Dokumenttyp und Datei können Sie jetzt sofort ergänzen.`
+          : "Ich öffne den Dokument-Upload. Tippen Sie den Patientennamen am besten vollständig ein, dann ordnen wir das sauber zu."
+        : best
+          ? `I am opening the document upload directly for ${best.name}.`
+          : "I am opening the document upload. Please type the patient name fully.",
+    actions: normalizeActions([
+      {
+        type: "open_patient_document_upload",
+        target: target === "{}" ? JSON.stringify({ patientQuery: "" }) : target,
+        explanation: "Open the patient document upload assistant.",
+      },
+    ]),
+  };
+}
+
 async function runCompanion(text: string, context: z.infer<typeof contextSchema>) {
+  const deterministicDocumentUpload = await maybeHandleDocumentUploadIntent(text, context);
+  if (deterministicDocumentUpload) {
+    return deterministicDocumentUpload;
+  }
+
   const knowledge = await buildICuraVoiceKnowledge(context);
   const tools: Tool[] = [
     {
