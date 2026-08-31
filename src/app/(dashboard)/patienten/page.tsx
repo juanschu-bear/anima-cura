@@ -227,19 +227,28 @@ export default function PatientenPage() {
           <tbody>
             {patienten.map((p) => {
               const raten = p.raten || [];
-              const total = Math.max(raten.length, 1);
-              const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-              const hasOverdue = raten.some((r: any) => r.status === "überfällig");
-              const maxMahn = raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
-              const offene = raten.filter((r: any) => r.status !== "bezahlt");
-              const rest = offene.reduce((s: number, r: any) => s + (r.betrag || 0), 0);
+              const finance = p._financeSummary || {
+                totalCount: raten.length,
+                paidCount: raten.filter((r: any) => r.status === "bezahlt").length,
+                hasOverdue: raten.some((r: any) => r.status === "überfällig"),
+                maxMahn: raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0),
+                restschuld: raten.filter((r: any) => r.status !== "bezahlt").reduce((s: number, r: any) => s + (r.betrag || 0), 0),
+                status: "pünktlich",
+              };
+              const total = Math.max(finance.totalCount || raten.length, 1);
+              const bezahlt = finance.paidCount ?? raten.filter((r: any) => r.status === "bezahlt").length;
+              const hasOverdue = finance.hasOverdue ?? raten.some((r: any) => r.status === "überfällig");
+              const maxMahn = finance.maxMahn ?? raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
+              const rest = finance.restschuld ?? 0;
               const rateMonat = raten[0]?.betrag || 0;
 
-              let status: string = "pünktlich";
-              if (maxMahn >= 3) status = "eskalation";
-              else if (maxMahn === 2) status = "verzug";
-              else if (maxMahn === 1) status = "stufe1";
-              else if (hasOverdue) status = "abweichung";
+              let status: string = finance.status || "pünktlich";
+              if (!p._financeSummary) {
+                if (maxMahn >= 3) status = "eskalation";
+                else if (maxMahn === 2) status = "verzug";
+                else if (maxMahn === 1) status = "stufe1";
+                else if (hasOverdue) status = "abweichung";
+              }
 
               return (
                 <tr

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
+import { summarizeOpenItems } from "@/lib/patient-finance";
 
 export async function GET() {
   const patient = await requirePatient();
@@ -109,7 +110,8 @@ export async function GET() {
 
     const offene = offenePosten ?? [];
     const zahlungen = transaktionen ?? [];
-    const offenBetrag = offene.reduce((sum, item) => sum + Number(item.offen ?? 0), 0);
+    const openItemsSummary = summarizeOpenItems(offene);
+    const offenBetrag = openItemsSummary.restschuld;
     const investiert = zahlungen.reduce((sum, tx) => sum + Number(tx.betrag ?? 0), 0);
     const total = investiert + offenBetrag;
 

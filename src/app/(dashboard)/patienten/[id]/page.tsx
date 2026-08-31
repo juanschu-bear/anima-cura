@@ -11,6 +11,8 @@ import { t } from "@/lib/i18n";
 import PatientPortalAdmin from "@/components/patient/PatientPortalAdmin";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { reconcileInstallments } from "@/lib/raten/reconciliation";
+import { resolveOpenItemAmount, resolveOpenItemStatus, resolvePaidItemAmount } from "@/lib/open-items";
+import { summarizePatientFinance } from "@/lib/patient-finance";
 
 const supabaseDetail = createBrowserClient();
 
@@ -27,12 +29,13 @@ export default function PatientDetailPage() {
   const { patient, loading } = usePatient(params.id as string);
   const [geldbewegungen, setGeldbewegungen] = useState<any[]>([]);
   const [bankZahlungen, setBankZahlungen] = useState<any[]>([]);
+  const [offenePosten, setOffenePosten] = useState<any[]>([]);
 
   useEffect(() => {
     const pid = params.id as string;
     if (!pid) return;
     (async () => {
-      const [kasse, bank] = await Promise.all([
+      const [kasse, bank, posten] = await Promise.all([
         supabaseDetail.from("kassen_zahlungen")
           .select("id, betrag, zahlart, zweck, kassen_datum, transaktion_id, beleg_nr, notiz")
           .eq("patient_id", pid)
@@ -43,6 +46,11 @@ export default function PatientDetailPage() {
           .eq("matched_patient_id", pid)
           .in("matching_status", ["auto", "manuell"])
           .order("datum", { ascending: false })
+          .limit(25),
+        supabaseDetail.from("offene_posten")
+          .select("id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
+          .eq("patient_id", pid)
+          .order("rechnung_datum", { ascending: false })
           .limit(25),
       ]);
       const liste: any[] = [];
@@ -78,6 +86,7 @@ export default function PatientDetailPage() {
       liste.sort((a, b) => (a.datum < b.datum ? 1 : -1));
       setGeldbewegungen(liste.slice(0, 25));
       setBankZahlungen(bank.data || []);
+      setOffenePosten(posten.data || []);
     })();
   }, [params.id]);
 
@@ -93,6 +102,10 @@ export default function PatientDetailPage() {
   if (!patient) return <p className="text-praxis-400">{t("patients.notFound", locale)}</p>;
 
   const raten = (patient.raten || []).sort((a: any, b: any) => a.rate_nummer - b.rate_nummer);
+  const finance = summarizePatientFinance({
+    rates: raten,
+    openItems: offenePosten,
+  });
   const aktivePlaene = [...(patient.ratenplaene || [])].sort((a: any, b: any) => {
     const left = new Date(b.start_datum || 0).getTime();
     const right = new Date(a.start_datum || 0).getTime();
@@ -100,21 +113,13 @@ export default function PatientDetailPage() {
   });
   const aktiverPlan = aktivePlaene.find((plan: any) => plan.status === "aktiv") || aktivePlaene[0] || null;
   const aktivePlanRaten = aktiverPlan ? raten.filter((rate: any) => rate.ratenplan_id === aktiverPlan.id) : [];
-  const totalRaten = Math.max(raten.length, 1);
-  const bezahlt = raten.filter((r: any) => r.status === "bezahlt").length;
-  const restschuld = raten
-    .filter((r: any) => r.status !== "bezahlt")
-    .reduce((s: number, r: any) => s + (r.betrag || 0), 0);
+  const totalRaten = Math.max(finance.totalCount || raten.length, 1);
+  const bezahlt = finance.paidCount || raten.filter((r: any) => r.status === "bezahlt").length;
+  const restschuld = finance.restschuld;
   const monatlicheRate = raten[0]?.betrag || 0;
   const progressPct = Math.round((bezahlt / totalRaten) * 100);
 
-  let status = "pünktlich";
-  const maxMahn = raten.reduce((m: number, r: any) => Math.max(m, r.mahnstufe || 0), 0);
-  const hasOverdue = raten.some((r: any) => r.status === "überfällig");
-  if (maxMahn >= 3) status = "eskalation";
-  else if (maxMahn === 2) status = "verzug";
-  else if (maxMahn === 1) status = "stufe1";
-  else if (hasOverdue) status = "abweichung";
+  const status = finance.status;
 
   const mahnStageMeta: Record<string, { label: string; border: string; glow: string; badgeBg: string; badgeText: string }> = {
     stufe1: {
@@ -254,6 +259,55 @@ export default function PatientDetailPage() {
         <MetricCard label={t("detail.monthlyRate", locale)} value={`${monatlicheRate.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} />
         <MetricCard label={t("detail.progressLabel", locale)} value={`${bezahlt} / ${totalRaten}`} sub={`${progressPct}% ${t("detail.completed", locale)}`} />
         <MetricCard label={t("detail.remainingDebt", locale)} value={`${restschuld.toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`} accent />
+      </div>
+
+      <div className="stat-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[24px] font-extrabold tracking-tight text-praxis-700">Offene Posten (Ist-Stand)</h3>
+            <p className="mt-1 text-sm text-praxis-400">
+              Echte Forderungen aus IVORIS/Synchronisierung. Das ist die Basis dafuer, was wirklich noch offen oder schon bezahlt ist.
+            </p>
+          </div>
+          <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-praxis-400">
+            Quelle: {finance.source === "open_items" ? "Offene Posten" : finance.source === "rates" ? "Ratenplan-Fallback" : "Keine Finanzdaten"}
+          </span>
+        </div>
+        {offenePosten.length === 0 ? (
+          <p className="mt-4 text-sm text-praxis-400">Keine offenen Posten hinterlegt. Falls hier Zahlungen fehlen, bitte IVORIS-Abgleich pruefen.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-surface-50">
+                  <th className="table-header">Datum</th>
+                  <th className="table-header">Referenz</th>
+                  <th className="table-header text-right">Betrag</th>
+                  <th className="table-header text-right">Gezahlt</th>
+                  <th className="table-header text-right">Offen</th>
+                  <th className="table-header">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {offenePosten.map((item) => (
+                  <tr key={item.id} className="hover:bg-surface-50/70">
+                    <td className="table-cell text-sm">{formatDate(item.rechnung_datum, locale)}</td>
+                    <td className="table-cell text-sm text-praxis-600">
+                      <div>{item.unser_zeichen || item.rechnung_nr || "—"}</div>
+                      {item.typ ? <div className="mt-1 text-[11px] text-praxis-400">{item.typ}</div> : null}
+                    </td>
+                    <td className="table-cell text-right text-sm font-semibold">{Number(item.betrag ?? 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
+                    <td className="table-cell text-right text-sm text-[#4ca43f]">{resolvePaidItemAmount(item).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
+                    <td className="table-cell text-right text-sm font-semibold text-accent-coral">{resolveOpenItemAmount(item).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
+                    <td className="table-cell text-sm">
+                      <StatusBadge status={resolveOpenItemStatus(item) === "erloesminderung" ? "storniert" : resolveOpenItemStatus(item)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="stat-card">

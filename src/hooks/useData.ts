@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { isBlockedPatientRecord, sanitizeBlockedTransactionMatch } from "@/lib/patient-blocklist";
+import { summarizePatientFinance } from "@/lib/patient-finance";
 
 const supabase = createBrowserClient();
 
@@ -121,17 +122,37 @@ export function usePatienten(search?: string) {
       query = query.or(muster);
     }
 
-    const { data, error: queryError } = await query;
+    const [{ data, error: queryError }, { data: offenePosten }] = await Promise.all([
+      query,
+      supabase
+        .from("offene_posten")
+        .select("patient_id, betrag, offen, gezahlt, status")
+        .limit(10000),
+    ]);
 
     if (queryError) {
       setError(queryError.message);
       setPatienten([]);
     } else {
+      const offenePotenByPatient = new Map<string, any[]>();
+      for (const item of offenePosten || []) {
+        if (!item.patient_id) continue;
+        const current = offenePotenByPatient.get(item.patient_id) || [];
+        current.push(item);
+        offenePotenByPatient.set(item.patient_id, current);
+      }
       const rows = (data || []).filter((patient) => !isBlockedPatientRecord(patient));
+      const enrichedRows = rows.map((patient) => ({
+        ...patient,
+        _financeSummary: summarizePatientFinance({
+          rates: patient.raten || [],
+          openItems: offenePotenByPatient.get(patient.id) || [],
+        }),
+      }));
       if (search?.trim()) {
         const normalizedSearch = search.trim();
         const tokens = buildSearchTokens(normalizedSearch);
-        const filteredRows = rows.filter((patient) => {
+        const filteredRows = enrichedRows.filter((patient) => {
           const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
           const reversedName = normalizePatientSearch(`${patient.vorname ?? ""} ${patient.nachname ?? ""}`);
           const patientNumber = String(patient.ivoris_nummer ?? "").toLowerCase();
@@ -151,7 +172,7 @@ export function usePatienten(search?: string) {
         });
         setPatienten(filteredRows);
       } else {
-        setPatienten(rows);
+        setPatienten(enrichedRows);
       }
     }
 
