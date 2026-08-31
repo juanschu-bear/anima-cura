@@ -13,6 +13,7 @@ import { P12Signer } from "@signpdf/signer-p12";
 import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
+import { classifyRecentIdentitySubmission } from "@/lib/services/animasign-submit-resume";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,12 +30,27 @@ type SubmitBody = {
 type SubmissionReplayRow = {
   id: string;
   status: string | null;
+  fehler_text?: string | null;
   account_email?: string | null;
   account_password?: string | null;
   matched_patient_id?: string | null;
   patient_id?: string | null;
   documenso_envelope_id?: string | null;
   documenso_recipient_token?: string | null;
+  signed_pdf_path?: string | null;
+  ivoris_synced?: boolean | null;
+  ivoris_doc_synced?: boolean | null;
+  ivoris_patient_id?: string | null;
+  ivoris_document_id?: string | null;
+  ivoris_sync_retry_count?: number | null;
+  ivoris_doc_retry_count?: number | null;
+  ivoris_sync_next_retry_at?: string | null;
+  ivoris_doc_next_retry_at?: string | null;
+  ivoris_sync_failed_permanently?: boolean | null;
+  ivoris_doc_failed_permanently?: boolean | null;
+  ivoris_summary_synced?: boolean | null;
+  ivoris_summary_synced_at?: string | null;
+  ivoris_summary_hash?: string | null;
 };
 
 type SubmitIntentState = {
@@ -47,6 +63,21 @@ type SubmitIntentState = {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+function normalizeMatchValue(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function toIsoDateOrNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
 }
 
 function normalizePatientGender(value: string | null): "m" | "w" | "d" | null {
@@ -279,7 +310,7 @@ async function loadReplayableSubmission(
   const { data, error } = await supabase
     .from("anamnese_submissions")
     .select(
-      "id, status, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token"
+      "id, status, fehler_text, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token, signed_pdf_path"
     )
     .eq("id", submissionId)
     .maybeSingle();
@@ -329,6 +360,65 @@ async function waitForResolvedSubmitIntent(
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return null;
+}
+
+type RecentIdentityDecision =
+  | { kind: "replay"; submission: SubmissionReplayRow }
+  | { kind: "resume"; submission: SubmissionReplayRow }
+  | { kind: "ignore" };
+
+async function findRecentResumableSubmission(
+  supabase: ReturnType<typeof createServerClient>,
+  params: {
+    vorname: string | null;
+    nachname: string | null;
+    geburtsdatum: string | null;
+  }
+): Promise<RecentIdentityDecision> {
+  const firstname = normalizeMatchValue(params.vorname);
+  const lastname = normalizeMatchValue(params.nachname);
+  const birthday = toIsoDateOrNull(params.geburtsdatum);
+
+  if (!firstname || !lastname || !birthday) {
+    return { kind: "ignore" };
+  }
+
+  const since = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("anamnese_submissions")
+    .select(
+      "id, created_at, vorname, nachname, geburtsdatum, status, fehler_text, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token, signed_pdf_path"
+    )
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) {
+    throw new Error(`Recent-Resume-Abgleich fehlgeschlagen: ${error.message}`);
+  }
+
+  for (const row of (data ?? []) as Array<
+    SubmissionReplayRow & {
+      created_at?: string | null;
+      vorname?: string | null;
+      nachname?: string | null;
+      geburtsdatum?: string | null;
+    }
+  >) {
+    if (normalizeMatchValue(row.vorname) !== firstname) continue;
+    if (normalizeMatchValue(row.nachname) !== lastname) continue;
+    if (toIsoDateOrNull(row.geburtsdatum) !== birthday) continue;
+
+    const decision = classifyRecentIdentitySubmission(row);
+    if (decision === "replay") {
+      return { kind: "replay", submission: row };
+    }
+    if (decision === "resume") {
+      return { kind: "resume", submission: row };
+    }
+  }
+
+  return { kind: "ignore" };
 }
 
 async function findRecentMatchingSubmission(
@@ -415,6 +505,36 @@ async function insertSubmissionWithSchemaFallback(
   return {
     data: null,
     error: { message: "Schema-Fallback fuer anamnese_submissions erschöpft." },
+  };
+}
+
+async function updateSubmissionWithSchemaFallback(
+  supabase: ReturnType<typeof createServerClient>,
+  submissionId: string,
+  payload: Record<string, unknown>
+) {
+  let currentPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from("anamnese_submissions")
+      .update(currentPayload)
+      .eq("id", submissionId);
+
+    if (!error) {
+      return { error: null as null };
+    }
+
+    const missingColumn = extractMissingColumn(error.message);
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return { error };
+    }
+
+    delete currentPayload[missingColumn];
+  }
+
+  return {
+    error: { message: "Schema-Fallback fuer anamnese_submissions update erschöpft." },
   };
 }
 
@@ -532,35 +652,107 @@ export async function POST(request: Request) {
       }
     }
 
-    // 1) Einreichung speichern
-    const { data: sub, error: insertError } = await insertSubmissionWithSchemaFallback(
-      supabase,
-      {
-        patient_id: patientId,
+    const submissionPayload = {
+      patient_id: patientId,
+      vorname,
+      nachname,
+      email,
+      geburtsdatum,
+      patient_anrede: asString(answers["patient_anrede"]),
+      versicherter_anrede: asString(answers["vp_anrede"]),
+      answers,
+      status: "signiert",
+    } as const;
+
+    let submissionId: string;
+
+    if (replayFingerprint) {
+      const resumable = await findRecentResumableSubmission(supabase, {
         vorname,
         nachname,
-        email,
         geburtsdatum,
-        patient_anrede: asString(answers["patient_anrede"]),
-        versicherter_anrede: asString(answers["vp_anrede"]),
-        answers,
-        status: "signiert",
+      });
+
+      if (resumable.kind === "replay") {
+        await finalizeSubmitIntent(supabase, replayFingerprint, resumable.submission.id);
+        return buildReplayResponse(resumable.submission);
       }
-    );
 
-    if (insertError || !sub) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Speichern fehlgeschlagen: ${insertError?.message ?? "unbekannt"}`,
-        },
-        { status: 500 }
+      if (resumable.kind === "resume") {
+        const { error: resumeError } = await updateSubmissionWithSchemaFallback(
+          supabase,
+          resumable.submission.id,
+          {
+            ...submissionPayload,
+            fehler_text: null,
+            documenso_envelope_id: null,
+            documenso_recipient_token: null,
+            signed_pdf_path: null,
+            signiert_am: null,
+            ivoris_synced: false,
+            ivoris_doc_synced: false,
+            ivoris_sync_error: null,
+            ivoris_document_id: null,
+            ivoris_sync_retry_count: 0,
+            ivoris_doc_retry_count: 0,
+            ivoris_sync_next_retry_at: null,
+            ivoris_doc_next_retry_at: null,
+            ivoris_sync_failed_permanently: false,
+            ivoris_doc_failed_permanently: false,
+            ivoris_summary_synced: false,
+            ivoris_summary_synced_at: null,
+            ivoris_summary_hash: null,
+          }
+        );
+
+        if (resumeError) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `Resume fehlgeschlagen: ${resumeError.message}`,
+            },
+            { status: 500 }
+          );
+        }
+
+        submissionId = resumable.submission.id;
+        await finalizeSubmitIntent(supabase, replayFingerprint, submissionId);
+      } else {
+        const { data: sub, error: insertError } = await insertSubmissionWithSchemaFallback(
+          supabase,
+          submissionPayload
+        );
+
+        if (insertError || !sub) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `Speichern fehlgeschlagen: ${insertError?.message ?? "unbekannt"}`,
+            },
+            { status: 500 }
+          );
+        }
+
+        submissionId = sub.id as string;
+        await finalizeSubmitIntent(supabase, replayFingerprint, submissionId);
+      }
+    } else {
+      const { data: sub, error: insertError } = await insertSubmissionWithSchemaFallback(
+        supabase,
+        submissionPayload
       );
-    }
 
-    const submissionId = sub.id as string;
-    if (replayFingerprint) {
-      await finalizeSubmitIntent(supabase, replayFingerprint, submissionId);
+      if (insertError || !sub) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Speichern fehlgeschlagen: ${insertError?.message ?? "unbekannt"}`,
+          },
+          { status: 500 }
+        );
+      }
+
+      submissionId = sub.id as string;
     }
 
     // 1b) Bestandspatienten-Abgleich: prüfen ob Patient existiert, Daten updaten

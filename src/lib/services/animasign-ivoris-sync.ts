@@ -209,6 +209,14 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function extractMissingColumn(message: string | null | undefined): string | null {
+  if (!message) return null;
+  const match = message.match(/column [^.]+\.(\w+) does not exist/i);
+  if (match?.[1]) return match[1];
+  const legacyMatch = message.match(/Could not find the '([^']+)' column/i);
+  return legacyMatch?.[1] ?? null;
+}
+
 function normalizeIvorisId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -754,21 +762,67 @@ async function loadSubmission(
   db: DbClient,
   submissionId: string
 ): Promise<SubmissionRow> {
-  const { data, error } = await db
-    .from("anamnese_submissions")
-    .select(
-      "id, patient_id, matched_patient_id, is_existing, vorname, nachname, email, geburtsdatum, answers, signed_pdf_path, signiert_am, created_at, ivoris_synced, ivoris_doc_synced, ivoris_sync_error, ivoris_patient_id, ivoris_document_id, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_summary_synced, ivoris_summary_synced_at, ivoris_summary_hash"
-    )
-    .eq("id", submissionId)
-    .single();
+  const requiredColumns = [
+    "id",
+    "patient_id",
+    "matched_patient_id",
+    "is_existing",
+    "vorname",
+    "nachname",
+    "email",
+    "geburtsdatum",
+    "answers",
+    "signed_pdf_path",
+    "signiert_am",
+    "created_at",
+    "ivoris_synced",
+    "ivoris_doc_synced",
+    "ivoris_sync_error",
+    "ivoris_patient_id",
+    "ivoris_document_id",
+    "ivoris_sync_retry_count",
+    "ivoris_doc_retry_count",
+    "ivoris_sync_next_retry_at",
+    "ivoris_doc_next_retry_at",
+    "ivoris_sync_failed_permanently",
+    "ivoris_doc_failed_permanently",
+  ];
+  const optionalColumns = [
+    "ivoris_summary_synced",
+    "ivoris_summary_synced_at",
+    "ivoris_summary_hash",
+  ];
+  const selectedColumns = [...requiredColumns, ...optionalColumns];
 
-  if (error || !data) {
-    throw new Error(
-      `Submission ${submissionId} konnte nicht geladen werden: ${error?.message ?? "unbekannt"}`
-    );
+  for (let attempt = 0; attempt < optionalColumns.length + 1; attempt += 1) {
+    const { data, error } = await db
+      .from("anamnese_submissions")
+      .select(selectedColumns.join(", "))
+      .eq("id", submissionId)
+      .single();
+
+    if (!error && data) {
+      return {
+        ivoris_summary_synced: null,
+        ivoris_summary_synced_at: null,
+        ivoris_summary_hash: null,
+        ...((data as unknown) as SubmissionRow),
+      };
+    }
+
+    const missingColumn = extractMissingColumn(error?.message);
+    if (!missingColumn || !optionalColumns.includes(missingColumn)) {
+      throw new Error(
+        `Submission ${submissionId} konnte nicht geladen werden: ${error?.message ?? "unbekannt"}`
+      );
+    }
+
+    const index = selectedColumns.indexOf(missingColumn);
+    if (index >= 0) {
+      selectedColumns.splice(index, 1);
+    }
   }
-
-  return data as SubmissionRow;
+  throw new Error(`Submission ${submissionId} konnte nicht geladen werden: optional schema fallback exhausted`);
 }
 
 async function loadResolvedPatient(
@@ -1568,6 +1622,19 @@ async function syncDocumentStage(
     const summaryText = buildAnamnesisSummaryText(submission);
     const summaryHash = buildSummaryHash(summaryText);
 
+    console.log(
+      `[ANIMASIGN][IVORIS] doc sync submission=${submission.id} patient=${patient} blobType=${
+        fileData.constructor?.name ?? typeof fileData
+      } bytes=${fileBytes.byteLength} base64Type=${typeof base64} base64Length=${base64.length}`
+    );
+
+    const documentId = await addIvorisDocument({
+      patientIvorisId: patient,
+      name: docName,
+      date: docDate,
+      contentBase64: base64,
+    });
+
     if (
       shouldPushIvorisSummary({
         alreadySynced: submission.ivoris_summary_synced,
@@ -1582,34 +1649,44 @@ async function syncDocumentStage(
         type: "Note",
       });
 
-      const { error: summaryMarkError } = await db
-        .from("anamnese_submissions")
-        .update({
-          ivoris_summary_synced: true,
-          ivoris_summary_synced_at: new Date().toISOString(),
-          ivoris_summary_hash: summaryHash,
-        })
-        .eq("id", submission.id);
+      const summaryPatch: Record<string, unknown> = {
+        ivoris_summary_synced: true,
+        ivoris_summary_synced_at: new Date().toISOString(),
+        ivoris_summary_hash: summaryHash,
+      };
+
+      let summaryMarkError: string | null = null;
+      let currentPatch = { ...summaryPatch };
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const { error } = await db
+          .from("anamnese_submissions")
+          .update(currentPatch)
+          .eq("id", submission.id);
+
+        if (!error) {
+          summaryMarkError = null;
+          break;
+        }
+
+        const missingColumn = extractMissingColumn(error.message);
+        if (!missingColumn || !(missingColumn in currentPatch)) {
+          summaryMarkError = error.message;
+          break;
+        }
+
+        delete currentPatch[missingColumn as keyof typeof currentPatch];
+        if (Object.keys(currentPatch).length === 0) {
+          break;
+        }
+        summaryMarkError = null;
+      }
 
       if (summaryMarkError) {
-        throw new Error(
-          `Karteiblatt-Markierung konnte nicht gespeichert werden: ${summaryMarkError.message}`
+        console.warn(
+          `[ANIMASIGN][IVORIS] summary marker fallback failed for submission=${submission.id}: ${summaryMarkError}`
         );
       }
     }
-
-    console.log(
-      `[ANIMASIGN][IVORIS] doc sync submission=${submission.id} patient=${patient} blobType=${
-        fileData.constructor?.name ?? typeof fileData
-      } bytes=${fileBytes.byteLength} base64Type=${typeof base64} base64Length=${base64.length}`
-    );
-
-    const documentId = await addIvorisDocument({
-      patientIvorisId: patient,
-      name: docName,
-      date: docDate,
-      contentBase64: base64,
-    });
 
     await writeSyncLog(db, submission.id, "document", attemptNo, "success", null, {
       requestPayload: {

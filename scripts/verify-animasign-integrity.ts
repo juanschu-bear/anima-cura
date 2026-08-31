@@ -105,7 +105,7 @@ async function main() {
       .limit(10000),
     db
       .from("anamnese_submissions")
-      .select("id, created_at, vorname, nachname, geburtsdatum, ivoris_patient_id, matched_patient_id")
+      .select("id, created_at, vorname, nachname, geburtsdatum, status, ivoris_patient_id, matched_patient_id")
       .gte("created_at", recentWindowIso)
       .limit(5000),
   ]);
@@ -203,8 +203,17 @@ async function main() {
     submissionGroups.get(key)!.push(row as unknown as Record<string, unknown>);
   }
   const duplicateSubmissionGroups = Array.from(submissionGroups.entries())
-    .filter(([, rows]) => rows.length > 1)
-    .map(([key, rows]) => ({ key, count: rows.length, rows: rows.slice(0, 5) }));
+    .map(([key, rows]) => ({
+      key,
+      rows,
+      activeRows: rows.filter((row) => row.status !== "fehler"),
+    }))
+    .filter(({ activeRows }) => activeRows.length > 1)
+    .map(({ key, rows, activeRows }) => ({
+      key,
+      count: activeRows.length,
+      rows: rows.slice(0, 5),
+    }));
   pushProblem(
     problems,
     "recent_submission_duplicate_groups",
