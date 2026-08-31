@@ -10,6 +10,39 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const PATIENT_DOCUMENTS_BUCKET = "documents";
+
+async function uploadPatientDocumentFile(input: {
+  serviceClient: ReturnType<typeof createServerClient>;
+  file: File;
+  storagePath: string;
+}) {
+  const attemptUpload = () =>
+    input.serviceClient.storage.from(PATIENT_DOCUMENTS_BUCKET).upload(input.storagePath, input.file, {
+      contentType: input.file.type,
+      upsert: false,
+    });
+
+  let uploadResult = await attemptUpload();
+
+  if (uploadResult.error?.message?.toLowerCase().includes("bucket not found")) {
+    const { error: bucketError } = await input.serviceClient.storage.createBucket(PATIENT_DOCUMENTS_BUCKET, {
+      public: true,
+      fileSizeLimit: "25MB",
+    });
+
+    if (bucketError && !bucketError.message?.toLowerCase().includes("already exists")) {
+      return {
+        error: bucketError,
+      };
+    }
+
+    uploadResult = await attemptUpload();
+  }
+
+  return uploadResult;
+}
+
 export async function POST(request: NextRequest) {
   // Auth check - must be praxis user
   const supabase = createServerComponentClient();
@@ -52,12 +85,11 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split(".").pop() || "pdf";
     const storagePath = `patient-docs/${patientId}/${Date.now()}-${name.replace(/[^a-zA-Z0-9]/g, "_")}.${ext}`;
 
-    const { error: uploadError } = await serviceClient.storage
-      .from("documents")
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+    const { error: uploadError } = await uploadPatientDocumentFile({
+      serviceClient,
+      file,
+      storagePath,
+    });
 
     if (uploadError) {
       console.error("[admin/dokumente] Upload error:", uploadError.message);
@@ -67,7 +99,7 @@ export async function POST(request: NextRequest) {
       );
     } else {
       const { data: urlData } = serviceClient.storage
-        .from("documents")
+        .from(PATIENT_DOCUMENTS_BUCKET)
         .getPublicUrl(storagePath);
       fileUrl = urlData?.publicUrl || null;
     }
