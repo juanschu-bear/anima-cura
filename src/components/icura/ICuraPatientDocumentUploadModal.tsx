@@ -39,6 +39,7 @@ export default function ICuraPatientDocumentUploadModal({
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
   const [documentName, setDocumentName] = useState("");
   const [documentType, setDocumentType] = useState(patientDocumentTypeOptions[0]?.value ?? "sonstiges");
+  const [customDocumentTypeLabel, setCustomDocumentTypeLabel] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -55,11 +56,22 @@ export default function ICuraPatientDocumentUploadModal({
   );
 
   const displayFileName = file?.name ?? "";
+  const isCustomType = documentType === "sonstiges";
+  const customTypeLabel = customDocumentTypeLabel.trim();
   const resolvedDocumentName = useMemo(() => {
     const trimmed = documentName.trim();
-    if (trimmed) return trimmed;
-    return displayFileName.replace(/\.[^.]+$/, "").trim();
-  }, [displayFileName, documentName]);
+    if (trimmed) {
+      return isCustomType && customTypeLabel
+        ? `${customTypeLabel} · ${trimmed}`
+        : trimmed;
+    }
+
+    const fallbackName = displayFileName.replace(/\.[^.]+$/, "").trim();
+    if (isCustomType && customTypeLabel) {
+      return fallbackName ? `${customTypeLabel} · ${fallbackName}` : customTypeLabel;
+    }
+    return fallbackName;
+  }, [customTypeLabel, displayFileName, documentName, isCustomType]);
 
   const closeAndReset = useCallback(() => {
     setResults([]);
@@ -69,6 +81,7 @@ export default function ICuraPatientDocumentUploadModal({
     setSuccessText(null);
     setDocumentName("");
     setDocumentType(patientDocumentTypeOptions[0]?.value ?? "sonstiges");
+    setCustomDocumentTypeLabel("");
     setFile(null);
     setSelectedPatient(null);
     setQuery("");
@@ -93,6 +106,7 @@ export default function ICuraPatientDocumentUploadModal({
     setFile(null);
     setDocumentName("");
     setDocumentType(patientDocumentTypeOptions[0]?.value ?? "sonstiges");
+    setCustomDocumentTypeLabel("");
 
     if (prefill?.patientId && prefill.patientName) {
       setSelectedPatient({
@@ -195,6 +209,10 @@ export default function ICuraPatientDocumentUploadModal({
       setErrorText("Bitte einen Dokumentnamen angeben oder eine Datei mit Namen wählen.");
       return;
     }
+    if (isCustomType && !customTypeLabel) {
+      setErrorText("Bitte den eigenen Dokumenttyp kurz benennen.");
+      return;
+    }
 
     setSubmitting(true);
     setErrorText(null);
@@ -220,7 +238,9 @@ export default function ICuraPatientDocumentUploadModal({
       onUploaded?.({
         patientName: selectedPatient.name,
         documentName: resolvedDocumentName,
-        type: selectedType,
+        type: isCustomType && customTypeLabel
+          ? { ...selectedType, label: customTypeLabel }
+          : selectedType,
       });
       window.setTimeout(() => {
         closeAndReset();
@@ -289,9 +309,27 @@ export default function ICuraPatientDocumentUploadModal({
               </div>
 
               <div className="mt-3 rounded-[18px] border border-[var(--ac-border)] bg-[var(--ac-surface)] p-2">
+                {selectedPatient ? (
+                  <div className="mb-2 rounded-[16px] border border-[var(--ac-primary)] bg-[color:rgba(96,118,255,0.12)] px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ac-primary)]">
+                      Ausgewählt
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-[var(--ac-text)]">
+                      {selectedPatient.name}
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--ac-text-soft)]">
+                      {selectedPatient.ivoris_nummer ? `IVORIS ${selectedPatient.ivoris_nummer}` : "Patient manuell gewählt"}
+                      {selectedPatient.geburtsdatum ? ` · ${selectedPatient.geburtsdatum}` : ""}
+                      {selectedPatient.email ? ` · ${selectedPatient.email}` : ""}
+                    </div>
+                  </div>
+                ) : null}
+
                 {results.length === 0 ? (
                   <div className="px-3 py-4 text-sm text-[var(--ac-text-soft)]">
-                    {query.trim().length < 2
+                    {selectedPatient
+                      ? "Patient ist bereits ausgewählt. Sie können direkt rechts das Dokument hochladen oder links weiter suchen."
+                      : query.trim().length < 2
                       ? "Mindestens 2 Zeichen eingeben."
                       : searching
                         ? "iCura sucht passende Patienten ..."
@@ -340,7 +378,10 @@ export default function ICuraPatientDocumentUploadModal({
                   <div className="mb-2 text-sm font-medium text-[var(--ac-text-soft)]">Dokumenttyp</div>
                   <select
                     value={documentType}
-                    onChange={(event) => setDocumentType(event.target.value)}
+                    onChange={(event) => {
+                      setDocumentType(event.target.value);
+                      setErrorText(null);
+                    }}
                     className="w-full rounded-[16px] border border-[var(--ac-border)] bg-[var(--ac-surface)] px-4 py-3 text-base text-[var(--ac-text)] outline-none"
                   >
                     {patientDocumentTypeOptions.map((option) => (
@@ -350,6 +391,21 @@ export default function ICuraPatientDocumentUploadModal({
                     ))}
                   </select>
                 </div>
+
+                {isCustomType ? (
+                  <div>
+                    <div className="mb-2 text-sm font-medium text-[var(--ac-text-soft)]">Eigener Dokumenttyp</div>
+                    <input
+                      value={customDocumentTypeLabel}
+                      onChange={(event) => setCustomDocumentTypeLabel(event.target.value)}
+                      placeholder="z. B. Diagnosebericht, Zusatzinfo, Labornachtrag"
+                      className="w-full rounded-[16px] border border-[var(--ac-border)] bg-[var(--ac-surface)] px-4 py-3 text-base text-[var(--ac-text)] outline-none placeholder:text-[var(--ac-text-soft)]"
+                    />
+                    <div className="mt-2 text-xs text-[var(--ac-text-soft)]">
+                      Dieser Freitext beschreibt den Typ genauer, obwohl das Dokument intern unter Sonstiges gespeichert wird.
+                    </div>
+                  </div>
+                ) : null}
 
                 <div>
                   <div className="mb-2 text-sm font-medium text-[var(--ac-text-soft)]">Dokumentname</div>
