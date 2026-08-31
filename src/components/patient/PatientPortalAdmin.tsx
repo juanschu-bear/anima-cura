@@ -55,6 +55,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   // Doc form
   const [docName, setDocName] = useState("");
   const [docTyp, setDocTyp] = useState("anfangsdiagnostik");
+  const [docCustomTyp, setDocCustomTyp] = useState("");
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docMsg, setDocMsg] = useState("");
@@ -136,9 +137,17 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   };
 
   const handleUploadDoc = async () => {
-    const finalName = docName.trim() || suggestedDocName(docFile);
+    const customTyp = docCustomTyp.trim();
+    const baseName = docName.trim() || suggestedDocName(docFile);
+    const finalName = docTyp === "sonstiges" && customTyp
+      ? (baseName ? `${customTyp} · ${baseName}` : customTyp)
+      : baseName;
     if (!finalName) {
       setDocMsg("✗ Bitte Dokumentname eingeben oder eine Datei auswählen");
+      return;
+    }
+    if (docTyp === "sonstiges" && !customTyp) {
+      setDocMsg("✗ Bitte den Dokumenttyp bei Sonstiges kurz eintragen");
       return;
     }
     setUploadingDoc(true);
@@ -156,6 +165,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
         setDocs(prev => [d.dokument, ...prev]);
         setDocName("");
         setDocTyp("anfangsdiagnostik");
+        setDocCustomTyp("");
         setDocFile(null);
         setDocMsg("✓ Dokument hinzugefügt");
       } else {
@@ -289,6 +299,14 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
               className="text-sm text-praxis-500 file:mr-2 file:rounded-md file:border-0 file:bg-[#5d4fd8] file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
             />
           </div>
+          {docTyp === "sonstiges" ? (
+            <input
+              value={docCustomTyp}
+              onChange={e => setDocCustomTyp(e.target.value)}
+              placeholder="Dokumenttyp eingeben, z. B. Zusatzinfo oder Diagnosebericht"
+              className={inputStyle}
+            />
+          ) : null}
           <div className="flex items-center gap-3">
             <button onClick={handleUploadDoc} disabled={uploadingDoc || !docFile || !docTyp} className={btnStyle}>
               {uploadingDoc ? "Wird hochgeladen..." : "Dokument speichern"}
