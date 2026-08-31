@@ -17,6 +17,40 @@ function getTransactionNote(tx: any): string {
   return "";
 }
 
+function cleanSenderCandidate(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/\b(BIC|IBAN|DATUM|UHR|RATE|RATEN|ZEICHEN|RECHNUNG)\b.*$/i, "")
+    .replace(/^[,.\-:\s]+|[,.\-:\s]+$/g, "")
+    .trim();
+}
+
+function fallbackSenderFromPurpose(purpose: string): string | null {
+  if (!purpose) return null;
+
+  const patterns = [
+    /Lastschrifteinreichg\.\s*([^]+?)\s*Rate von/i,
+    /Gutschrift\s+Überweisg\.\s*([^]+?)\s*(?:Zeichen:|Unser Zeichen:|\d{8}-\d+\/\d{4}(?:-\d+)?)/i,
+    /Gutschrift\s+Überweisg\.\s*([^]+?)\s*Rechnung/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = purpose.match(pattern);
+    const candidate = cleanSenderCandidate(match?.[1] || "");
+    if (candidate && !/^unbekannt$/i.test(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getDisplaySender(tx: any): string {
+  const sender = String(tx?.absender_name || "").trim();
+  if (sender && !/^unbekannt$/i.test(sender)) return sender;
+  return fallbackSenderFromPurpose(String(tx?.verwendungszweck || "")) || sender || "Unbekannt";
+}
+
 export default function ZahlungenPage() {
   const router = useRouter();
   const { locale, theme } = useAppStore();
@@ -215,7 +249,7 @@ export default function ZahlungenPage() {
 
   // Dialog mit vorbefuellter Suche: Nachname aus dem Absender raten.
   function openAssignModal(tx: any) {
-    const name = String(tx?.absender_name || "").trim();
+    const name = getDisplaySender(tx);
     const guess = name.includes(",") ? name.split(",")[0] : name.split(/\s+/)[0] || "";
     setPatSearch(guess.trim());
     setMatchModal(tx);
@@ -808,7 +842,7 @@ export default function ZahlungenPage() {
                 onClick={() => tx.matched_patient_id && router.push(`/patienten/${tx.matched_patient_id}`)}
               >
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
-                <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{tx.absender_name}</td>
+                <td className="table-cell py-3 text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{getDisplaySender(tx)}</td>
                 <td className="table-cell py-3 text-sm">
                   {(() => {
                     const w = wegVonTransaktion(tx);
@@ -880,7 +914,7 @@ export default function ZahlungenPage() {
                         openNoteModal({
                           typ: "transaktion",
                           id: tx.id,
-                          titel: tx.absender_name || "Unbekannt",
+                          titel: getDisplaySender(tx),
                           subtitle: tx.verwendungszweck || "Kein Verwendungszweck hinterlegt",
                           amountLabel: `+${Number(tx.betrag || 0).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€`,
                           notiz: getTransactionNote(tx),
@@ -1048,7 +1082,7 @@ export default function ZahlungenPage() {
                 {clientTx.filter(tx => Number(tx.betrag || 0) < 0).map((tx) => (
                   <tr key={tx.id}>
                     <td className="table-cell text-sm">{new Date(tx.datum).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE")}</td>
-                    <td className="table-cell text-sm font-semibold">{tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : tx.absender_name || "—"}</td>
+                    <td className="table-cell text-sm font-semibold">{tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : getDisplaySender(tx) || "—"}</td>
                     <td className="table-cell text-right text-sm font-bold" style={{ color: "var(--ac-danger)" }}>{Number(tx.betrag).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
                     <td className="table-cell text-sm">{tx.verwendungszweck || t("payments.chargebacks.defaultReason", locale)}</td>
                     <td className="table-cell text-sm" style={{ color: "var(--ac-warning)" }}>+3,50€</td>
@@ -1122,7 +1156,7 @@ export default function ZahlungenPage() {
               {t("payments.modalIntro", locale)}
             </div>
             <div className="rounded-lg p-4" style={{ background: "var(--ac-surface-muted)" }}>
-              <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{matchModal.absender_name}</p>
+              <p className="text-sm font-medium" style={{ color: "var(--ac-text)" }}>{getDisplaySender(matchModal)}</p>
               <p className="text-xs" style={{ color: "var(--ac-text-mute)" }}>{matchModal.verwendungszweck}</p>
               <p className="mt-1 text-lg font-bold" style={{ color: "var(--ac-text)" }}>{matchModal.betrag?.toLocaleString(locale === "en" ? "en-GB" : "de-DE")} €</p>
             </div>
