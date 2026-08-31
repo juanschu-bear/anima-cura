@@ -14,7 +14,6 @@ import { AlertTriangle,
   Brain,
   FolderKanban,
   Languages,
-  LayoutDashboard,
   LogOut,
   MessageSquare,
   Moon,
@@ -38,19 +37,15 @@ import AccessDenied from "@/components/auth/AccessDenied";
 import AuthSessionManager from "@/components/auth/AuthSessionManager";
 import ICuraVoiceCompanion from "@/components/icura/ICuraVoiceCompanion";
 
-type NavItem = { href: string; icon: typeof LayoutDashboard; key: string };
-
-const NAV_STANDALONE: NavItem[] = [
-  { href: "/uebersicht", icon: LayoutDashboard, key: "nav.overview" },
-];
+type NavItem = { href: string; icon: typeof CreditCard; key: string };
 
 const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
   {
     key: "navGroup.finance",
     items: [
-      { href: "/finanzen", icon: Coins, key: "nav.finances" },
-      { href: "/kasse", icon: Banknote, key: "nav.kasse" },
       { href: "/zahlungen", icon: CreditCard, key: "nav.payments" },
+      { href: "/kasse", icon: Banknote, key: "nav.kasse" },
+      { href: "/finanzen", icon: Coins, key: "nav.finances" },
       { href: "/offene-posten", icon: Receipt, key: "nav.openItems" },
       { href: "/rechnungen", icon: FileText, key: "nav.invoices" },
       { href: "/ratenplan", icon: CalendarRange, key: "nav.rateplans" },
@@ -129,9 +124,6 @@ export default function DashboardShell({
     day: "2-digit",
     month: "short",
   });
-  const visibleStandalone = NAV_STANDALONE.filter((item) =>
-    canAccessPath(activeUser.role, item.href, activeUser.permissions)
-  );
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => canAccessPath(activeUser.role, item.href, activeUser.permissions)),
@@ -236,7 +228,6 @@ export default function DashboardShell({
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-          {visibleStandalone.map((item) => renderNavItem(item))}
           {visibleGroups.map((group) => {
             const isOpen = openGroups[group.key] ?? true;
             return (
