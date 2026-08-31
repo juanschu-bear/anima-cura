@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { patientDocumentTypeOptions } from "@/lib/patient-document-types";
 
 interface Props {
@@ -59,10 +59,21 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docMsg, setDocMsg] = useState("");
+  const docFileInputRef = useRef<HTMLInputElement | null>(null);
 
   function suggestedDocName(file: File | null) {
     if (!file?.name) return "";
     return file.name.replace(/\.[^.]+$/, "");
+  }
+
+  function resetDocForm() {
+    setDocName("");
+    setDocTyp("anfangsdiagnostik");
+    setDocCustomTyp("");
+    setDocFile(null);
+    if (docFileInputRef.current) {
+      docFileInputRef.current.value = "";
+    }
   }
 
   const fetchData = useCallback(async () => {
@@ -163,10 +174,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
       if (res.ok) {
         const d = await res.json();
         setDocs(prev => [d.dokument, ...prev]);
-        setDocName("");
-        setDocTyp("anfangsdiagnostik");
-        setDocCustomTyp("");
-        setDocFile(null);
+        resetDocForm();
         setDocMsg("✓ Dokument hinzugefügt");
       } else {
         const d = await res.json();
@@ -289,11 +297,13 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
               {docTypes.map(dt => <option key={dt.value} value={dt.value}>{dt.label}</option>)}
             </select>
             <input
+              ref={docFileInputRef}
               type="file"
               accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
               onChange={e => {
                 const nextFile = e.target.files?.[0] || null;
                 setDocFile(nextFile);
+                setDocMsg("");
                 if (nextFile && !docName.trim()) setDocName(suggestedDocName(nextFile));
               }}
               className="text-sm text-praxis-500 file:mr-2 file:rounded-md file:border-0 file:bg-[#5d4fd8] file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
@@ -302,7 +312,10 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
           {docTyp === "sonstiges" ? (
             <input
               value={docCustomTyp}
-              onChange={e => setDocCustomTyp(e.target.value)}
+              onChange={e => {
+                setDocCustomTyp(e.target.value);
+                setDocMsg("");
+              }}
               placeholder="Dokumenttyp eingeben, z. B. Zusatzinfo oder Diagnosebericht"
               className={inputStyle}
             />
@@ -316,9 +329,9 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
             ) : null}
             {docFile ? (
               <span className="text-xs text-praxis-400">Ausgewählt: {docFile.name}</span>
-            ) : (
+            ) : !docMsg.startsWith("✓") ? (
               <span className="text-xs text-red-500">Bitte zuerst eine Datei auswählen.</span>
-            )}
+            ) : null}
             {docMsg && <span className={`text-sm ${docMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{docMsg}</span>}
           </div>
         </div>
