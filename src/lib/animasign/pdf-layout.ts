@@ -251,3 +251,96 @@ export async function rebuildLegacySignedPdf(params: {
 
   return Buffer.from(await out.save());
 }
+
+function extractBase64Payload(dataUrl: string): string | null {
+  const match = dataUrl.match(/^data:image\/(?:png|jpe?g);base64,(.+)$/i);
+  return match?.[1] ?? null;
+}
+
+function formatDateOnly(value: string | null): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-");
+    return `${day}.${month}.${year}`;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Berlin",
+  }).format(date);
+}
+
+export async function stampStoredSignatureOnReservedPage(params: {
+  unsignedPdf: Buffer;
+  signatureDataUrl: string;
+  signedAt: string | null;
+  signedDateText?: string | null;
+  ort?: string | null;
+}): Promise<Buffer> {
+  const base64Payload = extractBase64Payload(params.signatureDataUrl);
+  if (!base64Payload) {
+    throw new Error("signature_data_url_invalid");
+  }
+
+  const doc = await PDFDocument.load(params.unsignedPdf);
+  const pages = doc.getPages();
+  const page = pages[pages.length - 1];
+
+  if (!page) {
+    throw new Error("signature_page_missing");
+  }
+
+  const signatureBytes = Buffer.from(base64Payload, "base64");
+  const signatureImage = params.signatureDataUrl.toLowerCase().startsWith("data:image/jpeg")
+    ? await doc.embedJpg(signatureBytes)
+    : await doc.embedPng(signatureBytes);
+
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const { width, height } = page.getSize();
+  const signatureBox = {
+    x: 52,
+    y: 248,
+    width: width - 104,
+    height: 120,
+  };
+
+  const scaled = signatureImage.scale(1);
+  const ratio = Math.min(signatureBox.width / scaled.width, signatureBox.height / scaled.height);
+  const drawWidth = scaled.width * ratio;
+  const drawHeight = scaled.height * ratio;
+  const drawX = signatureBox.x + (signatureBox.width - drawWidth) / 2;
+  const drawY = signatureBox.y + (signatureBox.height - drawHeight) / 2;
+
+  page.drawImage(signatureImage, {
+    x: drawX,
+    y: drawY,
+    width: drawWidth,
+    height: drawHeight,
+  });
+
+  if (params.ort) {
+    page.drawText(params.ort, {
+      x: 52,
+      y: 182,
+      size: 12,
+      font: regular,
+      color: rgb(0.13, 0.17, 0.15),
+    });
+  }
+
+  const dateText = params.signedDateText?.trim() || formatDateOnly(params.signedAt);
+  if (dateText) {
+    page.drawText(dateText, {
+      x: width * 0.58,
+      y: 182,
+      size: 12,
+      font: regular,
+      color: rgb(0.13, 0.17, 0.15),
+    });
+  }
+
+  return Buffer.from(await doc.save());
+}

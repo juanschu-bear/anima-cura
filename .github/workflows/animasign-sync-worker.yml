@@ -51,6 +51,9 @@ jobs:
       - name: Run AnimaSign sync worker
         run: npm run animasign:sync-worker
 
+      - name: Repair legacy signed PDF paths
+        run: npm run repair:animasign-signed-paths -- --apply --limit=120
+
       - name: Verify AnimaSign integrity
         run: npm run check:animasign
 
