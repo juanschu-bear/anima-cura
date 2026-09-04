@@ -110,7 +110,7 @@ function BelegInhalt() {
           <button
             type="button"
             onClick={closeReceipt}
-            className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-[#111b27] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:bg-[#182434]"
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-[linear-gradient(180deg,#182434_0%,#101a29_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-[#7dd3fc]/50 hover:bg-[linear-gradient(180deg,#1d2d42_0%,#122033_100%)]"
           >
             <X size={16} />
             Schließen
@@ -118,13 +118,13 @@ function BelegInhalt() {
           <div className="inline-flex rounded-full border border-white/12 bg-[#0f1722] p-1 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
             <Link
               href={`/kasse/beleg?id=${id}&copy=praxis`}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${!isPatientCopy ? "bg-white text-[#0e1825]" : "text-white/80 hover:text-white"}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${!isPatientCopy ? "bg-[linear-gradient(135deg,#8cf0d2_0%,#d5fff1_100%)] text-[#0d2b24] shadow-[0_10px_28px_rgba(104,255,210,0.22)]" : "text-white/80 hover:text-white"}`}
             >
               Praxisquittung
             </Link>
             <Link
               href={`/kasse/beleg?id=${id}&copy=patient`}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isPatientCopy ? "bg-[#57e1a0] text-[#08281a]" : "text-white/80 hover:text-white"}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isPatientCopy ? "bg-[linear-gradient(135deg,#7cb8ff_0%,#dcecff_100%)] text-[#112646] shadow-[0_10px_28px_rgba(124,184,255,0.24)]" : "text-white/80 hover:text-white"}`}
             >
               Patientenkopie
             </Link>
@@ -133,7 +133,7 @@ function BelegInhalt() {
         <button
           type="button"
           onClick={drucke}
-          className="inline-flex items-center gap-2 rounded-full bg-[#2ac95a] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(42,201,90,0.28)] transition hover:bg-[#25b650]"
+          className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#34d46f_0%,#1cb954_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(42,201,90,0.28)] transition hover:brightness-105"
         >
           <Printer size={16} />
           Drucken / als PDF sichern
@@ -141,7 +141,7 @@ function BelegInhalt() {
       </div>
 
       <div className="beleg-print-shell">
-        <article className="beleg-druck overflow-hidden rounded-[28px] border border-[#dbe4ee] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+        <article className="beleg-druck overflow-hidden rounded-[28px] border border-white/12 bg-[#0d1320] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
           <header className="beleg-header flex items-start justify-between gap-6 px-9 py-8">
             <div className="min-w-0">
               <p className="beleg-kicker">{isPatientCopy ? "Patientenkopie" : "AnimaPay Kasse"}</p>
@@ -156,19 +156,19 @@ function BelegInhalt() {
           </header>
 
           <div className="grid gap-5 px-9 pt-7 md:grid-cols-[1.1fr_0.9fr]">
-            <section className="rounded-[20px] border border-[#dde6f0] bg-white p-5">
+            <section className="beleg-panel beleg-panel-strong p-5">
               <p className="beleg-section-label">{isPatientCopy ? "Praxis" : "Praxisansicht"}</p>
-              <p className="mt-3 text-[22px] font-bold text-[#18263a]">{PRAXIS.name}</p>
-              <p className="mt-1 font-sans text-[14px] text-[#52657c]">{PRAXIS.zusatz}</p>
-              <p className="mt-3 font-sans text-[13px] leading-7 text-[#6b7a90]">
+              <p className="beleg-panel-title mt-3 text-[22px] font-bold">{PRAXIS.name}</p>
+              <p className="beleg-panel-copy mt-1 font-sans text-[14px]">{PRAXIS.zusatz}</p>
+              <p className="beleg-panel-copy mt-3 font-sans text-[13px] leading-7">
                 {PRAXIS.strasse}
                 <br />
                 {PRAXIS.ort}
               </p>
             </section>
 
-            <section className="rounded-[20px] border border-[rgba(84,166,124,0.26)] bg-[linear-gradient(135deg,#eef8f3_0%,#f7fbff_100%)] p-5">
-              <p className="beleg-section-label text-[#5b7a69]">
+            <section className="beleg-panel beleg-amount-card p-5">
+              <p className="beleg-section-label text-[#2e6a58]">
                 {zahlung.buchungstyp === "ausgabe" ? "Dokumentierter Betrag" : "Erhaltener Betrag"}
               </p>
               <p className="mt-4 text-[44px] font-bold leading-none text-[#153a2b]">{signedAmount(zahlung.betrag, zahlung.buchungstyp)}</p>
@@ -184,21 +184,21 @@ function BelegInhalt() {
 
           <section className="grid gap-4 px-9 py-6 md:grid-cols-2">
             {cards.map(([label, value]) => (
-              <div key={label} className="rounded-[18px] border border-[#e4ebf3] bg-white px-4 py-4">
+              <div key={label} className="beleg-panel px-4 py-4">
                 <p className="beleg-section-label">{label}</p>
-                <p className="mt-2 text-[18px] font-bold leading-[1.35] text-[#1a2940]">{value}</p>
+                <p className="beleg-panel-title mt-2 text-[18px] font-bold leading-[1.35]">{value}</p>
               </div>
             ))}
           </section>
 
           {!isPatientCopy && zahlung.notiz ? (
-            <section className="mx-9 mb-6 rounded-[18px] border border-[#e4ebf3] bg-white px-5 py-4">
+            <section className="beleg-panel mx-9 mb-6 px-5 py-4">
               <p className="beleg-section-label">Interne Notiz</p>
-              <p className="mt-2 font-sans text-[15px] leading-7 text-[#3a4c61]">{zahlung.notiz}</p>
+              <p className="beleg-panel-copy mt-2 font-sans text-[15px] leading-7">{zahlung.notiz}</p>
             </section>
           ) : null}
 
-          <footer className="mx-9 mb-8 flex flex-wrap items-start justify-between gap-4 border-t border-[#e2e8f0] pt-4 font-sans text-[11px] text-[#8293a7]">
+          <footer className="beleg-footer mx-9 mb-8 flex flex-wrap items-start justify-between gap-4 border-t pt-4 font-sans text-[11px]">
             <span>{PRAXIS.name} · {PRAXIS.strasse} · {PRAXIS.ort}</span>
             <span>
               {zahlung.buchungstyp === "ausgabe"
@@ -221,9 +221,11 @@ function BelegInhalt() {
         }
         .beleg-header {
           background:
-            radial-gradient(circle at top left, rgba(87, 225, 160, 0.18), transparent 34%),
-            linear-gradient(135deg, #112033 0%, #1b3552 100%);
+            radial-gradient(circle at top left, rgba(116, 246, 203, 0.28), transparent 34%),
+            radial-gradient(circle at top right, rgba(117, 173, 255, 0.22), transparent 30%),
+            linear-gradient(135deg, #143040 0%, #1a3151 48%, #24385f 100%);
           color: #f4f8ff;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
         .beleg-kicker {
           margin: 0;
@@ -231,7 +233,7 @@ function BelegInhalt() {
           font-size: 12px;
           letter-spacing: 3px;
           text-transform: uppercase;
-          opacity: 0.72;
+          color: rgba(214, 250, 242, 0.82);
         }
         .beleg-title {
           margin: 10px 0 0;
@@ -245,25 +247,26 @@ function BelegInhalt() {
           font-family: Inter, Arial, sans-serif;
           font-size: 14px;
           line-height: 1.6;
-          color: rgba(244, 248, 255, 0.8);
+          color: rgba(234, 243, 255, 0.86);
         }
         .beleg-badge {
           display: inline-flex;
           padding: 10px 14px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.18);
           font-family: Inter, Arial, sans-serif;
           font-size: 12px;
           font-weight: 700;
           letter-spacing: 1.4px;
           text-transform: uppercase;
+          color: #ffffff;
         }
         .beleg-meta {
           margin: 0;
           font-family: Inter, Arial, sans-serif;
           font-size: 12px;
-          color: rgba(244, 248, 255, 0.72);
+          color: rgba(244, 248, 255, 0.8);
         }
         .beleg-section-label {
           margin: 0;
@@ -271,7 +274,40 @@ function BelegInhalt() {
           font-size: 11px;
           letter-spacing: 1.6px;
           text-transform: uppercase;
-          color: #7a8da6;
+          color: #8fa6c6;
+        }
+        .beleg-panel {
+          border-radius: 20px;
+          border: 1px solid rgba(154, 176, 209, 0.18);
+          background:
+            linear-gradient(180deg, rgba(20, 28, 45, 0.94) 0%, rgba(13, 19, 32, 0.98) 100%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+        .beleg-panel-strong {
+          background:
+            radial-gradient(circle at top left, rgba(111, 214, 184, 0.08), transparent 34%),
+            linear-gradient(180deg, rgba(18, 27, 42, 0.98) 0%, rgba(12, 18, 30, 0.98) 100%);
+          border-color: rgba(127, 224, 192, 0.3);
+        }
+        .beleg-amount-card {
+          border-radius: 24px;
+          border: 1px solid rgba(126, 205, 176, 0.34);
+          background:
+            radial-gradient(circle at top right, rgba(72, 211, 160, 0.16), transparent 38%),
+            linear-gradient(135deg, #f3fff8 0%, #e9faf2 54%, #f6fffd 100%);
+          box-shadow:
+            0 14px 40px rgba(33, 93, 70, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.88);
+        }
+        .beleg-panel-title {
+          color: #edf4ff;
+        }
+        .beleg-panel-copy {
+          color: #9cb2cf;
+        }
+        .beleg-footer {
+          border-color: rgba(154, 176, 209, 0.16);
+          color: #7f96b6;
         }
         @media print {
           @page {
@@ -300,6 +336,7 @@ function BelegInhalt() {
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
+            background: #ffffff !important;
             overflow: visible !important;
             break-inside: avoid;
             -webkit-print-color-adjust: exact;
@@ -309,6 +346,22 @@ function BelegInhalt() {
             background:
               radial-gradient(circle at top left, rgba(87, 225, 160, 0.18), transparent 34%),
               linear-gradient(135deg, #112033 0%, #1b3552 100%) !important;
+          }
+          .beleg-panel,
+          .beleg-panel-strong {
+            background: #ffffff !important;
+            border: 1px solid #e4ebf3 !important;
+            box-shadow: none !important;
+          }
+          .beleg-panel-title {
+            color: #1a2940 !important;
+          }
+          .beleg-panel-copy,
+          .beleg-footer {
+            color: #5f7087 !important;
+          }
+          .beleg-section-label {
+            color: #7a8da6 !important;
           }
         }
       `}</style>
