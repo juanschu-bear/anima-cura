@@ -13,6 +13,7 @@ import { createBrowserClient } from "@/lib/db/supabase";
 import { reconcileInstallments } from "@/lib/raten/reconciliation";
 import { resolveOpenItemAmount, resolveOpenItemStatus, resolvePaidItemAmount } from "@/lib/open-items";
 import { summarizePatientFinance } from "@/lib/patient-finance";
+import { buildReceiptPreviewHref } from "@/lib/kasse-receipt";
 
 const supabaseDetail = createBrowserClient();
 
@@ -55,12 +56,17 @@ export default function PatientDetailPage() {
           .limit(25),
       ]);
       const liste: any[] = [];
+      const linkedKassenByTransaktion = new Map<string, any>();
       for (const k of kasse.data || []) {
+        if (k.transaktion_id) {
+          linkedKassenByTransaktion.set(k.transaktion_id, k);
+        }
         // Verknuepfte QR-Zahlungen erscheinen ueber die Bankzeile,
         // sonst stuenden sie doppelt da.
         if ((k.zahlart === "qr_ueberweisung" || k.zahlart === "ueberweisung") && k.transaktion_id) continue;
         liste.push({
           id: `k-${k.id}`,
+          kassenId: k.id,
           datum: k.kassen_datum,
           quelle: `Kasse · ${KASSE_ZAHLART[k.zahlart] || k.zahlart}`,
           zweck: k.zweck || "",
@@ -76,8 +82,10 @@ export default function PatientDetailPage() {
         });
       }
       for (const b of bank.data || []) {
+        const linkedKassenBeleg = linkedKassenByTransaktion.get(b.id);
         liste.push({
           id: `b-${b.id}`,
+          kassenId: linkedKassenBeleg?.id || null,
           datum: b.datum,
           quelle: b.matching_details?.methode === "animapay_kasse" ? "AnimaPay · QR"
             : b.matching_details?.methode === "animapay_aufladung" ? "AnimaPay · Aufladung"
@@ -86,7 +94,7 @@ export default function PatientDetailPage() {
           notiz: typeof b.matching_details?.praxis_notiz === "string" ? b.matching_details.praxis_notiz : "",
           betrag: Number(b.betrag),
           status: "bestätigt",
-          beleg: null,
+          beleg: linkedKassenBeleg?.beleg_nr || null,
         });
       }
       liste.sort((a, b) => (a.datum < b.datum ? 1 : -1));
@@ -383,7 +391,20 @@ export default function PatientDetailPage() {
                 {geldbewegungen.map((g) => (
                   <tr key={g.id} className="hover:bg-surface-50/70">
                     <td className="table-cell text-sm">{new Date(g.datum).toLocaleDateString("de-DE")}</td>
-                    <td className="table-cell text-sm">{g.quelle}{g.beleg ? <span className="block text-[11px] text-praxis-400">{g.beleg}</span> : null}</td>
+                    <td className="table-cell text-sm">
+                      {g.quelle}
+                      {g.beleg ? <span className="block text-[11px] text-praxis-400">{g.beleg}</span> : null}
+                      {g.kassenId ? (
+                        <a
+                          href={buildReceiptPreviewHref(g.kassenId, { returnTo: `/patienten/${params.id as string}` })}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-flex text-[11px] font-semibold text-[#5d4fd8] hover:text-[#4c40be]"
+                        >
+                          Beleg öffnen
+                        </a>
+                      ) : null}
+                    </td>
                     <td className="table-cell max-w-[280px] text-sm text-praxis-500">
                       <div className="truncate">{g.zweck}</div>
                       {g.notiz ? <div className="mt-1 text-[11px] font-medium text-amber-600">Notiz: {g.notiz}</div> : null}

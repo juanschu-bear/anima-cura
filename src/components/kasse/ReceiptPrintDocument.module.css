@@ -1,0 +1,322 @@
+@page a4 {
+  size: A4;
+  margin: 0;
+}
+
+@page a5 {
+  size: A5;
+  margin: 0;
+}
+
+.sheet {
+  --ink: #10222a;
+  --ink-2: #4b5f66;
+  --ink-3: #8a989d;
+  --line: #d9dee0;
+  --line-2: #b9c2c6;
+  --accent: #1b6f68;
+  --pad: 18mm;
+  --fs: 10.5pt;
+  --fs-s: 8.5pt;
+  --fs-title: 26pt;
+  --fs-amt: 34pt;
+  --gap: 8mm;
+  width: 210mm;
+  min-height: 297mm;
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: var(--font-receipt-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--fs);
+  line-height: 1.45;
+  box-shadow: 0 18pt 48pt rgba(16, 34, 42, 0.18);
+  page: a4;
+}
+
+.sheet[data-format="a5"] {
+  --pad: 12mm;
+  --fs: 9pt;
+  --fs-s: 7.5pt;
+  --fs-title: 20pt;
+  --fs-amt: 26pt;
+  --gap: 5.5mm;
+  width: 148mm;
+  min-height: 210mm;
+  page: a5;
+}
+
+.sheet * {
+  box-sizing: border-box;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10mm;
+  padding-bottom: var(--gap);
+  border-bottom: 1.5pt solid var(--ink);
+}
+
+.practiceBlock {
+  min-width: 0;
+}
+
+.practiceName {
+  display: block;
+  font-size: calc(var(--fs) * 1.15);
+  font-weight: 600;
+}
+
+.practiceLine {
+  display: block;
+  color: var(--ink-2);
+  font-size: var(--fs-s);
+  line-height: 1.5;
+}
+
+.meta {
+  text-align: right;
+  font-size: var(--fs-s);
+  color: var(--ink-2);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 2mm;
+  margin-bottom: 2.5mm;
+  font-size: calc(var(--fs-s) * 0.95);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.brandIcon {
+  width: 9mm;
+  height: 4mm;
+  overflow: visible;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1mm 4mm;
+  justify-content: end;
+}
+
+.metaKey {
+  color: var(--ink-3);
+}
+
+.metaValue {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+}
+
+.mono {
+  font-family: var(--font-receipt-mono), ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.titleSection {
+  padding: var(--gap) 0;
+}
+
+.variant {
+  display: inline-block;
+  margin-bottom: 3mm;
+  padding: 0.6mm 3mm;
+  border: 0.6pt solid var(--accent);
+  border-radius: 99mm;
+  font-size: var(--fs-s);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.intro {
+  max-width: 120mm;
+  margin-top: 2mm;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6mm;
+  align-items: end;
+  margin-bottom: var(--gap);
+  padding: 6mm 7mm;
+  border: 1pt solid var(--ink);
+  border-radius: 3mm;
+}
+
+.amountLabel {
+  font-size: var(--fs-s);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.amountValue {
+  margin-top: 1.5mm;
+  font-size: var(--fs-amt);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.amountNote {
+  margin-top: 2mm;
+  font-size: var(--fs-s);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.amountMeta {
+  text-align: right;
+  font-size: var(--fs-s);
+  color: var(--ink-2);
+}
+
+.amountMeta strong {
+  display: block;
+  margin-top: 1mm;
+  font-size: var(--fs);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.6mm 3.5mm;
+  border: 0.6pt solid var(--ink);
+  border-radius: 99mm;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 10mm;
+  margin-bottom: var(--gap);
+}
+
+.detailColumn {
+  min-width: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 34mm 1fr;
+  gap: 3mm;
+  align-items: baseline;
+  padding: 2.6mm 0;
+  border-bottom: 0.5pt solid var(--line);
+}
+
+.sheet[data-format="a5"] .row {
+  grid-template-columns: 26mm 1fr;
+}
+
+.key {
+  font-size: var(--fs-s);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.value {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin-bottom: var(--gap);
+  padding: 3.5mm 4.5mm;
+  border: 0.5pt dashed var(--line-2);
+  border-radius: 2mm;
+}
+
+.noteTitle {
+  margin-bottom: 1mm;
+  font-size: var(--fs-s);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.noteCopy {
+  overflow-wrap: anywhere;
+}
+
+.sign {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12mm;
+  margin-top: 6mm;
+  margin-bottom: var(--gap);
+}
+
+.signLine {
+  margin-top: 14mm;
+  padding-top: 1.5mm;
+  border-top: 0.6pt solid var(--ink);
+  font-size: var(--fs-s);
+  color: var(--ink-2);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8mm;
+  margin-top: auto;
+  padding-top: 3mm;
+  border-top: 0.5pt solid var(--line);
+  font-size: var(--fs-s);
+  color: var(--ink-3);
+}
+
+.foot span:last-child {
+  text-align: right;
+}
+
+.foot span {
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  .sheet {
+    box-shadow: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .sheet[data-format="a4"] {
+    height: 297mm;
+    min-height: 297mm;
+  }
+
+  .sheet[data-format="a5"] {
+    height: 210mm;
+    min-height: 210mm;
+  }
+}

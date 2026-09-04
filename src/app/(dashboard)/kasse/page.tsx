@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
 import { Modal } from "@/components/ui";
+import { buildReceiptPdfHref, buildReceiptPreviewHref } from "@/lib/kasse-receipt";
 
 // Empfangskonto der Praxis (Patientenkonto, steht auf jeder Rechnung).
 const PRAXIS_NAME = "Dr. Maria Elena Schubert";
@@ -1027,12 +1028,18 @@ export default function KassePage() {
               </div>
             ) : null}
             <a
-              href={`/kasse/beleg?id=${detail.id}`}
+              href={buildReceiptPreviewHref(detail.id, { returnTo: "/kasse" })}
               target="_blank"
               rel="noreferrer"
               className="btn-secondary block w-full text-center text-xs"
             >
-              Beleg anzeigen / drucken
+              Belegvorschau öffnen
+            </a>
+            <a
+              href={buildReceiptPdfHref(detail.id)}
+              className="btn-secondary block w-full text-center text-xs"
+            >
+              Als PDF speichern
             </a>
             {(!detail.transaktion_id || detail.buchungstyp === "ausgabe") ? (
               loeschBestaetigung ? (
@@ -1066,7 +1073,17 @@ export default function KassePage() {
               <div className="text-sm" style={{ color: "#b88a2e" }}>Verbleibendes Anima-Balance-Guthaben: {bestaetigung.rest.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
             )}
             <div className="flex gap-2 pt-1">
-              <a className="ac-btn-primary" href={`/kasse/beleg?id=${bestaetigung.kzId}`} target="_blank" rel="noreferrer">Beleg öffnen</a>
+              <a
+                className="ac-btn-primary"
+                href={buildReceiptPreviewHref(bestaetigung.kzId, { returnTo: "/kasse" })}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Beleg öffnen
+              </a>
+              <a className="ac-chip" href={buildReceiptPdfHref(bestaetigung.kzId)}>
+                Als PDF speichern
+              </a>
               <button className="ac-chip" onClick={() => setBestaetigung(null)}>Schließen</button>
             </div>
           </div>

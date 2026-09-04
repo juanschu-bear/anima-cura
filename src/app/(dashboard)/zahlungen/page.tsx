@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePatienten, useTransaktionen, useTransaktionenStats } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
-import { ArrowRight, Check, CreditCard, Lock, MessageSquareQuote, Search, Trash2, X } from "lucide-react";
+import { ArrowRight, Check, CreditCard, FileText, Lock, MessageSquareQuote, Search, Trash2, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { buildReceiptPreviewHref } from "@/lib/kasse-receipt";
 
 function getTransactionNote(tx: any): string {
   if (typeof tx?.notiz === "string" && tx.notiz.trim()) return tx.notiz.trim();
@@ -414,10 +415,7 @@ export default function ZahlungenPage() {
       .order("kassen_datum", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(100)
-      .then(({ data }) => setKassenListe(
-        // Verknuepfte Kassen-Überweisungen leben als Bankzeile weiter
-        (data || []).filter((z: any) => !["qr_ueberweisung", "ueberweisung"].includes(z.zahlart) || !z.transaktion_id)
-      ));
+      .then(({ data }) => setKassenListe(data || []));
   }, []);
 
   function wegVonTransaktion(tx: any): { gruppe: string; w1: string; w2: string } {
@@ -437,6 +435,9 @@ export default function ZahlungenPage() {
   }
 
   const kassenSichtbar = kassenListe.filter((z: any) => {
+    if (["qr_ueberweisung", "ueberweisung"].includes(z.zahlart) && z.transaktion_id) {
+      return false;
+    }
     const status = kassenFilterStatus(z);
     const statusOk = statusFilter === "alle" || statusFilter === status;
     const wegOk = wegFilter === "alle" || wegFilter === "kasse";
@@ -453,6 +454,16 @@ export default function ZahlungenPage() {
       return statusFilter === "alle" ? true : tx.matching_status === statusFilter;
     })
     .filter((tx) => (wegFilter === "alle" ? true : wegVonTransaktion(tx).gruppe === wegFilter));
+
+  const kassenByTransaktionId = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const entry of kassenListe) {
+      if (entry?.transaktion_id) {
+        map.set(entry.transaktion_id, entry);
+      }
+    }
+    return map;
+  }, [kassenListe]);
 
 
   const KASSE_ZAHLART: Record<string, string> = {
@@ -791,6 +802,17 @@ export default function ZahlungenPage() {
                 <td className="table-cell py-3 text-sm" style={{ color: "var(--ac-text)" }}>{z.patients?.nachname}, {z.patients?.vorname}</td>
                 <td className="table-cell py-3">
                   <div className="flex items-center gap-1">
+                    <a
+                      href={buildReceiptPreviewHref(z.id, { returnTo: "/zahlungen" })}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded-lg p-1.5 transition-colors hover:bg-sky-500/10"
+                      style={{ color: "#8fb8ff" }}
+                      title="Beleg öffnen"
+                    >
+                      <FileText size={14} />
+                    </a>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -915,6 +937,23 @@ export default function ZahlungenPage() {
                 </td>
                 <td className="table-cell py-3">
                   <div className="flex items-center gap-1">
+                    {(() => {
+                      const linkedReceipt = kassenByTransaktionId.get(tx.id);
+                      if (!linkedReceipt) return null;
+                      return (
+                        <a
+                          href={buildReceiptPreviewHref(linkedReceipt.id, { returnTo: "/zahlungen" })}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded-lg p-1.5 transition-colors hover:bg-sky-500/10"
+                          style={{ color: "#8fb8ff" }}
+                          title="Beleg öffnen"
+                        >
+                          <FileText size={14} />
+                        </a>
+                      );
+                    })()}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
