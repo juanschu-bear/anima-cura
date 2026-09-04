@@ -86,22 +86,35 @@ function BelegInhalt() {
   const documentTitle = zahlung.buchungstyp === "ausgabe"
     ? "Interner Kassenbeleg"
     : isPatientCopy
-    ? "Patientenkopie der Quittung"
+    ? "Zahlungsquittung"
     : "Praxisquittung";
   const subline = zahlung.buchungstyp === "ausgabe"
     ? "Interner Nachweis aus dem Kassenbereich der Praxis."
     : isPatientCopy
-    ? "Diese Kopie kann dem Patienten oder den Eltern als Zahlungsnachweis mitgegeben oder als PDF gespeichert werden."
+    ? "Diese Quittung bestaetigt den Erhalt einer Zahlung und kann dem Patienten oder den Eltern als Nachweis mitgegeben oder gespeichert werden."
     : "Interne Praxisansicht mit vollständigem Kassenkontext und eindeutiger Belegreferenz.";
-  const cards: Array<[string, string]> = [
-    ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
-    ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
-    ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
-    ["Leistung", zahlung.zweck || "—"],
-    ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
-    ["Buchungsdatum", datum],
-    ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
-  ];
+  const patientName = zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—";
+  const patientNumber = zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—";
+  const serviceLabel = zahlung.zweck || "Praxisleistung";
+  const paymentLabel = ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart;
+  const cards: Array<[string, string]> = isPatientCopy
+    ? [
+        ["Patient", patientName],
+        ["Patientennummer", patientNumber],
+        ["Leistung", serviceLabel],
+        ["Zahlart", paymentLabel],
+        ["Zahlungsdatum", datum],
+        ["Belegnummer", zahlung.beleg_nr || "—"],
+      ]
+    : [
+        ["Buchungsart", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patientenzahlung"],
+        ["Patient", patientName],
+        ["Patientennummer", patientNumber],
+        ["Leistung", serviceLabel],
+        ["Zahlart", paymentLabel],
+        ["Buchungsdatum", datum],
+        ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
+      ];
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6">
@@ -141,7 +154,7 @@ function BelegInhalt() {
       </div>
 
       <div className="beleg-print-shell">
-        <article className="beleg-druck overflow-hidden rounded-[28px] border border-white/12 bg-[#0d1320] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+        <article className="beleg-druck screen-receipt overflow-hidden rounded-[28px] border border-white/12 bg-[#0d1320] shadow-[0_24px_60px_rgba(15,23,42,0.28)] print:hidden">
           <header className="beleg-header flex items-start justify-between gap-6 px-9 py-8">
             <div className="min-w-0">
               <p className="beleg-kicker">{isPatientCopy ? "Patientenkopie" : "AnimaPay Kasse"}</p>
@@ -149,7 +162,7 @@ function BelegInhalt() {
               <p className="beleg-subline">{subline}</p>
             </div>
             <div className="min-w-[190px] text-right">
-              <div className="beleg-badge">{ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart}</div>
+              <div className="beleg-badge">{paymentLabel}</div>
               <p className="beleg-meta mt-4">Beleg-Nr. {zahlung.beleg_nr || "—"}</p>
               <p className="beleg-meta mt-1">{datum}</p>
             </div>
@@ -206,6 +219,90 @@ function BelegInhalt() {
                 : isPatientCopy
                 ? "Patientenkopie einer erfassten Zahlung, keine Rechnung."
                 : "Praxisquittung über eine erfasste Zahlung, keine Rechnung."}
+            </span>
+          </footer>
+        </article>
+
+        <article className="beleg-print-document hidden bg-white text-[#18263a] print:block">
+          <header className="print-doc-header">
+            <div>
+              <p className="print-doc-kicker">{isPatientCopy ? "Patientenquittung" : "Praxisquittung"}</p>
+              <h1 className="print-doc-title">{documentTitle}</h1>
+              <p className="print-doc-copy">
+                {isPatientCopy
+                  ? "Quittung ueber eine erhaltene Zahlung. Diese Ausfertigung ist fuer Patient oder Eltern bestimmt."
+                  : "Interne Dokumentation einer in der Praxis erfassten Zahlung."}
+              </p>
+            </div>
+            <div className="print-doc-meta">
+              <p><strong>Beleg-Nr.</strong> {zahlung.beleg_nr || "—"}</p>
+              <p><strong>Datum</strong> {datum}</p>
+              <p><strong>Zahlart</strong> {paymentLabel}</p>
+            </div>
+          </header>
+
+          <section className="print-doc-topline">
+            <div className="print-doc-block">
+              <p className="print-doc-label">Praxis</p>
+              <p className="print-doc-value">{PRAXIS.name}</p>
+              <p className="print-doc-copy">{PRAXIS.zusatz}</p>
+              <p className="print-doc-copy">{PRAXIS.strasse}<br />{PRAXIS.ort}</p>
+            </div>
+            <div className="print-doc-amount">
+              <p className="print-doc-label">{zahlung.buchungstyp === "ausgabe" ? "Dokumentierter Betrag" : "Erhaltener Betrag"}</p>
+              <p className="print-doc-total">{signedAmount(zahlung.betrag, zahlung.buchungstyp)}</p>
+              <p className="print-doc-copy">
+                {isPatientCopy ? "Betrag dankend erhalten." : "Zahlung im Kassenbereich erfasst."}
+              </p>
+            </div>
+          </section>
+
+          <section className="print-doc-grid">
+            <div className="print-doc-row">
+              <span className="print-doc-label">Patient</span>
+              <span className="print-doc-row-value">{patientName}</span>
+            </div>
+            <div className="print-doc-row">
+              <span className="print-doc-label">Patientennummer</span>
+              <span className="print-doc-row-value">{patientNumber}</span>
+            </div>
+            <div className="print-doc-row">
+              <span className="print-doc-label">{isPatientCopy ? "Leistung / Zahlungsgrund" : "Leistung"}</span>
+              <span className="print-doc-row-value">{serviceLabel}</span>
+            </div>
+            <div className="print-doc-row">
+              <span className="print-doc-label">{isPatientCopy ? "Quittungsart" : "Buchungsart"}</span>
+              <span className="print-doc-row-value">
+                {isPatientCopy
+                  ? "Quittung ueber erhaltene Zahlung"
+                  : zahlung.buchungstyp === "ausgabe"
+                  ? "Praxis-Ausgabe"
+                  : "Patientenzahlung"}
+              </span>
+            </div>
+            {!isPatientCopy ? (
+              <div className="print-doc-row">
+                <span className="print-doc-label">Quartal</span>
+                <span className="print-doc-row-value">
+                  {zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"}
+                </span>
+              </div>
+            ) : null}
+          </section>
+
+          {!isPatientCopy && zahlung.notiz ? (
+            <section className="print-doc-note">
+              <p className="print-doc-label">Interne Notiz</p>
+              <p className="print-doc-copy">{zahlung.notiz}</p>
+            </section>
+          ) : null}
+
+          <footer className="print-doc-footer">
+            <span>{PRAXIS.name} · {PRAXIS.strasse} · {PRAXIS.ort}</span>
+            <span>
+              {isPatientCopy
+                ? "Dies ist eine Quittung und keine Rechnung."
+                : "Interner Kassenbeleg, keine Rechnung."}
             </span>
           </footer>
         </article>
@@ -309,10 +406,17 @@ function BelegInhalt() {
           border-color: rgba(154, 176, 209, 0.16);
           color: #7f96b6;
         }
+        .print-doc-header,
+        .print-doc-topline,
+        .print-doc-grid,
+        .print-doc-note,
+        .print-doc-footer {
+          display: none;
+        }
         @media print {
           @page {
             size: A4;
-            margin: 10mm;
+            margin: 12mm;
           }
           html,
           body {
@@ -327,12 +431,12 @@ function BelegInhalt() {
           }
           .beleg-print-shell {
             display: block !important;
-            width: 190mm !important;
-            margin: 0 auto !important;
+            width: 100% !important;
+            margin: 0 !important;
           }
           .beleg-druck {
-            width: 190mm !important;
-            max-width: 190mm !important;
+            width: 100% !important;
+            max-width: none !important;
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
@@ -362,6 +466,128 @@ function BelegInhalt() {
           }
           .beleg-section-label {
             color: #7a8da6 !important;
+          }
+          .screen-receipt {
+            display: none !important;
+          }
+          .beleg-print-document {
+            display: block !important;
+            width: 100%;
+            min-height: auto;
+            padding: 0;
+            color: #18263a !important;
+            background: #ffffff !important;
+          }
+          .print-doc-header,
+          .print-doc-topline,
+          .print-doc-grid,
+          .print-doc-note,
+          .print-doc-footer {
+            display: block;
+          }
+          .print-doc-header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 220px;
+            gap: 18px;
+            padding-bottom: 10mm;
+            border-bottom: 2px solid #1c3654;
+          }
+          .print-doc-kicker {
+            margin: 0 0 3mm;
+            font: 700 10pt Inter, Arial, sans-serif;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: #67809d;
+          }
+          .print-doc-title {
+            margin: 0 0 3mm;
+            font: 700 23pt Georgia, "Times New Roman", serif;
+            color: #18324f;
+          }
+          .print-doc-copy {
+            margin: 0;
+            font: 11pt Inter, Arial, sans-serif;
+            line-height: 1.55;
+            color: #5a6f87;
+          }
+          .print-doc-meta {
+            text-align: right;
+            font: 10.5pt Inter, Arial, sans-serif;
+            color: #31475f;
+          }
+          .print-doc-meta p {
+            margin: 0 0 2.5mm;
+          }
+          .print-doc-topline {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 72mm;
+            gap: 12mm;
+            padding: 9mm 0 8mm;
+          }
+          .print-doc-block,
+          .print-doc-amount {
+            border: 1px solid #d7e2ee;
+            border-radius: 4mm;
+            padding: 5mm;
+            background: #fbfdff;
+          }
+          .print-doc-amount {
+            background: linear-gradient(135deg, #effbf5 0%, #f9fdfc 100%) !important;
+            border-color: #cfe8db;
+          }
+          .print-doc-label {
+            display: block;
+            margin: 0 0 2mm;
+            font: 700 9pt Inter, Arial, sans-serif;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #7b91a9;
+          }
+          .print-doc-value {
+            margin: 0 0 2mm;
+            font: 700 14pt Inter, Arial, sans-serif;
+            color: #18263a;
+          }
+          .print-doc-total {
+            margin: 0 0 3mm;
+            font: 700 24pt Georgia, "Times New Roman", serif;
+            color: #174536;
+          }
+          .print-doc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0 8mm;
+            padding-top: 2mm;
+          }
+          .print-doc-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8mm;
+            padding: 4mm 0;
+            border-bottom: 1px solid #e2eaf2;
+          }
+          .print-doc-row-value {
+            flex: 1;
+            text-align: right;
+            font: 700 11pt Inter, Arial, sans-serif;
+            color: #20344b;
+          }
+          .print-doc-note {
+            margin-top: 8mm;
+            padding: 5mm;
+            border: 1px solid #e2eaf2;
+            border-radius: 4mm;
+            background: #fbfdff;
+          }
+          .print-doc-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 8mm;
+            margin-top: 10mm;
+            padding-top: 4mm;
+            border-top: 1px solid #d7e2ee;
+            font: 9.5pt Inter, Arial, sans-serif;
+            color: #667b92;
           }
         }
       `}</style>
