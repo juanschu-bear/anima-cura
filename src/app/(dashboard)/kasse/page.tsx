@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Check, CreditCard, Info, QrCode, Search, Wallet, X } from "lucide-react";
+import { Banknote, Check, CreditCard, Info, Landmark, QrCode, Search, Wallet, X } from "lucide-react";
 import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
@@ -25,6 +25,7 @@ const LEISTUNGEN = [
 
 const ZAHLARTEN = [
   { key: "qr_ueberweisung", label: "QR-Überweisung", icon: QrCode },
+  { key: "ueberweisung", label: "Überweisung", icon: Landmark },
   { key: "girocard", label: "Girocard", icon: CreditCard },
   { key: "kreditkarte", label: "Kreditkarte", icon: CreditCard },
   { key: "bar", label: "Bar", icon: Banknote },
@@ -171,7 +172,7 @@ export default function KassePage() {
   }, []);
   const verfuegbareZahlarten = useMemo(() => {
     if (buchungstyp === "ausgabe") {
-      return ZAHLARTEN.filter((item) => item.key !== "qr_ueberweisung" && item.key !== "guthaben");
+      return ZAHLARTEN.filter((item) => item.key !== "qr_ueberweisung" && item.key !== "ueberweisung" && item.key !== "guthaben");
     }
     return ZAHLARTEN;
   }, [buchungstyp]);
@@ -209,7 +210,7 @@ export default function KassePage() {
     if (buchungstyp === "ausgabe") {
       setPatient(null);
       setPatSearch("");
-      if (zahlart === "qr_ueberweisung" || zahlart === "guthaben") {
+      if (zahlart === "qr_ueberweisung" || zahlart === "ueberweisung" || zahlart === "guthaben") {
         setZahlart("bar");
       }
       if ((LEISTUNGEN as readonly string[]).includes(leistung)) {
@@ -271,6 +272,8 @@ export default function KassePage() {
           ? "Praxis-Ausgabe"
           : row.zahlart === "qr_ueberweisung"
           ? row.transaktion_id ? "Geldeingang da" : "Wartet auf Geldeingang"
+          : row.zahlart === "ueberweisung"
+          ? row.transaktion_id ? "Geldeingang da" : "Überweisung angekündigt"
           : row.zahlart === "guthaben"
           ? "Vom Guthaben verrechnet"
           : row.zahlart === "bar"
@@ -469,7 +472,7 @@ export default function KassePage() {
     const { data: offene } = await supabase
       .from("kassen_zahlungen")
       .select("id, betrag, zeichen, kassen_datum, patient_id")
-      .eq("zahlart", "qr_ueberweisung")
+      .in("zahlart", ["qr_ueberweisung", "ueberweisung"])
       .is("transaktion_id", null);
     for (const kz of offene || []) {
       if (!kz.zeichen) continue;
@@ -494,14 +497,14 @@ export default function KassePage() {
             eingang_typ: echtzeit ? "echtzeit" : "standard",
           })
           .eq("id", kz.id);
-        // Beweisklasse 100: diesen QR-Code haben wir selbst erzeugt,
+        // Beweisklasse 100: diesen Kassen-Zweck haben wir selbst erzeugt,
         // die Zahlung ist keine Vermutung, sondern unsere Handschrift.
         await supabase.from("transaktionen")
           .update({
             matched_patient_id: kz.patient_id,
             matching_status: "auto",
             matching_score: 100,
-            matching_details: { methode: "animapay_kasse", quelle: "kasse" },
+            matching_details: { methode: "animapay_kasse", quelle: "kasse", kassen_zahlart: kz.zahlart },
             geprueft_am: new Date().toISOString(),
           })
           .eq("id", tx[0].id);
@@ -517,7 +520,7 @@ export default function KassePage() {
     const b = parseBetrag(betrag);
     if (!b) { setHinweis("Bitte einen gültigen Betrag eingeben, z. B. 36,23."); return; }
     if (buchungstyp === "einnahme" && !patient) { setHinweis("Bitte zuerst einen Patienten wählen."); return; }
-    if (buchungstyp === "ausgabe" && (zahlart === "qr_ueberweisung" || zahlart === "guthaben")) {
+    if (buchungstyp === "ausgabe" && (zahlart === "qr_ueberweisung" || zahlart === "ueberweisung" || zahlart === "guthaben")) {
       setHinweis("Ausgaben koennen nur als Bar-, Girocard- oder Kreditkartenbuchung erfasst werden.");
       return;
     }
@@ -529,7 +532,7 @@ export default function KassePage() {
 
     setSaving(true);
     const zeichen = buchungstyp === "einnahme" ? (patient?.ivoris_nummer || null) : null;
-    const zweckFinal = buchungstyp === "einnahme" && zahlart === "qr_ueberweisung"
+    const zweckFinal = buchungstyp === "einnahme" && (zahlart === "qr_ueberweisung" || zahlart === "ueberweisung")
       ? (zweckManuell ?? `${leistung} ${zeichen || ""} ${patient?.nachname || ""}`).trim()
       : leistung;
     const { data: kz, error } = await supabase.from("kassen_zahlungen").insert({
@@ -610,7 +613,7 @@ export default function KassePage() {
       <div>
         <h1 className="ac-page-title">Kasse · AnimaPay Live</h1>
         <p className="mt-1 text-sm text-praxis-400">
-          Einnahmen und Ausgaben direkt an der Rezeption erfassen. Bei QR-Überweisung erscheint sofort der GiroCode mit Zeichen, die Zuordnung läuft dann von allein.
+          Einnahmen und Ausgaben direkt an der Rezeption erfassen. Bei QR-Überweisung erscheint sofort der GiroCode, bei normaler Überweisung bleibt derselbe saubere Verwendungszweck erhalten.
         </p>
       </div>
 
@@ -719,14 +722,16 @@ export default function KassePage() {
             </select>
           </label>
 
-          {buchungstyp === "einnahme" && zahlart === "qr_ueberweisung" && patient ? (() => {
+          {buchungstyp === "einnahme" && (zahlart === "qr_ueberweisung" || zahlart === "ueberweisung") && patient ? (() => {
             const standard = `${leistung} ${patient.ivoris_nummer || ""} ${patient.nachname || ""}`.trim();
             const zweck = zweckManuell ?? standard;
             const ohneZeichen = patient.ivoris_nummer && !zweck.includes(patient.ivoris_nummer);
             return (
               <div className="space-y-2">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-praxis-500">Verwendungszweck im QR (anpassbar)</span>
+                  <span className="mb-1 block text-xs font-medium text-praxis-500">
+                    {zahlart === "qr_ueberweisung" ? "Verwendungszweck im QR (anpassbar)" : "Verwendungszweck für Überweisung"}
+                  </span>
                   <input
                     className="input w-full"
                     value={zweck}
@@ -910,10 +915,10 @@ export default function KassePage() {
                     <span className="text-xs text-praxis-400">
                       {z.buchungstyp === "ausgabe" ? "Ausgabe · " : "Einnahme · "}
                       {ZAHLARTEN.find(a => a.key === z.zahlart)?.label}
-                      {z.buchungstyp === "einnahme" && z.zahlart === "qr_ueberweisung" ? (
+                      {z.buchungstyp === "einnahme" && (z.zahlart === "qr_ueberweisung" || z.zahlart === "ueberweisung") ? (
                         z.transaktion_id
                           ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen{z.eingang_typ === "echtzeit" ? " (Echtzeit)" : z.eingang_typ === "standard" ? " (Standard)" : ""}</span>
-                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· wartet auf Geldeingang</span>
+                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· {z.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>
                       ) : null}
                     </span>
                     <span className={`font-semibold ${z.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>
@@ -951,8 +956,9 @@ export default function KassePage() {
             </ul>
           </div>
           <div>
-            <p className="mb-1 font-semibold text-praxis-600">Girocard, Kreditkarte und Bar</p>
+            <p className="mb-1 font-semibold text-praxis-600">Überweisung, Girocard, Kreditkarte und Bar</p>
             <ul className="list-disc space-y-1 pl-4">
+              <li>Bei <strong>Überweisung</strong> bekommt die Praxis denselben strukturierten Verwendungszweck wie beim QR-Fall, nur ohne Code. Das ist für Patienten gedacht, die den Betrag manuell im Online-Banking eingeben.</li>
               <li>Girocard und Kreditkarte laufen weiter ganz normal über das Kartengerät. Hier wird die Zahlung nur <strong>eingetragen</strong>, damit das Kassenbuch stimmt.</li>
               <li>Dieser Eintrag ersetzt die Papier-Liste: Das Programm vergleicht die Tagessummen später mit den Sammel-Gutschriften des Kartengeräts.</li>
               <li>Barzahlungen und Praxis-Ausgaben werden genauso eingetragen, dann ist der Tag komplett.</li>
@@ -1005,12 +1011,12 @@ export default function KassePage() {
                 <span className="text-right text-xs">{detail.notiz}</span>
               </div>
             ) : null}
-            {detail.buchungstyp !== "ausgabe" && detail.zahlart === "qr_ueberweisung" ? (
+            {detail.buchungstyp !== "ausgabe" && (detail.zahlart === "qr_ueberweisung" || detail.zahlart === "ueberweisung") ? (
               <div className="flex items-center justify-between">
                 <span className="text-praxis-400">Status</span>
                 {detail.transaktion_id
                   ? <span className="font-semibold text-[#5f9339]">eingegangen{detail.eingang_typ === "echtzeit" ? " (Echtzeit)" : detail.eingang_typ === "standard" ? " (Standard)" : ""}</span>
-                  : <span>wartet auf Geldeingang</span>}
+                  : <span>{detail.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>}
               </div>
             ) : null}
             {detailQr && !detail.transaktion_id ? (

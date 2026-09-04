@@ -18,6 +18,7 @@ const supabaseDetail = createBrowserClient();
 
 const KASSE_ZAHLART: Record<string, string> = {
   qr_ueberweisung: "QR-Überweisung",
+  ueberweisung: "Überweisung",
   girocard: "Girocard",
   kreditkarte: "Kreditkarte",
   bar: "Bar",
@@ -57,7 +58,7 @@ export default function PatientDetailPage() {
       for (const k of kasse.data || []) {
         // Verknuepfte QR-Zahlungen erscheinen ueber die Bankzeile,
         // sonst stuenden sie doppelt da.
-        if (k.zahlart === "qr_ueberweisung" && k.transaktion_id) continue;
+        if ((k.zahlart === "qr_ueberweisung" || k.zahlart === "ueberweisung") && k.transaktion_id) continue;
         liste.push({
           id: `k-${k.id}`,
           datum: k.kassen_datum,
@@ -65,7 +66,12 @@ export default function PatientDetailPage() {
           zweck: k.zweck || "",
           notiz: k.notiz || "",
           betrag: Number(k.betrag),
-          status: k.zahlart === "qr_ueberweisung" && !k.transaktion_id ? "wartet auf Geldeingang" : "erhalten",
+          status:
+            k.zahlart === "qr_ueberweisung" && !k.transaktion_id
+              ? "wartet auf Geldeingang"
+              : k.zahlart === "ueberweisung" && !k.transaktion_id
+              ? "Überweisung angekündigt"
+              : "erhalten",
           beleg: k.beleg_nr || null,
         });
       }

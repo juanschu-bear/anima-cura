@@ -112,7 +112,8 @@ export interface MatchingDetails {
     | "rechnungsnr"
     | "name_plus_rate"
     | "name_plus_posten"
-    | "animapay_aufladung";
+    | "animapay_aufladung"
+    | "animapay_kasse";
   referenz?: string; // erkanntes unser_zeichen bei einem Referenz-Treffer
   ueberzahlung?: number; // verrechneter Ueberzahlungsbetrag, falls vorhanden
   mehrdeutig?: boolean;
@@ -120,6 +121,11 @@ export interface MatchingDetails {
   quelle?: string;
   booking_applied_at?: string;
   booking_mode?: "raten" | "offene_posten" | "keine_offenen_raten";
+  kassen_zahlart?: string;
+  open_item_sync_applied_at?: string;
+  open_item_sync_applied_amount?: number;
+  open_item_sync_remaining_amount?: number;
+  open_item_sync_items?: number;
 }
 
 // ─── Mahnwesen ──────────────────────────────────────────────

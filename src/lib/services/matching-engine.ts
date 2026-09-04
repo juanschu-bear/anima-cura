@@ -447,6 +447,10 @@ function cents(n: number): number {
   return Math.round(n * 100);
 }
 
+function isOpenItemSyncStamped(details: MatchingDetails | null | undefined) {
+  return Boolean(details && typeof details === "object" && details.open_item_sync_applied_at);
+}
+
 // Erkennt unser_zeichen wie "00005988-1/2026" und die 8-stellige Basis (ivoris_nummer).
 export function extractUnserZeichen(verwendungszweck: string): { full: string | null; base: string | null } {
   if (!verwendungszweck) return { full: null, base: null };
@@ -474,6 +478,14 @@ interface BookingCandidate {
   matched_patient_id: string | null;
   matched_rate_id?: string | null;
   matching_details?: MatchingDetails | null;
+}
+
+function getOpenItemSyncMeta(details: MatchingDetails | null | undefined) {
+  return {
+    applied: details?.open_item_sync_applied_amount || 0,
+    remaining: details?.open_item_sync_remaining_amount || 0,
+    affected: details?.open_item_sync_items || 0,
+  };
 }
 
 // Verrechnet eine Ueberzahlung mit den naechsten offenen Posten des Patienten
@@ -521,6 +533,69 @@ export async function applyUeberzahlung(
     const aktuell = ((pat?.guthaben as number | null) ?? 0);
     await db.from("patients").update({ guthaben: aktuell + rest }).eq("id", patientId);
   }
+}
+
+async function mirrorConfirmedPaymentIntoOpenItems(
+  db: ReturnType<typeof createServerClient>,
+  tx: BookingCandidate,
+  bookingStampedAt: string
+) {
+  if (!tx.id || !tx.matched_patient_id || cents(Number(tx.betrag) || 0) <= 0) {
+    return { applied: 0, remaining: Number(tx.betrag) || 0, affected: 0 };
+  }
+  if (isOpenItemSyncStamped(tx.matching_details)) {
+    return getOpenItemSyncMeta(tx.matching_details);
+  }
+
+  let remaining = Number(tx.betrag) || 0;
+  let applied = 0;
+  let affected = 0;
+
+  const { data: offenePosten } = await db
+    .from("offene_posten")
+    .select("id, offen, betrag, gezahlt, status, rechnung_datum, created_at")
+    .eq("patient_id", tx.matched_patient_id)
+    .in("status", ["offen", "teilbezahlt", "überfällig"])
+    .order("rechnung_datum", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  for (const posten of offenePosten || []) {
+    if (cents(remaining) <= 0) break;
+    const offen = posten.offen != null ? Number(posten.offen) : Math.max(0, Number(posten.betrag || 0) - Number(posten.gezahlt || 0));
+    if (cents(offen) <= 0) continue;
+
+    const chunk = Math.min(remaining, offen);
+    const nextOffen = Math.max(0, offen - chunk);
+    const nextGezahlt = Number(posten.gezahlt || 0) + chunk;
+
+    await db
+      .from("offene_posten")
+      .update({
+        offen: nextOffen,
+        gezahlt: nextGezahlt,
+        status: cents(nextOffen) === 0 ? "bezahlt" : "teilbezahlt",
+        bezahlt_am: cents(nextOffen) === 0 ? tx.datum : null,
+      })
+      .eq("id", posten.id);
+
+    remaining -= chunk;
+    applied += chunk;
+    affected += 1;
+  }
+
+  await db.from("transaktionen").update({
+    matching_details: {
+      ...(tx.matching_details || {}),
+      booking_applied_at: bookingStampedAt,
+      booking_mode: tx.matching_details?.booking_mode || "raten",
+      open_item_sync_applied_at: bookingStampedAt,
+      open_item_sync_applied_amount: Number(applied.toFixed(2)),
+      open_item_sync_remaining_amount: Number(Math.max(0, remaining).toFixed(2)),
+      open_item_sync_items: affected,
+    },
+  }).eq("id", tx.id);
+
+  return { applied, remaining, affected };
 }
 
 export async function applyConfirmedTransactionBooking(
@@ -576,6 +651,10 @@ export async function applyConfirmedTransactionBooking(
         ...(tx.matching_details || {}),
         booking_applied_at: bookingStampedAt,
         booking_mode: "offene_posten",
+        open_item_sync_applied_at: bookingStampedAt,
+        open_item_sync_applied_amount: Number(tx.betrag || 0),
+        open_item_sync_remaining_amount: Number(ref.ueberzahlung || 0),
+        open_item_sync_items: 1,
       },
     }).eq("id", tx.id);
 
@@ -614,6 +693,24 @@ export async function applyConfirmedTransactionBooking(
     },
   }).eq("id", tx.id);
 
+  if (allocation.updates.length > 0) {
+    await mirrorConfirmedPaymentIntoOpenItems(
+      db,
+      {
+        ...tx,
+        matching_details: {
+          name_score: tx.matching_details?.name_score ?? 0,
+          betrag_match: tx.matching_details?.betrag_match ?? false,
+          zweck_score: tx.matching_details?.zweck_score ?? 0,
+          methode: tx.matching_details?.methode ?? "manuell",
+          ...(tx.matching_details || {}),
+          booking_mode: "raten",
+        },
+      },
+      bookingStampedAt
+    );
+  }
+
   return {
     mode: allocation.updates.length > 0 ? "raten" : "keine_offenen_raten",
     matchedRateId: firstRateId,
@@ -644,6 +741,37 @@ async function backfillConfirmedRateBookings(db: ReturnType<typeof createServerC
     if (booking.mode === "raten" || booking.mode === "bereits") {
       repariert += 1;
     }
+  }
+
+  return repariert;
+}
+
+async function backfillOpenItemSync(db: ReturnType<typeof createServerClient>) {
+  const { data: kandidaten } = await db
+    .from("transaktionen")
+    .select("id, betrag, datum, verwendungszweck, matched_patient_id, matched_rate_id, matching_details")
+    .in("matching_status", ["auto", "manuell"])
+    .not("matched_patient_id", "is", null)
+    .gt("betrag", 0)
+    .order("datum", { ascending: true })
+    .limit(1000);
+
+  let repariert = 0;
+  for (const tx of (kandidaten || []).filter((row) => !isOpenItemSyncStamped(row.matching_details))) {
+    const result = await mirrorConfirmedPaymentIntoOpenItems(
+      db,
+      {
+        id: tx.id,
+        betrag: Number(tx.betrag) || 0,
+        datum: tx.datum,
+        verwendungszweck: tx.verwendungszweck || "",
+        matched_patient_id: tx.matched_patient_id,
+        matched_rate_id: tx.matched_rate_id,
+        matching_details: tx.matching_details,
+      },
+      new Date().toISOString()
+    );
+    if (result.applied > 0 || result.affected > 0) repariert += 1;
   }
 
   return repariert;
@@ -998,6 +1126,7 @@ export async function runBatchMatching(): Promise<{
   }
 
   stats.repariert = await backfillConfirmedRateBookings(db);
+  stats.repariert += await backfillOpenItemSync(db);
 
   // Alert erstellen
   await db.from("alerts").insert({

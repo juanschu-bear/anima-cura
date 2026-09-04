@@ -415,8 +415,8 @@ export default function ZahlungenPage() {
       .order("created_at", { ascending: false })
       .limit(100)
       .then(({ data }) => setKassenListe(
-        // Verknuepfte QR-Zahlungen leben als Bankzeile weiter
-        (data || []).filter((z: any) => z.zahlart !== "qr_ueberweisung" || !z.transaktion_id)
+        // Verknuepfte Kassen-Überweisungen leben als Bankzeile weiter
+        (data || []).filter((z: any) => !["qr_ueberweisung", "ueberweisung"].includes(z.zahlart) || !z.transaktion_id)
       ));
   }, []);
 
@@ -430,6 +430,7 @@ export default function ZahlungenPage() {
 
   function kassenFilterStatus(z: any) {
     if (z.zahlart === "qr_ueberweisung") return "wartet";
+    if (z.zahlart === "ueberweisung") return z.transaktion_id ? "erhalten" : "wartet";
     if (z.zahlart === "bar") return "erhalten";
     if (z.zahlart === "guthaben") return "guthaben";
     return "kartenzahlung";
@@ -456,6 +457,7 @@ export default function ZahlungenPage() {
 
   const KASSE_ZAHLART: Record<string, string> = {
     qr_ueberweisung: "QR-Überweisung",
+    ueberweisung: "Überweisung",
     girocard: "Girocard",
     guthaben: "Guthaben",
     kreditkarte: "Kreditkarte",
@@ -475,6 +477,11 @@ export default function ZahlungenPage() {
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
         : { label: "Wartet auf Geldeingang", color: "var(--ac-text-soft)", weight: 500 };
+    }
+    if (z.zahlart === "ueberweisung") {
+      return z.transaktion_id
+        ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
+        : { label: "Überweisung angekündigt", color: "var(--ac-text-soft)", weight: 500 };
     }
     if (z.zahlart === "bar") {
       return { label: "Bar erhalten", color: "#4ca43f", weight: 700 };

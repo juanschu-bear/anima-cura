@@ -328,12 +328,14 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
   }> = [];
 
   for (const entry of kasse ?? []) {
-    if (entry.zahlart === "qr_ueberweisung" && entry.transaktion_id) continue;
+    if ((entry.zahlart === "qr_ueberweisung" || entry.zahlart === "ueberweisung") && entry.transaktion_id) continue;
     geldbewegungen.push({
       datum: entry.kassen_datum ?? null,
       quelle:
         entry.zahlart === "qr_ueberweisung"
           ? "Kasse · QR-Überweisung"
+          : entry.zahlart === "ueberweisung"
+          ? "Kasse · Überweisung"
           : entry.zahlart === "girocard"
           ? "Kasse · Girocard"
           : entry.zahlart === "kreditkarte"
@@ -343,7 +345,12 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
           : `Kasse · ${entry.zahlart}`,
       zweck: entry.zweck || "",
       betrag: Number(entry.betrag || 0),
-      status: entry.zahlart === "qr_ueberweisung" && !entry.transaktion_id ? "wartet auf Geldeingang" : "erhalten",
+      status:
+        entry.zahlart === "qr_ueberweisung" && !entry.transaktion_id
+          ? "wartet auf Geldeingang"
+          : entry.zahlart === "ueberweisung" && !entry.transaktion_id
+          ? "Überweisung angekündigt"
+          : "erhalten",
       beleg: entry.beleg_nr || null,
     });
   }
