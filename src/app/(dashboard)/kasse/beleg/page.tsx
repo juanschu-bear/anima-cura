@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Printer, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
@@ -93,19 +93,15 @@ function BelegInhalt() {
     : isPatientCopy
     ? "Diese Kopie kann dem Patienten oder den Eltern als Zahlungsnachweis mitgegeben oder als PDF gespeichert werden."
     : "Interne Praxisansicht mit vollständigem Kassenkontext und eindeutiger Belegreferenz.";
-  const cards = useMemo(
-    () =>
-      [
-        ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
-        ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
-        ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
-        ["Leistung", zahlung.zweck || "—"],
-        ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
-        ["Buchungsdatum", datum],
-        ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
-      ] as Array<[string, string]>,
-    [zahlung, datum]
-  );
+  const cards: Array<[string, string]> = [
+    ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
+    ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
+    ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
+    ["Leistung", zahlung.zweck || "—"],
+    ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
+    ["Buchungsdatum", datum],
+    ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
+  ];
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6">
