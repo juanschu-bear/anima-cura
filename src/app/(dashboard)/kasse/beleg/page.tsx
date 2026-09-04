@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Printer, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
@@ -28,15 +29,30 @@ function signedAmount(betrag: number, buchungstyp?: string) {
   return `${sign}${Number(betrag || 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function BelegInhalt() {
   const router = useRouter();
   const params = useSearchParams();
   const id = params.get("id");
+  const copy = params.get("copy") === "patient" ? "patient" : "praxis";
   const [zahlung, setZahlung] = useState<any | null>(null);
   const [fehler, setFehler] = useState("");
 
   useEffect(() => {
-    if (!id) { setFehler("Kein Beleg angegeben."); return; }
+    if (!id) {
+      setFehler("Kein Beleg angegeben.");
+      return;
+    }
     (async () => {
       const { data, error } = await supabase
         .from("kassen_zahlungen")
@@ -48,118 +64,256 @@ function BelegInhalt() {
     })();
   }, [id]);
 
+  const closeReceipt = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/kasse");
+  };
+
+  const drucke = () => {
+    if (typeof window === "undefined") return;
+    document.title = copy === "patient" ? "Patientenkopie Quittung" : "Praxisquittung";
+    window.print();
+  };
+
   if (fehler) return <p className="p-8 text-sm text-praxis-400">{fehler}</p>;
   if (!zahlung) return <p className="p-8 text-sm text-praxis-400">Beleg wird geladen …</p>;
 
-  const datum = new Date(zahlung.kassen_datum).toLocaleDateString("de-DE", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
+  const datum = formatDate(zahlung.kassen_datum);
+  const isPatientCopy = copy === "patient";
+  const documentTitle = zahlung.buchungstyp === "ausgabe"
+    ? "Interner Kassenbeleg"
+    : isPatientCopy
+    ? "Patientenkopie der Quittung"
+    : "Praxisquittung";
+  const subline = zahlung.buchungstyp === "ausgabe"
+    ? "Interner Nachweis aus dem Kassenbereich der Praxis."
+    : isPatientCopy
+    ? "Diese Kopie kann dem Patienten oder den Eltern als Zahlungsnachweis mitgegeben oder als PDF gespeichert werden."
+    : "Interne Praxisansicht mit vollständigem Kassenkontext und eindeutiger Belegreferenz.";
+  const cards = useMemo(
+    () =>
+      [
+        ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
+        ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
+        ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
+        ["Leistung", zahlung.zweck || "—"],
+        ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
+        ["Buchungsdatum", datum],
+        ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
+      ] as Array<[string, string]>,
+    [zahlung, datum]
+  );
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={closeReceipt}
+            className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-[#111b27] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:bg-[#182434]"
+          >
+            <X size={16} />
+            Schließen
+          </button>
+          <div className="inline-flex rounded-full border border-white/12 bg-[#0f1722] p-1 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+            <Link
+              href={`/kasse/beleg?id=${id}&copy=praxis`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${!isPatientCopy ? "bg-white text-[#0e1825]" : "text-white/80 hover:text-white"}`}
+            >
+              Praxisquittung
+            </Link>
+            <Link
+              href={`/kasse/beleg?id=${id}&copy=patient`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isPatientCopy ? "bg-[#57e1a0] text-[#08281a]" : "text-white/80 hover:text-white"}`}
+            >
+              Patientenkopie
+            </Link>
+          </div>
+        </div>
         <button
           type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white/80 px-4 py-2 text-sm font-semibold text-praxis-700 transition hover:bg-white"
+          onClick={drucke}
+          className="inline-flex items-center gap-2 rounded-full bg-[#2ac95a] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(42,201,90,0.28)] transition hover:bg-[#25b650]"
         >
-          <X size={16} /> Schließen
+          <Printer size={16} />
+          Drucken / als PDF sichern
         </button>
       </div>
-      <div
-        className="beleg-druck"
-        style={{
-          background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
-          color: "#162338",
-          borderRadius: 24,
-          padding: "0",
-          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.12)",
-          fontFamily: "\"Georgia\", \"Times New Roman\", serif",
-          overflow: "hidden",
-          border: "1px solid rgba(44, 78, 116, 0.12)",
-        }}
-      >
-        <div style={{ background: "radial-gradient(circle at top left, rgba(87, 225, 160, 0.18), transparent 34%), linear-gradient(135deg, #112033 0%, #1b3552 100%)", color: "#f4f8ff", padding: "38px 48px 34px", display: "flex", justifyContent: "space-between", gap: 24, alignItems: "flex-start" }}>
-          <div>
-            <p style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", opacity: 0.72, margin: 0, fontFamily: "Inter, Arial, sans-serif" }}>AnimaPay Kasse</p>
-            <p style={{ fontSize: 30, fontWeight: 700, margin: "10px 0 0" }}>{zahlung.buchungstyp === "ausgabe" ? "Interner Kassenbeleg" : "Zahlungsquittung"}</p>
-            <p style={{ fontSize: 14, lineHeight: 1.55, margin: "14px 0 0", maxWidth: 420, color: "rgba(244,248,255,0.78)", fontFamily: "Inter, Arial, sans-serif" }}>
-              Professioneller Beleg aus dem Patienten- und Kassenportal von {PRAXIS.name}.
-            </p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ display: "inline-flex", padding: "10px 14px", borderRadius: 999, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 12, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", fontFamily: "Inter, Arial, sans-serif" }}>
-              {ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart}
-            </div>
-            <p style={{ fontSize: 12, color: "rgba(244,248,255,0.72)", margin: "16px 0 0", fontFamily: "Inter, Arial, sans-serif" }}>Beleg-Nr. {zahlung.beleg_nr || "—"}</p>
-            <p style={{ fontSize: 12, color: "rgba(244,248,255,0.72)", margin: "4px 0 0", fontFamily: "Inter, Arial, sans-serif" }}>{datum}</p>
-          </div>
-        </div>
 
-        <div style={{ padding: "38px 48px 44px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 24, marginBottom: 28 }}>
-            <div style={{ border: "1px solid #dde6f0", borderRadius: 20, padding: 24, background: "#ffffff" }}>
-              <p style={{ margin: 0, fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#68809c", fontFamily: "Inter, Arial, sans-serif" }}>Praxis</p>
-              <p style={{ margin: "10px 0 0", fontSize: 22, fontWeight: 700 }}>{PRAXIS.name}</p>
-              <p style={{ margin: "6px 0 0", fontSize: 14, color: "#52657c", fontFamily: "Inter, Arial, sans-serif" }}>{PRAXIS.zusatz}</p>
-              <p style={{ margin: "12px 0 0", fontSize: 13, color: "#6b7a90", lineHeight: 1.7, fontFamily: "Inter, Arial, sans-serif" }}>{PRAXIS.strasse}<br />{PRAXIS.ort}</p>
+      <div className="beleg-print-shell">
+        <article className="beleg-druck overflow-hidden rounded-[28px] border border-[#dbe4ee] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+          <header className="beleg-header flex items-start justify-between gap-6 px-9 py-8">
+            <div className="min-w-0">
+              <p className="beleg-kicker">{isPatientCopy ? "Patientenkopie" : "AnimaPay Kasse"}</p>
+              <h1 className="beleg-title">{documentTitle}</h1>
+              <p className="beleg-subline">{subline}</p>
             </div>
-            <div style={{ borderRadius: 20, padding: 24, background: "linear-gradient(135deg, #eef8f3 0%, #f7fbff 100%)", border: "1px solid rgba(84, 166, 124, 0.24)" }}>
-              <p style={{ margin: 0, fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#5b7a69", fontFamily: "Inter, Arial, sans-serif" }}>
+            <div className="min-w-[190px] text-right">
+              <div className="beleg-badge">{ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart}</div>
+              <p className="beleg-meta mt-4">Beleg-Nr. {zahlung.beleg_nr || "—"}</p>
+              <p className="beleg-meta mt-1">{datum}</p>
+            </div>
+          </header>
+
+          <div className="grid gap-5 px-9 pt-7 md:grid-cols-[1.1fr_0.9fr]">
+            <section className="rounded-[20px] border border-[#dde6f0] bg-white p-5">
+              <p className="beleg-section-label">{isPatientCopy ? "Praxis" : "Praxisansicht"}</p>
+              <p className="mt-3 text-[22px] font-bold text-[#18263a]">{PRAXIS.name}</p>
+              <p className="mt-1 font-sans text-[14px] text-[#52657c]">{PRAXIS.zusatz}</p>
+              <p className="mt-3 font-sans text-[13px] leading-7 text-[#6b7a90]">
+                {PRAXIS.strasse}
+                <br />
+                {PRAXIS.ort}
+              </p>
+            </section>
+
+            <section className="rounded-[20px] border border-[rgba(84,166,124,0.26)] bg-[linear-gradient(135deg,#eef8f3_0%,#f7fbff_100%)] p-5">
+              <p className="beleg-section-label text-[#5b7a69]">
                 {zahlung.buchungstyp === "ausgabe" ? "Dokumentierter Betrag" : "Erhaltener Betrag"}
               </p>
-              <p style={{ margin: "14px 0 0", fontSize: 38, fontWeight: 700, color: "#153a2b" }}>
-                {signedAmount(zahlung.betrag, zahlung.buchungstyp)}
+              <p className="mt-4 text-[44px] font-bold leading-none text-[#153a2b]">{signedAmount(zahlung.betrag, zahlung.buchungstyp)}</p>
+              <p className="mt-4 font-sans text-[13px] leading-6 text-[#527266]">
+                {isPatientCopy
+                  ? "Die Zahlung wurde in der Praxis erfasst und kann als Nachweis gespeichert oder vorgezeigt werden."
+                  : zahlung.buchungstyp === "ausgabe"
+                  ? "Interne Ausgabe im Kassenbuch dokumentiert."
+                  : "Zahlung wurde im Kassenbereich der Praxis erfasst."}
               </p>
-              <p style={{ margin: "10px 0 0", fontSize: 13, color: "#527266", lineHeight: 1.6, fontFamily: "Inter, Arial, sans-serif" }}>
-                {zahlung.buchungstyp === "ausgabe" ? "Interne Ausgabe im Kassenbuch dokumentiert." : "Zahlung wurde im Kassenbereich der Praxis erfasst."}
-              </p>
-            </div>
+            </section>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16, marginBottom: 28 }}>
-            {[
-              ["Typ", zahlung.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : "Patienten-Einnahme"],
-              ["Patient", zahlung.patient_id ? `${zahlung.patients?.nachname}, ${zahlung.patients?.vorname}` : "—"],
-              ["Patientennummer", zahlung.patient_id ? (zahlung.patients?.ivoris_nummer || "—") : "—"],
-              ["Leistung", zahlung.zweck || "—"],
-              ["Zahlart", ZAHLART_LABEL[zahlung.zahlart] || zahlung.zahlart],
-              ["Quartal", zahlung.quartal_jahr && zahlung.quartal_nummer ? `Q${zahlung.quartal_nummer} ${zahlung.quartal_jahr}` : "—"],
-            ].map(([k, v]) => (
-              <div key={k as string} style={{ border: "1px solid #e4ebf3", borderRadius: 18, padding: "16px 18px", background: "#fff" }}>
-                <p style={{ margin: 0, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a8da6", fontFamily: "Inter, Arial, sans-serif" }}>{k}</p>
-                <p style={{ margin: "10px 0 0", fontSize: 18, fontWeight: 700 }}>{v}</p>
+          <section className="grid gap-4 px-9 py-6 md:grid-cols-2">
+            {cards.map(([label, value]) => (
+              <div key={label} className="rounded-[18px] border border-[#e4ebf3] bg-white px-4 py-4">
+                <p className="beleg-section-label">{label}</p>
+                <p className="mt-2 text-[18px] font-bold leading-[1.35] text-[#1a2940]">{value}</p>
               </div>
             ))}
-          </div>
+          </section>
 
-          {zahlung.notiz ? (
-            <div style={{ border: "1px solid #e4ebf3", borderRadius: 18, padding: 20, marginBottom: 28, background: "#fff" }}>
-              <p style={{ margin: 0, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a8da6", fontFamily: "Inter, Arial, sans-serif" }}>Interne Notiz</p>
-              <p style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.7, color: "#3a4c61", fontFamily: "Inter, Arial, sans-serif" }}>{zahlung.notiz}</p>
-            </div>
+          {!isPatientCopy && zahlung.notiz ? (
+            <section className="mx-9 mb-6 rounded-[18px] border border-[#e4ebf3] bg-white px-5 py-4">
+              <p className="beleg-section-label">Interne Notiz</p>
+              <p className="mt-2 font-sans text-[15px] leading-7 text-[#3a4c61]">{zahlung.notiz}</p>
+            </section>
           ) : null}
 
-          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 16, display: "flex", justifyContent: "space-between", gap: 16, fontSize: 11, color: "#8293a7", fontFamily: "Inter, Arial, sans-serif" }}>
+          <footer className="mx-9 mb-8 flex flex-wrap items-start justify-between gap-4 border-t border-[#e2e8f0] pt-4 font-sans text-[11px] text-[#8293a7]">
             <span>{PRAXIS.name} · {PRAXIS.strasse} · {PRAXIS.ort}</span>
-            <span>{zahlung.buchungstyp === "ausgabe" ? "Interner Kassenbeleg, keine Rechnung." : "Quittung über eine erfasste Zahlung, keine Rechnung."}</span>
-          </div>
-        </div>
+            <span>
+              {zahlung.buchungstyp === "ausgabe"
+                ? "Interner Kassenbeleg, keine Rechnung."
+                : isPatientCopy
+                ? "Patientenkopie einer erfassten Zahlung, keine Rechnung."
+                : "Praxisquittung über eine erfasste Zahlung, keine Rechnung."}
+            </span>
+          </footer>
+        </article>
       </div>
 
-      <button
-        onClick={() => window.print()}
-        className="druck-knopf btn-primary mx-auto mt-4 flex items-center gap-2"
-      >
-        <Printer size={16} /> Drucken / als PDF sichern
-      </button>
-
       <style jsx global>{`
+        .beleg-print-shell {
+          display: flex;
+          justify-content: center;
+        }
+        .beleg-druck {
+          width: min(100%, 860px);
+        }
+        .beleg-header {
+          background:
+            radial-gradient(circle at top left, rgba(87, 225, 160, 0.18), transparent 34%),
+            linear-gradient(135deg, #112033 0%, #1b3552 100%);
+          color: #f4f8ff;
+        }
+        .beleg-kicker {
+          margin: 0;
+          font-family: Inter, Arial, sans-serif;
+          font-size: 12px;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          opacity: 0.72;
+        }
+        .beleg-title {
+          margin: 10px 0 0;
+          font-size: 30px;
+          font-weight: 700;
+          color: #f8fbff;
+        }
+        .beleg-subline {
+          margin: 14px 0 0;
+          max-width: 480px;
+          font-family: Inter, Arial, sans-serif;
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(244, 248, 255, 0.8);
+        }
+        .beleg-badge {
+          display: inline-flex;
+          padding: 10px 14px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          font-family: Inter, Arial, sans-serif;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 1.4px;
+          text-transform: uppercase;
+        }
+        .beleg-meta {
+          margin: 0;
+          font-family: Inter, Arial, sans-serif;
+          font-size: 12px;
+          color: rgba(244, 248, 255, 0.72);
+        }
+        .beleg-section-label {
+          margin: 0;
+          font-family: Inter, Arial, sans-serif;
+          font-size: 11px;
+          letter-spacing: 1.6px;
+          text-transform: uppercase;
+          color: #7a8da6;
+        }
         @media print {
-          body * { visibility: hidden; }
-          .beleg-druck, .beleg-druck * { visibility: visible; }
-          .beleg-druck { position: absolute; left: 0; top: 0; width: 100%; border-radius: 0 !important; box-shadow: none !important; border: none !important; }
-          .druck-knopf { display: none; }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          html,
+          body {
+            background: #ffffff !important;
+          }
+          body * {
+            visibility: hidden;
+          }
+          .beleg-print-shell,
+          .beleg-print-shell * {
+            visibility: visible;
+          }
+          .beleg-print-shell {
+            display: block !important;
+            width: 190mm !important;
+            margin: 0 auto !important;
+          }
+          .beleg-druck {
+            width: 190mm !important;
+            max-width: 190mm !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            break-inside: avoid;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .beleg-header {
+            background:
+              radial-gradient(circle at top left, rgba(87, 225, 160, 0.18), transparent 34%),
+              linear-gradient(135deg, #112033 0%, #1b3552 100%) !important;
+          }
         }
       `}</style>
     </div>
