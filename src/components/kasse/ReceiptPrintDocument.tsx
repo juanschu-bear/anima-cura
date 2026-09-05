@@ -63,8 +63,8 @@ export default function ReceiptPrintDocument({
         <div className={styles.meta}>
           <div className={styles.brand}>
             <svg viewBox="0 0 28 12" aria-hidden="true" className={styles.brandIcon}>
-              <line x1="1" y1="6" x2="27" y2="6" stroke="#10222A" strokeOpacity="0.35" />
-              <circle cx="19" cy="6" r="3" fill="#1B6F68" />
+              <line x1="1" y1="6" x2="27" y2="6" stroke="#1D3142" strokeOpacity="0.28" />
+              <circle cx="19" cy="6" r="3" fill="#2B6CB0" />
             </svg>
             AnimaPay Kasse
           </div>

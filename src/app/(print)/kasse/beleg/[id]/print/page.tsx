@@ -1,4 +1,4 @@
-import { JetBrains_Mono, Manrope } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import { notFound, redirect } from "next/navigation";
 import ReceiptPrintDocument from "@/components/kasse/ReceiptPrintDocument";
 import ReceiptPreviewShell from "@/components/kasse/ReceiptPreviewShell";
@@ -16,14 +16,14 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-receipt-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["500", "700"],
   variable: "--font-receipt-mono",
@@ -75,7 +75,7 @@ export default async function ReceiptPrintPage({
 
   return (
     <div
-      className={`${manrope.variable} ${jetbrainsMono.variable} min-h-screen ${pdfMode ? "bg-white" : "bg-[radial-gradient(circle_at_top,_#dce8ff_0%,_#edf2f8_38%,_#e7ecef_100%)]"}`}
+      className={`${inter.variable} ${ibmPlexMono.variable} min-h-screen ${pdfMode ? "bg-white" : "bg-[radial-gradient(circle_at_top,_#dce8ff_0%,_#edf2f8_38%,_#e7ecef_100%)]"}`}
     >
       {!pdfMode ? (
         <ReceiptPreviewShell

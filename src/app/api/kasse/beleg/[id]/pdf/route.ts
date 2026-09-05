@@ -114,7 +114,7 @@ export async function GET(
 
     const pdf = await page.pdf({
       format: format === "a5" ? "A5" : "A4",
-      printBackground: false,
+      printBackground: true,
       preferCSSPageSize: true,
       margin: {
         top: "0mm",

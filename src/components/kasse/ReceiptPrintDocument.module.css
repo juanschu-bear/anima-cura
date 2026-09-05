@@ -9,39 +9,43 @@
 }
 
 .sheet {
-  --ink: #10222a;
-  --ink-2: #4b5f66;
-  --ink-3: #8a989d;
-  --line: #d9dee0;
-  --line-2: #b9c2c6;
-  --accent: #1b6f68;
-  --pad: 18mm;
-  --fs: 10.5pt;
-  --fs-s: 8.5pt;
-  --fs-title: 26pt;
-  --fs-amt: 34pt;
-  --gap: 8mm;
+  --receipt-ink: #142634;
+  --receipt-ink-soft: #445d70;
+  --receipt-ink-mute: #708495;
+  --receipt-line: #c9d5e0;
+  --receipt-line-strong: #9caebb;
+  --receipt-accent: #2267b3;
+  --receipt-accent-soft: rgba(34, 103, 179, 0.1);
+  --receipt-pad: 18mm;
+  --receipt-fs: 10.5pt;
+  --receipt-fs-s: 8.5pt;
+  --receipt-fs-title: 26pt;
+  --receipt-fs-amt: 34pt;
+  --receipt-gap: 8mm;
   width: 210mm;
   min-height: 297mm;
-  padding: var(--pad);
+  padding: var(--receipt-pad);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  color: var(--ink);
+  color: var(--receipt-ink);
   font-family: var(--font-receipt-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: var(--fs);
+  font-size: var(--receipt-fs);
   line-height: 1.45;
+  text-rendering: geometricPrecision;
+  font-synthesis: none;
   box-shadow: 0 18pt 48pt rgba(16, 34, 42, 0.18);
   page: a4;
 }
 
 .sheet[data-format="a5"] {
-  --pad: 12mm;
-  --fs: 9pt;
-  --fs-s: 7.5pt;
-  --fs-title: 20pt;
-  --fs-amt: 26pt;
-  --gap: 5.5mm;
+  --receipt-pad: 12mm;
+  --receipt-fs: 9pt;
+  --receipt-fs-s: 7.5pt;
+  --receipt-fs-title: 20pt;
+  --receipt-fs-amt: 26pt;
+  --receipt-gap: 5.5mm;
   width: 148mm;
   min-height: 210mm;
   page: a5;
@@ -52,12 +56,18 @@
 }
 
 .head {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10mm;
-  padding-bottom: var(--gap);
-  border-bottom: 1.5pt solid var(--ink);
+  margin: calc(var(--receipt-gap) * -0.22) 0 0;
+  padding: 4.5mm 5mm var(--receipt-gap);
+  border-bottom: 1.5pt solid var(--receipt-ink);
+  border-radius: 4.5mm;
+  background:
+    radial-gradient(circle at top left, rgba(116, 168, 240, 0.38), transparent 44%),
+    linear-gradient(135deg, rgba(33, 93, 162, 0.18) 0%, rgba(72, 139, 217, 0.09) 48%, rgba(255, 255, 255, 0) 100%);
 }
 
 .practiceBlock {
@@ -66,21 +76,22 @@
 
 .practiceName {
   display: block;
-  font-size: calc(var(--fs) * 1.15);
-  font-weight: 600;
+  color: var(--receipt-ink);
+  font-size: calc(var(--receipt-fs) * 1.15);
+  font-weight: 700;
 }
 
 .practiceLine {
   display: block;
-  color: var(--ink-2);
-  font-size: var(--fs-s);
+  color: var(--receipt-ink-soft);
+  font-size: var(--receipt-fs-s);
   line-height: 1.5;
 }
 
 .meta {
   text-align: right;
-  font-size: var(--fs-s);
-  color: var(--ink-2);
+  font-size: var(--receipt-fs-s);
+  color: var(--receipt-ink-soft);
 }
 
 .brand {
@@ -88,11 +99,11 @@
   align-items: center;
   gap: 2mm;
   margin-bottom: 2.5mm;
-  font-size: calc(var(--fs-s) * 0.95);
-  font-weight: 600;
+  font-size: calc(var(--receipt-fs-s) * 0.95);
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--receipt-ink);
 }
 
 .brandIcon {
@@ -109,12 +120,12 @@
 }
 
 .metaKey {
-  color: var(--ink-3);
+  color: var(--receipt-ink-mute);
 }
 
 .metaValue {
-  color: var(--ink);
-  font-weight: 500;
+  color: var(--receipt-ink);
+  font-weight: 600;
   text-align: right;
 }
 
@@ -124,24 +135,33 @@
 }
 
 .titleSection {
-  padding: var(--gap) 0;
+  margin: 6mm 0 var(--receipt-gap);
+  padding: 6mm 6mm 6.5mm;
+  border: 1px solid rgba(34, 103, 179, 0.16);
+  border-radius: 4.5mm;
+  background:
+    radial-gradient(circle at top left, rgba(116, 168, 240, 0.18), transparent 46%),
+    linear-gradient(135deg, rgba(18, 73, 137, 0.1) 0%, rgba(66, 129, 208, 0.04) 58%, rgba(255, 255, 255, 0) 100%);
 }
 
 .variant {
   display: inline-block;
   margin-bottom: 3mm;
   padding: 0.6mm 3mm;
-  border: 0.6pt solid var(--accent);
+  border: 0.75pt solid var(--receipt-accent);
   border-radius: 99mm;
-  font-size: var(--fs-s);
+  background: var(--receipt-accent-soft);
+  font-size: var(--receipt-fs-s);
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--receipt-accent);
 }
 
 .title {
-  font-size: var(--fs-title);
-  font-weight: 600;
+  color: var(--receipt-ink);
+  font-size: var(--receipt-fs-title);
+  font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -149,7 +169,8 @@
 .intro {
   max-width: 120mm;
   margin-top: 2mm;
-  color: var(--ink-2);
+  color: var(--receipt-ink-soft);
+  font-size: calc(var(--receipt-fs) * 1.06);
   overflow-wrap: anywhere;
 }
 
@@ -158,23 +179,25 @@
   grid-template-columns: 1fr auto;
   gap: 6mm;
   align-items: end;
-  margin-bottom: var(--gap);
+  margin-bottom: var(--receipt-gap);
   padding: 6mm 7mm;
-  border: 1pt solid var(--ink);
+  border: 1.1pt solid var(--receipt-ink);
   border-radius: 3mm;
+  background: linear-gradient(180deg, rgba(238, 245, 255, 0.92) 0%, rgba(255, 255, 255, 1) 100%);
 }
 
 .amountLabel {
-  font-size: var(--fs-s);
+  font-size: var(--receipt-fs-s);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--receipt-ink-mute);
 }
 
 .amountValue {
   margin-top: 1.5mm;
-  font-size: var(--fs-amt);
-  font-weight: 600;
+  color: var(--receipt-ink);
+  font-size: var(--receipt-fs-amt);
+  font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
@@ -182,42 +205,43 @@
 
 .amountNote {
   margin-top: 2mm;
-  font-size: var(--fs-s);
-  color: var(--ink-2);
+  font-size: var(--receipt-fs-s);
+  color: var(--receipt-ink-soft);
   overflow-wrap: anywhere;
 }
 
 .amountMeta {
   text-align: right;
-  font-size: var(--fs-s);
-  color: var(--ink-2);
+  font-size: var(--receipt-fs-s);
+  color: var(--receipt-ink-soft);
 }
 
 .amountMeta strong {
   display: block;
   margin-top: 1mm;
-  font-size: var(--fs);
-  font-weight: 600;
-  color: var(--ink);
+  font-size: var(--receipt-fs);
+  font-weight: 700;
+  color: var(--receipt-ink);
 }
 
 .chip {
   display: inline-block;
   padding: 0.6mm 3.5mm;
-  border: 0.6pt solid var(--ink);
+  border: 0.75pt solid var(--receipt-ink);
   border-radius: 99mm;
-  font-size: var(--fs-s);
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: var(--receipt-fs-s);
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--receipt-ink);
 }
 
 .details {
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 10mm;
-  margin-bottom: var(--gap);
+  margin-bottom: var(--receipt-gap);
 }
 
 .detailColumn {
@@ -230,7 +254,7 @@
   gap: 3mm;
   align-items: baseline;
   padding: 2.6mm 0;
-  border-bottom: 0.5pt solid var(--line);
+  border-bottom: 0.55pt solid var(--receipt-line);
 }
 
 .sheet[data-format="a5"] .row {
@@ -238,33 +262,37 @@
 }
 
 .key {
-  font-size: var(--fs-s);
+  font-size: var(--receipt-fs-s);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--receipt-ink-mute);
 }
 
 .value {
-  font-weight: 500;
+  color: var(--receipt-ink);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .note {
-  margin-bottom: var(--gap);
+  margin-bottom: var(--receipt-gap);
   padding: 3.5mm 4.5mm;
-  border: 0.5pt dashed var(--line-2);
+  border: 0.55pt dashed var(--receipt-line-strong);
   border-radius: 2mm;
+  background: rgba(245, 249, 255, 0.82);
 }
 
 .noteTitle {
   margin-bottom: 1mm;
-  font-size: var(--fs-s);
+  font-size: var(--receipt-fs-s);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--receipt-ink-mute);
 }
 
 .noteCopy {
+  color: var(--receipt-ink);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
@@ -273,15 +301,15 @@
   grid-template-columns: 1fr 1fr;
   gap: 12mm;
   margin-top: 6mm;
-  margin-bottom: var(--gap);
+  margin-bottom: var(--receipt-gap);
 }
 
 .signLine {
   margin-top: 14mm;
   padding-top: 1.5mm;
-  border-top: 0.6pt solid var(--ink);
-  font-size: var(--fs-s);
-  color: var(--ink-2);
+  border-top: 0.75pt solid var(--receipt-ink);
+  font-size: var(--receipt-fs-s);
+  color: var(--receipt-ink-soft);
 }
 
 .foot {
@@ -290,9 +318,9 @@
   gap: 8mm;
   margin-top: auto;
   padding-top: 3mm;
-  border-top: 0.5pt solid var(--line);
-  font-size: var(--fs-s);
-  color: var(--ink-3);
+  border-top: 0.55pt solid var(--receipt-line);
+  font-size: var(--receipt-fs-s);
+  color: var(--receipt-ink-mute);
 }
 
 .foot span:last-child {
@@ -320,8 +348,8 @@
     inset: 0 0 auto 0;
     height: 40mm;
     background:
-      radial-gradient(circle at top left, rgba(122, 170, 255, 0.22), transparent 48%),
-      linear-gradient(135deg, rgba(28, 72, 142, 0.08) 0%, rgba(65, 120, 214, 0.12) 100%);
+      radial-gradient(circle at top left, rgba(122, 170, 255, 0.26), transparent 48%),
+      linear-gradient(135deg, rgba(28, 72, 142, 0.1) 0%, rgba(65, 120, 214, 0.14) 100%);
     pointer-events: none;
   }
 
@@ -337,9 +365,9 @@
   }
 
   .variant {
-    background: rgba(43, 88, 168, 0.06);
-    border-color: rgba(43, 88, 168, 0.42);
-    color: #234d8f;
+    background: rgba(43, 108, 176, 0.1);
+    border-color: rgba(43, 108, 176, 0.42);
+    color: #245f9d;
   }
 }
 
@@ -348,6 +376,7 @@
     box-shadow: none;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+    overflow: hidden;
   }
 
   .sheet[data-format="a4"] {
