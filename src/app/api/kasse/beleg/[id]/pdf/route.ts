@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Browser } from "playwright-core";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { canAccessPath } from "@/lib/auth";
 import {
@@ -12,6 +13,26 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+async function launchReceiptBrowser(): Promise<Browser> {
+  if (process.platform === "darwin" || process.platform === "win32") {
+    const { chromium } = await import("playwright");
+    return chromium.launch({ headless: true });
+  }
+
+  const [{ chromium: playwrightChromium }, chromiumModule] = await Promise.all([
+    import("playwright-core"),
+    import("@sparticuz/chromium"),
+  ]);
+
+  const chromium = chromiumModule.default;
+
+  return playwrightChromium.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: true,
+  });
+}
 
 async function ensureKasseAccess() {
   const supabase = createServerComponentClient();
@@ -52,16 +73,16 @@ export async function GET(
   const format = parseReceiptFormat(request.nextUrl.searchParams.get("format"));
   const requestedVariant = parseReceiptVariant(request.nextUrl.searchParams.get("variant"));
   const variant = canRenderPatientReceipt(beleg) ? requestedVariant : "praxis";
+  const disposition = request.nextUrl.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
   const targetUrl = new URL(
     buildReceiptPreviewHref(params.id, { variant, format, mode: "pdf" }),
     request.nextUrl.origin
   );
 
-  let browser: Awaited<ReturnType<(typeof import("playwright"))["chromium"]["launch"]>> | null = null;
+  let browser: Browser | null = null;
 
   try {
-    const { chromium } = await import("playwright");
-    browser = await chromium.launch({ headless: true });
+    browser = await launchReceiptBrowser();
     const context = await browser.newContext({ locale: "de-DE" });
     const cookies = request.cookies
       .getAll()
@@ -107,13 +128,19 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${getReceiptFilename(beleg, variant)}"`,
+        "Content-Disposition": `${disposition}; filename="${getReceiptFilename(beleg, variant)}"`,
         "Cache-Control": "no-store",
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "PDF-Erzeugung fehlgeschlagen";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "PDF konnte gerade nicht erzeugt werden.",
+        details: process.env.NODE_ENV === "development" ? message : undefined,
+      },
+      { status: 500 }
+    );
   } finally {
     if (browser) {
       await browser.close();

@@ -19,6 +19,7 @@ const ZAHLART_LABELS: Record<string, string> = {
 
 export type ReceiptVariant = "praxis" | "patient";
 export type ReceiptFormat = "a4" | "a5";
+export type ReceiptPdfDisposition = "attachment" | "inline";
 
 export interface KassenBelegData {
   id: string;
@@ -189,14 +190,17 @@ export function buildReceiptPdfHref(
   options?: {
     variant?: ReceiptVariant;
     format?: ReceiptFormat;
+    disposition?: ReceiptPdfDisposition;
   }
 ): string {
   const params = new URLSearchParams();
   const variant = options?.variant && options.variant !== "praxis" ? options.variant : null;
   const format = options?.format && options.format !== "a4" ? options.format : null;
+  const disposition = options?.disposition === "inline" ? "inline" : null;
 
   if (variant) params.set("variant", variant);
   if (format) params.set("format", format);
+  if (disposition) params.set("disposition", disposition);
 
   const query = params.toString();
   return `/api/kasse/beleg/${id}/pdf${query ? `?${query}` : ""}`;

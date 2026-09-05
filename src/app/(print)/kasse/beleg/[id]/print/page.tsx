@@ -75,7 +75,7 @@ export default async function ReceiptPrintPage({
 
   return (
     <div
-      className={`${manrope.variable} ${jetbrainsMono.variable} min-h-screen ${pdfMode ? "bg-white" : "bg-[#e9ebec]"}`}
+      className={`${manrope.variable} ${jetbrainsMono.variable} min-h-screen ${pdfMode ? "bg-white" : "bg-[radial-gradient(circle_at_top,_#dce8ff_0%,_#edf2f8_38%,_#e7ecef_100%)]"}`}
     >
       {!pdfMode ? (
         <ReceiptPreviewShell

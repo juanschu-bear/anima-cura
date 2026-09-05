@@ -1036,7 +1036,17 @@ export default function KassePage() {
               Belegvorschau öffnen
             </a>
             <a
+              href={buildReceiptPdfHref(detail.id, { disposition: "inline" })}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary block w-full text-center text-xs"
+            >
+              PDF ansehen
+            </a>
+            <a
               href={buildReceiptPdfHref(detail.id)}
+              target="_blank"
+              rel="noreferrer"
               className="btn-secondary block w-full text-center text-xs"
             >
               Als PDF speichern
@@ -1081,7 +1091,20 @@ export default function KassePage() {
               >
                 Beleg öffnen
               </a>
-              <a className="ac-chip" href={buildReceiptPdfHref(bestaetigung.kzId)}>
+              <a
+                className="ac-chip"
+                href={buildReceiptPdfHref(bestaetigung.kzId, { disposition: "inline" })}
+                target="_blank"
+                rel="noreferrer"
+              >
+                PDF ansehen
+              </a>
+              <a
+                className="ac-chip"
+                href={buildReceiptPdfHref(bestaetigung.kzId)}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Als PDF speichern
               </a>
               <button className="ac-chip" onClick={() => setBestaetigung(null)}>Schließen</button>

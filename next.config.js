@@ -2,6 +2,10 @@
 const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
+    serverComponentsExternalPackages: ["@sparticuz/chromium", "playwright-core"],
+    outputFileTracingIncludes: {
+      "/api/kasse/beleg/[id]/pdf": ["./node_modules/@sparticuz/chromium/**/*"],
+    },
   },
   async redirects() {
     return [

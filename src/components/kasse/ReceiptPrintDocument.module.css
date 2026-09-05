@@ -303,6 +303,46 @@
   overflow-wrap: anywhere;
 }
 
+@media screen {
+  .sheet {
+    position: relative;
+    border: 1px solid rgba(76, 123, 206, 0.22);
+    border-radius: 7mm;
+    overflow: hidden;
+    box-shadow:
+      0 24px 72px rgba(16, 34, 42, 0.18),
+      0 2px 0 rgba(255, 255, 255, 0.9) inset;
+  }
+
+  .sheet::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 40mm;
+    background:
+      radial-gradient(circle at top left, rgba(122, 170, 255, 0.22), transparent 48%),
+      linear-gradient(135deg, rgba(28, 72, 142, 0.08) 0%, rgba(65, 120, 214, 0.12) 100%);
+    pointer-events: none;
+  }
+
+  .head,
+  .titleSection,
+  .amount,
+  .details,
+  .note,
+  .sign,
+  .foot {
+    position: relative;
+    z-index: 1;
+  }
+
+  .variant {
+    background: rgba(43, 88, 168, 0.06);
+    border-color: rgba(43, 88, 168, 0.42);
+    color: #234d8f;
+  }
+}
+
 @media print {
   .sheet {
     box-shadow: none;

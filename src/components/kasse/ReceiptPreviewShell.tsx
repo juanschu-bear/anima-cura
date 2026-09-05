@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Printer, X } from "lucide-react";
+import { Download, Eye, Printer, X } from "lucide-react";
 import {
   buildReceiptPdfHref,
   buildReceiptPreviewHref,
@@ -29,6 +29,7 @@ export default function ReceiptPreviewShell({
   pendingHinweis: string | null;
 }) {
   const router = useRouter();
+  const title = variant === "patient" ? "Patientenquittung" : "Praxisquittung";
 
   useEffect(() => {
     if (!autoPrint) return;
@@ -52,16 +53,16 @@ export default function ReceiptPreviewShell({
 
   return (
     <div className="print:hidden">
-      <div className="sticky top-0 z-20 border-b border-[#d7dde1] bg-[#10222a]/95 px-4 py-3 text-[#f3efe7] shadow-[0_10px_32px_rgba(16,34,42,0.22)] backdrop-blur">
+      <div className="sticky top-0 z-20 border-b border-[#7aa6ff]/20 bg-[radial-gradient(circle_at_top_left,rgba(99,146,255,0.28),transparent_28%),linear-gradient(135deg,#0f1b2d_0%,#122640_56%,#173d66_100%)] px-4 py-3 text-[#f3efe7] shadow-[0_12px_36px_rgba(10,20,34,0.28)] backdrop-blur">
         <div className="mx-auto flex max-w-[1360px] flex-wrap items-center gap-3">
-          <b className="mr-2 text-sm font-semibold">Vorschau: Praxisquittung</b>
-          <span className="text-xs uppercase tracking-[0.18em] text-[#b6c3c8]">Exemplar</span>
+          <b className="mr-2 text-sm font-semibold">Vorschau: {title}</b>
+          <span className="text-xs uppercase tracking-[0.18em] text-[#c5d5f1]">Exemplar</span>
           <Link
             href={buildReceiptPreviewHref(belegId, { variant: "praxis", format, returnTo })}
             className={`rounded-full px-4 py-2 text-sm transition ${
               variant === "praxis"
-                ? "bg-[#f3efe7] font-semibold text-[#10222a]"
-                : "bg-white/10 text-[#f3efe7] hover:bg-white/16"
+                ? "bg-[#dfeaff] font-semibold text-[#17345b] shadow-[0_8px_24px_rgba(126,170,255,0.22)]"
+                : "border border-white/12 bg-[#09111c]/28 text-[#f3efe7] hover:bg-white/12"
             }`}
           >
             Praxisexemplar
@@ -71,8 +72,8 @@ export default function ReceiptPreviewShell({
               href={buildReceiptPreviewHref(belegId, { variant: "patient", format, returnTo })}
               className={`rounded-full px-4 py-2 text-sm transition ${
                 variant === "patient"
-                  ? "bg-[#f3efe7] font-semibold text-[#10222a]"
-                  : "bg-white/10 text-[#f3efe7] hover:bg-white/16"
+                  ? "bg-[#dfeaff] font-semibold text-[#17345b] shadow-[0_8px_24px_rgba(126,170,255,0.22)]"
+                  : "border border-white/12 bg-[#09111c]/28 text-[#f3efe7] hover:bg-white/12"
               }`}
             >
               Patientenkopie
@@ -83,13 +84,13 @@ export default function ReceiptPreviewShell({
             </span>
           )}
 
-          <span className="ml-2 text-xs uppercase tracking-[0.18em] text-[#b6c3c8]">Format</span>
+          <span className="ml-2 text-xs uppercase tracking-[0.18em] text-[#c5d5f1]">Format</span>
           <Link
             href={buildReceiptPreviewHref(belegId, { variant, format: "a4", returnTo })}
             className={`rounded-full px-4 py-2 text-sm transition ${
               format === "a4"
                 ? "bg-[#f3efe7] font-semibold text-[#10222a]"
-                : "bg-white/10 text-[#f3efe7] hover:bg-white/16"
+                : "border border-white/12 bg-[#09111c]/28 text-[#f3efe7] hover:bg-white/12"
             }`}
           >
             A4
@@ -99,7 +100,7 @@ export default function ReceiptPreviewShell({
             className={`rounded-full px-4 py-2 text-sm transition ${
               format === "a5"
                 ? "bg-[#f3efe7] font-semibold text-[#10222a]"
-                : "bg-white/10 text-[#f3efe7] hover:bg-white/16"
+                : "border border-white/12 bg-[#09111c]/28 text-[#f3efe7] hover:bg-white/12"
             }`}
           >
             A5
@@ -114,6 +115,15 @@ export default function ReceiptPreviewShell({
               <X size={16} />
               Schließen
             </button>
+            <a
+              href={buildReceiptPdfHref(belegId, { variant, format, disposition: "inline" })}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-[#9ebcff]/35 bg-[#dfeaff] px-4 py-2 text-sm font-semibold text-[#17345b] transition hover:brightness-105"
+            >
+              <Eye size={16} />
+              PDF ansehen
+            </a>
             <button
               type="button"
               onClick={() => window.print()}
@@ -124,6 +134,8 @@ export default function ReceiptPreviewShell({
             </button>
             <a
               href={buildReceiptPdfHref(belegId, { variant, format })}
+              target="_blank"
+              rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-[#f3efe7] px-4 py-2 text-sm font-semibold text-[#10222a] transition hover:brightness-105"
             >
               <Download size={16} />
