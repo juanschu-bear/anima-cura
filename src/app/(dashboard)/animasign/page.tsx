@@ -114,6 +114,22 @@ const EMPTY_OUTBOX: OutboxStats = {
   nextRetryAt: null,
 };
 
+interface StabilityEvidence {
+  latestDate: string | null;
+  latestObservedAt: string | null;
+  latestHealthy: boolean | null;
+  healthyDayStreak: number;
+  observedDays: number;
+}
+
+const EMPTY_STABILITY: StabilityEvidence = {
+  latestDate: null,
+  latestObservedAt: null,
+  latestHealthy: null,
+  healthyDayStreak: 0,
+  observedDays: 0,
+};
+
 type FilterTab = "today" | "week" | "all" | "open";
 const PAGE_SIZE = 15;
 
@@ -124,6 +140,7 @@ export default function AnimaSignPage() {
   const [subs, setSubs] = useState<Submission[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
   const [outbox, setOutbox] = useState<OutboxStats>(EMPTY_OUTBOX);
+  const [stability, setStability] = useState<StabilityEvidence>(EMPTY_STABILITY);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
@@ -150,6 +167,7 @@ export default function AnimaSignPage() {
       setSubs(d.submissions || []);
       setStats(d.stats || { total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
       setOutbox(d.outbox || EMPTY_OUTBOX);
+      setStability(d.stability || EMPTY_STABILITY);
     } catch (e) { console.error("[AnimaSign]", e); }
     setLoading(false);
   }, [search, filter]);
@@ -478,6 +496,13 @@ export default function AnimaSignPage() {
         </div>
         <div style={{ fontSize: 11, color: muted, marginTop: 8 }}>
           {outbox.nextRetryAt ? `Nächster geplanter Versuch: ${fmtDate(outbox.nextRetryAt)} ${fmtTime(outbox.nextRetryAt)}` : "Kein zeitgesteuerter Wiederholungsversuch vorgemerkt."}
+        </div>
+        <div style={{ fontSize: 11, color: muted, marginTop: 6 }}>
+          Stabilitätsnachweis: <b style={{ color: stability.latestHealthy ? green : errorRed }}>
+            {stability.latestHealthy === null ? "noch keine Messung" : stability.latestHealthy ? "GRÜN" : "HANDLUNGSBEDARF"}
+          </b>
+          {` · ${stability.healthyDayStreak} fehlerfreie Tage in Folge · ${stability.observedDays} Tage protokolliert`}
+          {stability.latestObservedAt ? ` · zuletzt ${fmtDate(stability.latestObservedAt)} ${fmtTime(stability.latestObservedAt)}` : ""}
         </div>
       </div>
 

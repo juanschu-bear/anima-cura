@@ -12,6 +12,7 @@
     "test": "npm run test:animus && npm run test:animasign-dupguard && npm run test:ivoris-patient-link",
     "check:schema": "tsx scripts/check-production-schema.ts",
     "test:outbox-claim": "tsx scripts/test-integration-outbox-claim.ts",
+    "snapshot:anima-stability-daily": "tsx scripts/anima-stability-daily-snapshot.ts",
     "report:anima-stability-weekly": "tsx scripts/anima-stability-weekly-report.ts",
     "check:animasign": "tsx scripts/verify-animasign-integrity.ts",
     "check:animasign-supervisor": "tsx scripts/animasign-supervisor.ts",

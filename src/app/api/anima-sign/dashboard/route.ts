@@ -83,6 +83,28 @@ export async function GET(req: Request) {
     nextRetryAt,
   };
 
+  const { data: stabilityRows, error: stabilityError } = await supabase
+    .from("stability_observations")
+    .select("observation_date,observed_at,healthy")
+    .order("observation_date", { ascending: false })
+    .limit(35);
+  if (stabilityError) {
+    console.error("[AnimaSign API] Stabilitätsnachweise konnten nicht geladen werden:", stabilityError.message);
+  }
+  const observations = stabilityRows ?? [];
+  let healthyDayStreak = 0;
+  for (const observation of observations) {
+    if (!observation.healthy) break;
+    healthyDayStreak += 1;
+  }
+  const stability = {
+    latestDate: observations[0]?.observation_date ?? null,
+    latestObservedAt: observations[0]?.observed_at ?? null,
+    latestHealthy: observations[0]?.healthy ?? null,
+    healthyDayStreak,
+    observedDays: observations.length,
+  };
+
   // Stats
   const [
     { count: total },
@@ -139,5 +161,6 @@ export async function GET(req: Request) {
       loggedIn: loggedInCount,
     },
     outbox,
+    stability,
   });
 }

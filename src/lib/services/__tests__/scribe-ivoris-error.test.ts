@@ -5,9 +5,12 @@ import { buildScribeRetryFailurePatch, classifyScribeIvorisError } from "../scri
 test("retries every technical 5xx and network failure", () => {
   for (const error of [
     "IVORIS AddEntry fehlgeschlagen (500): leer",
+    "IVORIS AddEntry fehlgeschlagen (502): Bad Gateway",
     "IVORIS ist gerade nicht stabil erreichbar (503)",
+    "IVORIS AddEntry fehlgeschlagen (504): Gateway Timeout",
     "fetch failed",
     "network timeout",
+    "read ECONNRESET",
   ]) {
     assert.equal(classifyScribeIvorisError(error), "automatic_retry");
   }
