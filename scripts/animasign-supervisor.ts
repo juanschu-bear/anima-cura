@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/db/supabase";
 import { runNextPendingAnimaSignStage } from "@/lib/services/animasign-ivoris-sync";
+import { isIvorisServiceOutage } from "@/lib/services/scribe-ivoris-error";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -250,6 +251,12 @@ async function runAtomicAutoHeal(db: DbClient, metrics: SupervisorMetrics) {
       totals.documentSuccess += stage === "document" ? 1 : 0;
     }
     if (next.result?.errors.length) totals.failures += 1;
+    if (next.result?.errors.some(isIvorisServiceOutage)) {
+      console.warn(
+        `[AnimaSignSupervisor] IVORIS circuit breaker open after ${stage} service outage; remaining jobs stay queued for a later run.`
+      );
+      break;
+    }
   }
 
   return totals;

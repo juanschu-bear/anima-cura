@@ -35,6 +35,12 @@ export function isAutomaticScribeIvorisRetry(error: string | null | undefined) {
   return classifyScribeIvorisError(error) === "automatic_retry";
 }
 
+export function isIvorisServiceOutage(error: string | null | undefined) {
+  const text = (error ?? "").trim();
+  return /\((502|503|504)\)/.test(text) ||
+    /fetch failed|network|timeout|timed out|econnreset|econnrefused|socket hang up/i.test(text);
+}
+
 const RETRY_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
 
 export function buildScribeRetryFailurePatch(

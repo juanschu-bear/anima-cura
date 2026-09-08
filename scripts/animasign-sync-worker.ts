@@ -4,6 +4,7 @@ import {
   type NextStageSyncResult,
 } from "@/lib/services/animasign-ivoris-sync";
 import { retryPendingScribeIvorisPushes } from "@/lib/services/scribe-ivoris-retry";
+import { isIvorisServiceOutage } from "@/lib/services/scribe-ivoris-error";
 
 type SyncStage = "patient" | "document";
 type WorkerFatal = {
@@ -65,7 +66,7 @@ async function drainStage(
   limit: number,
   workerId: string,
   db = createServerClient()
-): Promise<{ results: NextStageSyncResult[]; fatal?: WorkerFatal }> {
+): Promise<{ results: NextStageSyncResult[]; fatal?: WorkerFatal; serviceOutage?: boolean }> {
   if (limit <= 0) return { results: [] };
 
   const results: NextStageSyncResult[] = [];
@@ -101,6 +102,14 @@ async function drainStage(
     if (next.submissionId) {
       claimedIds.add(next.submissionId);
     }
+
+    const serviceOutage = next.result?.errors.some(isIvorisServiceOutage) ?? false;
+    if (serviceOutage) {
+      console.warn(
+        `[AnimaSignSyncWorker] IVORIS circuit breaker open after ${stage} service outage; remaining jobs stay queued for a later run.`
+      );
+      return { results, serviceOutage: true };
+    }
   }
 
   return { results };
@@ -125,7 +134,9 @@ async function main() {
   console.log("[AnimaSignSyncWorker] scribe retry", JSON.stringify(scribeRetry, null, 2));
 
   const patientDrain = await drainStage("patient", patientLimit, workerId, db);
-  const documentDrain = await drainStage("document", documentLimit, workerId, db);
+  const documentDrain: Awaited<ReturnType<typeof drainStage>> = patientDrain.serviceOutage
+    ? { results: [] as NextStageSyncResult[], serviceOutage: true }
+    : await drainStage("document", documentLimit, workerId, db);
   const fatals = [patientDrain.fatal, documentDrain.fatal].filter(
     (entry): entry is WorkerFatal => Boolean(entry)
   );
