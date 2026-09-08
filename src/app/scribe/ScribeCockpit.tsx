@@ -474,6 +474,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [zwischenInfo, setZwischenInfo] = useState<string | null>(null);
   const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string; terminDatum: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
+  const [billingCopyInfo, setBillingCopyInfo] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
   const [pwOffen, setPwOffen] = useState(false);
   const [pw1, setPw1] = useState("");
@@ -1301,6 +1302,20 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     setZwischenInfo(null);
     setPushStatus("offen");
     await ladeHeute();
+  }
+
+  async function bestaetigtePositionenKopieren(entryId: string) {
+    setBillingCopyInfo(null);
+    try {
+      const response = await fetch(`/api/doku/eintrag/${entryId}/billing-export`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error ?? "Abrechnungspositionen konnten nicht geladen werden.");
+      if (!payload?.copy_text) throw new Error("Der bestätigte Eintrag enthält keine Abrechnungspositionen.");
+      await navigator.clipboard.writeText(payload.copy_text);
+      setBillingCopyInfo(`Positionen aus bestätigter Version ${payload.source_version} kopiert · manuell in IVORIS prüfen/eintragen`);
+    } catch (error) {
+      setBillingCopyInfo(error instanceof Error ? error.message : "Kopieren fehlgeschlagen.");
+    }
   }
 
   // Zwischenspeichern: aktuellen Stand als Entwurf sichern, ohne Pflichtpruefung, ohne ivoris.
@@ -2249,6 +2264,12 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               <p className="geldnotiz" dangerouslySetInnerHTML={{ __html: abrechnungHinweis }} />
             )}
             <p className="geldnotiz">Positionen sind Vorschläge aus der Vorlage, abrechnungsfachlich zu prüfen. Mit * markierte Zeilen besonders.</p>
+            {bestaetigt && positionen.length > 0 && (
+              <button className="neben" type="button" onClick={() => void bestaetigtePositionenKopieren(bestaetigt.id)}>
+                Bestätigte Positionen für IVORIS kopieren
+              </button>
+            )}
+            {billingCopyInfo && <p className="geldnotiz">{billingCopyInfo}</p>}
           </div>
           <span className="signatur">Cash Cow · ohne Doku kein Geld</span>
           </div>
