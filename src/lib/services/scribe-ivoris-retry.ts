@@ -1,5 +1,6 @@
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
+import { repairDokuPatientIvorisLink, type PatientIdentity } from "@/lib/services/patient-ivoris-link";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -16,6 +17,7 @@ function istAutomatischWiederholbarerPushFehler(fehler: string | null | undefine
     text.includes("(503)") ||
     text.includes("(504)") ||
     text.includes("nicht stabil erreichbar") ||
+    text === "Patient hat keine ivoris_id" ||
     text === 'IVORIS AddEntry fehlgeschlagen (500): {"message":"An error has occurred."}'
   );
 }
@@ -28,7 +30,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   let query = db
     .from("doku_eintraege")
     .select(
-      "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, patients ( ivoris_id, vorname, nachname )"
+      "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )"
     )
     .eq("status", "bestaetigt")
     .in("ivoris_push_status", ["ausstehend", "fehler"])
@@ -56,9 +58,12 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   const results: Array<{ id: string; status: "gepusht" | "fehler"; patient: string; message?: string }> = [];
 
   for (const eintrag of kandidaten) {
-    const patient = (Array.isArray(eintrag.patients) ? eintrag.patients[0] : eintrag.patients) as
-      | { ivoris_id: string | null; vorname?: string; nachname?: string }
+    let patient = (Array.isArray(eintrag.patients) ? eintrag.patients[0] : eintrag.patients) as
+      | PatientIdentity
       | null;
+    if (patient && !patient.ivoris_id) {
+      patient = await repairDokuPatientIvorisLink(db, String(eintrag.id), patient);
+    }
     const patientName = patient ? `${patient.vorname ?? ""} ${patient.nachname ?? ""}`.trim() || "Unbekannt" : "Unbekannt";
 
     if (!patient?.ivoris_id) {

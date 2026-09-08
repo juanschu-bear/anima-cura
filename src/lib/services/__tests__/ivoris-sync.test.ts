@@ -73,3 +73,23 @@ test("does not flag the same ivoris id as duplicate", () => {
 
   assert.equal(duplicate, false);
 });
+
+test("links a matching local patient that does not have an ivoris id yet", () => {
+  const duplicate = isSamePersonCandidate(
+    {
+      ivoris_id: "new-ivoris-id",
+      vorname: "Emiliia",
+      nachname: "Petushkova",
+      geburtsdatum: "2016-03-31",
+    },
+    {
+      id: "local-patient",
+      ivoris_id: null,
+      vorname: " Emiliia ",
+      nachname: "PETUSHKOVA",
+      geburtsdatum: "2016-03-31",
+    }
+  );
+
+  assert.equal(duplicate, true);
+});

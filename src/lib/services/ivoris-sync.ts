@@ -98,7 +98,7 @@ export function isSamePersonCandidate(
   incoming: Pick<NormalizedPatient, "vorname" | "nachname" | "geburtsdatum" | "ivoris_id">,
   existing: ExistingPatientCandidate
 ): boolean {
-  if (!existing.ivoris_id || existing.ivoris_id === incoming.ivoris_id) {
+  if (existing.ivoris_id === incoming.ivoris_id) {
     return false;
   }
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
+import { createServerClient } from "@/lib/db/supabase";
+import { repairDokuPatientIvorisLink, type PatientIdentity } from "@/lib/services/patient-ivoris-link";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +34,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
 
   const { data: eintrag, error: loadError } = await supabase
     .from("doku_eintraege")
-    .select("*, patients ( id, ivoris_id, vorname, nachname )")
+    .select("*, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )")
     .eq("id", params.id)
     .single();
 
@@ -49,7 +51,10 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     });
   }
 
-  const patient = eintrag.patients as { ivoris_id: string | null } | null;
+  let patient = eintrag.patients as PatientIdentity | null;
+  if (patient && !patient.ivoris_id) {
+    patient = await repairDokuPatientIvorisLink(createServerClient(), eintrag.id, patient);
+  }
   if (!patient?.ivoris_id) {
     await supabase
       .from("doku_eintraege")

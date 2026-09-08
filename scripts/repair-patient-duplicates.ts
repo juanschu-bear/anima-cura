@@ -72,6 +72,9 @@ function uniqueValues(values: Array<string | null | undefined>) {
 }
 
 function chooseCanonical(rows: PatientRow[], refs: GroupRefSnapshot[]) {
+  const ivorisLinked = rows.filter((row) => Boolean(row.ivoris_id));
+  if (ivorisLinked.length === 1) return ivorisLinked[0];
+
   const refById = new Map(refs.map((entry) => [entry.patientId, entry]));
   const score = (row: PatientRow) => {
     const refTotal = refById.get(row.id)?.total ?? 0;
@@ -229,6 +232,8 @@ async function main() {
       return sum + (snapshot?.total ?? 0);
     }, 0);
 
+    const distinctIvorisIds = uniqueValues(group.rows.map((row) => row.ivoris_id));
+    const safeToApply = distinctIvorisIds.length <= 1;
     const plan = {
       key: group.key,
       canonical: {
@@ -245,12 +250,12 @@ async function main() {
       })),
       references: refs,
       duplicateRefTotals,
-      safeToApply: true,
+      safeToApply,
     };
 
     preview.push(plan);
 
-    if (!apply) continue;
+    if (!apply || !safeToApply) continue;
 
     await mergePatientPayload(canonical, duplicates);
     for (const duplicate of duplicates) {
