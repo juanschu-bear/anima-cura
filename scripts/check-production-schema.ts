@@ -57,6 +57,11 @@ async function main() {
       "id,ivoris_push_status,ivoris_fehler,ivoris_retry_count,ivoris_next_retry_at,ivoris_last_attempt_at,ivoris_error_class",
     ),
     runSelectCheck(
+      "integration outbox jobs",
+      "integration_outbox_jobs",
+      "id,artifact_type,artifact_id,artifact_version,idempotency_key,status,attempt_count,next_attempt_at,last_error,locked_at,locked_by,succeeded_at,created_at,updated_at",
+    ),
+    runSelectCheck(
       "patient portal core",
       "patients",
       "id,vorname,nachname,behandlung,behandlung_status,behandlungsart,versicherung_status,guthaben,aktiv",
