@@ -23,6 +23,13 @@ type InboxEintrag = {
   in_arbeit_am?: string | null;
   erledigt_am?: string | null;
   status_zeitpunkte?: Partial<Record<InboxStatus, string>>;
+  status_verlauf?: Array<{
+    von: InboxStatus | null;
+    zu: InboxStatus;
+    geaendert_von_name: string | null;
+    geaendert_am: string;
+  }>;
+  praxis_bestaetigt_von?: string | null;
   istHeute: boolean;
   assigned_to: string | null;
   assigned_to_name: string | null;
@@ -201,13 +208,13 @@ export default function PraxisInboxWidget() {
     }
   }
 
-  async function statusSetzen(id: string, status: InboxStatus) {
+  async function statusSetzen(id: string, status: InboxStatus, praxisBestaetigtVon?: string) {
     setFehler(null);
     try {
       const res = await fetch("/api/scribe/inbox", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, praxis_bestaetigt_von: praxisBestaetigtVon }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "Status konnte nicht aktualisiert werden.");
@@ -215,6 +222,14 @@ export default function PraxisInboxWidget() {
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Status konnte nicht aktualisiert werden.");
     }
+  }
+
+  async function durchPraxisBestaetigen(id: string) {
+    const name = typeof window !== "undefined"
+      ? window.prompt("Wer bestätigt die Bereitstellung für die Praxis? Bitte vollständigen Namen eintragen.")?.trim()
+      : "";
+    if (!name) return;
+    await statusSetzen(id, "praxis_bestaetigt", name);
   }
 
   async function antwortSpeichern(id: string) {
@@ -622,7 +637,12 @@ export default function PraxisInboxWidget() {
                       <div className="praxis-item-actions">
                         <button type="button" onClick={() => void statusSetzen(eintrag.id, "bestaetigt")}>Zurück auf bestätigt</button>
                         {STATUS_NEXT[eintrag.status] && (
-                          <button type="button" onClick={() => void statusSetzen(eintrag.id, STATUS_NEXT[eintrag.status] as InboxStatus)}>
+                          <button
+                            type="button"
+                            onClick={() => eintrag.status === "bereitgestellt"
+                              ? void durchPraxisBestaetigen(eintrag.id)
+                              : void statusSetzen(eintrag.id, STATUS_NEXT[eintrag.status] as InboxStatus)}
+                          >
                             {STATUS_NEXT_LABEL[eintrag.status]}
                           </button>
                         )}
@@ -695,6 +715,7 @@ export default function PraxisInboxWidget() {
                     <div className="praxis-item-zeiten">
                       Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · Praxis bestätigt: {formatZeitpunkt(eintrag.status_zeitpunkte?.praxis_bestaetigt ?? eintrag.erledigt_am)}
                     </div>
+                    <div className="praxis-zustaendig">Abgenommen von: {eintrag.praxis_bestaetigt_von || "nicht dokumentiert (Alteintrag)"}</div>
                     {renderKommentarbereich(eintrag)}
                     <div className="praxis-item-actions" style={{ marginTop: 10 }}>
                       <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)}>

@@ -36,6 +36,14 @@ type InboxKommentar = {
   gelesen_von: string[];
 };
 
+type InboxStatusEvent = {
+  von: InboxStatus | null;
+  zu: InboxStatus;
+  geaendert_von: string | null;
+  geaendert_von_name: string | null;
+  geaendert_am: string;
+};
+
 type InboxEintrag = {
   id: string;
   art: InboxArt;
@@ -52,6 +60,8 @@ type InboxEintrag = {
   in_arbeit_am: string | null;
   erledigt_am: string | null;
   status_zeitpunkte: Partial<Record<InboxStatus, string>>;
+  status_verlauf: InboxStatusEvent[];
+  praxis_bestaetigt_von: string | null;
   assigned_to: string | null;
   assigned_to_name: string | null;
   kommentare: InboxKommentar[];
@@ -126,7 +136,13 @@ function normalizeInboxEintrag(eintrag: InboxEintrag): InboxEintrag {
           ? eintrag.in_arbeit_am ?? eintrag.erstellt_am
           : eintrag.erstellt_am;
   }
-  return { ...eintrag, status, status_zeitpunkte: statusZeitpunkte };
+  return {
+    ...eintrag,
+    status,
+    status_zeitpunkte: statusZeitpunkte,
+    status_verlauf: Array.isArray(eintrag.status_verlauf) ? eintrag.status_verlauf : [],
+    praxis_bestaetigt_von: eintrag.praxis_bestaetigt_von ?? null,
+  };
 }
 
 async function speichereInbox(service: ReturnType<typeof createServerClient>, inbox: InboxEintrag[]) {
@@ -268,6 +284,14 @@ export async function POST(request: NextRequest) {
     in_arbeit_am: null,
     erledigt_am: null,
     status_zeitpunkte: { bestaetigt: new Date().toISOString() },
+    status_verlauf: [{
+      von: null,
+      zu: "bestaetigt",
+      geaendert_von: user.id,
+      geaendert_von_name: name,
+      geaendert_am: new Date().toISOString(),
+    }],
+    praxis_bestaetigt_von: null,
     assigned_to: assignedPerson?.id ?? null,
     assigned_to_name: assignedPerson?.name ?? null,
     kommentare: [],
@@ -288,6 +312,7 @@ export async function PATCH(request: NextRequest) {
     mention_user_id?: string | null;
     assigned_to?: string | null;
     mark_mentions_read?: boolean;
+    praxis_bestaetigt_von?: string;
   } | null;
   if (!body?.id) {
     return NextResponse.json({ error: "id nötig" }, { status: 400 });
@@ -309,13 +334,35 @@ export async function PATCH(request: NextRequest) {
     if (!["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].includes(status)) {
       return NextResponse.json({ error: "Status ist ungültig" }, { status: 400 });
     }
+    const praxisBestaetigtVon = String(body.praxis_bestaetigt_von ?? "").trim();
+    if (status === "praxis_bestaetigt" && !praxisBestaetigtVon) {
+      return NextResponse.json({ error: "Für die finale Praxisabnahme ist der Name der bestätigenden Person nötig" }, { status: 400 });
+    }
+    const previousStatus = aktualisiert.status;
+    const changedAt = new Date().toISOString();
     aktualisiert = {
       ...aktualisiert,
       status: status as InboxStatus,
       status_zeitpunkte: {
         ...(aktualisiert.status_zeitpunkte ?? {}),
-        [status]: new Date().toISOString(),
+        [status]: changedAt,
       },
+      status_verlauf: [
+        ...(aktualisiert.status_verlauf ?? []),
+        {
+          von: previousStatus,
+          zu: status as InboxStatus,
+          geaendert_von: user.id,
+          geaendert_von_name: name,
+          geaendert_am: changedAt,
+        },
+      ],
+      praxis_bestaetigt_von:
+        status === "praxis_bestaetigt"
+          ? praxisBestaetigtVon.slice(0, 120)
+          : status === "bestaetigt"
+            ? null
+            : aktualisiert.praxis_bestaetigt_von,
       in_arbeit_am:
         status === "fix_in_arbeit"
           ? aktualisiert.in_arbeit_am ?? new Date().toISOString()
