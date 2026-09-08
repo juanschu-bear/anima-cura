@@ -17,7 +17,12 @@ type InboxBody = {
   assigned_to?: string | null;
 };
 
-type InboxStatus = "offen" | "in_arbeit" | "erledigt";
+type InboxStatus =
+  | "bestaetigt"
+  | "untersucht"
+  | "fix_in_arbeit"
+  | "bereitgestellt"
+  | "praxis_bestaetigt";
 type InboxArt = "anliegen" | "idee" | "aufgabe" | "frage" | "inspiration";
 type InboxPrioritaet = "niedrig" | "mittel" | "hoch";
 type InboxKommentar = {
@@ -46,6 +51,7 @@ type InboxEintrag = {
   erstellt_am: string;
   in_arbeit_am: string | null;
   erledigt_am: string | null;
+  status_zeitpunkte: Partial<Record<InboxStatus, string>>;
   assigned_to: string | null;
   assigned_to_name: string | null;
   kommentare: InboxKommentar[];
@@ -96,7 +102,31 @@ async function ladeInbox(service: ReturnType<typeof createServerClient>): Promis
     .maybeSingle<{ value: InboxEintrag[] }>();
 
   if (!data?.value || !Array.isArray(data.value)) return [];
-  return data.value;
+  return data.value.map((eintrag) => normalizeInboxEintrag(eintrag));
+}
+
+function normalizeInboxStatus(status: string): InboxStatus {
+  if (status === "offen") return "bestaetigt";
+  if (status === "in_arbeit") return "fix_in_arbeit";
+  if (status === "erledigt") return "praxis_bestaetigt";
+  if (["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].includes(status)) {
+    return status as InboxStatus;
+  }
+  return "bestaetigt";
+}
+
+function normalizeInboxEintrag(eintrag: InboxEintrag): InboxEintrag {
+  const status = normalizeInboxStatus(String(eintrag.status));
+  const statusZeitpunkte = { ...(eintrag.status_zeitpunkte ?? {}) };
+  if (!statusZeitpunkte[status]) {
+    statusZeitpunkte[status] =
+      status === "praxis_bestaetigt"
+        ? eintrag.erledigt_am ?? eintrag.erstellt_am
+        : status === "fix_in_arbeit"
+          ? eintrag.in_arbeit_am ?? eintrag.erstellt_am
+          : eintrag.erstellt_am;
+  }
+  return { ...eintrag, status, status_zeitpunkte: statusZeitpunkte };
 }
 
 async function speichereInbox(service: ReturnType<typeof createServerClient>, inbox: InboxEintrag[]) {
@@ -153,9 +183,7 @@ async function ladeTeam(service: ReturnType<typeof createServerClient>): Promise
 }
 
 function statusGewicht(status: InboxStatus): number {
-  if (status === "offen") return 0;
-  if (status === "in_arbeit") return 1;
-  return 2;
+  return ["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].indexOf(status);
 }
 
 export async function GET() {
@@ -177,7 +205,7 @@ export async function GET() {
     .map((eintrag) => ({
       ...eintrag,
       kommentare: Array.isArray(eintrag.kommentare) ? eintrag.kommentare : [],
-      istHeute: eintrag.status !== "erledigt" && eintrag.faellig_am <= heute,
+      istHeute: eintrag.status !== "praxis_bestaetigt" && eintrag.faellig_am <= heute,
       unread_mentions: (Array.isArray(eintrag.kommentare) ? eintrag.kommentare : []).filter((kommentar) =>
         kommentar.mention_user_id === user.id && !kommentar.gelesen_von?.includes(user.id)
       ).length,
@@ -232,13 +260,14 @@ export async function POST(request: NextRequest) {
     kategorie: kategorie.slice(0, 60),
     prioritaet: prioritaet as InboxPrioritaet,
     bereich: bereich ? bereich.slice(0, 60) : null,
-    status: "offen",
+    status: "bestaetigt",
     faellig_am: faelligkeitAusPreset(erinnerung),
     erstellt_von: user.id,
     erstellt_von_name: name,
     erstellt_am: new Date().toISOString(),
     in_arbeit_am: null,
     erledigt_am: null,
+    status_zeitpunkte: { bestaetigt: new Date().toISOString() },
     assigned_to: assignedPerson?.id ?? null,
     assigned_to_name: assignedPerson?.name ?? null,
     kommentare: [],
@@ -277,22 +306,26 @@ export async function PATCH(request: NextRequest) {
 
   if (body.status) {
     const status = String(body.status);
-    if (!["offen", "in_arbeit", "erledigt"].includes(status)) {
+    if (!["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].includes(status)) {
       return NextResponse.json({ error: "Status ist ungültig" }, { status: 400 });
     }
     aktualisiert = {
       ...aktualisiert,
       status: status as InboxStatus,
+      status_zeitpunkte: {
+        ...(aktualisiert.status_zeitpunkte ?? {}),
+        [status]: new Date().toISOString(),
+      },
       in_arbeit_am:
-        status === "in_arbeit"
+        status === "fix_in_arbeit"
           ? aktualisiert.in_arbeit_am ?? new Date().toISOString()
-          : status === "offen"
+          : status === "bestaetigt"
             ? null
             : aktualisiert.in_arbeit_am,
       erledigt_am:
-        status === "erledigt"
+        status === "praxis_bestaetigt"
           ? new Date().toISOString()
-          : status === "offen"
+          : status === "bestaetigt"
             ? null
             : aktualisiert.erledigt_am,
     };

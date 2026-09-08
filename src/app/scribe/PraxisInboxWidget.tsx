@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useThema } from "./ScribeShell";
 
-type InboxStatus = "offen" | "in_arbeit" | "erledigt";
+type InboxStatus = "bestaetigt" | "untersucht" | "fix_in_arbeit" | "bereitgestellt" | "praxis_bestaetigt";
 type InboxArt = "anliegen" | "idee" | "aufgabe" | "frage" | "inspiration";
 
 type InboxEintrag = {
@@ -22,6 +22,7 @@ type InboxEintrag = {
   erstellt_am: string;
   in_arbeit_am?: string | null;
   erledigt_am?: string | null;
+  status_zeitpunkte?: Partial<Record<InboxStatus, string>>;
   istHeute: boolean;
   assigned_to: string | null;
   assigned_to_name: string | null;
@@ -66,6 +67,28 @@ const ERINNERUNGEN = [
   { key: "morgen", label: "Morgen" },
   { key: "diese_woche", label: "Diese Woche" },
 ] as const;
+
+const STATUS_LABELS: Record<InboxStatus, string> = {
+  bestaetigt: "Bestätigt",
+  untersucht: "Untersucht",
+  fix_in_arbeit: "Fix in Arbeit",
+  bereitgestellt: "Bereitgestellt",
+  praxis_bestaetigt: "Durch Praxis bestätigt",
+};
+
+const STATUS_NEXT: Partial<Record<InboxStatus, InboxStatus>> = {
+  bestaetigt: "untersucht",
+  untersucht: "fix_in_arbeit",
+  fix_in_arbeit: "bereitgestellt",
+  bereitgestellt: "praxis_bestaetigt",
+};
+
+const STATUS_NEXT_LABEL: Partial<Record<InboxStatus, string>> = {
+  bestaetigt: "Untersuchung starten",
+  untersucht: "Fix starten",
+  fix_in_arbeit: "Als bereitgestellt markieren",
+  bereitgestellt: "Durch Praxis bestätigen",
+};
 
 const DEFAULT_FORM = {
   art: "anliegen" as InboxArt,
@@ -285,19 +308,19 @@ export default function PraxisInboxWidget() {
   }
 
   const heuteListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "offen" && eintrag.istHeute),
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "bestaetigt" && eintrag.istHeute),
     [daten],
   );
   const spaeterListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "offen" && !eintrag.istHeute),
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "bestaetigt" && !eintrag.istHeute),
     [daten],
   );
   const inArbeitListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "in_arbeit"),
+    () => (daten?.eintraege ?? []).filter((eintrag) => ["untersucht", "fix_in_arbeit", "bereitgestellt"].includes(eintrag.status)),
     [daten],
   );
   const erledigtListe = useMemo(
-    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "erledigt").slice(0, 4),
+    () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "praxis_bestaetigt").slice(0, 4),
     [daten],
   );
 
@@ -560,8 +583,7 @@ export default function PraxisInboxWidget() {
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>In Arbeit</button>
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "untersucht")}>Untersuchung starten</button>
                         <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
                           <Trash2 size={14} />
                         </button>
@@ -582,7 +604,7 @@ export default function PraxisInboxWidget() {
 
             <div className="praxis-listenblock arbeit">
               <div className="praxis-listenblock-kopf">
-                <h4>In Arbeit</h4>
+                <h4>Bearbeitungsstand</h4>
                 <span>{inArbeitListe.length}</span>
               </div>
               {inArbeitListe.length === 0 ? (
@@ -591,21 +613,26 @@ export default function PraxisInboxWidget() {
                 inArbeitListe.slice(0, 4).map((eintrag) => (
                   <article key={eintrag.id} className="praxis-item kompakt">
                     <InboxMeta eintrag={eintrag} />
+                    <div className={`praxis-zustaendig status-${slugifyLabel(eintrag.status)}`}>{STATUS_LABELS[eintrag.status]}</div>
                     <strong>{eintrag.titel}</strong>
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "offen")}>Zurück offen</button>
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "erledigt")}>Erledigt</button>
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "bestaetigt")}>Zurück auf bestätigt</button>
+                        {STATUS_NEXT[eintrag.status] && (
+                          <button type="button" onClick={() => void statusSetzen(eintrag.id, STATUS_NEXT[eintrag.status] as InboxStatus)}>
+                            {STATUS_NEXT_LABEL[eintrag.status]}
+                          </button>
+                        )}
                         <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
                     <div className="praxis-item-zeiten">
-                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)}
+                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · Aktueller Schritt: {formatZeitpunkt(eintrag.status_zeitpunkte?.[eintrag.status])}
                     </div>
                     {renderKommentarbereich(eintrag)}
                   </article>
@@ -633,7 +660,7 @@ export default function PraxisInboxWidget() {
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
                       <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "in_arbeit")}>Jetzt starten</button>
+                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "untersucht")}>Untersuchung starten</button>
                         <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
                           <Trash2 size={14} />
                         </button>
@@ -649,7 +676,7 @@ export default function PraxisInboxWidget() {
             {erledigtListe.length > 0 && (
               <div className="praxis-listenblock erledigt">
                 <div className="praxis-listenblock-kopf">
-                  <h4>Zuletzt erledigt</h4>
+                  <h4>Durch Praxis bestätigt</h4>
                   <CheckCheck size={15} />
                 </div>
                 {erledigtListe.map((eintrag) => (
@@ -666,7 +693,7 @@ export default function PraxisInboxWidget() {
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-zeiten">
-                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · In Arbeit: {formatZeitpunkt(eintrag.in_arbeit_am)} · Erledigt: {formatZeitpunkt(eintrag.erledigt_am)}
+                      Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · Praxis bestätigt: {formatZeitpunkt(eintrag.status_zeitpunkte?.praxis_bestaetigt ?? eintrag.erledigt_am)}
                     </div>
                     {renderKommentarbereich(eintrag)}
                     <div className="praxis-item-actions" style={{ marginTop: 10 }}>
