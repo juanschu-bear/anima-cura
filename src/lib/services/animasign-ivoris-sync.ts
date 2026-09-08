@@ -1810,13 +1810,6 @@ async function syncDocumentStage(
   }
 }
 
-function isRetryDue(value: string | null | undefined) {
-  if (!value) return true;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return true;
-  return parsed.getTime() <= Date.now();
-}
-
 export async function syncAnimaSignSubmission(
   submissionId: string,
   options: {
@@ -1959,73 +1952,23 @@ export async function retryPendingAnimaSignSyncs(
   } = {}
 ) {
   const db = options.db ?? createServerClient();
-  const limit = options.limit ?? 25;
-  const fetchWindow = Math.max(limit * 12, 300);
-  const { data, error } = await db
-    .from("anamnese_submissions")
-    .select(
-      "id, ivoris_synced, ivoris_doc_synced, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, signed_pdf_path"
-    )
-    .or("ivoris_synced.eq.false,ivoris_doc_synced.eq.false")
-    .order("created_at", { ascending: true })
-    .limit(fetchWindow);
-
-  if (error) {
-    throw new Error(`Pending AnimaSign Syncs konnten nicht geladen werden: ${error.message}`);
-  }
-
+  const limit = Math.max(1, Math.min(150, options.limit ?? 25));
+  const workerId = `manual-retry-${crypto.randomUUID()}`;
   const summaries: SubmissionSyncResult[] = [];
+  const stages: SyncStage[] = ["patient", "document"];
+  let consecutiveEmptyStages = 0;
+  let stageIndex = 0;
 
-  const pendingRows = ((data ?? []) as Array<
-    Pick<
-      SubmissionRow,
-      | "id"
-      | "ivoris_synced"
-      | "ivoris_doc_synced"
-      | "ivoris_sync_next_retry_at"
-      | "ivoris_doc_next_retry_at"
-      | "ivoris_sync_failed_permanently"
-      | "ivoris_doc_failed_permanently"
-      | "signed_pdf_path"
-    >
-  >).filter((row) => {
-    const patientDue =
-      row.ivoris_synced === false &&
-      row.ivoris_sync_failed_permanently !== true &&
-      isRetryDue(row.ivoris_sync_next_retry_at);
-    const documentDue =
-      row.ivoris_doc_synced === false &&
-      row.ivoris_doc_failed_permanently !== true &&
-      Boolean(row.signed_pdf_path) &&
-      isRetryDue(row.ivoris_doc_next_retry_at);
-    return patientDue || documentDue;
-  });
-
-  for (const row of pendingRows.slice(0, limit)) {
-    const stages: SyncStage[] = [];
-
-    if (
-      row.ivoris_synced === false &&
-      row.ivoris_sync_failed_permanently !== true &&
-      isRetryDue(row.ivoris_sync_next_retry_at)
-    ) {
-      stages.push("patient");
-    }
-
-    if (
-      row.ivoris_doc_synced === false &&
-      row.ivoris_doc_failed_permanently !== true &&
-      Boolean(row.signed_pdf_path) &&
-      isRetryDue(row.ivoris_doc_next_retry_at)
-    ) {
-      stages.push("document");
-    }
-
-    if (!stages.length) {
+  while (summaries.length < limit && consecutiveEmptyStages < stages.length) {
+    const stage = stages[stageIndex % stages.length];
+    stageIndex += 1;
+    const next = await runNextPendingAnimaSignStage(stage, { db, workerId });
+    if (!next.found || !next.result) {
+      consecutiveEmptyStages += 1;
       continue;
     }
-
-    summaries.push(await syncAnimaSignSubmission(row.id, { db, stages }));
+    consecutiveEmptyStages = 0;
+    summaries.push(next.result);
   }
 
   return {
