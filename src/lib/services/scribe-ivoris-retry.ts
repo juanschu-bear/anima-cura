@@ -15,27 +15,69 @@ type RetryOptions = {
   limit?: number;
 };
 
+type RetryEntry = {
+  id: string;
+  termin_datum: string;
+  version: number;
+  text: string | null;
+  zaehne: string[] | null;
+  bestaetigt_kuerzel: string | null;
+  ivoris_push_status: string | null;
+  ivoris_fehler: string | null;
+  ivoris_retry_count: number | null;
+  ivoris_next_retry_at: string | null;
+  patients: PatientIdentity | PatientIdentity[] | null;
+};
+
 export async function retryPendingScribeIvorisPushes(options: RetryOptions = {}) {
   const db = options.db ?? createServerClient();
   const datum = options.datum && /^\d{4}-\d{2}-\d{2}$/.test(options.datum) ? options.datum : null;
   const limit = Math.max(1, Math.min(50, options.limit ?? 20));
+  const workerId = `scribe-${crypto.randomUUID()}`;
 
-  let query = db
-    .from("doku_eintraege")
-    .select(
-      "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )"
-    )
-    .eq("status", "bestaetigt")
-    .in("ivoris_push_status", ["ausstehend", "fehler"])
-    .or(`ivoris_next_retry_at.is.null,ivoris_next_retry_at.lte.${new Date().toISOString()}`)
-    .order("bestaetigt_am", { ascending: true })
-    .limit(limit);
+  const baseSelect =
+    "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )";
+
+  let data: RetryEntry[] | null = null;
+  let error: { message: string } | null = null;
 
   if (datum) {
-    query = query.eq("termin_datum", datum);
-  }
+    const result = await db
+      .from("doku_eintraege")
+      .select(baseSelect)
+      .eq("status", "bestaetigt")
+      .in("ivoris_push_status", ["ausstehend", "fehler"])
+      .or(`ivoris_next_retry_at.is.null,ivoris_next_retry_at.lte.${new Date().toISOString()}`)
+      .eq("termin_datum", datum)
+      .order("bestaetigt_am", { ascending: true })
+      .limit(limit);
+    data = result.data as RetryEntry[] | null;
+    error = result.error;
+  } else {
+    const claimedIds: string[] = [];
+    for (let index = 0; index < limit; index += 1) {
+      const claim = await db.rpc("claim_integration_outbox_job", {
+        p_artifact_type: "carteitext",
+        p_worker_id: workerId,
+        p_lease_minutes: 15,
+      });
+      if (claim.error) throw new Error(`Scribe-Job konnte nicht reserviert werden: ${claim.error.message}`);
+      const claimed = Array.isArray(claim.data) ? claim.data[0] : null;
+      if (!claimed) break;
+      claimedIds.push(String((claimed as { artifact_id: string }).artifact_id));
+    }
 
-  const { data, error } = await query;
+    if (claimedIds.length === 0) {
+      return { datum: "alle", processed: 0, recovered: 0, failed: 0, results: [] };
+    }
+
+    const result = await db
+    .from("doku_eintraege")
+      .select(baseSelect)
+      .in("id", claimedIds);
+    data = result.data as RetryEntry[] | null;
+    error = result.error;
+  }
 
   if (error) throw new Error(error.message);
 
