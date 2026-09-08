@@ -254,7 +254,13 @@ export default function AnimaSignPage() {
 
   const getIvorisStatus = (submission: Submission): StatusPresentation => {
     if (submission.ivoris_synced && submission.ivoris_doc_synced) {
-      return { label: "Vollstaendig", color: green, glow: greenBg, textColor: ink, note: "Stammdaten und PDF in Ivoris" };
+      return {
+        label: "Basis-Sync erfolgt",
+        color: green,
+        glow: greenBg,
+        textColor: ink,
+        note: "Patienten-Basisdaten und PDF in Ivoris; Versicherten-/Vertreterdaten im PDF",
+      };
     }
 
     if (!hasSignedPdf(submission)) {
@@ -264,7 +270,7 @@ export default function AnimaSignPage() {
           color: errorRed,
           glow: errorRedBg,
           textColor: ink,
-          note: "Ivoris blockiert das Update, PDF folgt nach Signatur",
+          note: "Patientenzuordnung muss fachlich bestaetigt werden; PDF folgt nach Signatur",
         };
       }
 
@@ -280,7 +286,7 @@ export default function AnimaSignPage() {
     }
 
     if (submission.ivoris_manual_review) {
-      return { label: "Stammdaten pruefen", color: errorRed, glow: errorRedBg, textColor: ink, note: "Kontakt- oder Adressupdate manuell in Ivoris pruefen" };
+      return { label: "Stammdaten pruefen", color: errorRed, glow: errorRedBg, textColor: ink, note: "Patientenzuordnung oder Basisdaten muessen manuell geprueft werden" };
     }
 
     if (submission.ivoris_synced && !submission.ivoris_doc_synced) {
