@@ -35,7 +35,8 @@ test("buildAnamnesisSummaryText includes core intake data and positive findings"
   assert.match(text, /Versicherung: Gesetzlich versichert · AOK Plus · Zusatzversicherung \(Dkv\)/);
   assert.match(text, /Versicherte Person: Frau Nicole Kurth/);
   assert.match(text, /Medizinische Hinweise: .*HNO-Behandlung.*Naechtliches Zaehneknirschen.*Atmung: Nase/);
-  assert.match(text, /Kontaktdaten und Versicherungsdaten wurden zur Stammdatenuebernahme uebergeben\./);
+  assert.match(text, /Versicherten-\/Erziehungsberechtigtendaten: im signierten PDF dokumentiert/);
+  assert.doesNotMatch(text, /Kontaktdaten und Versicherungsdaten wurden zur Stammdatenuebernahme uebergeben/);
   assert.doesNotMatch(text, /Kontakt:/);
   assert.doesNotMatch(text, /Zaehneputzen:/);
   assert.doesNotMatch(text, /Allergien \/ Unvertraeglichkeiten/);

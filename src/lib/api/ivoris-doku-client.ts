@@ -345,6 +345,62 @@ export type IvorisDocumentInput = {
   contentBase64: string;
 };
 
+function matchesDocumentPayload(
+  row: Record<string, unknown>,
+  input: Pick<IvorisDocumentInput, "name" | "date">
+): string | null {
+  const name = pickString(row, ["Name", "name", "Filename", "filename", "FileName", "fileName"]);
+  const date = pickString(row, ["Date", "date", "DocumentDate", "documentDate"]);
+  const documentId = pickString(row, ["DocumentId", "documentId", "Id", "id"]);
+
+  if (!documentId || normalizeLooseText(name) !== normalizeLooseText(input.name)) return null;
+  if (date && !date.startsWith(input.date)) return null;
+  return documentId;
+}
+
+export function findExistingDocumentId(
+  payload: unknown,
+  input: Pick<IvorisDocumentInput, "name" | "date">
+): string | null {
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const found = findExistingDocumentId(item, input);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!payload || typeof payload !== "object") return null;
+
+  const candidate = payload as Record<string, unknown>;
+  const direct = matchesDocumentPayload(candidate, input);
+  if (direct) return direct;
+  for (const key of ["document", "documents", "entries", "data", "result", "items"]) {
+    const nested = findExistingDocumentId(candidate[key], input);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+async function findExistingIvorisDocumentId(input: IvorisDocumentInput): Promise<string | null> {
+  const creds = getCredentials();
+  const url = buildUrl(creds, "/Documentation/v1/DocumentEntries");
+  url.searchParams.set("patientId", normalizePatientIvorisId(input.patientIvorisId));
+  url.searchParams.set("profileId", creds.profileId);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: buildHeaders(creds),
+      cache: "no-store",
+    });
+    const payload = await parseBestEffort(response);
+    if (!response.ok) return null;
+    return findExistingDocumentId(payload, input);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Laedt ein Dokument (z.B. signiertes PDF) in die Ivoris-Patientenakte hoch.
  * POST /Documentation/v1/Document
@@ -377,6 +433,9 @@ export async function addIvorisDocument(
     );
   }
 
+  const existingDocumentId = await findExistingIvorisDocumentId(input);
+  if (existingDocumentId) return existingDocumentId;
+
   console.log(
     `[IVORIS] AddDocument request patient=${patientId}: ${JSON.stringify({
       document: {
@@ -400,6 +459,9 @@ export async function addIvorisDocument(
       break;
     }
 
+    const recoveredDocumentId = await findExistingIvorisDocumentId(input);
+    if (recoveredDocumentId) return recoveredDocumentId;
+
     console.warn(
       `[IVORIS] AddDocument transient response patient=${patientId}: status=${response.status} attempt=${attempt + 1} payload=${formatPayload(payload)}`
     );
@@ -410,6 +472,10 @@ export async function addIvorisDocument(
     throw new Error("IVORIS AddDocument konnte nicht gestartet werden.");
   }
   if (!response.ok) {
+    if (TRANSIENT_IVORIS_STATUSES.has(response.status)) {
+      const recoveredDocumentId = await findExistingIvorisDocumentId(input);
+      if (recoveredDocumentId) return recoveredDocumentId;
+    }
     console.error(
       `[IVORIS] AddDocument response patient=${patientId}: status=${response.status} payload=${
         typeof payload === "string" ? payload : JSON.stringify(payload)

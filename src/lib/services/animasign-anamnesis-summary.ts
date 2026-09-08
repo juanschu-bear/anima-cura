@@ -3,6 +3,7 @@ type Answers = Record<string, unknown> | null | undefined;
 type SubmissionLike = {
   vorname: string | null;
   nachname: string | null;
+  email?: string | null;
   geburtsdatum: string | null;
   created_at: string;
   signiert_am?: string | null;
@@ -106,7 +107,23 @@ export function buildAnamnesisSummaryText(submission: SubmissionLike): string {
     lines.push(`Medizinische Hinweise: ${findings.join(" · ")}`);
   }
 
-  lines.push("Kontaktdaten und Versicherungsdaten wurden zur Stammdatenuebernahme uebergeben.");
+  const transferredPatientFields = [
+    submission.email ? "E-Mail" : null,
+    asString(answers["patient_telefon"]) ? "Telefon" : null,
+    asString(answers["patient_mobil"]) ? "Mobilnummer" : null,
+    asString(answers["patient_strasse"]) || asString(answers["patient_plz"]) || asString(answers["patient_wohnort"])
+      ? "Adresse"
+      : null,
+  ].filter((value): value is string => Boolean(value));
+
+  if (transferredPatientFields.length > 0) {
+    lines.push(`Patienten-Stammdaten zur IVORIS-Uebertragung: ${transferredPatientFields.join(", ")}.`);
+  }
+  if (insuredName || asString(answers["vp_telefon"]) || asString(answers["vp_email"])) {
+    lines.push(
+      "Versicherten-/Erziehungsberechtigtendaten: im signierten PDF dokumentiert; die aktivierte IVORIS-API bietet dafuer kein verifiziertes Stammdaten-Zielfeld."
+    );
+  }
 
   return lines.join("\n");
 }
