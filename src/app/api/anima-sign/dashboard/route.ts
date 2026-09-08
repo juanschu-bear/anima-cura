@@ -38,7 +38,7 @@ export async function GET(req: Request) {
   // Submissions query
   let query = supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, signed_pdf_path, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently")
+    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, signed_pdf_path, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_field_results")
     .order("created_at", { ascending: false });
 
   if (filter === "today") query = query.gte("created_at", todayStart.toISOString());

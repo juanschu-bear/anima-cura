@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildContactVerificationResults,
   buildFallbackExistingPatientUpdateOperations,
   buildIdentityFingerprint,
   decideIdentityClaimAction,
@@ -10,6 +11,43 @@ import {
   shouldPushIvorisSummary,
   shouldReusePriorSubmissionMatch,
 } from "../animasign-ivoris-sync";
+
+test("marks contact fields verified only after matching IVORIS readback", () => {
+  const results = buildContactVerificationResults(
+    {
+      Email: "patient@example.com",
+      Phone: "0049 30 123456",
+      Mobile: "+49 170 1234567",
+      Address: { Street: "Testweg 4", Zip: "10115", City: "Berlin", Country: "D" },
+    },
+    {
+      Email: "patient@example.com",
+      Phone: "+4930123456",
+      Mobile: "+491701234567",
+      Address: { Street: "Testweg 4", Zip: "10115", City: "Berlin", Country: "D" },
+    },
+    "2026-09-08T20:00:00.000Z"
+  );
+
+  assert.equal(results.email.status, "verified");
+  assert.equal(results.telefon.status, "verified");
+  assert.equal(results.mobiltelefon.status, "verified");
+  assert.equal(results.adresse.status, "verified");
+  assert.equal(results.anrede.status, "unsupported");
+  assert.equal(results.versicherten_kontakt.status, "unsupported");
+});
+
+test("reports mismatched and missing contact fields truthfully", () => {
+  const results = buildContactVerificationResults(
+    { Email: "new@example.com", Phone: "030 999" },
+    { Email: "old@example.com", Phone: "030 999" }
+  );
+
+  assert.equal(results.email.status, "mismatch");
+  assert.equal(results.telefon.status, "verified");
+  assert.equal(results.mobiltelefon.status, "not_provided");
+  assert.equal(results.adresse.status, "not_provided");
+});
 
 test("does not treat shared parent email as same patient when names differ", () => {
   const sameName = namesMatchSubmission(

@@ -22,6 +22,7 @@ interface Submission {
   ivoris_doc_failed_permanently: boolean;
   ivoris_manual_review: boolean;
   ivoris_manual_review_reason: string | null;
+  ivoris_field_results?: Record<string, { status: "verified" | "mismatch" | "not_provided" | "unsupported"; target: string | null; verifiedAt?: string }>;
   has_logged_in: boolean;
   last_login: string | null;
 }
@@ -350,6 +351,19 @@ export default function AnimaSignPage() {
     }
 
     return "Wartet auf Signatur";
+  };
+
+  const getFieldEvidenceNote = (submission: Submission) => {
+    const labels: Record<string, string> = {
+      email: "E-Mail",
+      telefon: "Telefon",
+      mobiltelefon: "Mobil",
+      adresse: "Adresse",
+    };
+    const verified = Object.entries(submission.ivoris_field_results ?? {})
+      .filter(([field, result]) => labels[field] && result.status === "verified")
+      .map(([field]) => labels[field]);
+    return verified.length > 0 ? `Rückgelesen: ${verified.join(", ")}` : null;
   };
 
   const resolveSubmission = async (payload: { patientId?: string; ivorisId?: string }) => {
@@ -743,6 +757,9 @@ export default function AnimaSignPage() {
                     </div>
                     {ivoris.note && (
                       <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>{ivoris.note}</div>
+                    )}
+                    {getFieldEvidenceNote(s) && (
+                      <div style={{ fontSize: 10, color: green, marginTop: 4 }}>{getFieldEvidenceNote(s)}</div>
                     )}
                   </>
                 );

@@ -44,7 +44,7 @@ async function main() {
     runSelectCheck(
       "anamnese_submissions core",
       "anamnese_submissions",
-      "id,patient_id,vorname,nachname,geburtsdatum,email,answers,status,account_email,matched_patient_id,is_existing,patient_anrede,versicherter_anrede,ivoris_synced,ivoris_sync_error,ivoris_patient_error,ivoris_document_error,ivoris_summary_synced,ivoris_summary_hash",
+      "id,patient_id,vorname,nachname,geburtsdatum,email,answers,status,account_email,matched_patient_id,is_existing,patient_anrede,versicherter_anrede,ivoris_synced,ivoris_sync_error,ivoris_patient_error,ivoris_document_error,ivoris_summary_synced,ivoris_summary_hash,ivoris_field_results",
     ),
     runSelectCheck(
       "patients anima sign fields",

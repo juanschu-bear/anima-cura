@@ -159,6 +159,14 @@ type IvorisContactSnapshot = {
   };
 };
 
+type FieldVerificationStatus = "verified" | "mismatch" | "not_provided" | "unsupported";
+type FieldVerificationResult = {
+  status: FieldVerificationStatus;
+  target: string | null;
+  verifiedAt?: string;
+};
+type PatientFieldVerification = Record<string, FieldVerificationResult>;
+
 export function isTransientIvorisAvailabilityError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -564,6 +572,38 @@ function sameAddress(
     sameValue(left?.City, right?.City) &&
     sameValue(left?.Country, right?.Country)
   );
+}
+
+export function buildContactVerificationResults(
+  requested: Partial<IvorisPatientInput>,
+  actual: IvorisContactSnapshot,
+  verifiedAt = new Date().toISOString()
+): PatientFieldVerification {
+  const result = (
+    provided: boolean,
+    matches: boolean,
+    target: string
+  ): FieldVerificationResult => provided
+    ? { status: matches ? "verified" : "mismatch", target, verifiedAt }
+    : { status: "not_provided", target };
+
+  return {
+    email: result(Boolean(requested.Email), sameValue(requested.Email, actual.Email), "Patient.Email"),
+    telefon: result(Boolean(requested.Phone), samePhoneValue(requested.Phone, actual.Phone), "Patient.Phone"),
+    mobiltelefon: result(Boolean(requested.Mobile), samePhoneValue(requested.Mobile, actual.Mobile), "Patient.Mobile"),
+    adresse: result(Boolean(requested.Address), sameAddress(requested.Address, actual.Address), "Patient.Address"),
+    anrede: { status: "unsupported", target: null },
+    versicherten_kontakt: { status: "unsupported", target: null },
+  };
+}
+
+function assertVerifiedContactResults(results: PatientFieldVerification) {
+  const mismatches = Object.entries(results)
+    .filter(([, result]) => result.status === "mismatch")
+    .map(([field]) => field);
+  if (mismatches.length > 0) {
+    throw new Error(`IVORIS-Ruecklesepruefung fehlgeschlagen fuer: ${mismatches.join(", ")}`);
+  }
 }
 
 function buildSingleFieldOperations(
@@ -1464,6 +1504,7 @@ async function syncExistingPatient(
 ): Promise<{
   status: SyncStatus;
   ivorisId: string | null;
+  fieldResults: PatientFieldVerification;
   metadata?: Record<string, unknown>;
 }> {
   const patient = await loadResolvedPatient(db, submission);
@@ -1475,6 +1516,7 @@ async function syncExistingPatient(
 
   let operations: Array<Partial<IvorisPatientInput>> = [];
   let metadata: Record<string, unknown> = { operations: 0 };
+  const requestedContacts = buildContactUpdate(submission);
 
   try {
     const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
@@ -1500,7 +1542,10 @@ async function syncExistingPatient(
     console.log(
       `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} no contact delta`
     );
-    return { status: "skipped", ivorisId: patient.ivoris_id, metadata };
+    const actual = extractCurrentContacts(await fetchIvorisPatientById(patient.ivoris_id));
+    const fieldResults = buildContactVerificationResults(requestedContacts, actual);
+    assertVerifiedContactResults(fieldResults);
+    return { status: "skipped", ivorisId: patient.ivoris_id, fieldResults, metadata };
   }
 
   console.log(
@@ -1523,9 +1568,14 @@ async function syncExistingPatient(
     }
   }
 
+  const actual = extractCurrentContacts(await fetchIvorisPatientById(patient.ivoris_id));
+  const fieldResults = buildContactVerificationResults(requestedContacts, actual);
+  assertVerifiedContactResults(fieldResults);
+
   return {
     status: "success",
     ivorisId: patient.ivoris_id,
+    fieldResults,
     metadata: {
       ...metadata,
       operations: operations.length,
@@ -1536,7 +1586,7 @@ async function syncExistingPatient(
 async function syncNewPatient(
   db: DbClient,
   submission: SubmissionRow
-): Promise<{ status: SyncStatus; ivorisId: string | null; requestPayload: IvorisPatientInput }> {
+): Promise<{ status: SyncStatus; ivorisId: string | null; requestPayload: IvorisPatientInput; fieldResults: PatientFieldVerification }> {
   const payload = buildCreateInput(submission);
   const reusableIvorisId = await findReusableIvorisPatientIdForNewSubmission(db, submission);
   const identityFingerprint = buildIdentityFingerprint(submission);
@@ -1548,7 +1598,10 @@ async function syncNewPatient(
       status: "resolved",
       note: "Bereits vorhandene Ivoris-Person wiederverwendet.",
     });
-    return { status: "skipped", ivorisId: reusableIvorisId, requestPayload: payload };
+    const actual = extractCurrentContacts(await fetchIvorisPatientById(reusableIvorisId));
+    const fieldResults = buildContactVerificationResults(payload, actual);
+    assertVerifiedContactResults(fieldResults);
+    return { status: "skipped", ivorisId: reusableIvorisId, requestPayload: payload, fieldResults };
   }
 
   const ivorisId = await createIvorisPatient(payload);
@@ -1574,7 +1627,10 @@ async function syncNewPatient(
   });
 
   await patchSubmissionIvorisPatientId(db, submission.id, ivorisId);
-  return { status: "success", ivorisId, requestPayload: payload };
+  const actual = extractCurrentContacts(await fetchIvorisPatientById(ivorisId));
+  const fieldResults = buildContactVerificationResults(payload, actual);
+  assertVerifiedContactResults(fieldResults);
+  return { status: "success", ivorisId, requestPayload: payload, fieldResults };
 }
 
 async function syncPatientStage(
@@ -1603,6 +1659,7 @@ async function syncPatientStage(
 
     await markStageSuccess(db, submission.id, "patient", {
       ivoris_patient_id: result.ivorisId,
+      ivoris_field_results: result.fieldResults,
     });
 
     return { status: result.status, ivorisId: result.ivorisId };
