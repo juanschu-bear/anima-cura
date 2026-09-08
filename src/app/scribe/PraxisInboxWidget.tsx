@@ -30,6 +30,9 @@ type InboxEintrag = {
     geaendert_am: string;
   }>;
   praxis_bestaetigt_von?: string | null;
+  zwischenloesung?: string | null;
+  zwischenloesung_aktualisiert_am?: string | null;
+  zwischenloesung_aktualisiert_von_name?: string | null;
   istHeute: boolean;
   assigned_to: string | null;
   assigned_to_name: string | null;
@@ -162,6 +165,7 @@ export default function PraxisInboxWidget() {
   const [daten, setDaten] = useState<ApiAntwort | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [antworten, setAntworten] = useState<Record<string, { text: string; mentionUserId: string }>>({});
+  const [zwischenloesungen, setZwischenloesungen] = useState<Record<string, string>>({});
   const [teamForm, setTeamForm] = useState({ lokal: "", name: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
   const [teamSpeichert, setTeamSpeichert] = useState(false);
 
@@ -248,6 +252,23 @@ export default function PraxisInboxWidget() {
       await laden();
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Antwort konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function zwischenloesungSpeichern(eintrag: InboxEintrag) {
+    const text = zwischenloesungen[eintrag.id] ?? eintrag.zwischenloesung ?? "";
+    setFehler(null);
+    try {
+      const res = await fetch("/api/scribe/inbox", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: eintrag.id, zwischenloesung: text }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Zwischenlösung konnte nicht gespeichert werden.");
+      await laden();
+    } catch (err) {
+      setFehler(err instanceof Error ? err.message : "Zwischenlösung konnte nicht gespeichert werden.");
     }
   }
 
@@ -345,6 +366,26 @@ export default function PraxisInboxWidget() {
     const erstellerIstImTeam = istPersonImTeam(eintrag.erstellt_von_name, team);
     return (
       <div className="praxis-thread">
+        <div className="praxis-antwortbox">
+          <div className="praxis-thread-kopf"><span>Zwischenlösung für die Praxis</span></div>
+          <textarea
+            className="praxis-inbox-textarea klein"
+            rows={2}
+            placeholder="Was soll die Praxis bis zur endgültigen Lösung konkret tun?"
+            value={zwischenloesungen[eintrag.id] ?? eintrag.zwischenloesung ?? ""}
+            onChange={(event) => setZwischenloesungen((alt) => ({ ...alt, [eintrag.id]: event.target.value }))}
+          />
+          <div className="praxis-antwortzeile">
+            <span className="praxis-inbox-minihelp">
+              {eintrag.zwischenloesung_aktualisiert_am
+                ? `${eintrag.zwischenloesung_aktualisiert_von_name || "Praxis"} · ${formatZeitpunkt(eintrag.zwischenloesung_aktualisiert_am)}`
+                : "Noch keine Zwischenlösung dokumentiert"}
+            </span>
+            <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void zwischenloesungSpeichern(eintrag)}>
+              Zwischenlösung speichern
+            </button>
+          </div>
+        </div>
         <div className="praxis-thread-kopf">
           <span>Antworten & Rückfragen</span>
           {eintrag.unread_mentions ? (

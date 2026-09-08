@@ -62,6 +62,9 @@ type InboxEintrag = {
   status_zeitpunkte: Partial<Record<InboxStatus, string>>;
   status_verlauf: InboxStatusEvent[];
   praxis_bestaetigt_von: string | null;
+  zwischenloesung: string | null;
+  zwischenloesung_aktualisiert_am: string | null;
+  zwischenloesung_aktualisiert_von_name: string | null;
   assigned_to: string | null;
   assigned_to_name: string | null;
   kommentare: InboxKommentar[];
@@ -142,6 +145,9 @@ function normalizeInboxEintrag(eintrag: InboxEintrag): InboxEintrag {
     status_zeitpunkte: statusZeitpunkte,
     status_verlauf: Array.isArray(eintrag.status_verlauf) ? eintrag.status_verlauf : [],
     praxis_bestaetigt_von: eintrag.praxis_bestaetigt_von ?? null,
+    zwischenloesung: eintrag.zwischenloesung ?? null,
+    zwischenloesung_aktualisiert_am: eintrag.zwischenloesung_aktualisiert_am ?? null,
+    zwischenloesung_aktualisiert_von_name: eintrag.zwischenloesung_aktualisiert_von_name ?? null,
   };
 }
 
@@ -292,6 +298,9 @@ export async function POST(request: NextRequest) {
       geaendert_am: new Date().toISOString(),
     }],
     praxis_bestaetigt_von: null,
+    zwischenloesung: null,
+    zwischenloesung_aktualisiert_am: null,
+    zwischenloesung_aktualisiert_von_name: null,
     assigned_to: assignedPerson?.id ?? null,
     assigned_to_name: assignedPerson?.name ?? null,
     kommentare: [],
@@ -313,6 +322,7 @@ export async function PATCH(request: NextRequest) {
     assigned_to?: string | null;
     mark_mentions_read?: boolean;
     praxis_bestaetigt_von?: string;
+    zwischenloesung?: string;
   } | null;
   if (!body?.id) {
     return NextResponse.json({ error: "id nötig" }, { status: 400 });
@@ -385,6 +395,16 @@ export async function PATCH(request: NextRequest) {
       ...aktualisiert,
       assigned_to: assignedPerson?.id ?? null,
       assigned_to_name: assignedPerson?.name ?? null,
+    };
+  }
+
+  if (body.zwischenloesung !== undefined) {
+    const zwischenloesung = String(body.zwischenloesung).trim();
+    aktualisiert = {
+      ...aktualisiert,
+      zwischenloesung: zwischenloesung ? zwischenloesung.slice(0, 1200) : null,
+      zwischenloesung_aktualisiert_am: new Date().toISOString(),
+      zwischenloesung_aktualisiert_von_name: name,
     };
   }
 
