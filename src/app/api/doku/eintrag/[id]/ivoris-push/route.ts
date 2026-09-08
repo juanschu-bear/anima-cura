@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
@@ -52,9 +53,25 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     });
   }
 
+  const service = createServerClient();
+  const workerId = `scribe-manual-${randomUUID()}`;
+  const claim = await service.rpc("claim_integration_outbox_job_for_artifact", {
+    p_artifact_type: "carteitext",
+    p_artifact_id: eintrag.id,
+    p_worker_id: workerId,
+    p_lease_minutes: 15,
+    p_force: true,
+  });
+  if (claim.error) {
+    return NextResponse.json({ error: `Scribe-Job konnte nicht reserviert werden: ${claim.error.message}` }, { status: 500 });
+  }
+  if (!Array.isArray(claim.data) || claim.data.length === 0) {
+    return NextResponse.json({ error: "Dieser Scribe-Eintrag wird bereits verarbeitet oder benötigt eine manuelle Patientenprüfung." }, { status: 409 });
+  }
+
   let patient = eintrag.patients as PatientIdentity | null;
   if (patient && !patient.ivoris_id) {
-    patient = await repairDokuPatientIvorisLink(createServerClient(), eintrag.id, patient);
+    patient = await repairDokuPatientIvorisLink(service, eintrag.id, patient);
   }
   if (!patient?.ivoris_id) {
     await supabase

@@ -1816,11 +1816,13 @@ export async function syncAnimaSignSubmission(
     stages?: SyncStage[];
     db?: DbClient;
     stageOverrides?: Partial<Record<SyncStage, StageOverrides>>;
+    workerId?: string;
   } = {}
 ): Promise<SubmissionSyncResult> {
   const db = options.db ?? createServerClient();
   const submission = await loadSubmission(db, submissionId);
   const requestedStages = options.stages ?? ["patient", "document"];
+  const workerId = options.workerId ?? `direct-sync-${crypto.randomUUID()}`;
   const result: SubmissionSyncResult = {
     submissionId,
     patient: "skipped",
@@ -1831,6 +1833,10 @@ export async function syncAnimaSignSubmission(
   let patientIvorisId: string | null | undefined = submission.ivoris_patient_id ?? null;
 
   if (requestedStages.includes("patient")) {
+    const claimed = await claimSpecificStageJob(db, "patient", submission.id, workerId);
+    if (!claimed) {
+      result.patient = "skipped";
+    } else {
     try {
       const patientResult = await syncPatientStage(
         db,
@@ -1844,9 +1850,14 @@ export async function syncAnimaSignSubmission(
       result.patient = "error";
       result.errors.push(error instanceof Error ? error.message : String(error));
     }
+    }
   }
 
   if (requestedStages.includes("document")) {
+    const claimed = await claimSpecificStageJob(db, "document", submission.id, workerId);
+    if (!claimed) {
+      result.document = "skipped";
+    } else {
     try {
       const docResult = await syncDocumentStage(
         db,
@@ -1860,9 +1871,27 @@ export async function syncAnimaSignSubmission(
       result.document = "error";
       result.errors.push(error instanceof Error ? error.message : String(error));
     }
+    }
   }
 
   return result;
+}
+
+async function claimSpecificStageJob(
+  db: DbClient,
+  stage: SyncStage,
+  submissionId: string,
+  workerId: string
+) {
+  const { data, error } = await db.rpc("claim_integration_outbox_job_for_artifact", {
+    p_artifact_type: stage,
+    p_artifact_id: submissionId,
+    p_worker_id: workerId,
+    p_lease_minutes: 15,
+    p_force: false,
+  });
+  if (error) throw new Error(`${stage} Job konnte nicht reserviert werden: ${error.message}`);
+  return Array.isArray(data) && data.length > 0;
 }
 
 async function claimPendingStageCandidate(
@@ -1896,10 +1925,11 @@ export async function runNextPendingAnimaSignStage(
   } = {}
 ): Promise<NextStageSyncResult> {
   const db = options.db ?? createServerClient();
+  const workerId = options.workerId ?? `animasign-${crypto.randomUUID()}`;
   const next = await claimPendingStageCandidate(
     db,
     stage,
-    options.workerId ?? `animasign-${crypto.randomUUID()}`
+    workerId
   );
 
   if (!next) {
@@ -1916,6 +1946,7 @@ export async function runNextPendingAnimaSignStage(
       result: await syncAnimaSignSubmission(next.id, {
         db,
         stages: [stage],
+        workerId,
       }),
     };
   } catch (error) {

@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/db/supabase";
 async function main() {
   const db = createServerClient();
   const runId = randomUUID();
-  const artifactIds = [randomUUID(), randomUUID()];
+  const artifactIds = [randomUUID(), randomUUID(), randomUUID()];
   const idempotencyKeys = artifactIds.map((id, index) => `selftest:${runId}:${index}:${id}`);
 
   const { data: inserted, error: insertError } = await db
@@ -15,6 +15,7 @@ async function main() {
       artifact_id: artifactId,
       idempotency_key: idempotencyKeys[index],
       status: "queued",
+      ...(index === 2 ? { status: "retry_wait", next_attempt_at: "2999-01-01T00:00:00.000Z" } : {}),
     })))
     .select("id");
 
@@ -45,9 +46,33 @@ async function main() {
     assert.ok(insertedIds.includes(String(firstJob.id)));
     assert.ok(insertedIds.includes(String(secondJob.id)));
 
+    const specificArtifactId = artifactIds[2];
+    const [specificA, specificB] = await Promise.all([
+      db.rpc("claim_integration_outbox_job_for_artifact", {
+        p_artifact_type: "billing",
+        p_artifact_id: specificArtifactId,
+        p_worker_id: `specific-a-${runId}`,
+        p_lease_minutes: 1,
+        p_force: true,
+      }),
+      db.rpc("claim_integration_outbox_job_for_artifact", {
+        p_artifact_type: "billing",
+        p_artifact_id: specificArtifactId,
+        p_worker_id: `specific-b-${runId}`,
+        p_lease_minutes: 1,
+        p_force: true,
+      }),
+    ]);
+    if (specificA.error) throw new Error(specificA.error.message);
+    if (specificB.error) throw new Error(specificB.error.message);
+    const specificClaims = [specificA.data, specificB.data]
+      .filter((rows) => Array.isArray(rows) && rows.length > 0);
+    assert.equal(specificClaims.length, 1, "Nur ein direkter Prozess darf dasselbe Artefakt reservieren");
+
     console.log(JSON.stringify({
       ok: true,
       claimedDistinctJobs: 2,
+      sameArtifactClaimedOnce: true,
       patientDataTouched: false,
     }));
   } finally {
