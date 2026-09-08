@@ -1,6 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findExistingDocumentId } from "@/lib/api/ivoris-doku-client";
+import { findExistingDocumentId, findExistingEntryId } from "@/lib/api/ivoris-doku-client";
+
+test("finds an existing Scribe entry by stable date, text and tooth", () => {
+  const result = findExistingEntryId(
+    { entries: [{ EntryId: "entry-42", Date: "2026-09-08T10:00:00", Text: "Kontrolle erfolgt. JS", Tooth: "21" }] },
+    { date: "2026-09-08", text: "  Kontrolle   erfolgt. JS ", tooth: "21" }
+  );
+  assert.equal(result, "entry-42");
+});
+
+test("does not reuse a different Scribe text from the same day", () => {
+  const result = findExistingEntryId(
+    [{ EntryId: "entry-42", Date: "2026-09-08", Text: "Anderer Text" }],
+    { date: "2026-09-08", text: "Kontrolle erfolgt. JS" }
+  );
+  assert.equal(result, null);
+});
 
 test("finds an existing IVORIS document by stable name and date", () => {
   const result = findExistingDocumentId(

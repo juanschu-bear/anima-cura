@@ -109,7 +109,7 @@ function matchesEntryPayload(
   return entryId;
 }
 
-function findExistingEntryId(
+export function findExistingEntryId(
   payload: unknown,
   input: Pick<IvorisKarteiEintragInput, "date" | "text" | "tooth">
 ): string | null {
@@ -267,7 +267,34 @@ export async function addIvorisKarteiEintrag(
   };
   const requestBody = JSON.stringify(body);
 
-  let { response, payload } = await postJson(url, headers, requestBody);
+  const preExistingEntryId = await findExistingKarteiEntryId(input);
+  if (preExistingEntryId) {
+    console.info(
+      `[IVORIS] AddEntry skipped existing entryId=${preExistingEntryId} patient=${input.patientIvorisId}`
+    );
+    return { entryId: preExistingEntryId };
+  }
+
+  let response: Response;
+  let payload: unknown;
+  try {
+    ({ response, payload } = await postJson(url, headers, requestBody));
+  } catch (error) {
+    const recoveredEntryId = await findExistingKarteiEntryId(input);
+    if (recoveredEntryId) return { entryId: recoveredEntryId };
+    await sleep(ADD_ENTRY_RETRY_DELAY_MS);
+    try {
+      ({ response, payload } = await postJson(url, headers, requestBody));
+    } catch (retryError) {
+      const recoveredAfterRetryId = await findExistingKarteiEntryId(input);
+      if (recoveredAfterRetryId) return { entryId: recoveredAfterRetryId };
+      throw new Error(
+        `IVORIS AddEntry Netzwerkfehler; Annahme nicht nachweisbar: ${
+          retryError instanceof Error ? retryError.message : String(retryError)
+        }`
+      );
+    }
+  }
   if (!response.ok && TRANSIENT_IVORIS_STATUSES.has(response.status)) {
     console.warn(
       `[IVORIS] AddEntry transient response status=${response.status} patient=${input.patientIvorisId} date=${input.date} payload=${formatPayload(payload)}`
