@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run test:animus && npm run test:animasign-dupguard && npm run test:ivoris-patient-link",
     "check:schema": "tsx scripts/check-production-schema.ts",
+    "test:outbox-claim": "tsx scripts/test-integration-outbox-claim.ts",
     "check:animasign": "tsx scripts/verify-animasign-integrity.ts",
     "check:animasign-supervisor": "tsx scripts/animasign-supervisor.ts",
     "verify:prod": "npm run typecheck && npm run test && npm run check:schema && npm run check:animasign",
