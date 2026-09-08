@@ -63,6 +63,7 @@ async function createWorkerAlert(stage: SyncStage, message: string) {
 async function drainStage(
   stage: SyncStage,
   limit: number,
+  workerId: string,
   db = createServerClient()
 ): Promise<{ results: NextStageSyncResult[]; fatal?: WorkerFatal }> {
   if (limit <= 0) return { results: [] };
@@ -77,6 +78,7 @@ async function drainStage(
       next = await runNextPendingAnimaSignStage(stage, {
         db,
         excludeSubmissionIds: Array.from(claimedIds),
+        workerId,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -110,6 +112,7 @@ async function main() {
   const scribeRetryLimit = readPositiveInt("SCRIBE_IVORIS_RETRY_LIMIT", 20);
   validateWorkerEnv({ patientLimit, documentLimit });
   const db = createServerClient();
+  const workerId = `github-worker-${crypto.randomUUID()}`;
 
   console.log(
     `[AnimaSignSyncWorker] start patientLimit=${patientLimit} documentLimit=${documentLimit} scribeRetryLimit=${scribeRetryLimit}`
@@ -121,8 +124,8 @@ async function main() {
   });
   console.log("[AnimaSignSyncWorker] scribe retry", JSON.stringify(scribeRetry, null, 2));
 
-  const patientDrain = await drainStage("patient", patientLimit, db);
-  const documentDrain = await drainStage("document", documentLimit, db);
+  const patientDrain = await drainStage("patient", patientLimit, workerId, db);
+  const documentDrain = await drainStage("document", documentLimit, workerId, db);
   const fatals = [patientDrain.fatal, documentDrain.fatal].filter(
     (entry): entry is WorkerFatal => Boolean(entry)
   );

@@ -1815,51 +1815,26 @@ export async function syncAnimaSignSubmission(
   return result;
 }
 
-async function loadPendingStageCandidates(
+async function claimPendingStageCandidate(
   db: DbClient,
   stage: SyncStage,
-  excludeSubmissionIds: string[] = []
+  workerId: string
 ) {
-  let query = db
-    .from("anamnese_submissions")
-    .select(
-      "id, signed_pdf_path, ivoris_synced, ivoris_doc_synced, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, created_at"
-    )
-    .eq(syncedColumn(stage), false)
-    .not(permanentFailureColumn(stage), "is", true)
-    .order("created_at", { ascending: true })
-    .limit(200);
-
-  if (stage === "document") {
-    query = query.not("signed_pdf_path", "is", null);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(`Pending ${stage} syncs konnten nicht geladen werden: ${error.message}`);
-  }
-
-  return ((data ?? []) as Array<
-    Pick<
-      SubmissionRow,
-      | "id"
-      | "signed_pdf_path"
-      | "ivoris_synced"
-      | "ivoris_doc_synced"
-      | "ivoris_sync_retry_count"
-      | "ivoris_doc_retry_count"
-      | "ivoris_sync_next_retry_at"
-      | "ivoris_doc_next_retry_at"
-      | "ivoris_sync_failed_permanently"
-      | "ivoris_doc_failed_permanently"
-    >
-  >).filter((row) => {
-    if (excludeSubmissionIds.includes(row.id)) {
-      return false;
-    }
-
-    return isRetryDue(row[nextRetryColumn(stage)]);
+  const { data, error } = await db.rpc("claim_integration_outbox_job", {
+    p_artifact_type: stage,
+    p_worker_id: workerId,
+    p_lease_minutes: 15,
   });
+  if (error) {
+    throw new Error(`Pending ${stage} Job konnte nicht reserviert werden: ${error.message}`);
+  }
+  const claimed = Array.isArray(data) ? data[0] : null;
+  return claimed
+    ? {
+        id: String((claimed as { artifact_id: string }).artifact_id),
+        attemptCount: Number((claimed as { attempt_count?: number | null }).attempt_count ?? 0),
+      }
+    : null;
 }
 
 export async function runNextPendingAnimaSignStage(
@@ -1867,25 +1842,21 @@ export async function runNextPendingAnimaSignStage(
   options: {
     db?: DbClient;
     excludeSubmissionIds?: string[];
+    workerId?: string;
   } = {}
 ): Promise<NextStageSyncResult> {
   const db = options.db ?? createServerClient();
-  const candidates = await loadPendingStageCandidates(
+  const next = await claimPendingStageCandidate(
     db,
     stage,
-    options.excludeSubmissionIds ?? []
+    options.workerId ?? `animasign-${crypto.randomUUID()}`
   );
-  const next = candidates[0];
 
   if (!next) {
     return { stage, found: false, reason: "Keine faellige Submission" };
   }
 
-  const retryCount =
-    stage === "patient"
-      ? (next.ivoris_sync_retry_count ?? 0)
-      : (next.ivoris_doc_retry_count ?? 0);
-  const attemptNo = retryCount + 1;
+  const attemptNo = next.attemptCount + 1;
 
   try {
     return {
