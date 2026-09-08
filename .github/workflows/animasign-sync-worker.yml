@@ -1,5 +1,9 @@
 name: AnimaSign Sync Worker
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -60,3 +64,28 @@ jobs:
       - name: Run AnimaSign supervisor
         if: always()
         run: npm run check:animasign-supervisor
+
+      - name: Create or update staffed P0 incident
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INCIDENT_TITLE: "[P0] AnimaSign/Anima-Scribe Betriebscheck rot"
+        run: |
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$INCIDENT_TITLE in:title" --json number,title --jq '.[] | select(.title == env.INCIDENT_TITLE) | .number' | head -n 1)"
+          incident_body="$(printf 'Der automatische AnimaSign/Anima-Scribe-Betriebscheck ist rot. Es existiert mindestens ein ungeklärter Integritäts-, Synchronisations- oder Infrastrukturfehler.\n\nLetzter Lauf: https://github.com/%s/actions/runs/%s\n\nNötige Aktion: Lauf öffnen, fehlerhafte Stufe prüfen und den Fall erst nach Rücklesebeweis oder bewusster manueller Auflösung schließen.' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$GITHUB_REPOSITORY" --body "$incident_body" --add-assignee "$GITHUB_REPOSITORY_OWNER"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$INCIDENT_TITLE" --body "$incident_body" --assignee "$GITHUB_REPOSITORY_OWNER"
+          fi
+
+      - name: Close recovered P0 incident
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INCIDENT_TITLE: "[P0] AnimaSign/Anima-Scribe Betriebscheck rot"
+        run: |
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$INCIDENT_TITLE in:title" --json number,title --jq '.[] | select(.title == env.INCIDENT_TITLE) | .number' | head -n 1)"
+          if [ -n "$issue_number" ]; then
+            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --comment "Der Betriebscheck ist wieder grün. Das Incident wird automatisch geschlossen."
+          fi
