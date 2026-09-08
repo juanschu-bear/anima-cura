@@ -79,6 +79,32 @@ interface Stats {
   loggedIn: number;
 }
 
+interface OutboxStats {
+  queued: number;
+  processing: number;
+  retryWait: number;
+  manualReview: number;
+  patientOpen: number;
+  documentOpen: number;
+  scribeOpen: number;
+  maxAttempts: number;
+  oldestAgeMinutes: number;
+  nextRetryAt: string | null;
+}
+
+const EMPTY_OUTBOX: OutboxStats = {
+  queued: 0,
+  processing: 0,
+  retryWait: 0,
+  manualReview: 0,
+  patientOpen: 0,
+  documentOpen: 0,
+  scribeOpen: 0,
+  maxAttempts: 0,
+  oldestAgeMinutes: 0,
+  nextRetryAt: null,
+};
+
 type FilterTab = "today" | "week" | "all" | "open";
 const PAGE_SIZE = 15;
 
@@ -88,6 +114,7 @@ export default function AnimaSignPage() {
 
   const [subs, setSubs] = useState<Submission[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
+  const [outbox, setOutbox] = useState<OutboxStats>(EMPTY_OUTBOX);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
@@ -112,6 +139,7 @@ export default function AnimaSignPage() {
       const d = await res.json();
       setSubs(d.submissions || []);
       setStats(d.stats || { total: 0, today: 0, matched: 0, pendingSignatures: 0, registrations: 0, loggedIn: 0 });
+      setOutbox(d.outbox || EMPTY_OUTBOX);
     } catch (e) { console.error("[AnimaSign]", e); }
     setLoading(false);
   }, [search, filter]);
@@ -185,6 +213,11 @@ export default function AnimaSignPage() {
 
   const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
+  const fmtAge = (minutes: number) => minutes >= 1440
+    ? `${Math.floor(minutes / 1440)} T ${Math.floor((minutes % 1440) / 60)} Std.`
+    : minutes >= 60
+      ? `${Math.floor(minutes / 60)} Std. ${minutes % 60} Min.`
+      : `${minutes} Min.`;
 
   // Colors
   const bg = dk ? "#0c1014" : "#f5f1eb";
@@ -399,6 +432,28 @@ export default function AnimaSignPage() {
           <div style={{ height: "100%", borderRadius: 999, background: `linear-gradient(90deg,${blue},${green})`, width: `${rate}%`, transition: "width .6s" }} />
         </div>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: green }}>{rate}%</div>
+      </div>
+
+      <div style={{ background: cardBg, border: `1px solid ${outbox.manualReview > 0 ? errorRed : line}`, borderRadius: 14, padding: "16px 20px", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>IVORIS-Outbox</div>
+            <div style={{ fontSize: 13, color: ink, marginTop: 5 }}>
+              Patient {outbox.patientOpen} · PDF {outbox.documentOpen} · Scribe {outbox.scribeOpen}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: muted }}>
+            <span>Wartend: <b style={{ color: ink }}>{outbox.queued}</b></span>
+            <span>In Verarbeitung: <b style={{ color: ink }}>{outbox.processing}</b></span>
+            <span>Retry: <b style={{ color: gold }}>{outbox.retryWait}</b></span>
+            <span>Manuell: <b style={{ color: outbox.manualReview ? errorRed : ink }}>{outbox.manualReview}</b></span>
+            <span>Ältester offener Job: <b style={{ color: ink }}>{fmtAge(outbox.oldestAgeMinutes)}</b></span>
+            <span>Max. Versuche: <b style={{ color: ink }}>{outbox.maxAttempts}</b></span>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: muted, marginTop: 8 }}>
+          {outbox.nextRetryAt ? `Nächster geplanter Versuch: ${fmtDate(outbox.nextRetryAt)} ${fmtTime(outbox.nextRetryAt)}` : "Kein zeitgesteuerter Wiederholungsversuch vorgemerkt."}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, marginBottom: 24 }}>

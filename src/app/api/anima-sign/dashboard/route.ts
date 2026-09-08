@@ -51,6 +51,38 @@ export async function GET(req: Request) {
 
   const { data: submissions } = await query.limit(200);
 
+  const { data: openOutboxJobs, error: outboxError } = await supabase
+    .from("integration_outbox_jobs")
+    .select("artifact_type,status,attempt_count,next_attempt_at,created_at")
+    .neq("status", "succeeded")
+    .order("created_at", { ascending: true })
+    .limit(5000);
+  if (outboxError) {
+    console.error("[AnimaSign API] Outbox-Metriken konnten nicht geladen werden:", outboxError.message);
+  }
+
+  const outboxRows = openOutboxJobs ?? [];
+  const oldestCreatedAt = outboxRows[0]?.created_at ?? null;
+  const oldestAgeMinutes = oldestCreatedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(oldestCreatedAt).getTime()) / 60_000))
+    : 0;
+  const nextRetryAt = outboxRows
+    .map((job) => job.next_attempt_at as string | null)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] ?? null;
+  const outbox = {
+    queued: outboxRows.filter((job) => job.status === "queued").length,
+    processing: outboxRows.filter((job) => job.status === "processing").length,
+    retryWait: outboxRows.filter((job) => job.status === "retry_wait").length,
+    manualReview: outboxRows.filter((job) => job.status === "manual_review").length,
+    patientOpen: outboxRows.filter((job) => job.artifact_type === "patient").length,
+    documentOpen: outboxRows.filter((job) => job.artifact_type === "document").length,
+    scribeOpen: outboxRows.filter((job) => job.artifact_type === "carteitext").length,
+    maxAttempts: outboxRows.reduce((max, job) => Math.max(max, Number(job.attempt_count ?? 0)), 0),
+    oldestAgeMinutes,
+    nextRetryAt,
+  };
+
   // Stats
   const [
     { count: total },
@@ -106,5 +138,6 @@ export async function GET(req: Request) {
       registrations: regs || 0,
       loggedIn: loggedInCount,
     },
+    outbox,
   });
 }
