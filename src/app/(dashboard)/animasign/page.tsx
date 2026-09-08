@@ -56,6 +56,14 @@ interface ManualReviewItem {
   ivoris_patient_id: string | null;
 }
 
+interface PatientIdentityConflict {
+  key: string;
+  patient_name: string;
+  geburtsdatum: string | null;
+  ivoris_ids: string[];
+  patients: Array<{ id: string; ivoris_id: string | null; created_at: string }>;
+}
+
 type StatusPresentation = {
   label: string;
   color: string;
@@ -127,6 +135,7 @@ export default function AnimaSignPage() {
   const [resolveIvorisId, setResolveIvorisId] = useState("");
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateReviewGroup[]>([]);
   const [manualReviewItems, setManualReviewItems] = useState<ManualReviewItem[]>([]);
+  const [patientIdentityConflicts, setPatientIdentityConflicts] = useState<PatientIdentityConflict[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
   const [closingGroupKey, setClosingGroupKey] = useState<string | null>(null);
 
@@ -175,10 +184,12 @@ export default function AnimaSignPage() {
       const data = await res.json();
       setDuplicateGroups(data.duplicateGroups || []);
       setManualReviewItems(data.manualReview || []);
+      setPatientIdentityConflicts(data.patientIdentityConflicts || []);
     } catch (error) {
       console.error("[AnimaSign][review-queue]", error);
       setDuplicateGroups([]);
       setManualReviewItems([]);
+      setPatientIdentityConflicts([]);
     } finally {
       setQueueLoading(false);
     }
@@ -537,6 +548,31 @@ export default function AnimaSignPage() {
           <div style={{ fontSize: 13, color: muted, marginBottom: 12 }}>
             Diese Fälle bleiben absichtlich unter menschlicher Kontrolle, wenn Ivoris mehrere plausible Treffer liefert.
           </div>
+          {patientIdentityConflicts.length > 0 && (
+            <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+              {patientIdentityConflicts.map((conflict) => (
+                <div key={conflict.key} style={{ border: `1px solid ${errorRed}`, borderRadius: 14, background: errorRedBg, padding: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: errorRed, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                    Zwei IVORIS-Akten – keine automatische Zusammenführung
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: ink, marginTop: 7 }}>{conflict.patient_name}</div>
+                  <div style={{ fontSize: 12, color: muted, marginTop: 3 }}>
+                    {conflict.geburtsdatum || "Geburtsdatum unbekannt"} · {conflict.patients.length} lokale Datensätze · {conflict.ivoris_ids.length} unterschiedliche IVORIS-IDs
+                  </div>
+                  <div style={{ fontSize: 12, color: ink, marginTop: 8, lineHeight: 1.5 }}>
+                    Praxis muss in IVORIS prüfen, welche Akte bestehen bleibt oder ob es sich tatsächlich um getrennte Personen handelt. Bis dahin löscht oder verschiebt Anima Cura nichts.
+                  </div>
+                  <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
+                    {conflict.patients.map((patient) => (
+                      <div key={patient.id} style={{ fontSize: 11, color: muted }}>
+                        Lokal {patient.id.slice(0, 8)} · IVORIS {patient.ivoris_id || "nicht verknüpft"} · angelegt {fmtDate(patient.created_at)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {queueLoading ? (
             <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Prüffälle werden geladen…</div>
           ) : manualReviewItems.length === 0 ? (

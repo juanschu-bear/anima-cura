@@ -16,6 +16,15 @@ type SubmissionRow = {
   ivoris_sync_error: string | null;
 };
 
+type PatientRow = {
+  id: string;
+  ivoris_id: string | null;
+  vorname: string | null;
+  nachname: string | null;
+  geburtsdatum: string | null;
+  created_at: string;
+};
+
 function normalizeNamePart(value: string | null | undefined) {
   return (value ?? "")
     .trim()
@@ -47,20 +56,29 @@ export async function GET() {
   const db = createServerClient();
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await db
-    .from("anamnese_submissions")
-    .select(
-      "id, created_at, vorname, nachname, geburtsdatum, status, signed_pdf_path, ivoris_patient_id, matched_patient_id, ivoris_sync_error"
-    )
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(5000);
+  const [submissionsResult, patientsResult] = await Promise.all([
+    db
+      .from("anamnese_submissions")
+      .select(
+        "id, created_at, vorname, nachname, geburtsdatum, status, signed_pdf_path, ivoris_patient_id, matched_patient_id, ivoris_sync_error"
+      )
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(5000),
+    db
+      .from("patients")
+      .select("id, ivoris_id, vorname, nachname, geburtsdatum, created_at")
+      .limit(10000),
+  ]);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (submissionsResult.error || patientsResult.error) {
+    return NextResponse.json(
+      { error: submissionsResult.error?.message ?? patientsResult.error?.message },
+      { status: 500 }
+    );
   }
 
-  const rows = (data ?? []) as SubmissionRow[];
+  const rows = (submissionsResult.data ?? []) as SubmissionRow[];
   const groups = new Map<string, SubmissionRow[]>();
   for (const row of rows) {
     if (!row.geburtsdatum || !normalizeNamePart(row.vorname) || !normalizeNamePart(row.nachname)) {
@@ -106,8 +124,32 @@ export async function GET() {
     }))
     .slice(0, 20);
 
+  const patientGroups = new Map<string, PatientRow[]>();
+  for (const patient of (patientsResult.data ?? []) as PatientRow[]) {
+    if (!patient.geburtsdatum || !normalizeNamePart(patient.vorname) || !normalizeNamePart(patient.nachname)) continue;
+    const key = identityKey(patient);
+    if (!patientGroups.has(key)) patientGroups.set(key, []);
+    patientGroups.get(key)!.push(patient);
+  }
+
+  const patientIdentityConflicts = Array.from(patientGroups.entries())
+    .map(([key, patients]) => ({
+      key,
+      patient_name: `${patients[0]?.vorname ?? ""} ${patients[0]?.nachname ?? ""}`.trim(),
+      geburtsdatum: patients[0]?.geburtsdatum ?? null,
+      ivoris_ids: Array.from(new Set(patients.map((patient) => patient.ivoris_id).filter(Boolean))),
+      patients: patients.map((patient) => ({
+        id: patient.id,
+        ivoris_id: patient.ivoris_id,
+        created_at: patient.created_at,
+      })),
+    }))
+    .filter((group) => group.patients.length > 1 && group.ivoris_ids.length > 1)
+    .sort((left, right) => right.patients.length - left.patients.length);
+
   return NextResponse.json({
     duplicateGroups,
     manualReview,
+    patientIdentityConflicts,
   });
 }
