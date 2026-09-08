@@ -24,6 +24,8 @@ type SubmissionRow = {
   ivoris_patient_id?: string | null;
   ivoris_document_id?: string | null;
   ivoris_sync_error?: string | null;
+  ivoris_sync_failed_permanently?: boolean | null;
+  ivoris_doc_failed_permanently?: boolean | null;
 };
 
 type SyncLogRow = {
@@ -74,6 +76,8 @@ async function main() {
     warningSuccessLogs,
     duplicatePatients,
     duplicateRecentSubmissions,
+    pendingSignedDocuments,
+    confirmedScribePushFailures,
   ] = await Promise.all([
     db
       .from("anamnese_submissions")
@@ -92,7 +96,7 @@ async function main() {
     db
       .from("anamnese_submissions")
       .select(
-        "id, created_at, vorname, nachname, geburtsdatum, patient_id, matched_patient_id, ivoris_synced, ivoris_patient_id, ivoris_sync_error, status, signed_pdf_path"
+        "id, created_at, vorname, nachname, geburtsdatum, patient_id, matched_patient_id, ivoris_synced, ivoris_doc_synced, ivoris_patient_id, ivoris_document_id, ivoris_sync_error, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, status, signed_pdf_path"
       )
       .limit(5000),
     db
@@ -110,6 +114,18 @@ async function main() {
       .select("id, created_at, vorname, nachname, geburtsdatum, status, ivoris_patient_id, matched_patient_id")
       .gte("created_at", recentWindowIso)
       .limit(5000),
+    db
+      .from("anamnese_submissions")
+      .select("id, created_at, vorname, nachname, status, signed_pdf_path, ivoris_document_id, ivoris_sync_error, ivoris_doc_failed_permanently")
+      .eq("status", "signiert")
+      .or("ivoris_doc_synced.is.null,ivoris_doc_synced.eq.false")
+      .limit(5000),
+    db
+      .from("doku_eintraege")
+      .select("id, termin_datum, patient_id, ivoris_push_status, ivoris_fehler, ivoris_entry_id, bestaetigt_am")
+      .eq("status", "bestaetigt")
+      .or("ivoris_push_status.is.null,ivoris_push_status.neq.gepusht")
+      .limit(5000),
   ]);
 
   if (signedWithoutPdf.error) throw new Error(signedWithoutPdf.error.message);
@@ -118,11 +134,15 @@ async function main() {
   if (warningSuccessLogs.error) throw new Error(warningSuccessLogs.error.message);
   if (duplicatePatients.error) throw new Error(duplicatePatients.error.message);
   if (duplicateRecentSubmissions.error) throw new Error(duplicateRecentSubmissions.error.message);
+  if (pendingSignedDocuments.error) throw new Error(pendingSignedDocuments.error.message);
+  if (confirmedScribePushFailures.error) throw new Error(confirmedScribePushFailures.error.message);
 
   pushProblem(problems, "signed_without_pdf", "critical", signedWithoutPdf.data ?? []);
 
   const docRows = (docSyncedWithoutDocumentId.data ?? []).filter((row) => Boolean(row.signed_pdf_path));
   pushProblem(problems, "doc_synced_without_document_id", "critical", docRows);
+  pushProblem(problems, "signed_pdf_without_ivoris_document", "critical", pendingSignedDocuments.data ?? []);
+  pushProblem(problems, "confirmed_scribe_push_not_succeeded", "critical", confirmedScribePushFailures.data ?? []);
 
   const patientRowsData = (patientRows.data ?? []) as SubmissionRow[];
   const localLinkMissing = patientRowsData.filter(
@@ -171,6 +191,11 @@ async function main() {
     }));
   pushProblem(problems, "false_green_contact_blocked", "critical", currentFalseGreens);
 
+  const permanentlyStopped = patientRowsData.filter(
+    (row) => row.ivoris_sync_failed_permanently === true || row.ivoris_doc_failed_permanently === true
+  );
+  pushProblem(problems, "permanently_stopped_sync", "critical", permanentlyStopped);
+
   const signedPdfWrongPath = patientRowsData.filter(
     (row) =>
       row.status === "signiert" &&
@@ -205,7 +230,7 @@ async function main() {
   pushProblem(
     problems,
     "local_patient_duplicate_groups",
-    "warning",
+    "critical",
     duplicatePatientGroups
   );
 
@@ -239,7 +264,7 @@ async function main() {
   pushProblem(
     problems,
     "recent_submission_duplicate_groups",
-    "warning",
+    "critical",
     duplicateSubmissionGroups
   );
 

@@ -17,7 +17,7 @@
     "sync:animus-react": "node scripts/sync-animus-react.mjs",
     "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
     "test:animasign-dupguard": "tsx --test src/lib/services/__tests__/animasign-*.test.ts",
-    "test:ivoris-patient-link": "tsx --test src/lib/services/__tests__/ivoris-sync.test.ts src/lib/services/__tests__/patient-ivoris-link.test.ts",
+    "test:ivoris-patient-link": "tsx --test src/lib/services/__tests__/ivoris-sync.test.ts src/lib/services/__tests__/patient-ivoris-link.test.ts src/lib/services/__tests__/scribe-ivoris-error.test.ts",
     "test:animasign-dupguard-live": "RUN_LIVE_ANIMASIGN_DUPGUARD_TEST=true tsx scripts/test-animasign-duplicate-guard.ts",
     "db:migrate": "supabase db push",
     "animasign:sync-worker": "tsx scripts/animasign-sync-worker.ts",
@@ -31,6 +31,7 @@
     "repair:animasign-false-greens": "tsx scripts/repair-animasign-false-greens.ts",
     "repair:animasign-duplicate-submissions": "tsx scripts/repair-animasign-duplicate-submissions.ts",
     "repair:patient-portal-access": "tsx scripts/repair-patient-portal-access.ts",
+    "export:stabilization-snapshot": "tsx scripts/export-stabilization-snapshot.ts",
     "repair:patient-duplicates": "tsx scripts/repair-patient-duplicates.ts",
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",
     "cron:reports": "tsx src/lib/services/report-generator.ts"

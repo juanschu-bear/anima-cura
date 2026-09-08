@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error";
 import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
 
@@ -42,6 +43,9 @@ type TagesEintrag = {
   behandlungsart: string | null;
   ivoris_push_status: string;
   ivoris_fehler?: string | null;
+  ivoris_error_class?: string | null;
+  ivoris_retry_count?: number | null;
+  ivoris_next_retry_at?: string | null;
   bestaetigt_am: string | null;
   text: string;
   zaehne: string[];
@@ -86,20 +90,14 @@ function beschreibePushFehlerPraxis(fehler: string | null | undefined): string {
   if (text === "Patient hat keine ivoris_id") {
     return "Patient ist noch nicht mit ivoris verknüpft. Bitte intern prüfen.";
   }
-  if (istAutomatischBehebbarerPushFehler(text) || text.includes("AddEntry fehlgeschlagen")) {
+  if (isAutomaticScribeIvorisRetry(text)) {
     return "ivoris ist gerade vorübergehend nicht erreichbar. Wird automatisch erneut versucht.";
   }
   return "Übertragung gerade nicht möglich. Bitte später erneut senden.";
 }
 
 function istAutomatischBehebbarerPushFehler(fehler: string | null | undefined): boolean {
-  const text = (fehler ?? "").trim();
-  return (
-    text.includes("(502)") ||
-    text.includes("(503)") ||
-    text.includes("(504)") ||
-    text.includes("nicht stabil erreichbar")
-  );
+  return isAutomaticScribeIvorisRetry(fehler);
 }
 
 const ART_NAMEN = { aligner: "Aligner", multiband: "Multiband", removable: "Herausnehmbar" } as const;
@@ -1503,6 +1501,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
 
   function wachePille(e: TagesEintrag): { cls: string; text: string } {
     if (e.status === "entwurf") return { cls: "rot", text: "Doku ausstehend" };
+    if (e.ivoris_push_status === "fehler" && e.ivoris_error_class?.includes("manual_review")) {
+      return { cls: "rot", text: "Prüfung nötig" };
+    }
     if (e.ivoris_push_status === "fehler") return { cls: "rot", text: "Push-Fehler" };
     if (e.ivoris_push_status === "gepusht") return { cls: "gruen", text: "✓ in ivoris" };
     return { cls: "bernstein", text: `v${e.version} · noch nicht in ivoris` };

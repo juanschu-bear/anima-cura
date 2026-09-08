@@ -3,6 +3,7 @@ import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
 import { repairDokuPatientIvorisLink, type PatientIdentity } from "@/lib/services/patient-ivoris-link";
+import { buildScribeRetryFailurePatch } from "@/lib/services/scribe-ivoris-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   if (!patient?.ivoris_id) {
     await supabase
       .from("doku_eintraege")
-      .update({ ivoris_push_status: "fehler", ivoris_fehler: "Patient hat keine ivoris_id" })
+      .update(buildScribeRetryFailurePatch("Patient hat keine ivoris_id", eintrag.ivoris_retry_count))
       .eq("id", eintrag.id);
     return NextResponse.json({ error: "Patient hat keine ivoris_id" }, { status: 422 });
   }
@@ -84,6 +85,9 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
         ivoris_entry_id: result.entryId,
         ivoris_gepusht_am: new Date().toISOString(),
         ivoris_fehler: null,
+        ivoris_retry_count: 0,
+        ivoris_next_retry_at: null,
+        ivoris_error_class: null,
       })
       .eq("id", eintrag.id);
 
@@ -99,7 +103,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     const message = e instanceof Error ? e.message : "Unbekannter Fehler";
     await supabase
       .from("doku_eintraege")
-      .update({ ivoris_push_status: "fehler", ivoris_fehler: message })
+      .update(buildScribeRetryFailurePatch(message, eintrag.ivoris_retry_count))
       .eq("id", eintrag.id);
     return NextResponse.json({ error: message }, { status: 502 });
   }

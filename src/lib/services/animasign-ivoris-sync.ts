@@ -43,6 +43,8 @@ type SubmissionRow = {
   ivoris_synced: boolean | null;
   ivoris_doc_synced: boolean | null;
   ivoris_sync_error: string | null;
+  ivoris_patient_error?: string | null;
+  ivoris_document_error?: string | null;
   ivoris_patient_id?: string | null;
   ivoris_document_id?: string | null;
   ivoris_sync_retry_count?: number | null;
@@ -649,6 +651,14 @@ function syncedColumn(stage: SyncStage) {
   return stage === "patient" ? "ivoris_synced" : "ivoris_doc_synced";
 }
 
+function stageErrorColumn(stage: SyncStage) {
+  return stage === "patient" ? "ivoris_patient_error" : "ivoris_document_error";
+}
+
+function otherStageErrorColumn(stage: SyncStage) {
+  return stage === "patient" ? "ivoris_document_error" : "ivoris_patient_error";
+}
+
 function computeNextRetryAt(retryCount: number) {
   const minutes =
     SYNC_BACKOFF_MINUTES[
@@ -695,6 +705,18 @@ async function markStageSuccess(
   stage: SyncStage,
   patch: Record<string, unknown> = {}
 ) {
+  const { data: current, error: loadError } = await db
+    .from("anamnese_submissions")
+    .select("ivoris_patient_error, ivoris_document_error")
+    .eq("id", submissionId)
+    .single();
+  if (loadError) {
+    console.error("[ANIMASIGN][SYNC] success state load failed:", loadError.message);
+  }
+  const remainingError = current
+    ? (current[otherStageErrorColumn(stage) as keyof typeof current] as string | null)
+    : null;
+
   const { error } = await db
     .from("anamnese_submissions")
     .update({
@@ -702,7 +724,8 @@ async function markStageSuccess(
       [retryColumn(stage)]: 0,
       [nextRetryColumn(stage)]: null,
       [permanentFailureColumn(stage)]: false,
-      ivoris_sync_error: null,
+      [stageErrorColumn(stage)]: null,
+      ivoris_sync_error: remainingError ?? null,
       ...patch,
     })
     .eq("id", submissionId);
@@ -719,12 +742,12 @@ async function markStageFailure(
   retryCount: number,
   errorText: string
 ) {
-  const permanentFailure = retryCount >= MAX_SYNC_ATTEMPTS;
   const patch = {
     [syncedColumn(stage)]: false,
     [retryColumn(stage)]: retryCount,
-    [nextRetryColumn(stage)]: permanentFailure ? null : computeNextRetryAt(retryCount),
-    [permanentFailureColumn(stage)]: permanentFailure,
+    [nextRetryColumn(stage)]: computeNextRetryAt(retryCount),
+    [permanentFailureColumn(stage)]: false,
+    [stageErrorColumn(stage)]: errorText,
     ivoris_sync_error: errorText,
   };
 
@@ -749,6 +772,7 @@ async function markStageManualReview(
     [retryColumn(stage)]: MAX_SYNC_ATTEMPTS,
     [nextRetryColumn(stage)]: null,
     [permanentFailureColumn(stage)]: true,
+    [stageErrorColumn(stage)]: formatManualReviewError(reason),
     ivoris_sync_error: formatManualReviewError(reason),
   };
 
@@ -782,6 +806,8 @@ async function loadSubmission(
     "ivoris_synced",
     "ivoris_doc_synced",
     "ivoris_sync_error",
+    "ivoris_patient_error",
+    "ivoris_document_error",
     "ivoris_patient_id",
     "ivoris_document_id",
     "ivoris_sync_retry_count",

@@ -290,7 +290,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        ok: true,
+        ok: !degraded,
         checkedAt,
         before,
         after,
@@ -302,6 +302,10 @@ async function main() {
       2
     )
   );
+
+  if (degraded) {
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {
