@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/db/supabase";
-import { retryPendingAnimaSignSyncs } from "@/lib/services/animasign-ivoris-sync";
+import { runNextPendingAnimaSignStage } from "@/lib/services/animasign-ivoris-sync";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -226,6 +226,35 @@ async function createAlert(db: DbClient, metrics: SupervisorMetrics) {
   if (error) throw new Error(error.message);
 }
 
+async function runAtomicAutoHeal(db: DbClient, metrics: SupervisorMetrics) {
+  const workerId = `supervisor-${crypto.randomUUID()}`;
+  const totals = {
+    processed: 0,
+    patientSuccess: 0,
+    documentSuccess: 0,
+    failures: 0,
+  };
+  const stages = [
+    ...Array(Math.min(metrics.retryDuePatient, 75)).fill("patient" as const),
+    ...Array(Math.min(metrics.retryDueDocument, 75)).fill("document" as const),
+  ].slice(0, 150);
+
+  for (const stage of stages) {
+    const next = await runNextPendingAnimaSignStage(stage, { db, workerId });
+    if (!next.found) continue;
+    totals.processed += 1;
+    if (next.result?.patient === "success" || next.result?.patient === "skipped") {
+      totals.patientSuccess += stage === "patient" ? 1 : 0;
+    }
+    if (next.result?.document === "success" || next.result?.document === "skipped") {
+      totals.documentSuccess += stage === "document" ? 1 : 0;
+    }
+    if (next.result?.errors.length) totals.failures += 1;
+  }
+
+  return totals;
+}
+
 async function main() {
   const db = createServerClient();
   const checkedAt = new Date().toISOString();
@@ -234,10 +263,7 @@ async function main() {
   let autoHeal = null as SupervisorState["autoHeal"];
 
   if ((before.retryDuePatient > 0 || before.retryDueDocument > 0) && hasWorkerEnv()) {
-    const result = await retryPendingAnimaSignSyncs({
-      db,
-      limit: Math.min(150, before.retryDuePatient + before.retryDueDocument + 10),
-    });
+    const result = await runAtomicAutoHeal(db, before);
 
     autoHeal = {
       attemptedAt: checkedAt,
