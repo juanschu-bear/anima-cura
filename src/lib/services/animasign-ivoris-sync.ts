@@ -16,7 +16,10 @@ import {
   type DirectoryStrategyResult,
 } from "@/lib/services/animasign-ivoris-directory";
 import { buildAnamnesisSummaryText } from "@/lib/services/animasign-anamnesis-summary";
-import { formatManualReviewError } from "@/lib/services/animasign-sync-status";
+import {
+  formatManualReviewError,
+  isNonRetryableIvorisResponse,
+} from "@/lib/services/animasign-sync-status";
 
 const SYNC_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
 const MAX_SYNC_ATTEMPTS = SYNC_BACKOFF_MINUTES.length;
@@ -1682,8 +1685,8 @@ async function syncPatientStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "patient", attemptNo, "error", message);
-    if (error instanceof ManualReviewRequiredError) {
-      await markStageManualReview(db, submission.id, "patient", error.message);
+    if (error instanceof ManualReviewRequiredError || isNonRetryableIvorisResponse(message)) {
+      await markStageManualReview(db, submission.id, "patient", message);
     } else {
       await markStageFailure(db, submission.id, "patient", retryCountOnFailure, message);
     }
@@ -1817,8 +1820,8 @@ async function syncDocumentStage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await writeSyncLog(db, submission.id, "document", attemptNo, "error", message);
-    if (error instanceof ManualReviewRequiredError) {
-      await markStageManualReview(db, submission.id, "document", error.message);
+    if (error instanceof ManualReviewRequiredError || isNonRetryableIvorisResponse(message)) {
+      await markStageManualReview(db, submission.id, "document", message);
     } else {
       await markStageFailure(db, submission.id, "document", retryCountOnFailure, message);
     }

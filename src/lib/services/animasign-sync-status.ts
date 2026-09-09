@@ -14,3 +14,10 @@ export function stripManualReviewPrefix(value: string | null | undefined) {
     ? value.slice(MANUAL_REVIEW_PREFIX.length).trim()
     : value;
 }
+
+export function isNonRetryableIvorisResponse(value: string | null | undefined) {
+  if (!value) return false;
+  const status = Number(value.match(/\((\d{3})\)/)?.[1]);
+  if (!Number.isFinite(status)) return false;
+  return status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429;
+}
