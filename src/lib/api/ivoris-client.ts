@@ -1,3 +1,5 @@
+import { fetchIvoris } from "@/lib/api/ivoris-fetch";
+
 const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -131,7 +133,7 @@ async function fetchJsonWithTransientRetry(
   let lastPayload: unknown = null;
 
   for (let attempt = 0; attempt <= IVORIS_RETRY_DELAYS_MS.length; attempt += 1) {
-    const response = await fetch(url.toString(), {
+    const response = await fetchIvoris(url, {
       ...options,
       cache: "no-store",
     });
@@ -164,7 +166,7 @@ export async function fetchIvorisDocumentation() {
   const url = new URL(`${baseUrl}/About/v1/Documentation`);
   withAuthParams(url, creds);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method: "GET",
     headers: buildHeaders(creds),
   });
@@ -198,7 +200,7 @@ export async function fetchIvorisPatientsRaw() {
         url.searchParams.set("mandantIndex", mandantIndex);
       }
 
-      const response = await fetch(url.toString(), {
+      const response = await fetchIvoris(url, {
         method,
         headers: buildHeaders(creds),
         cache: "no-store",
@@ -227,7 +229,7 @@ export async function fetchIvorisPatientsRaw() {
     url.searchParams.set("mandantIndex", mandantIndex);
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method,
     headers: buildHeaders(creds),
     cache: "no-store",
@@ -252,7 +254,7 @@ export async function fetchIvorisPatientsPage(page = 0) {
     url.searchParams.set("mandantIndex", mandantIndex);
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method: "GET",
     headers: buildHeaders(creds),
     cache: "no-store",
@@ -301,7 +303,7 @@ export async function searchIvorisPatients(params: IvorisPatientSearchParams) {
     }
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method: "GET",
     headers: buildHeaders(creds),
     cache: "no-store",

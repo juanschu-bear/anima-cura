@@ -20,7 +20,7 @@
     "sync:animus-react": "node scripts/sync-animus-react.mjs",
     "test:animus": "tsx --test src/vendor/animus-react/__tests__/*.test.ts",
     "test:animasign-dupguard": "tsx --test src/lib/services/__tests__/animasign-*.test.ts",
-    "test:ivoris-patient-link": "tsx --test src/lib/services/__tests__/ivoris-sync.test.ts src/lib/services/__tests__/patient-ivoris-link.test.ts src/lib/services/__tests__/scribe-ivoris-error.test.ts src/lib/services/__tests__/ivoris-document-idempotency.test.ts",
+    "test:ivoris-patient-link": "tsx --test src/lib/services/__tests__/ivoris-sync.test.ts src/lib/services/__tests__/patient-ivoris-link.test.ts src/lib/services/__tests__/scribe-ivoris-error.test.ts src/lib/services/__tests__/ivoris-document-idempotency.test.ts src/lib/services/__tests__/ivoris-request-timeout.test.ts",
     "test:animasign-dupguard-live": "RUN_LIVE_ANIMASIGN_DUPGUARD_TEST=true tsx scripts/test-animasign-duplicate-guard.ts",
     "db:migrate": "supabase db push",
     "animasign:sync-worker": "tsx scripts/animasign-sync-worker.ts",

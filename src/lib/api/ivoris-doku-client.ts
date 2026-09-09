@@ -1,3 +1,5 @@
+import { fetchIvoris } from "@/lib/api/ivoris-fetch";
+
 // ivoris-Doku-Client: Karteieintraege schreiben/lesen via Relay.
 // Kanal: POST /Documentation/v1/Entry (append-only, kein PUT/DELETE in der ivoris-API).
 // Benoetigt zusaetzlich zur bestehenden IVORIS_*-Konfiguration: IVORIS_PROFILE_ID (Mandant).
@@ -142,7 +144,7 @@ function sleep(ms: number) {
 }
 
 async function postJson(url: URL, headers: Record<string, string>, body: string) {
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method: "POST",
     headers,
     body,
@@ -343,7 +345,7 @@ export async function fetchIvorisKarteiEintraege(patientIvorisId: string): Promi
   url.searchParams.set("patientId", patientIvorisId);
   url.searchParams.set("profileId", creds.profileId);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchIvoris(url, {
     method: "GET",
     headers: buildHeaders(creds),
     cache: "no-store",
@@ -415,7 +417,7 @@ async function findExistingIvorisDocumentId(input: IvorisDocumentInput): Promise
   url.searchParams.set("profileId", creds.profileId);
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetchIvoris(url, {
       method: "GET",
       headers: buildHeaders(creds),
       cache: "no-store",
@@ -474,7 +476,7 @@ export async function addIvorisDocument(
   let response: Response | null = null;
   let payload: unknown = null;
   for (let attempt = 0; attempt <= ADD_DOCUMENT_RETRY_DELAYS_MS.length; attempt += 1) {
-    response = await fetch(url.toString(), {
+    response = await fetchIvoris(url, {
       method: "POST",
       headers: buildHeaders(creds),
       body: requestBody,
