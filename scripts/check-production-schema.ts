@@ -62,6 +62,11 @@ async function main() {
       "id,artifact_type,artifact_id,artifact_version,idempotency_key,status,attempt_count,next_attempt_at,last_error,locked_at,locked_by,succeeded_at,created_at,updated_at",
     ),
     runSelectCheck(
+      "integration outbox event history",
+      "integration_outbox_events",
+      "id,job_id,artifact_type,artifact_id,event_type,previous_status,new_status,attempt_count,error_category,worker_id,next_attempt_at,occurred_at",
+    ),
+    runSelectCheck(
       "patient portal core",
       "patients",
       "id,vorname,nachname,behandlung,behandlung_status,behandlungsart,versicherung_status,guthaben,aktiv",
