@@ -5,6 +5,7 @@ import {
   buildScribeRetryFailurePatch,
   classifyScribeIvorisError,
   isAutomaticScribeIvorisRetry,
+  isIvorisServiceOutage,
 } from "@/lib/services/scribe-ivoris-error";
 
 type DbClient = ReturnType<typeof createServerClient>;
@@ -40,6 +41,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
 
   let data: RetryEntry[] | null = null;
   let error: { message: string } | null = null;
+  const claimedIds: string[] = [];
 
   if (datum) {
     const result = await db
@@ -54,7 +56,6 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
     data = result.data as RetryEntry[] | null;
     error = result.error;
   } else {
-    const claimedIds: string[] = [];
     for (let index = 0; index < limit; index += 1) {
       const claim = await db.rpc("claim_integration_outbox_job", {
         p_artifact_type: "carteitext",
@@ -68,7 +69,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
     }
 
     if (claimedIds.length === 0) {
-      return { datum: "alle", processed: 0, recovered: 0, failed: 0, results: [] };
+      return { datum: "alle", processed: 0, recovered: 0, failed: 0, circuitBreakerOpen: false, results: [] };
     }
 
     const result = await db
@@ -94,19 +95,27 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
       .eq("id", eintrag.id);
   }
 
+  const claimOrder = new Map(claimedIds.map((id, index) => [id, index]));
   const kandidaten = (data ?? []).filter((eintrag) => {
     const pushStatus = (eintrag as { ivoris_push_status?: string | null }).ivoris_push_status;
     const fehler = (eintrag as { ivoris_fehler?: string | null }).ivoris_fehler;
     if (pushStatus === "ausstehend") return true;
     if (pushStatus !== "fehler") return false;
     return isAutomaticScribeIvorisRetry(fehler);
-  });
+  }).sort((left, right) =>
+    (claimOrder.get(String(left.id)) ?? Number.MAX_SAFE_INTEGER) -
+    (claimOrder.get(String(right.id)) ?? Number.MAX_SAFE_INTEGER)
+  );
 
   let recovered = 0;
   let failed = 0;
+  let processed = 0;
+  let circuitBreakerOpen = false;
   const results: Array<{ id: string; status: "gepusht" | "fehler"; patient: string; message?: string }> = [];
 
-  for (const eintrag of kandidaten) {
+  for (let index = 0; index < kandidaten.length; index += 1) {
+    const eintrag = kandidaten[index];
+    processed += 1;
     const previousRetryCount = Number((eintrag as { ivoris_retry_count?: number | null }).ivoris_retry_count ?? 0);
     await db
       .from("doku_eintraege")
@@ -172,14 +181,38 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
         .eq("id", eintrag.id);
       failed += 1;
       results.push({ id: String(eintrag.id), status: "fehler", patient: patientName, message });
+      if (isIvorisServiceOutage(message)) {
+        circuitBreakerOpen = true;
+        const unprocessedIds = kandidaten.slice(index + 1).map((entry) => String(entry.id));
+        if (claimedIds.length > 0 && unprocessedIds.length > 0) {
+          const retryAt = new Date(Date.now() + 5 * 60_000).toISOString();
+          const { error: releaseError } = await db
+            .from("integration_outbox_jobs")
+            .update({
+              status: "retry_wait",
+              next_attempt_at: retryAt,
+              locked_at: null,
+              locked_by: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("artifact_type", "carteitext")
+            .eq("locked_by", workerId)
+            .in("artifact_id", unprocessedIds);
+          if (releaseError) {
+            throw new Error(`Scribe-Reservierungen konnten nach IVORIS-Ausfall nicht freigegeben werden: ${releaseError.message}`);
+          }
+        }
+        break;
+      }
     }
   }
 
   return {
     datum: datum ?? "alle",
-    processed: kandidaten.length,
+    processed,
     recovered,
     failed,
+    circuitBreakerOpen,
     results,
   };
 }
