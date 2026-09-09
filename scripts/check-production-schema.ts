@@ -67,6 +67,11 @@ async function main() {
       "id,job_id,artifact_type,artifact_id,event_type,previous_status,new_status,attempt_count,error_category,worker_id,next_attempt_at,occurred_at",
     ),
     runSelectCheck(
+      "manual integration resolutions",
+      "integration_manual_resolutions",
+      "id,artifact_type,artifact_id,previous_patient_id,resolved_patient_id,resolved_by,resolved_at",
+    ),
+    runSelectCheck(
       "patient portal core",
       "patients",
       "id,vorname,nachname,behandlung,behandlung_status,behandlungsart,versicherung_status,guthaben,aktiv",

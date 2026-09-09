@@ -43,25 +43,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Die gewählte Patientenakte besitzt keine gültige IVORIS-ID" }, { status: 422 });
   }
 
-  const { data: updatedEntry, error: updateError } = await db
-    .from("doku_eintraege")
-    .update({
-      patient_id: patient.id,
-      ivoris_push_status: "ausstehend",
-      ivoris_fehler: null,
-      ivoris_retry_count: 0,
-      ivoris_next_retry_at: null,
-      ivoris_error_class: null,
-    })
-    .eq("id", entry.id)
-    .eq("ivoris_push_status", entry.ivoris_push_status)
-    .select("id")
-    .maybeSingle();
+  const { error: updateError } = await db.rpc("resolve_scribe_patient_atomic", {
+    p_entry_id: entry.id,
+    p_patient_id: patient.id,
+    p_resolved_by: user.id,
+  });
   if (updateError) {
-    return NextResponse.json({ error: `Patientenzuordnung konnte nicht gespeichert werden: ${updateError.message}` }, { status: 500 });
-  }
-  if (!updatedEntry) {
-    return NextResponse.json({ error: "Der Eintrag wurde parallel geändert; bitte Ansicht aktualisieren" }, { status: 409 });
+    return NextResponse.json({ error: `Patientenzuordnung konnte nicht atomar gespeichert werden: ${updateError.message}` }, { status: 409 });
   }
 
   return NextResponse.json({ ok: true, patientId: patient.id });
