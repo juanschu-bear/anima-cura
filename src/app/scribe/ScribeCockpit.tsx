@@ -412,6 +412,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
   const [detailLaeuft, setDetailLaeuft] = useState(false);
   const [detailFehler, setDetailFehler] = useState<string | null>(null);
+  const [detailPatientSuche, setDetailPatientSuche] = useState("");
+  const [detailPatientTreffer, setDetailPatientTreffer] = useState<PatientTreffer[]>([]);
   const [spickOffen, setSpickOffen] = useState(false);
   const [spickSuche, setSpickSuche] = useState("");
   const [spickBereich, setSpickBereich] = useState<string>("alle");
@@ -565,6 +567,24 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     }, 250);
     return () => clearTimeout(t);
   }, [suche, patient]);
+
+  useEffect(() => {
+    if (!detail || detail.ivoris_error_class !== "patient_manual_review" || detailPatientSuche.trim().length < 2) {
+      setDetailPatientTreffer([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(detailPatientSuche.trim())}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setDetailPatientTreffer((json.results ?? []).map((entry: { id: string; name: string; geburtsdatum?: string | null }) => ({
+        id: entry.id,
+        name: entry.name,
+        alter: berechneAlter(entry.geburtsdatum ?? null),
+      })));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [detail, detailPatientSuche]);
 
   // Manueller ivoris-Sync direkt aus der Suche: holt fehlende Patienten sofort.
   // ivoris bietet keinen "geaendert seit"-Endpoint, daher voller Pull ueber batch-sync,
@@ -1514,6 +1534,36 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
     await ladeHeute();
   }
 
+  async function detailPatientZuordnen(patientId: string) {
+    if (!detail) return;
+    setDetailLaeuft(true);
+    setDetailFehler(null);
+    const resolveRes = await fetch(`/api/doku/eintrag/${detail.id}/resolve-patient`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patientId }),
+    });
+    const resolveJson = await resolveRes.json().catch(() => ({}));
+    if (!resolveRes.ok) {
+      setDetailLaeuft(false);
+      setDetailFehler(resolveJson.error ?? "Patientenzuordnung fehlgeschlagen.");
+      return;
+    }
+
+    const pushRes = await fetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
+    const pushJson = await pushRes.json().catch(() => ({}));
+    setDetailLaeuft(false);
+    if (!pushRes.ok) {
+      setDetailFehler(pushJson.error ?? "Zuordnung gespeichert, Übertragung fehlgeschlagen.");
+      await ladeHeute();
+      return;
+    }
+    setDetail({ ...detail, patient_id: patientId, ivoris_push_status: "gepusht", ivoris_error_class: null, ivoris_fehler: null });
+    setDetailPatientSuche("");
+    setDetailPatientTreffer([]);
+    await ladeHeute();
+  }
+
   function wachePille(e: TagesEintrag): { cls: string; text: string } {
     if (e.status === "entwurf") return { cls: "rot", text: "Doku ausstehend" };
     if (e.ivoris_push_status === "fehler" && e.ivoris_error_class?.includes("manual_review")) {
@@ -2389,8 +2439,33 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                   {beschreibePushFehlerPraxis(detail.ivoris_fehler)}
                 </p>
               )}
+              {detail.ivoris_error_class === "patient_manual_review" && (
+                <div className="feld" style={{ marginTop: 12 }}>
+                  <label htmlFor="detail-patient-suche"><b>Richtige Patientenakte auswählen</b></label>
+                  <input
+                    id="detail-patient-suche"
+                    type="text"
+                    placeholder="Name suchen (mind. 2 Zeichen)"
+                    value={detailPatientSuche}
+                    disabled={detailLaeuft}
+                    onChange={(event) => setDetailPatientSuche(event.target.value)}
+                  />
+                  {detailPatientTreffer.length > 0 && (
+                    <ul className="suchliste">
+                      {detailPatientTreffer.map((treffer) => (
+                        <li key={treffer.id}>
+                          <button type="button" disabled={detailLaeuft} onClick={() => void detailPatientZuordnen(treffer.id)}>
+                            {treffer.name}{treffer.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {treffer.alter} J.</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="detailmeta">Nur Patientenakten mit gültiger IVORIS-ID werden akzeptiert. Nach der Auswahl wird der bestätigte Eintrag unmittelbar übertragen.</p>
+                </div>
+              )}
               <div className="aktionen" style={{ marginTop: 14 }}>
-                {detail.status === "bestaetigt" && detail.ivoris_push_status !== "gepusht" && (
+                {detail.status === "bestaetigt" && detail.ivoris_push_status !== "gepusht" && detail.ivoris_error_class !== "patient_manual_review" && (
                   <button className="haupt" onClick={detailPush} disabled={detailLaeuft}>
                     {detailLaeuft ? "Schreibt in ivoris ..." : "In ivoris-Akte schreiben"}
                   </button>
