@@ -1508,18 +1508,34 @@ async function syncExistingPatient(
   metadata?: Record<string, unknown>;
 }> {
   const patient = await loadResolvedPatient(db, submission);
-  if (!patient?.ivoris_id) {
-    throw new Error("Bestandspatient hat keine gueltige ivoris_id");
+  let patientIvorisId = normalizeIvorisId(patient?.ivoris_id);
+  if (!patientIvorisId) {
+    patientIvorisId = await resolveSubmissionPatientIvorisId(db, submission);
+  }
+  if (!patientIvorisId) {
+    throw new ManualReviewRequiredError(
+      "Bestandspatient konnte nicht eindeutig einer IVORIS-Akte zugeordnet werden.",
+      "patient"
+    );
+  }
+  if (patient?.id && !normalizeIvorisId(patient.ivoris_id)) {
+    const { error } = await db
+      .from("patients")
+      .update({ ivoris_id: patientIvorisId })
+      .eq("id", patient.id);
+    if (error) {
+      throw new Error(`Sicher gefundene IVORIS-ID konnte lokal nicht verknuepft werden: ${error.message}`);
+    }
   }
 
-  await patchSubmissionIvorisPatientId(db, submission.id, patient.ivoris_id);
+  await patchSubmissionIvorisPatientId(db, submission.id, patientIvorisId);
 
   let operations: Array<Partial<IvorisPatientInput>> = [];
   let metadata: Record<string, unknown> = { operations: 0 };
   const requestedContacts = buildContactUpdate(submission);
 
   try {
-    const currentPatient = await fetchIvorisPatientById(patient.ivoris_id);
+    const currentPatient = await fetchIvorisPatientById(patientIvorisId);
     const currentContacts = extractCurrentContacts(currentPatient);
     operations = buildExistingPatientUpdateOperations(currentContacts, submission);
   } catch (error) {
@@ -1534,29 +1550,29 @@ async function syncExistingPatient(
       fallbackReason: error instanceof Error ? error.message : String(error),
     };
     console.warn(
-      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} using submission fallback after transient GetPatient failure`
+      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patientIvorisId} using submission fallback after transient GetPatient failure`
     );
   }
 
   if (operations.length === 0) {
     console.log(
-      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} no contact delta`
+      `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patientIvorisId} no contact delta`
     );
-    const actual = extractCurrentContacts(await fetchIvorisPatientById(patient.ivoris_id));
+    const actual = extractCurrentContacts(await fetchIvorisPatientById(patientIvorisId));
     const fieldResults = buildContactVerificationResults(requestedContacts, actual);
     assertVerifiedContactResults(fieldResults);
-    return { status: "skipped", ivorisId: patient.ivoris_id, fieldResults, metadata };
+    return { status: "skipped", ivorisId: patientIvorisId, fieldResults, metadata };
   }
 
   console.log(
-    `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patient.ivoris_id} operations=${JSON.stringify(
+    `[ANIMASIGN][IVORIS] submission=${submission.id} patient=${patientIvorisId} operations=${JSON.stringify(
       operations
     )}`
   );
 
   for (const operation of operations) {
     try {
-      await updateIvorisPatient(patient.ivoris_id, operation);
+      await updateIvorisPatient(patientIvorisId, operation);
     } catch (error) {
       if (isIvorisIdentityConstraintError(error)) {
         throw new Error(
@@ -1568,13 +1584,13 @@ async function syncExistingPatient(
     }
   }
 
-  const actual = extractCurrentContacts(await fetchIvorisPatientById(patient.ivoris_id));
+  const actual = extractCurrentContacts(await fetchIvorisPatientById(patientIvorisId));
   const fieldResults = buildContactVerificationResults(requestedContacts, actual);
   assertVerifiedContactResults(fieldResults);
 
   return {
     status: "success",
-    ivorisId: patient.ivoris_id,
+    ivorisId: patientIvorisId,
     fieldResults,
     metadata: {
       ...metadata,
