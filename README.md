@@ -171,6 +171,7 @@ IVORIS_API_KEY=<api_key>
 IVORIS_USERNAME=<ivoris-benutzername>
 IVORIS_PASSWORD=<ivoris-passwort>
 IVORIS_MANDANT_INDEX=<optional>
+IVORIS_REQUEST_TIMEOUT_MS=20000
 ```
 
 Optional (falls deine Installation andere Endpoint-Namen nutzt):
