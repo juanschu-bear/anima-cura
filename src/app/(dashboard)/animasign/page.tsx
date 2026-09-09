@@ -99,6 +99,8 @@ interface OutboxStats {
   maxAttempts: number;
   oldestAgeMinutes: number;
   nextRetryAt: string | null;
+  serviceOutageJobs: number;
+  dominantOutage: string | null;
 }
 
 const EMPTY_OUTBOX: OutboxStats = {
@@ -112,6 +114,8 @@ const EMPTY_OUTBOX: OutboxStats = {
   maxAttempts: 0,
   oldestAgeMinutes: 0,
   nextRetryAt: null,
+  serviceOutageJobs: 0,
+  dominantOutage: null,
 };
 
 interface StabilityEvidence {
@@ -497,6 +501,12 @@ export default function AnimaSignPage() {
         <div style={{ fontSize: 11, color: muted, marginTop: 8 }}>
           {outbox.nextRetryAt ? `Nächster geplanter Versuch: ${fmtDate(outbox.nextRetryAt)} ${fmtTime(outbox.nextRetryAt)}` : "Kein zeitgesteuerter Wiederholungsversuch vorgemerkt."}
         </div>
+        {outbox.serviceOutageJobs > 0 && (
+          <div style={{ fontSize: 12, color: errorRed, marginTop: 7, fontWeight: 600 }}>
+            Externe IVORIS-Dienststörung nachgewiesen: {outbox.serviceOutageJobs} offene Jobs
+            {outbox.dominantOutage ? ` · überwiegend ${outbox.dominantOutage}` : ""}. Automatische Wiederholung bleibt aktiv.
+          </div>
+        )}
         <div style={{ fontSize: 11, color: muted, marginTop: 6 }}>
           Stabilitätsnachweis: <b style={{ color: stability.latestHealthy ? green : errorRed }}>
             {stability.latestHealthy === null ? "noch keine Messung" : stability.latestHealthy ? "GRÜN" : "HANDLUNGSBEDARF"}

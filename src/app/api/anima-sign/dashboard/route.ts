@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { isManualReviewErrorText, stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
+import { isIvorisServiceOutage } from "@/lib/services/scribe-ivoris-error";
+
+function safeOutageCategory(error: string | null) {
+  const status = error?.match(/\((502|503|504)\)/)?.[1];
+  if (status) return `HTTP ${status}`;
+  if (/timeout|timed out/i.test(error ?? "")) return "Timeout";
+  if (/fetch failed|network|econnreset|econnrefused|socket hang up/i.test(error ?? "")) return "Netzwerkfehler";
+  return "IVORIS nicht erreichbar";
+}
 
 export async function GET(req: Request) {
   const authClient = createServerComponentClient();
@@ -53,7 +62,7 @@ export async function GET(req: Request) {
 
   const { data: openOutboxJobs, error: outboxError } = await supabase
     .from("integration_outbox_jobs")
-    .select("artifact_type,status,attempt_count,next_attempt_at,created_at")
+    .select("artifact_type,status,attempt_count,next_attempt_at,created_at,last_error")
     .neq("status", "succeeded")
     .order("created_at", { ascending: true })
     .limit(5000);
@@ -70,6 +79,14 @@ export async function GET(req: Request) {
     .map((job) => job.next_attempt_at as string | null)
     .filter((value): value is string => Boolean(value))
     .sort()[0] ?? null;
+  const outageRows = outboxRows.filter((job) => isIvorisServiceOutage(job.last_error));
+  const outageCategories = new Map<string, number>();
+  for (const job of outageRows) {
+    const category = safeOutageCategory(job.last_error);
+    outageCategories.set(category, (outageCategories.get(category) ?? 0) + 1);
+  }
+  const dominantOutage = Array.from(outageCategories.entries())
+    .sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
   const outbox = {
     queued: outboxRows.filter((job) => job.status === "queued").length,
     processing: outboxRows.filter((job) => job.status === "processing").length,
@@ -81,6 +98,8 @@ export async function GET(req: Request) {
     maxAttempts: outboxRows.reduce((max, job) => Math.max(max, Number(job.attempt_count ?? 0)), 0),
     oldestAgeMinutes,
     nextRetryAt,
+    serviceOutageJobs: outageRows.length,
+    dominantOutage,
   };
 
   const { data: stabilityRows, error: stabilityError } = await supabase
