@@ -89,6 +89,7 @@ async function main() {
   const applyInvoiceNumber = process.argv.includes("--apply-invoice-number");
   const applyIbanAmount = process.argv.includes("--apply-iban-amount");
   const applyNameAmount = process.argv.includes("--apply-name-amount");
+  const protectRequested = process.argv.includes("--protect-requested");
   const [items, allItems, transactions, cash, patients, rates] = await Promise.all([
     fetchAll(
       "offene_posten",
@@ -368,14 +369,21 @@ async function main() {
   const requestedItemEvidence = allItems.filter((item) =>
     requestedReferences.has(item.unser_zeichen) || requestedReferences.has(item.rechnung_nr)
   ).map((item) => {
+    const itemPatient = item.patient_id ? patientById.get(item.patient_id) : null;
+    const firstName = normalizedText(itemPatient?.vorname || String(item.patient_name || "").split(",")[1]);
+    const lastName = normalizedText(itemPatient?.nachname || String(item.patient_name || "").split(",")[0]);
     const evidence = transactions.flatMap((tx) => {
       if (tx.datum < item.rechnung_datum) return [];
+      const bankText = normalizedText(`${tx.absender_name || ""} ${tx.verwendungszweck || ""}`);
       const reference = fullReference(tx.verwendungszweck);
       const invoiceMatch = invoiceNumberTokens(tx.verwendungszweck).includes(item.rechnung_nr);
       const baseMention = item.basis_nr && tokens(tx.verwendungszweck, /(?:^|\D)(\d{8})(?=\D|$)/g).includes(item.basis_nr);
       const patientMatch = item.patient_id && tx.matched_patient_id === item.patient_id;
       const amountMatch = cents(tx.betrag) === cents(item.offen) || cents(tx.betrag) === cents(item.betrag);
-      if (reference !== item.unser_zeichen && !invoiceMatch && !baseMention && !(patientMatch && amountMatch)) return [];
+      const fullNameMention = firstName.length >= 3 && lastName.length >= 3 && bankText.includes(firstName) && bankText.includes(lastName);
+      const uniqueLastNameMention = lastName.length >= 5 && bankText.includes(lastName) &&
+        patients.filter((patient) => normalizedText(patient.nachname) === lastName).length === 1;
+      if (reference !== item.unser_zeichen && !invoiceMatch && !baseMention && !(patientMatch && amountMatch) && !fullNameMention && !uniqueLastNameMention) return [];
       return [{
         txId: tx.id,
         datum: tx.datum,
@@ -397,15 +405,34 @@ async function main() {
           invoiceNumber: invoiceMatch,
           patientBase: Boolean(baseMention),
           matchedPatientAndAmount: Boolean(patientMatch && amountMatch),
+          fullPatientName: fullNameMention,
+          uniquePatientLastName: uniqueLastNameMention,
         },
       }];
     });
     const cashEvidence = cash.filter((payment) =>
-      payment.patient_id === item.patient_id && payment.kassen_datum >= item.rechnung_datum &&
-      (cents(payment.betrag) === cents(item.offen) || String(payment.zeichen || "").includes(item.basis_nr || "NO_MATCH"))
+      payment.patient_id === item.patient_id && payment.kassen_datum >= item.rechnung_datum
     );
-    return { item, evidence, cashEvidence };
+    const patientItems = item.patient_id
+      ? allItems.filter((candidate) => candidate.patient_id === item.patient_id)
+      : allItems.filter((candidate) => candidate.basis_nr === item.basis_nr);
+    return { item, patientItems, evidence, cashEvidence };
   });
+
+  let protectedRequested = 0;
+  if (protectRequested) {
+    for (const { item } of requestedItemEvidence) {
+      if (!["offen", "teilbezahlt"].includes(item.status) || item.nicht_mahnen === true) continue;
+      const { data, error } = await db
+        .from("offene_posten")
+        .update({ nicht_mahnen: true })
+        .eq("id", item.id)
+        .in("status", ["offen", "teilbezahlt"])
+        .select("id");
+      if (error) throw error;
+      protectedRequested += data?.length || 0;
+    }
+  }
 
   let applied = 0;
   if (apply) {
@@ -729,6 +756,7 @@ async function main() {
       }, {} as Record<string, { total: number; open: number; partial: number; paid: number; openAmount: number }>),
     },
     requestedItemEvidence,
+    protectedRequested,
     bankTransactions: transactions.length,
     bankRange: [transactions[0]?.datum, transactions.at(-1)?.datum],
     unappliedIncomingTransactions: unused.length,

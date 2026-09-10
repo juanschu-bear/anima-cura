@@ -47,6 +47,17 @@ export async function runDunningEngine(): Promise<DunningResult> {
     maria_eskalation: true,
   }) as Record<string, boolean>;
 
+  // Ein ungeklärter offener Posten sperrt automatisches Mahnen für den gesamten
+  // Patienten. Raten- und Rechnungssicht dürfen sich während des Bankabgleichs
+  // nicht gegenseitig überholen.
+  const { data: protectedOpenItems } = await db
+    .from("offene_posten")
+    .select("patient_id")
+    .eq("nicht_mahnen", true)
+    .in("status", ["offen", "teilbezahlt"])
+    .not("patient_id", "is", null);
+  const protectedPatientIds = new Set((protectedOpenItems || []).map((item) => item.patient_id));
+
   // 2. Überfällige Raten finden
   const today = new Date();
   const { data: offeneRaten } = await db
@@ -69,6 +80,7 @@ export async function runDunningEngine(): Promise<DunningResult> {
     const patient = (rate as any).patients;
 
     if (!isSafeDunningRate(rate, patient)) continue;
+    if (protectedPatientIds.has(patient.id)) continue;
     result.checked++;
 
     // Noch in Karenzzeit?
