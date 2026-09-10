@@ -25,6 +25,9 @@ interface OffenerPosten {
   status: string;
   bezahlt_am: string | null;
   patient_id: string | null;
+  source_file: string | null;
+  imported_at: string | null;
+  nicht_mahnen: boolean | null;
 }
 
 const OPEN_LIKE = new Set(["offen", "teilbezahlt"]);
@@ -50,7 +53,7 @@ export default function OffenePostenPage() {
     const { data, error } = await supabase
       .from("offene_posten")
       .select(
-        "id, typ, rechnung_datum, patient_name, rechnung_nr, unser_zeichen, basis_nr, betrag, gebuehr, offen, gezahlt, mahnung_datum, status, bezahlt_am, patient_id"
+        "id, typ, rechnung_datum, patient_name, rechnung_nr, unser_zeichen, basis_nr, betrag, gebuehr, offen, gezahlt, mahnung_datum, status, bezahlt_am, patient_id, source_file, imported_at, nicht_mahnen"
       )
       .order("rechnung_datum", { ascending: false });
 
@@ -79,7 +82,7 @@ export default function OffenePostenPage() {
       const { data, error } = await supabase
         .from("offene_posten")
         .select(
-          "id, typ, rechnung_datum, patient_name, rechnung_nr, unser_zeichen, basis_nr, betrag, gebuehr, offen, gezahlt, mahnung_datum, status, bezahlt_am, patient_id"
+          "id, typ, rechnung_datum, patient_name, rechnung_nr, unser_zeichen, basis_nr, betrag, gebuehr, offen, gezahlt, mahnung_datum, status, bezahlt_am, patient_id, source_file, imported_at, nicht_mahnen"
         )
         .order("rechnung_datum", { ascending: false });
       if (!active) return;
@@ -211,10 +214,10 @@ export default function OffenePostenPage() {
         }}
       >
         <p className="text-sm font-semibold" style={{ color: theme === "dark" ? "#f3d06a" : "#8f6115" }}>
-          Historischer Forderungsbestand, kein Quartalsumsatz
+          Ungeprüfter historischer Forderungsbestand – nicht kontaktfreigegeben
         </p>
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-          Diese Ansicht zeigt den gesamten offenen Forderungsbestand aus IVORIS. Bereits eingegangene Zahlungen verschwinden erst nach Bank-Sync und erneutem Abgleich aus dieser Liste.
+          Die offenen Beträge stammen überwiegend aus dem IVORIS-Export vom 04.06.2026. Ein fehlender Banktreffer beweist keine offene Forderung. Vor Anruf, Erinnerung oder Mahnung sind ein aktueller IVORIS-Saldo und ein zweiter Zahlungsnachweis erforderlich.
         </p>
       </div>
 
@@ -245,7 +248,7 @@ export default function OffenePostenPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Bestand offen (€)" value={metrics.openTotal.toLocaleString(numberLocale)} sub="Gesamter noch offener Forderungsbestand laut IVORIS, nicht nur aktueller Zeitraum" amber theme={theme} />
+        <MetricCard label="Ungeprüfter Importbestand (€)" value={metrics.openTotal.toLocaleString(numberLocale)} sub="Kein bestätigter aktueller Forderungssaldo; nicht als Mahngrundlage verwenden" amber theme={theme} />
         <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} sub={t("openItems.kpi.openCountSub", locale)} theme={theme} />
         <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} sub={t("openItems.kpi.partialSub", locale)} theme={theme} />
         <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} sub={t("openItems.kpi.paidSub", locale)} green theme={theme} />
@@ -394,7 +397,23 @@ export default function OffenePostenPage() {
                   <td className="table-cell py-3 text-right text-sm" style={{ color: "var(--ac-text-soft)" }}>{fmtEur(p.gezahlt)}</td>
                   <td className="table-cell py-3 text-right text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{fmtEur(p.offen)}</td>
                   <td className="table-cell py-3">
-                    <StatusBadge status={p.status} />
+                    {OPEN_LIKE.has(p.status) ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={p.status} />
+                        <span
+                          className="rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
+                          style={{
+                            color: theme === "dark" ? "#ffd4a8" : "#8a4300",
+                            background: theme === "dark" ? "rgba(224,132,52,0.18)" : "#fff0df",
+                          }}
+                          title={`Quelle: ${p.source_file || "unbekannt"}; Import: ${p.imported_at ? fmtDate(p.imported_at) : "unbekannt"}`}
+                        >
+                          Nicht verifiziert
+                        </span>
+                      </div>
+                    ) : (
+                      <StatusBadge status={p.status} />
+                    )}
                   </td>
                 </tr>
               ))}

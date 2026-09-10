@@ -853,14 +853,17 @@ export async function applyReferenceMatch(
   ref: ReferenceResult,
   existingDetails?: Record<string, unknown> | null
 ): Promise<void> {
-  await db.from("offene_posten").update({
+  const { data: updatedItems, error: itemError } = await db.from("offene_posten").update({
     status: ref.posten_update.status,
     gezahlt: ref.posten_update.gezahlt,
     offen: ref.posten_update.offen,
     bezahlt_am: ref.posten_update.bezahlt_am,
-  }).eq("id", ref.posten_id);
+  }).eq("id", ref.posten_id).select("id");
+  if (itemError || updatedItems?.length !== 1) {
+    throw new Error(`Offener Posten konnte nicht eindeutig aktualisiert werden: ${itemError?.message ?? "kein Datensatz"}`);
+  }
 
-  await db.from("transaktionen").update({
+  const { data: updatedTransactions, error: transactionError } = await db.from("transaktionen").update({
     matching_status: ref.status,
     matched_patient_id: ref.patient_id,
     matching_score: 100,
@@ -869,7 +872,10 @@ export async function applyReferenceMatch(
       ...ref.details,
     },
     geprueft_am: new Date().toISOString(),
-  }).eq("id", txId);
+  }).eq("id", txId).select("id");
+  if (transactionError || updatedTransactions?.length !== 1) {
+    throw new Error(`Zahlungsbeleg konnte nicht eindeutig markiert werden: ${transactionError?.message ?? "kein Datensatz"}`);
+  }
 
   if (ref.ueberzahlung > 0) {
     await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
