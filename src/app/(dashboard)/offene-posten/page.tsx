@@ -161,8 +161,13 @@ export default function OffenePostenPage() {
 
   const visiblePosten = useMemo(() => {
     let rows = posten.filter((p) => {
-      if (!OPEN_LIKE.has(p.status)) return listMode === "confirmed";
-      return listMode === "confirmed" ? p.nicht_mahnen !== true : p.nicht_mahnen === true;
+      if (listMode === "review") {
+        return OPEN_LIKE.has(p.status) && p.nicht_mahnen === true;
+      }
+      if (statusFilter === "bezahlt" || statusFilter === "erloesminderung") {
+        return p.status === statusFilter;
+      }
+      return OPEN_LIKE.has(p.status) && p.nicht_mahnen !== true;
     });
     if (statusFilter !== "alle") rows = rows.filter((p) => p.status === statusFilter);
     if (typFilter !== "alle") rows = rows.filter((p) => (p.typ || "").toLowerCase() === typFilter);
