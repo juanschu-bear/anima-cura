@@ -19,6 +19,9 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("Supabase-Konfiguration fehlt");
 const db = createClient(url, key);
+// The imported open balance is the accounting baseline. Earlier payments may
+// already be included and must never be subtracted from that balance again.
+const OPEN_ITEMS_IMPORT_CUTOFF = "2026-06-03";
 
 type Row = Record<string, any>;
 
@@ -134,6 +137,9 @@ async function main() {
   }
 
   const unused = transactions.filter((tx) => !alreadyApplied(tx));
+  const reconciliationTransactions = unused.filter((tx) =>
+    String(tx.datum || "").slice(0, 10) >= OPEN_ITEMS_IMPORT_CUTOFF
+  );
   const misassignedBaseTransactions = transactions.flatMap((tx) => {
     const mentionedPatients = new Map<string, Row>();
     for (const base of tokens(tx.verwendungszweck, /(?:^|\D)(\d{8})(?=\D|$)/g)) {
@@ -147,7 +153,7 @@ async function main() {
   const invoiceCandidates: Array<{ tx: Row; item: Row }> = [];
   const patientAmountCandidates: Array<{ tx: Row; item: Row }> = [];
 
-  for (const tx of unused) {
+  for (const tx of reconciliationTransactions) {
     const invoiceMatches = new Map<string, Row>();
     for (const token of invoiceNumberTokens(tx.verwendungszweck)) {
       for (const item of byInvoice.get(token) || []) {
@@ -324,7 +330,7 @@ async function main() {
   const openItemById = new Map(items.map((item) => [item.id, item]));
   const directCashMatches = cash.filter((payment) => payment.posten_id && openItemById.has(payment.posten_id));
   const uniqueCashPatientAmount = cash.flatMap((payment) => {
-    if (!payment.patient_id) return [];
+    if (!payment.patient_id || String(payment.kassen_datum || "").slice(0, 10) < OPEN_ITEMS_IMPORT_CUTOFF) return [];
     const matches = (byPatient.get(payment.patient_id) || []).filter((item) =>
       (!payment.kassen_datum || payment.kassen_datum >= item.rechnung_datum) && cents(payment.betrag) === cents(item.offen)
     );
@@ -332,6 +338,7 @@ async function main() {
   });
   const uniqueCashPatientBaseCandidates = cash.flatMap((payment) => {
     if (!payment.patient_id || payment.posten_id || payment.abgleich_status !== "offen") return [];
+    if (String(payment.kassen_datum || "").slice(0, 10) < OPEN_ITEMS_IMPORT_CUTOFF) return [];
     if (!/bezahlt/i.test(String(payment.notiz || ""))) return [];
     const base = String(payment.zeichen || "").match(/\d{8}/)?.[0] || null;
     if (!base) return [];
@@ -344,7 +351,7 @@ async function main() {
     [...uniqueCashPatientAmount, ...uniqueCashPatientBaseCandidates].map((candidate) => [`${candidate.payment.id}:${candidate.item.id}`, candidate])
   ).values());
   const strictReferenceGroups = new Map<string, { item: Row; transactions: Row[] }>();
-  for (const tx of unused) {
+  for (const tx of reconciliationTransactions) {
     const reference = fullReference(tx.verwendungszweck);
     const matches = reference ? byFullReference.get(reference) || [] : [];
     if (matches.length !== 1) continue;
@@ -781,6 +788,8 @@ async function main() {
     bankTransactions: transactions.length,
     bankRange: [transactions[0]?.datum, transactions.at(-1)?.datum],
     unappliedIncomingTransactions: unused.length,
+    reconciliationCutoff: OPEN_ITEMS_IMPORT_CUTOFF,
+    unappliedIncomingTransactionsAfterCutoff: reconciliationTransactions.length,
     transactionsAssignedAgainstExplicitPatientNumber: misassignedBaseTransactions.length,
     misassignedBaseSample: misassignedBaseTransactions.slice(0, 30).map(({ tx, intendedPatient, currentlyMatchedPatient }) => ({
       txId: tx.id,
