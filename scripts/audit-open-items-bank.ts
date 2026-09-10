@@ -90,15 +90,16 @@ async function main() {
   const applyIbanAmount = process.argv.includes("--apply-iban-amount");
   const applyNameAmount = process.argv.includes("--apply-name-amount");
   const protectRequested = process.argv.includes("--protect-requested");
+  const protectAllOpen = process.argv.includes("--protect-all-open");
   const [items, allItems, transactions, cash, patients, rates] = await Promise.all([
     fetchAll(
       "offene_posten",
-      "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status",
+      "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status, nicht_mahnen",
       (query) => query.in("status", ["offen", "teilbezahlt"]).order("rechnung_datum").order("id")
     ),
     fetchAll(
       "offene_posten",
-      "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status, patient_name",
+      "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status, patient_name, nicht_mahnen",
       (query) => query.order("rechnung_datum").order("id")
     ),
     fetchAll(
@@ -433,6 +434,17 @@ async function main() {
       protectedRequested += data?.length || 0;
     }
   }
+  let protectedAllOpen = 0;
+  if (protectAllOpen) {
+    const { data, error } = await db
+      .from("offene_posten")
+      .update({ nicht_mahnen: true })
+      .in("status", ["offen", "teilbezahlt"])
+      .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
+      .select("id");
+    if (error) throw error;
+    protectedAllOpen = data?.length || 0;
+  }
 
   let applied = 0;
   if (apply) {
@@ -734,6 +746,8 @@ async function main() {
     openItemsWithoutRemainingPaymentCandidate: withoutCandidate.length,
     openItemsWithAmbiguousPaymentCandidate: ambiguousCandidateItemIds.size,
     openItemsWithoutPatientLink: items.filter((item) => !item.patient_id).length,
+    confirmedOpenItems: items.filter((item) => item.nicht_mahnen !== true).length,
+    reviewOpenItems: items.filter((item) => item.nicht_mahnen === true).length,
     currentYear: {
       total: currentYearItems.length,
       open: currentYearItems.filter((item) => item.status === "offen").length,
@@ -757,6 +771,7 @@ async function main() {
     },
     requestedItemEvidence,
     protectedRequested,
+    protectedAllOpen,
     bankTransactions: transactions.length,
     bankRange: [transactions[0]?.datum, transactions.at(-1)?.datum],
     unappliedIncomingTransactions: unused.length,

@@ -41,6 +41,7 @@ export default function OffenePostenPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [statusFilter, setStatusFilter] = useState("alle");
+  const [listMode, setListMode] = useState<"confirmed" | "review">("confirmed");
   const [typFilter, setTypFilter] = useState("alle");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [searchTerm, setSearchTerm] = useState("");
@@ -134,13 +135,14 @@ export default function OffenePostenPage() {
   };
 
   const metrics = useMemo(() => {
-    const openTotal = posten
-      .filter((p) => OPEN_LIKE.has(p.status))
+    const confirmed = posten.filter((p) => OPEN_LIKE.has(p.status) && p.nicht_mahnen !== true);
+    const review = posten.filter((p) => OPEN_LIKE.has(p.status) && p.nicht_mahnen === true);
+    const openTotal = confirmed
       .reduce((sum, p) => sum + resolveOpenItemAmount(p), 0);
-    const openCount = posten.filter((p) => p.status === "offen").length;
-    const partialCount = posten.filter((p) => p.status === "teilbezahlt").length;
+    const openCount = confirmed.filter((p) => p.status === "offen").length;
+    const partialCount = confirmed.filter((p) => p.status === "teilbezahlt").length;
     const paidCount = posten.filter((p) => p.status === "bezahlt").length;
-    return { openTotal, openCount, partialCount, paidCount };
+    return { openTotal, openCount, partialCount, paidCount, reviewCount: review.length };
   }, [posten]);
 
   const filters = [
@@ -158,7 +160,10 @@ export default function OffenePostenPage() {
   ];
 
   const visiblePosten = useMemo(() => {
-    let rows = posten;
+    let rows = posten.filter((p) => {
+      if (!OPEN_LIKE.has(p.status)) return listMode === "confirmed";
+      return listMode === "confirmed" ? p.nicht_mahnen !== true : p.nicht_mahnen === true;
+    });
     if (statusFilter !== "alle") rows = rows.filter((p) => p.status === statusFilter);
     if (typFilter !== "alle") rows = rows.filter((p) => (p.typ || "").toLowerCase() === typFilter);
     const needle = searchTerm.trim().toLocaleLowerCase();
@@ -175,7 +180,7 @@ export default function OffenePostenPage() {
       return sortDir === "asc" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [posten, searchTerm, statusFilter, typFilter, sortDir]);
+  }, [posten, searchTerm, statusFilter, typFilter, sortDir, listMode]);
 
   const numberLocale = locale === "en" ? "en-GB" : "de-DE";
   const fmtEur = (v: number | null) => `${Number(v || 0).toLocaleString(numberLocale)}€`;
@@ -214,10 +219,10 @@ export default function OffenePostenPage() {
         }}
       >
         <p className="text-sm font-semibold" style={{ color: theme === "dark" ? "#f3d06a" : "#8f6115" }}>
-          Historischer Forderungsbestand – bis zum Zahlungsabgleich nicht kontaktfreigegeben
+          In „Offene Posten“ stehen nur bestätigte Forderungen
         </p>
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-          Die offenen Beträge stammen überwiegend aus dem Import vom 04.06.2026. Ein fehlender automatischer Treffer beweist allein keine offene Forderung. Vor Anruf, Erinnerung oder Mahnung müssen Bank-, Kassen- und Patientenzuordnung abgeschlossen und nachvollziehbar dokumentiert sein.
+          Ungeprüfte Importdaten werden getrennt im Prüfbestand geführt. Sie bleiben erhalten, erscheinen aber nicht als offene Forderung und dürfen nicht als Grundlage für Patientenkontakt verwendet werden.
         </p>
       </div>
 
@@ -248,10 +253,27 @@ export default function OffenePostenPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Ungeprüfter Importbestand (€)" value={metrics.openTotal.toLocaleString(numberLocale)} sub="Kein bestätigter aktueller Forderungssaldo; nicht als Mahngrundlage verwenden" amber theme={theme} />
+        <MetricCard label="Bestätigt offen (€)" value={metrics.openTotal.toLocaleString(numberLocale)} sub="Nur abgeschlossene Zahlungsprüfungen" amber theme={theme} />
         <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} sub={t("openItems.kpi.openCountSub", locale)} theme={theme} />
         <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} sub={t("openItems.kpi.partialSub", locale)} theme={theme} />
         <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} sub={t("openItems.kpi.paidSub", locale)} green theme={theme} />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setListMode("confirmed")}
+          className={`ac-chip ${listMode === "confirmed" ? "ac-chip-active" : ""}`}
+        >
+          Bestätigt offen
+        </button>
+        <button
+          type="button"
+          onClick={() => setListMode("review")}
+          className={`ac-chip ${listMode === "review" ? "ac-chip-active" : ""}`}
+        >
+          Prüfbestand ({metrics.reviewCount})
+        </button>
       </div>
 
       <div
@@ -397,7 +419,7 @@ export default function OffenePostenPage() {
                   <td className="table-cell py-3 text-right text-sm" style={{ color: "var(--ac-text-soft)" }}>{fmtEur(p.gezahlt)}</td>
                   <td className="table-cell py-3 text-right text-sm font-semibold" style={{ color: "var(--ac-text)" }}>{fmtEur(p.offen)}</td>
                   <td className="table-cell py-3">
-                    {OPEN_LIKE.has(p.status) ? (
+                    {OPEN_LIKE.has(p.status) && p.nicht_mahnen === true ? (
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge status={p.status} />
                         <span
@@ -408,7 +430,7 @@ export default function OffenePostenPage() {
                           }}
                           title={`Quelle: ${p.source_file || "unbekannt"}; Import: ${p.imported_at ? fmtDate(p.imported_at) : "unbekannt"}`}
                         >
-                          Nicht verifiziert
+                          Prüfung erforderlich
                         </span>
                       </div>
                     ) : (
