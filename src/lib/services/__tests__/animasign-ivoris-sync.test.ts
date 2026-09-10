@@ -7,6 +7,7 @@ import {
   decideIdentityClaimAction,
   decideExactLocalPatientCandidate,
   isTransientIvorisAvailabilityError,
+  isIvorisPatientNotFoundResponse,
   namesMatchSubmission,
   shouldPushIvorisSummary,
   shouldReusePriorSubmissionMatch,
@@ -221,6 +222,29 @@ test("detects transient ivoris availability errors", () => {
   assert.equal(
     isTransientIvorisAvailabilityError(
       new Error("IVORIS UpdatePatient abc fehlgeschlagen (400): bad request")
+    ),
+    false
+  );
+});
+
+test("detects the deterministic IVORIS stale-patient response", () => {
+  assert.equal(
+    isIvorisPatientNotFoundResponse(
+      new Error(
+        "IVORIS AddDocument fehlgeschlagen (400): The patient with Id 45877b2c-cf32-45c3-b2d7-e5ff2434538f could not be found."
+      )
+    ),
+    true
+  );
+  assert.equal(
+    isIvorisPatientNotFoundResponse(
+      new Error("IVORIS AddDocument fehlgeschlagen (400): Invalid document")
+    ),
+    false
+  );
+  assert.equal(
+    isIvorisPatientNotFoundResponse(
+      new Error("IVORIS AddDocument fehlgeschlagen (503): Service unavailable")
     ),
     false
   );

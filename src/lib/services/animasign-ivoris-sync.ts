@@ -180,6 +180,14 @@ export function isTransientIvorisAvailabilityError(error: unknown) {
   );
 }
 
+export function isIvorisPatientNotFoundResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /AddDocument fehlgeschlagen \(400\)/i.test(message) &&
+    /patient with Id .* could not be found/i.test(message)
+  );
+}
+
 type SyncAttemptContext = {
   requestPayload?: unknown;
   responsePayload?: unknown;
@@ -959,6 +967,38 @@ async function patchSubmissionResolvedPatient(
   }
 }
 
+async function persistRecoveredIvorisPatientLink(
+  db: DbClient,
+  submission: SubmissionRow,
+  staleIvorisId: string,
+  recoveredIvorisId: string
+) {
+  await patchSubmissionIvorisPatientId(db, submission.id, recoveredIvorisId);
+
+  const resolvedPatientId = submission.matched_patient_id ?? submission.patient_id;
+  if (resolvedPatientId) {
+    const { error } = await db
+      .from("patients")
+      .update({ ivoris_id: recoveredIvorisId })
+      .eq("id", resolvedPatientId)
+      .eq("ivoris_id", staleIvorisId);
+
+    if (error) {
+      throw new Error(
+        `Wiedergefundene IVORIS-ID konnte nicht am lokalen Patienten gespeichert werden: ${error.message}`
+      );
+    }
+  }
+
+  await updateIdentityClaim(db, buildIdentityFingerprint(submission), {
+    patient_id: resolvedPatientId ?? null,
+    ivoris_id: recoveredIvorisId,
+    last_submission_id: submission.id,
+    status: "resolved",
+    note: `Veraltete IVORIS-ID ${staleIvorisId} nach eindeutiger Verzeichnissuche ersetzt.`,
+  });
+}
+
 async function loadIdentityClaim(
   db: DbClient,
   fingerprint: string
@@ -1734,12 +1774,47 @@ async function syncDocumentStage(
       } bytes=${fileBytes.byteLength} base64Type=${typeof base64} base64Length=${base64.length}`
     );
 
-    const documentId = await addIvorisDocument({
-      patientIvorisId: patient,
+    const documentPayload = {
       name: docName,
       date: docDate,
       contentBase64: base64,
-    });
+    };
+    let effectivePatient = patient;
+    let documentId: string;
+
+    try {
+      documentId = await addIvorisDocument({
+        patientIvorisId: effectivePatient,
+        ...documentPayload,
+      });
+    } catch (error) {
+      if (!isIvorisPatientNotFoundResponse(error)) {
+        throw error;
+      }
+
+      const recoveredPatient = await recoverIvorisPatientIdFromDirectory(db, submission);
+      if (recoveredPatient === effectivePatient) {
+        throw new ManualReviewRequiredError(
+          `IVORIS kennt die gespeicherte Patienten-ID ${effectivePatient} nicht mehr und die Verzeichnissuche liefert keine andere eindeutige Akte.`,
+          "document"
+        );
+      }
+
+      await persistRecoveredIvorisPatientLink(
+        db,
+        submission,
+        effectivePatient,
+        recoveredPatient
+      );
+      console.warn(
+        `[ANIMASIGN][IVORIS] replaced stale patientId=${effectivePatient} with recovered patientId=${recoveredPatient} for submission=${submission.id}`
+      );
+      effectivePatient = recoveredPatient;
+      documentId = await addIvorisDocument({
+        patientIvorisId: effectivePatient,
+        ...documentPayload,
+      });
+    }
 
     const shouldPersistSummaryMarker = shouldPushIvorisSummary({
       alreadySynced: submission.ivoris_summary_synced,
@@ -1751,7 +1826,7 @@ async function syncDocumentStage(
 
     if (shouldPushSummaryNote) {
       await addIvorisKarteiEintrag({
-        patientIvorisId: patient,
+        patientIvorisId: effectivePatient,
         date: docDate,
         text: summaryText,
         type: "Note",
@@ -1800,7 +1875,7 @@ async function syncDocumentStage(
 
     await writeSyncLog(db, submission.id, "document", attemptNo, "success", null, {
       requestPayload: {
-        patientIvorisId: patient,
+        patientIvorisId: effectivePatient,
         summaryLength: summaryText.length,
         summaryHash,
         name: docName,
