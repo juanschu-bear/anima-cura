@@ -61,16 +61,17 @@ async function main() {
   const applyCash = process.argv.includes("--apply-cash");
   const applyBasisAmount = process.argv.includes("--apply-basis-amount");
   const applyInvoiceNumber = process.argv.includes("--apply-invoice-number");
+  const applyIbanAmount = process.argv.includes("--apply-iban-amount");
   const [items, transactions, cash] = await Promise.all([
     fetchAll(
       "offene_posten",
       "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status",
-      (query) => query.in("status", ["offen", "teilbezahlt"]).order("rechnung_datum")
+      (query) => query.in("status", ["offen", "teilbezahlt"]).order("rechnung_datum").order("id")
     ),
     fetchAll(
       "transaktionen",
       "id, datum, betrag, absender_name, absender_iban, verwendungszweck, matching_status, matching_score, matched_patient_id, matched_rate_id, matching_details",
-      (query) => query.gt("betrag", 0).order("datum")
+      (query) => query.gt("betrag", 0).order("datum").order("id")
     ),
     fetchAll("kassen_zahlungen", "*")
   ]);
@@ -136,6 +137,37 @@ async function main() {
     Number(tx.matching_score || 0) >= 95 &&
     !tx.matched_rate_id
   );
+  const patientsByIban = new Map<string, Set<string>>();
+  const confirmedPaymentsByIbanPatient = new Map<string, number>();
+  for (const tx of transactions) {
+    const iban = String(tx.absender_iban || "").replace(/\s+/g, "").toUpperCase();
+    if (!iban || tx.matching_status !== "auto" || !tx.matched_patient_id) continue;
+    const patientIds = patientsByIban.get(iban) || new Set<string>();
+    patientIds.add(tx.matched_patient_id);
+    patientsByIban.set(iban, patientIds);
+    if (alreadyApplied(tx) || ["referenz", "rechnungsnummer_eindeutig", "basisnummer_plus_exakter_betrag"].includes(String(tx.matching_details?.methode || ""))) {
+      const key = `${iban}:${tx.matched_patient_id}`;
+      confirmedPaymentsByIbanPatient.set(key, (confirmedPaymentsByIbanPatient.get(key) || 0) + 1);
+    }
+  }
+  const uniqueIbanAndExactAmountCandidates = patientAmountCandidates.filter(({ tx }) => {
+    const iban = String(tx.absender_iban || "").replace(/\s+/g, "").toUpperCase();
+    return tx.matching_status === "auto" &&
+      Number(tx.matching_score || 0) >= 90 &&
+      !tx.matched_rate_id &&
+      !fullReference(tx.verwendungszweck) &&
+      Boolean(
+        iban &&
+        patientsByIban.get(iban)?.size === 1 &&
+        patientsByIban.get(iban)?.has(tx.matched_patient_id) &&
+        (confirmedPaymentsByIbanPatient.get(`${iban}:${tx.matched_patient_id}`) || 0) >= 1
+      );
+  });
+  const ibanItemCounts = uniqueIbanAndExactAmountCandidates.reduce((counts, { item }) => {
+    counts.set(item.id, (counts.get(item.id) || 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+  const safeUniqueIbanAndExactAmount = uniqueIbanAndExactAmountCandidates.filter(({ item }) => ibanItemCounts.get(item.id) === 1);
   const patientAmountDoubleEvidence = patientAmountStrong.filter(({ tx, item }) => {
     const purpose = String(tx.verwendungszweck || "").replace(/\s*([-/])\s*/g, "$1");
     const method = String(tx.matching_details?.methode || "");
@@ -181,6 +213,13 @@ async function main() {
     strictReferenceGroups.set(matches[0].id, group);
   }
   const strictReferenceSummary = Array.from(strictReferenceGroups.values());
+  const invoiceCandidateItemIds = new Set(invoiceCandidates.map(({ item }) => item.id));
+  const patientAmountCandidateItemIds = new Set(patientAmountCandidates.map(({ item }) => item.id));
+  const ambiguousCandidateItemIds = new Set([...Array.from(invoiceCandidateItemIds), ...Array.from(patientAmountCandidateItemIds)]);
+  const bankStart = transactions[0]?.datum || "9999-12-31";
+  const beforeBankHistory = items.filter((item) => item.rechnung_datum < bankStart);
+  const withinBankHistory = items.filter((item) => item.rechnung_datum >= bankStart);
+  const withoutCandidate = items.filter((item) => !ambiguousCandidateItemIds.has(item.id));
 
   let applied = 0;
   if (apply) {
@@ -390,10 +429,56 @@ async function main() {
       appliedInvoiceItems += 1;
     }
   }
+  let appliedIbanAmount = 0;
+  if (applyIbanAmount) {
+    for (const { tx, item } of safeUniqueIbanAndExactAmount) {
+      const stamp = new Date().toISOString();
+      const { data: updatedItems, error: itemError } = await db
+        .from("offene_posten")
+        .update({
+          offen: 0,
+          gezahlt: Number((Number(item.gezahlt || 0) + Number(tx.betrag)).toFixed(2)),
+          status: "bezahlt",
+          bezahlt_am: tx.datum,
+        })
+        .eq("id", item.id)
+        .eq("offen", item.offen)
+        .in("status", ["offen", "teilbezahlt"])
+        .select("id");
+      if (itemError || updatedItems?.length !== 1) throw new Error(`IBAN-Posten ${item.id} konnte nicht aktualisiert werden`);
+      const { data: updatedTransactions, error: txError } = await db
+        .from("transaktionen")
+        .update({
+          matching_status: "auto",
+          matching_score: 100,
+          matched_patient_id: item.patient_id,
+          matching_details: {
+            ...(tx.matching_details || {}),
+            methode: "eindeutige_iban_plus_exakter_betrag",
+            iban_amount_repair_applied_at: stamp,
+            open_item_sync_applied_at: stamp,
+            open_item_sync_applied_amount: Number(tx.betrag),
+            open_item_sync_remaining_amount: 0,
+            open_item_sync_items: 1,
+          },
+          geprueft_am: stamp,
+        })
+        .eq("id", tx.id)
+        .select("id");
+      if (txError || updatedTransactions?.length !== 1) throw new Error(`IBAN-Zahlung ${tx.id} konnte nicht markiert werden`);
+      appliedIbanAmount += 1;
+    }
+  }
 
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(),
     openItems: items.length,
+    openAmount: Number(items.reduce((sum, item) => sum + Number(item.offen || 0), 0).toFixed(2)),
+    openItemsWithinBankHistory: withinBankHistory.length,
+    openItemsBeforeBankHistory: beforeBankHistory.length,
+    openItemsWithoutRemainingPaymentCandidate: withoutCandidate.length,
+    openItemsWithAmbiguousPaymentCandidate: ambiguousCandidateItemIds.size,
+    openItemsWithoutPatientLink: items.filter((item) => !item.patient_id).length,
     bankTransactions: transactions.length,
     bankRange: [transactions[0]?.datum, transactions.at(-1)?.datum],
     unappliedIncomingTransactions: unused.length,
@@ -431,7 +516,20 @@ async function main() {
       zahlungen: group.transactions.map((tx) => ({ id: tx.id, datum: tx.datum, betrag: tx.betrag, zweck: tx.verwendungszweck })),
     })),
     uniquePatientAndExactAmountCandidates: patientAmountCandidates.length,
+    patientAmountCandidateBreakdown: Object.fromEntries(Object.entries(patientAmountCandidates.reduce((counts, { tx }) => {
+      const key = `${tx.matching_status || "null"}|${tx.matching_score ?? "null"}|${tx.matching_details?.methode || "unbekannt"}|${tx.matched_rate_id ? "rate" : "keine_rate"}`;
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>)).sort((left, right) => right[1] - left[1])),
+    namePlusPostenScoreBreakdown: Object.fromEntries(Object.entries(patientAmountCandidates
+      .filter(({ tx }) => tx.matching_details?.methode === "name_plus_posten")
+      .reduce((counts, { tx }) => {
+        const score = String(tx.matching_details?.name_score ?? "null");
+        counts[score] = (counts[score] || 0) + 1;
+        return counts;
+      }, {} as Record<string, number>)).sort((left, right) => Number(right[0]) - Number(left[0]))),
     patientAndExactAmountScore95WithoutRate: patientAmountStrong.length,
+    safeUniqueIbanAndExactAmount: safeUniqueIbanAndExactAmount.length,
     patientAmountWithExplicitReferenceAndExactAmount: patientAmountDoubleEvidence.length,
     safeBasisAndExactAmountWithoutConflictingFullReference: safeBasisAndExactAmount.length,
     safeSingleInvoiceNumberCandidates: safeSingleInvoiceCandidates.length,
@@ -448,6 +546,7 @@ async function main() {
     appliedBasisAmount,
     appliedInvoiceTransactions,
     appliedInvoiceItems,
+    appliedIbanAmount,
     safeCandidateSample: safe.slice(0, 20).map(({ tx, item, evidence }) => ({
       txId: tx.id,
       datum: tx.datum,
