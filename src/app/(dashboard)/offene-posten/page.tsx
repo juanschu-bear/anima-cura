@@ -229,6 +229,9 @@ export default function OffenePostenPage() {
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
           Ungeprüfte Importdaten werden getrennt im Prüfbestand geführt. Sie bleiben erhalten, erscheinen aber nicht als offene Forderung und dürfen nicht als Grundlage für Patientenkontakt verwendet werden.
         </p>
+        <p className="mt-2 text-sm font-semibold" style={{ color: theme === "dark" ? "#ffd4a8" : "#8a4300" }}>
+          Wichtig: 0 bestätigt offen bedeutet nicht „alles bezahlt“. {metrics.reviewCount.toLocaleString(numberLocale)} Datensätze warten noch auf die Zahlungsprüfung.
+        </p>
       </div>
 
       {errorMsg && (
@@ -259,8 +262,8 @@ export default function OffenePostenPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Bestätigt offen (€)" value={metrics.openTotal.toLocaleString(numberLocale)} sub="Nur abgeschlossene Zahlungsprüfungen" amber theme={theme} />
-        <MetricCard label={t("openItems.kpi.openCount", locale)} value={String(metrics.openCount)} sub={t("openItems.kpi.openCountSub", locale)} theme={theme} />
-        <MetricCard label={t("openItems.kpi.partial", locale)} value={String(metrics.partialCount)} sub={t("openItems.kpi.partialSub", locale)} theme={theme} />
+        <MetricCard label="Bestätigte Forderungen" value={String(metrics.openCount + metrics.partialCount)} sub="Nach Bank- und Kassenprüfung tatsächlich offen oder teilbezahlt" theme={theme} />
+        <MetricCard label="Prüfbestand" value={metrics.reviewCount.toLocaleString(numberLocale)} sub="Noch nicht als bezahlt oder tatsächlich offen entschieden" theme={theme} />
         <MetricCard label={t("openItems.kpi.paid", locale)} value={String(metrics.paidCount)} sub={t("openItems.kpi.paidSub", locale)} green theme={theme} />
       </div>
 
@@ -351,8 +354,10 @@ export default function OffenePostenPage() {
         >
           <EmptyState
             icon={<Receipt size={20} />}
-            title={t("openItems.empty.title", locale)}
-            description={t("openItems.empty.desc", locale)}
+            title={listMode === "confirmed" ? "Keine bestätigten offenen Forderungen" : "Prüfbestand leer"}
+            description={listMode === "confirmed"
+              ? `${metrics.reviewCount.toLocaleString(numberLocale)} ungeklärte Datensätze befinden sich weiterhin im Prüfbestand. Das bedeutet nicht, dass sie bezahlt sind.`
+              : "Alle Datensätze wurden abschließend geprüft."}
           />
         </div>
       ) : (

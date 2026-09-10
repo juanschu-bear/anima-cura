@@ -740,6 +740,8 @@ async function main() {
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(),
     openItems: items.length,
+    openStatusItems: items.filter((item) => item.status === "offen").length,
+    partialStatusItems: items.filter((item) => item.status === "teilbezahlt").length,
     openAmount: Number(items.reduce((sum, item) => sum + Number(item.offen || 0), 0).toFixed(2)),
     openItemsWithinBankHistory: withinBankHistory.length,
     openItemsBeforeBankHistory: beforeBankHistory.length,
