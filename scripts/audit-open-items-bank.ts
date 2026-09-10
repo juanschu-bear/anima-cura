@@ -51,12 +51,18 @@ function alreadyApplied(tx: Row) {
   );
 }
 
+function fullReference(text: string | null) {
+  const match = String(text || "").match(/(\d{8})\s*-\s*(\d+)\s*[/.]\s*(\d)\s*(\d)\s*(\d)\s*(\d)(?:\s*-\s*(\d+))?/);
+  return match ? `${match[1]}-${match[2]}/${match[3]}${match[4]}${match[5]}${match[6]}${match[7] ? `-${match[7]}` : ""}` : null;
+}
+
 async function main() {
   const apply = process.argv.includes("--apply");
+  const applyCash = process.argv.includes("--apply-cash");
   const [items, transactions, cash] = await Promise.all([
     fetchAll(
       "offene_posten",
-      "id, patient_id, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status",
+      "id, patient_id, basis_nr, rechnung_nr, unser_zeichen, rechnung_datum, betrag, gezahlt, offen, status",
       (query) => query.in("status", ["offen", "teilbezahlt"]).order("rechnung_datum")
     ),
     fetchAll(
@@ -69,9 +75,11 @@ async function main() {
 
   const byInvoice = new Map<string, Row[]>();
   const byPatient = new Map<string, Row[]>();
+  const byFullReference = new Map<string, Row[]>();
   for (const item of items) {
     if (item.rechnung_nr) byInvoice.set(item.rechnung_nr, [...(byInvoice.get(item.rechnung_nr) || []), item]);
     if (item.patient_id) byPatient.set(item.patient_id, [...(byPatient.get(item.patient_id) || []), item]);
+    if (item.unser_zeichen) byFullReference.set(item.unser_zeichen, [...(byFullReference.get(item.unser_zeichen) || []), item]);
   }
 
   const unused = transactions.filter((tx) => !alreadyApplied(tx));
@@ -126,6 +134,16 @@ async function main() {
     Number(tx.matching_score || 0) >= 95 &&
     !tx.matched_rate_id
   );
+  const patientAmountDoubleEvidence = patientAmountStrong.filter(({ tx, item }) => {
+    const purpose = String(tx.verwendungszweck || "").replace(/\s*([-/])\s*/g, "$1");
+    const method = String(tx.matching_details?.methode || "");
+    if (method === "basisnummer") {
+      return Boolean(item.basis_nr && tokens(purpose, /(?:^|\D)(\d{8})(?=\D|$)/g).includes(item.basis_nr));
+    }
+    if (method === "referenz") return Boolean(item.unser_zeichen && purpose.includes(item.unser_zeichen));
+    if (method === "rechnungsnr") return Boolean(item.rechnung_nr && purpose.includes(item.rechnung_nr));
+    return false;
+  });
   const openItemById = new Map(items.map((item) => [item.id, item]));
   const directCashMatches = cash.filter((payment) => payment.posten_id && openItemById.has(payment.posten_id));
   const uniqueCashPatientAmount = cash.flatMap((payment) => {
@@ -135,6 +153,16 @@ async function main() {
     );
     return matches.length === 1 ? [{ payment, item: matches[0] }] : [];
   });
+  const strictReferenceGroups = new Map<string, { item: Row; transactions: Row[] }>();
+  for (const tx of unused) {
+    const reference = fullReference(tx.verwendungszweck);
+    const matches = reference ? byFullReference.get(reference) || [] : [];
+    if (matches.length !== 1) continue;
+    const group = strictReferenceGroups.get(matches[0].id) || { item: matches[0], transactions: [] };
+    group.transactions.push(tx);
+    strictReferenceGroups.set(matches[0].id, group);
+  }
+  const strictReferenceSummary = Array.from(strictReferenceGroups.values());
 
   let applied = 0;
   if (apply) {
@@ -194,6 +222,40 @@ async function main() {
     console.error(`Backup: ${backupPath}`);
   }
 
+  let appliedCash = 0;
+  if (applyCash) {
+    for (const { payment, item } of uniqueCashPatientAmount) {
+      const cashBase = String(payment.zeichen || "").match(/\d{8}/)?.[0] || null;
+      if (!cashBase || cashBase !== item.basis_nr || payment.abgleich_status !== "offen" || payment.posten_id) continue;
+      const { data: updatedItems, error: itemError } = await db
+        .from("offene_posten")
+        .update({
+          offen: 0,
+          gezahlt: Number((Number(item.gezahlt || 0) + Number(payment.betrag)).toFixed(2)),
+          status: "bezahlt",
+          bezahlt_am: payment.kassen_datum,
+        })
+        .eq("id", item.id)
+        .eq("offen", item.offen)
+        .in("status", ["offen", "teilbezahlt"])
+        .select("id");
+      if (itemError || updatedItems?.length !== 1) {
+        throw new Error(`Kassen-Posten ${item.id} konnte nicht exklusiv aktualisiert werden`);
+      }
+      const { data: updatedCash, error: cashError } = await db
+        .from("kassen_zahlungen")
+        .update({ posten_id: item.id, abgleich_status: "abgeglichen", eingang_am: new Date().toISOString(), eingang_typ: "bar" })
+        .eq("id", payment.id)
+        .eq("abgleich_status", "offen")
+        .is("posten_id", null)
+        .select("id");
+      if (cashError || updatedCash?.length !== 1) {
+        throw new Error(`Kassenzahlung ${payment.id} konnte nicht markiert werden`);
+      }
+      appliedCash += 1;
+    }
+  }
+
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(),
     openItems: items.length,
@@ -204,8 +266,14 @@ async function main() {
     directCashMatchesToOpenItems: directCashMatches.length,
     uniqueCashPatientAndAmountMatches: uniqueCashPatientAmount.length,
     uniqueInvoiceNumberCandidates: invoiceCandidates.length,
+    strictReferenceItems: strictReferenceSummary.length,
+    strictReferenceTransactions: strictReferenceSummary.reduce((sum, group) => sum + group.transactions.length, 0),
+    strictReferenceOverpaymentGroups: strictReferenceSummary.filter((group) =>
+      cents(group.transactions.reduce((sum, tx) => sum + Number(tx.betrag), 0)) > cents(group.item.offen)
+    ).length,
     uniquePatientAndExactAmountCandidates: patientAmountCandidates.length,
     patientAndExactAmountScore95WithoutRate: patientAmountStrong.length,
+    patientAmountWithExplicitReferenceAndExactAmount: patientAmountDoubleEvidence.length,
     patientAmountMethods: Object.fromEntries(Object.entries(patientAmountStrong.reduce((counts, { tx }) => {
       const method = String(tx.matching_details?.methode || "unbekannt");
       counts[method] = (counts[method] || 0) + 1;
@@ -215,6 +283,7 @@ async function main() {
     safeOneToOneCandidates: oneToOne.length,
     safeOneToOneTotal: oneToOne.reduce((sum, row) => sum + Number(row.tx.betrag), 0),
     applied,
+    appliedCash,
     safeCandidateSample: safe.slice(0, 20).map(({ tx, item, evidence }) => ({
       txId: tx.id,
       datum: tx.datum,
@@ -228,6 +297,32 @@ async function main() {
       itemCandidateCount: itemMultiplicity.get(item.id),
     })),
     cashColumns: Object.keys(cash[0] || {}).sort(),
+    cashPatientAmountSample: uniqueCashPatientAmount.slice(0, 10).map(({ payment, item }) => ({
+      cashId: payment.id,
+      datum: payment.kassen_datum,
+      betrag: payment.betrag,
+      zeichen: payment.zeichen,
+      zweck: payment.zweck,
+      abgleichStatus: payment.abgleich_status,
+      transaktionId: payment.transaktion_id,
+      postenId: item.id,
+      unserZeichen: item.unser_zeichen,
+      rechnung: item.rechnung_nr,
+      rechnungsdatum: item.rechnung_datum,
+      offen: item.offen,
+    })),
+    patientAmountDoubleEvidenceSample: patientAmountDoubleEvidence.slice(0, 20).map(({ tx, item }) => ({
+      txId: tx.id,
+      datum: tx.datum,
+      zahlung: tx.betrag,
+      zweck: tx.verwendungszweck,
+      methode: tx.matching_details?.methode,
+      postenId: item.id,
+      unserZeichen: item.unser_zeichen,
+      rechnung: item.rechnung_nr,
+      rechnungsdatum: item.rechnung_datum,
+      offen: item.offen,
+    })),
     sample: oneToOne.slice(0, 20).map(({ tx, item, evidence }) => ({
       txId: tx.id,
       datum: tx.datum,

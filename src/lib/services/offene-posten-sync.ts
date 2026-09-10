@@ -57,12 +57,16 @@ function cents(n: number): number {
 }
 
 function hasRepairMarker(details: Record<string, unknown> | null | undefined): boolean {
-  return Boolean(details && typeof details === "object" && details.referenz_repair_applied_at);
+  return Boolean(details && typeof details === "object" && (
+    details.referenz_repair_applied_at ||
+    details.invoice_repair_applied_at ||
+    details.open_item_sync_applied_at ||
+    details.booking_applied_at
+  ));
 }
 
 function hasExactReference(purpose: string | null): boolean {
-  if (!purpose) return false;
-  return /\b\d{8}-\d+\/\d{4}(?:-\d+)?\b/.test(purpose.replace(/\s*([-/])\s*/g, "$1"));
+  return Boolean(purpose && extractUnserZeichen(purpose).full);
 }
 
 async function fetchAllCandidates(db: DatabaseClient): Promise<TxRow[]> {
@@ -216,6 +220,7 @@ export async function syncOpenItemsByReference(options: {
     skippedAlreadyRepaired: 0,
     matchedByExactReference: 0,
     unmatchedAfterStrictReference: 0,
+    skippedWouldOverpay: 0,
     updatedOpenItems: 0,
     sampleApplied: [] as Array<Record<string, unknown>>,
     sampleUnmatched: [] as Array<Record<string, unknown>>,
@@ -244,6 +249,24 @@ export async function syncOpenItemsByReference(options: {
           referenz: token.full,
           status: tx.matching_status,
           verwendungszweck: tx.verwendungszweck,
+        });
+      }
+      continue;
+    }
+
+    // Eine Ueberzahlung beweist nur die angegebene Rechnung. Sie darf nicht
+    // automatisch auf andere offene Rechnungen desselben Patienten verteilt
+    // werden; solche Faelle bleiben zur Guthabenpruefung offen.
+    if (ref.ueberzahlung > 0) {
+      summary.skippedWouldOverpay += 1;
+      if (summary.sampleUnmatched.length < 10) {
+        summary.sampleUnmatched.push({
+          txId: tx.id,
+          datum: tx.datum,
+          betrag: tx.betrag,
+          referenz: ref.details.referenz,
+          offen: posten.offen,
+          grund: "ueberzahlung_manuell_pruefen",
         });
       }
       continue;
