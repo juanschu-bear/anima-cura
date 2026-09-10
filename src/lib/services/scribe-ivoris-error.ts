@@ -41,6 +41,11 @@ export function isIvorisServiceOutage(error: string | null | undefined) {
     /fetch failed|network|timeout|timed out|econnreset|econnrefused|socket hang up/i.test(text);
 }
 
+export function isScribePatientNotFoundError(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error ?? "");
+  return /AddEntry fehlgeschlagen \(400\)/i.test(text) && /patient.+could not be found/i.test(text);
+}
+
 const RETRY_BACKOFF_MINUTES = [5, 30, 120, 720, 2880] as const;
 
 export function buildScribeRetryFailurePatch(

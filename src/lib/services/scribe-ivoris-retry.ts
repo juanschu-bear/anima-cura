@@ -1,11 +1,16 @@
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
-import { repairDokuPatientIvorisLink, type PatientIdentity } from "@/lib/services/patient-ivoris-link";
+import {
+  recoverStalePatientIvorisLink,
+  repairDokuPatientIvorisLink,
+  type PatientIdentity,
+} from "@/lib/services/patient-ivoris-link";
 import {
   buildScribeRetryFailurePatch,
   classifyScribeIvorisError,
   isAutomaticScribeIvorisRetry,
   isIvorisServiceOutage,
+  isScribePatientNotFoundError,
 } from "@/lib/services/scribe-ivoris-error";
 
 type DbClient = ReturnType<typeof createServerClient>;
@@ -150,12 +155,29 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
     const text = `${prefix}${(eintrag.text as string) ?? ""}${kuerzel}`;
 
     try {
-      const result = await addIvorisKarteiEintrag({
-        patientIvorisId: patient.ivoris_id,
+      const entryPayload = {
         date: String(eintrag.termin_datum),
         text,
         tooth: zaehne.length === 1 ? zaehne[0] : undefined,
-      });
+      };
+      let result;
+      try {
+        result = await addIvorisKarteiEintrag({
+          patientIvorisId: patient.ivoris_id,
+          ...entryPayload,
+        });
+      } catch (error) {
+        if (!isScribePatientNotFoundError(error)) throw error;
+        const recoveredPatient = await recoverStalePatientIvorisLink(db, patient);
+        if (!recoveredPatient.ivoris_id || recoveredPatient.ivoris_id === patient.ivoris_id) {
+          throw error;
+        }
+        patient = recoveredPatient;
+        result = await addIvorisKarteiEintrag({
+          patientIvorisId: recoveredPatient.ivoris_id,
+          ...entryPayload,
+        });
+      }
 
       const { error: updError } = await db
         .from("doku_eintraege")

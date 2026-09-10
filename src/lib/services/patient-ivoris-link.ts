@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/db/supabase";
+import { searchIvorisPatients } from "@/lib/api/ivoris-client";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -66,4 +67,58 @@ export async function repairDokuPatientIvorisLink(
   }
 
   return canonical;
+}
+
+function asText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function selectUniqueRemoteIvorisIdentityCandidate(
+  patient: PatientIdentity,
+  candidates: Array<Record<string, unknown>>
+): string | null {
+  const ids = candidates
+    .filter((candidate) => {
+      const birthday = asText(candidate.Birthday ?? candidate.birthday).slice(0, 10);
+      const firstname = asText(candidate.Firstname ?? candidate.firstname ?? candidate.FirstName);
+      const lastname = asText(candidate.Lastname ?? candidate.lastname ?? candidate.LastName);
+      return (
+        birthday === patient.geburtsdatum.slice(0, 10) &&
+        normalizePersonToken(firstname) === normalizePersonToken(patient.vorname) &&
+        normalizePersonToken(lastname) === normalizePersonToken(patient.nachname)
+      );
+    })
+    .map((candidate) => asText(candidate.Id ?? candidate.id))
+    .filter(Boolean);
+  const uniqueIds = Array.from(new Set(ids));
+  return uniqueIds.length === 1 ? uniqueIds[0] : null;
+}
+
+export async function recoverStalePatientIvorisLink(
+  db: DbClient,
+  patient: PatientIdentity
+): Promise<PatientIdentity> {
+  const payload = await searchIvorisPatients({
+    firstname: patient.vorname,
+    lastname: patient.nachname,
+    birthday: patient.geburtsdatum.slice(0, 10),
+  });
+  const recoveredId = selectUniqueRemoteIvorisIdentityCandidate(
+    patient,
+    Array.isArray(payload)
+      ? payload.filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
+      : []
+  );
+
+  if (!recoveredId || recoveredId === patient.ivoris_id) return patient;
+
+  const query = db.from("patients").update({ ivoris_id: recoveredId }).eq("id", patient.id);
+  const { error } = patient.ivoris_id
+    ? await query.eq("ivoris_id", patient.ivoris_id)
+    : await query.is("ivoris_id", null);
+  if (error) {
+    throw new Error(`Wiedergefundene IVORIS-ID konnte nicht gespeichert werden: ${error.message}`);
+  }
+
+  return { ...patient, ivoris_id: recoveredId };
 }
