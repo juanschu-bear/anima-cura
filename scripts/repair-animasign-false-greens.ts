@@ -3,7 +3,30 @@ import { createServerClient } from "@/lib/db/supabase";
 type RepairSummary = {
   falseGreensRequeued: string[];
   legacyDocumentStatesRequeued: string[];
+  stalePatientFailureFlagsCleared: string[];
+  staleDocumentFailureFlagsCleared: string[];
 };
+
+async function collectStaleSuccessfulFailureFlags(
+  syncedColumn: "ivoris_synced" | "ivoris_doc_synced",
+  permanentColumn:
+    | "ivoris_sync_failed_permanently"
+    | "ivoris_doc_failed_permanently"
+) {
+  const db = createServerClient();
+  const { data, error } = await db
+    .from("anamnese_submissions")
+    .select("id")
+    .eq(syncedColumn, true)
+    .eq(permanentColumn, true)
+    .limit(500);
+
+  if (error) {
+    throw new Error(`Veraltete Erfolgskennzeichen konnten nicht geladen werden: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => row.id);
+}
 
 async function collectFalseGreenSubmissionIds() {
   const db = createServerClient();
@@ -79,7 +102,49 @@ async function main() {
   const summary: RepairSummary = {
     falseGreensRequeued: await collectFalseGreenSubmissionIds(),
     legacyDocumentStatesRequeued: await collectLegacyDocumentStateIds(),
+    stalePatientFailureFlagsCleared: await collectStaleSuccessfulFailureFlags(
+      "ivoris_synced",
+      "ivoris_sync_failed_permanently"
+    ),
+    staleDocumentFailureFlagsCleared: await collectStaleSuccessfulFailureFlags(
+      "ivoris_doc_synced",
+      "ivoris_doc_failed_permanently"
+    ),
   };
+
+  if (summary.stalePatientFailureFlagsCleared.length > 0) {
+    const { error } = await db
+      .from("anamnese_submissions")
+      .update({
+        ivoris_sync_failed_permanently: false,
+        ivoris_sync_retry_count: 0,
+        ivoris_sync_next_retry_at: null,
+        ivoris_patient_error: null,
+      })
+      .in("id", summary.stalePatientFailureFlagsCleared)
+      .eq("ivoris_synced", true);
+
+    if (error) {
+      throw new Error(`Veraltete Patienten-Fehlerkennzeichen konnten nicht bereinigt werden: ${error.message}`);
+    }
+  }
+
+  if (summary.staleDocumentFailureFlagsCleared.length > 0) {
+    const { error } = await db
+      .from("anamnese_submissions")
+      .update({
+        ivoris_doc_failed_permanently: false,
+        ivoris_doc_retry_count: 0,
+        ivoris_doc_next_retry_at: null,
+        ivoris_document_error: null,
+      })
+      .in("id", summary.staleDocumentFailureFlagsCleared)
+      .eq("ivoris_doc_synced", true);
+
+    if (error) {
+      throw new Error(`Veraltete Dokument-Fehlerkennzeichen konnten nicht bereinigt werden: ${error.message}`);
+    }
+  }
 
   if (summary.falseGreensRequeued.length > 0) {
     const { error } = await db
@@ -121,6 +186,8 @@ async function main() {
         updated: {
           falseGreens: summary.falseGreensRequeued.length,
           legacyDocumentStates: summary.legacyDocumentStatesRequeued.length,
+          stalePatientFailureFlags: summary.stalePatientFailureFlagsCleared.length,
+          staleDocumentFailureFlags: summary.staleDocumentFailureFlagsCleared.length,
         },
         ids: summary,
       },
