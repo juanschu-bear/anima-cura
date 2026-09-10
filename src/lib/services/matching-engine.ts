@@ -92,16 +92,23 @@ async function loadMatchingConfig(db: ReturnType<typeof createServerClient>): Pr
 }
 
 async function loadPatientCandidates(db: ReturnType<typeof createServerClient>): Promise<PatientCandidate[]> {
-  const { data: patienten } = await db
-    .from("patients")
-    .select(`
-      id, ivoris_nummer, vorname, nachname, email,
-      raten!inner (
-        id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag
-      )
-    `)
-    .in("raten.status", ["offen", "teilbezahlt", "überfällig"])
-    .order("faellig_am", { referencedTable: "raten", ascending: true });
+  const [{ data: patienten }, { data: offeneRaten }] = await Promise.all([
+    db.from("patients").select("id, ivoris_nummer, vorname, nachname, email"),
+    db
+      .from("raten")
+      .select("id, patient_id, rate_nummer, betrag, faellig_am, status, ratenplan_id, bezahlt_betrag")
+      .in("status", ["offen", "teilbezahlt", "überfällig"])
+      .order("faellig_am", { ascending: true }),
+  ]);
+
+  const ratenByPatient = new Map<string, RateCandidate[]>();
+  for (const rate of offeneRaten ?? []) {
+    const patientId = (rate as { patient_id?: string | null }).patient_id;
+    if (!patientId) continue;
+    const rates = ratenByPatient.get(patientId) ?? [];
+    rates.push(rate as RateCandidate);
+    ratenByPatient.set(patientId, rates);
+  }
 
   return (patienten ?? [])
     .filter((patient) => !isBlockedPatientName(patient.vorname, patient.nachname))
@@ -111,7 +118,7 @@ async function loadPatientCandidates(db: ReturnType<typeof createServerClient>):
       vorname: patient.vorname,
       nachname: patient.nachname,
       normalizedNachname: normalizeMatchText(patient.nachname || ""),
-      raten: ((patient as { raten?: RateCandidate[] }).raten ?? []).map((rate) => ({
+      raten: (ratenByPatient.get(patient.id) ?? []).map((rate) => ({
         id: rate.id,
         rate_nummer: rate.rate_nummer,
         betrag: rate.status === "teilbezahlt"
@@ -226,11 +233,11 @@ export function matchTransaction(
         return a.rate_nummer - b.rate_nummer;
       }).find(Boolean);
 
-      if (patient.id && rate?.id) {
-        const betragMatch = Math.abs(transaktion.betrag - rate.betrag) < 0.01;
+      if (patient.id) {
+        const betragMatch = rate ? Math.abs(transaktion.betrag - rate.betrag) < 0.01 : false;
         return {
           patient_id: patient.id,
-          rate_id: rate.id,
+          rate_id: rate?.id ?? null,
           score: betragMatch ? 100 : 96,
           status: "auto",
           details: {

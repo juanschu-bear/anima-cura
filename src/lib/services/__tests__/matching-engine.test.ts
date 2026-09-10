@@ -184,3 +184,52 @@ test("uses patient number for auto-match even when the amount covers more than o
   assert.equal(result.details.methode, "basisnummer");
   assert.equal(result.details.betrag_match, false);
 });
+
+test("unique patient number wins even when that patient has no open rate", () => {
+  const ibanHistory = new Map<string, Set<string>>([
+    ["DE001234", new Set(["family-member"])],
+  ]);
+  const result = matchTransaction(
+    {
+      absender_name: "Familie Datchenko",
+      absender_iban: "DE001234",
+      betrag: 50,
+      verwendungszweck: "00005467 Rechn in Raten Oleh",
+    },
+    [
+      {
+        id: "intended-patient",
+        ivoris_nummer: "00005467",
+        vorname: "Oleh",
+        nachname: "Datchenko",
+        normalizedNachname: "DATCHENKO",
+        raten: [],
+      },
+      {
+        id: "family-member",
+        ivoris_nummer: "00005724",
+        vorname: "Olena",
+        nachname: "Datchenko",
+        normalizedNachname: "DATCHENKO",
+        raten: [
+          {
+            id: "wrong-rate",
+            rate_nummer: 1,
+            betrag: 50,
+            faellig_am: "2026-07-01",
+            status: "offen",
+            ratenplan_id: "wrong-plan",
+          },
+        ],
+      },
+    ],
+    ibanHistory,
+    config
+  );
+
+  assert.equal(result.status, "auto");
+  assert.equal(result.patient_id, "intended-patient");
+  assert.equal(result.rate_id, null);
+  assert.equal(result.score, 96);
+  assert.equal(result.details.methode, "basisnummer");
+});
