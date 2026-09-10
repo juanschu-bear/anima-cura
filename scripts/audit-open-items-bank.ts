@@ -108,7 +108,7 @@ async function main() {
       (query) => query.gt("betrag", 0).order("datum").order("id")
     ),
     fetchAll("kassen_zahlungen", "*"),
-    fetchAll("patients", "id, ivoris_nummer, vorname, nachname"),
+    fetchAll("patients", "id, ivoris_nummer, vorname, nachname, guthaben"),
     fetchAll("raten", "id, patient_id, betrag, bezahlt_betrag, status, transaktion_id, bezahlt_am")
   ]);
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
@@ -367,14 +367,17 @@ async function main() {
       .map((value) => value.trim())
       .filter(Boolean)
   );
+  const includeCurrentYearEvidence = process.argv.includes("--current-year-evidence");
   const requestedItemEvidence = allItems.filter((item) =>
-    requestedReferences.has(item.unser_zeichen) || requestedReferences.has(item.rechnung_nr)
+    requestedReferences.has(item.unser_zeichen) || requestedReferences.has(item.rechnung_nr) ||
+    (includeCurrentYearEvidence && String(item.rechnung_datum || "").startsWith("2026-") && ["offen", "teilbezahlt"].includes(item.status))
   ).map((item) => {
     const itemPatient = item.patient_id ? patientById.get(item.patient_id) : null;
     const firstName = normalizedText(itemPatient?.vorname || String(item.patient_name || "").split(",")[1]);
     const lastName = normalizedText(itemPatient?.nachname || String(item.patient_name || "").split(",")[0]);
+    const evidenceStart = includeCurrentYearEvidence ? "2026-01-01" : item.rechnung_datum;
     const evidence = transactions.flatMap((tx) => {
-      if (tx.datum < item.rechnung_datum) return [];
+      if (tx.datum < evidenceStart) return [];
       const bankText = normalizedText(`${tx.absender_name || ""} ${tx.verwendungszweck || ""}`);
       const reference = fullReference(tx.verwendungszweck);
       const invoiceMatch = invoiceNumberTokens(tx.verwendungszweck).includes(item.rechnung_nr);
@@ -402,6 +405,7 @@ async function main() {
         alreadyApplied: alreadyApplied(tx),
         matchingDetails: tx.matching_details,
         reasons: {
+          parsedReference: reference,
           exactReference: reference === item.unser_zeichen,
           invoiceNumber: invoiceMatch,
           patientBase: Boolean(baseMention),
@@ -412,7 +416,7 @@ async function main() {
       }];
     });
     const cashEvidence = cash.filter((payment) =>
-      payment.patient_id === item.patient_id && payment.kassen_datum >= item.rechnung_datum
+      payment.patient_id === item.patient_id && payment.kassen_datum >= evidenceStart
     );
     const patientItems = item.patient_id
       ? allItems.filter((candidate) => candidate.patient_id === item.patient_id)
