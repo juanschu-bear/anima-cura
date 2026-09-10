@@ -858,7 +858,8 @@ export async function applyReferenceMatch(
   txId: string,
   tx: { datum: string },
   ref: ReferenceResult,
-  existingDetails?: Record<string, unknown> | null
+  existingDetails?: Record<string, unknown> | null,
+  options: { overpaymentMode?: "allocate" | "credit" } = {}
 ): Promise<void> {
   const { data: updatedItems, error: itemError } = await db.from("offene_posten").update({
     status: ref.posten_update.status,
@@ -885,7 +886,24 @@ export async function applyReferenceMatch(
   }
 
   if (ref.ueberzahlung > 0) {
-    await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
+    if (options.overpaymentMode === "credit" && ref.patient_id) {
+      const { data: patient, error: patientError } = await db
+        .from("patients")
+        .select("guthaben")
+        .eq("id", ref.patient_id)
+        .single();
+      if (patientError) throw patientError;
+      const { data: updatedPatients, error: creditError } = await db
+        .from("patients")
+        .update({ guthaben: Number(patient?.guthaben || 0) + ref.ueberzahlung })
+        .eq("id", ref.patient_id)
+        .select("id");
+      if (creditError || updatedPatients?.length !== 1) {
+        throw new Error(`Ueberzahlung konnte nicht als Guthaben gesichert werden: ${creditError?.message ?? "kein Patient"}`);
+      }
+    } else {
+      await applyUeberzahlung(db, ref.patient_id, ref.ueberzahlung, ref.posten_id, tx.datum);
+    }
   }
 }
 

@@ -221,6 +221,7 @@ export async function syncOpenItemsByReference(options: {
     matchedByExactReference: 0,
     unmatchedAfterStrictReference: 0,
     skippedWouldOverpay: 0,
+    overpaymentsCredited: 0,
     updatedOpenItems: 0,
     sampleApplied: [] as Array<Record<string, unknown>>,
     sampleUnmatched: [] as Array<Record<string, unknown>>,
@@ -257,7 +258,7 @@ export async function syncOpenItemsByReference(options: {
     // Eine Ueberzahlung beweist nur die angegebene Rechnung. Sie darf nicht
     // automatisch auf andere offene Rechnungen desselben Patienten verteilt
     // werden; solche Faelle bleiben zur Guthabenpruefung offen.
-    if (ref.ueberzahlung > 0) {
+    if (ref.ueberzahlung > 0 && !ref.patient_id) {
       summary.skippedWouldOverpay += 1;
       if (summary.sampleUnmatched.length < 10) {
         summary.sampleUnmatched.push({
@@ -314,8 +315,16 @@ export async function syncOpenItemsByReference(options: {
         referenz_repair_mode: "apply",
       };
 
-      await applyReferenceMatch(db, item.tx.id, { datum: item.tx.datum }, item.ref, nextDetails);
+      await applyReferenceMatch(
+        db,
+        item.tx.id,
+        { datum: item.tx.datum },
+        item.ref,
+        nextDetails,
+        { overpaymentMode: "credit" }
+      );
       summary.updatedOpenItems += 1;
+      if (item.ref.ueberzahlung > 0) summary.overpaymentsCredited += 1;
 
       const key = item.ref.details.referenz || "";
       if (!key) continue;

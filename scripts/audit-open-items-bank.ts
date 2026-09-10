@@ -271,6 +271,15 @@ async function main() {
     strictReferenceOverpaymentGroups: strictReferenceSummary.filter((group) =>
       cents(group.transactions.reduce((sum, tx) => sum + Number(tx.betrag), 0)) > cents(group.item.offen)
     ).length,
+    strictReferenceOverpaymentSample: strictReferenceSummary.filter((group) =>
+      cents(group.transactions.reduce((sum, tx) => sum + Number(tx.betrag), 0)) > cents(group.item.offen)
+    ).slice(0, 10).map((group) => ({
+      postenId: group.item.id,
+      patientId: group.item.patient_id,
+      referenz: group.item.unser_zeichen,
+      offen: group.item.offen,
+      zahlungen: group.transactions.map((tx) => ({ id: tx.id, datum: tx.datum, betrag: tx.betrag, zweck: tx.verwendungszweck })),
+    })),
     uniquePatientAndExactAmountCandidates: patientAmountCandidates.length,
     patientAndExactAmountScore95WithoutRate: patientAmountStrong.length,
     patientAmountWithExplicitReferenceAndExactAmount: patientAmountDoubleEvidence.length,
