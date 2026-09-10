@@ -59,6 +59,8 @@ function fullReference(text: string | null) {
 async function main() {
   const apply = process.argv.includes("--apply");
   const applyCash = process.argv.includes("--apply-cash");
+  const applyBasisAmount = process.argv.includes("--apply-basis-amount");
+  const applyInvoiceNumber = process.argv.includes("--apply-invoice-number");
   const [items, transactions, cash] = await Promise.all([
     fetchAll(
       "offene_posten",
@@ -143,6 +145,22 @@ async function main() {
     if (method === "referenz") return Boolean(item.unser_zeichen && purpose.includes(item.unser_zeichen));
     if (method === "rechnungsnr") return Boolean(item.rechnung_nr && purpose.includes(item.rechnung_nr));
     return false;
+  });
+  const safeBasisAndExactAmount = patientAmountStrong.filter(({ tx, item }) => {
+    if (tx.matching_details?.methode !== "basisnummer" || fullReference(tx.verwendungszweck)) return false;
+    const bases = tokens(tx.verwendungszweck, /(?:^|\D)(\d{8})(?=\D|$)/g);
+    return Boolean(item.basis_nr && bases.includes(item.basis_nr));
+  });
+  const safeSingleInvoiceCandidates = invoiceCandidates.filter(({ tx, item }) => {
+    const invoiceNumbers = Array.from(new Set(tokens(tx.verwendungszweck, /(?:^|\D)(00\d{6})(?=\D|$)/g)));
+    const explicitFull = fullReference(tx.verwendungszweck);
+    return invoiceNumbers.length === 1 &&
+      invoiceNumbers[0] === item.rechnung_nr &&
+      tx.matched_patient_id === item.patient_id &&
+      ["auto", "manuell"].includes(tx.matching_status) &&
+      Number(tx.matching_score || 0) >= 95 &&
+      !tx.matched_rate_id &&
+      (!explicitFull || explicitFull === item.unser_zeichen);
   });
   const openItemById = new Map(items.map((item) => [item.id, item]));
   const directCashMatches = cash.filter((payment) => payment.posten_id && openItemById.has(payment.posten_id));
@@ -255,6 +273,123 @@ async function main() {
       appliedCash += 1;
     }
   }
+  let appliedBasisAmount = 0;
+  if (applyBasisAmount) {
+    for (const { tx, item } of safeBasisAndExactAmount) {
+      const stamp = new Date().toISOString();
+      const { data: updatedItems, error: itemError } = await db
+        .from("offene_posten")
+        .update({
+          offen: 0,
+          gezahlt: Number((Number(item.gezahlt || 0) + Number(tx.betrag)).toFixed(2)),
+          status: "bezahlt",
+          bezahlt_am: tx.datum,
+        })
+        .eq("id", item.id)
+        .eq("offen", item.offen)
+        .in("status", ["offen", "teilbezahlt"])
+        .select("id");
+      if (itemError || updatedItems?.length !== 1) throw new Error(`Basisnummer-Posten ${item.id} konnte nicht aktualisiert werden`);
+      const { data: updatedTransactions, error: txError } = await db
+        .from("transaktionen")
+        .update({
+          matching_status: "auto",
+          matching_score: 100,
+          matched_patient_id: item.patient_id,
+          matching_details: {
+            ...(tx.matching_details || {}),
+            methode: "basisnummer_plus_exakter_betrag",
+            basisnummer: item.basis_nr,
+            basis_amount_repair_applied_at: stamp,
+            open_item_sync_applied_at: stamp,
+            open_item_sync_applied_amount: Number(tx.betrag),
+            open_item_sync_remaining_amount: 0,
+            open_item_sync_items: 1,
+          },
+          geprueft_am: stamp,
+        })
+        .eq("id", tx.id)
+        .select("id");
+      if (txError || updatedTransactions?.length !== 1) throw new Error(`Basisnummer-Zahlung ${tx.id} konnte nicht markiert werden`);
+      appliedBasisAmount += 1;
+    }
+  }
+  let appliedInvoiceTransactions = 0;
+  let appliedInvoiceItems = 0;
+  if (applyInvoiceNumber) {
+    const groups = new Map<string, { item: Row; transactions: Row[] }>();
+    for (const { tx, item } of safeSingleInvoiceCandidates) {
+      const group = groups.get(item.id) || { item, transactions: [] };
+      group.transactions.push(tx);
+      groups.set(item.id, group);
+    }
+    for (const { item, transactions: groupTransactions } of Array.from(groups.values())) {
+      groupTransactions.sort((left, right) => `${left.datum}-${left.id}`.localeCompare(`${right.datum}-${right.id}`));
+      const total = groupTransactions.reduce((sum, tx) => sum + Number(tx.betrag), 0);
+      const oldOpen = Number(item.offen || 0);
+      const appliedToInvoice = Math.min(total, oldOpen);
+      const excess = Number(Math.max(0, total - oldOpen).toFixed(2));
+      const nextOpen = Number(Math.max(0, oldOpen - total).toFixed(2));
+      const stamp = new Date().toISOString();
+      const { data: updatedItems, error: itemError } = await db
+        .from("offene_posten")
+        .update({
+          offen: nextOpen,
+          gezahlt: Number((Number(item.gezahlt || 0) + appliedToInvoice).toFixed(2)),
+          status: nextOpen === 0 ? "bezahlt" : "teilbezahlt",
+          bezahlt_am: nextOpen === 0 ? groupTransactions.at(-1)?.datum : null,
+        })
+        .eq("id", item.id)
+        .eq("offen", item.offen)
+        .in("status", ["offen", "teilbezahlt"])
+        .select("id");
+      if (itemError || updatedItems?.length !== 1) throw new Error(`Rechnungsnummer-Posten ${item.id} konnte nicht aktualisiert werden`);
+
+      if (excess > 0 && item.patient_id) {
+        const { data: patient, error: patientError } = await db.from("patients").select("guthaben").eq("id", item.patient_id).single();
+        if (patientError) throw patientError;
+        const { data: updatedPatient, error: creditError } = await db
+          .from("patients")
+          .update({ guthaben: Number(patient?.guthaben || 0) + excess })
+          .eq("id", item.patient_id)
+          .select("id");
+        if (creditError || updatedPatient?.length !== 1) throw new Error(`Rechnungsnummer-Ueberzahlung ${item.id} konnte nicht gesichert werden`);
+      }
+
+      let remainingInvoice = oldOpen;
+      for (const tx of groupTransactions) {
+        const amount = Number(tx.betrag);
+        const invoiceChunk = Math.min(remainingInvoice, amount);
+        const txExcess = Number(Math.max(0, amount - invoiceChunk).toFixed(2));
+        remainingInvoice = Math.max(0, remainingInvoice - invoiceChunk);
+        const { data: updatedTransactions, error: txError } = await db
+          .from("transaktionen")
+          .update({
+            matching_status: "auto",
+            matching_score: 100,
+            matched_patient_id: item.patient_id,
+            matching_details: {
+              ...(tx.matching_details || {}),
+              methode: "rechnungsnummer_eindeutig",
+              rechnung_nr: item.rechnung_nr,
+              invoice_repair_applied_at: stamp,
+              invoice_repair_applied_amount: invoiceChunk,
+              invoice_repair_excess_credit: txExcess,
+              open_item_sync_applied_at: stamp,
+              open_item_sync_applied_amount: invoiceChunk,
+              open_item_sync_remaining_amount: txExcess,
+              open_item_sync_items: 1,
+            },
+            geprueft_am: stamp,
+          })
+          .eq("id", tx.id)
+          .select("id");
+        if (txError || updatedTransactions?.length !== 1) throw new Error(`Rechnungsnummer-Zahlung ${tx.id} konnte nicht markiert werden`);
+        appliedInvoiceTransactions += 1;
+      }
+      appliedInvoiceItems += 1;
+    }
+  }
 
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(),
@@ -266,6 +401,21 @@ async function main() {
     directCashMatchesToOpenItems: directCashMatches.length,
     uniqueCashPatientAndAmountMatches: uniqueCashPatientAmount.length,
     uniqueInvoiceNumberCandidates: invoiceCandidates.length,
+    invoiceCandidateSample: invoiceCandidates.slice(0, 30).map(({ tx, item }) => ({
+      txId: tx.id,
+      datum: tx.datum,
+      zahlung: tx.betrag,
+      zweck: tx.verwendungszweck,
+      matchedPatientId: tx.matched_patient_id,
+      matchingStatus: tx.matching_status,
+      matchingScore: tx.matching_score,
+      postenId: item.id,
+      postenPatientId: item.patient_id,
+      rechnung: item.rechnung_nr,
+      offen: item.offen,
+      amountWithinOpen: cents(tx.betrag) <= cents(item.offen),
+      patientConsistent: !tx.matched_patient_id || !item.patient_id || tx.matched_patient_id === item.patient_id,
+    })),
     strictReferenceItems: strictReferenceSummary.length,
     strictReferenceTransactions: strictReferenceSummary.reduce((sum, group) => sum + group.transactions.length, 0),
     strictReferenceOverpaymentGroups: strictReferenceSummary.filter((group) =>
@@ -283,6 +433,8 @@ async function main() {
     uniquePatientAndExactAmountCandidates: patientAmountCandidates.length,
     patientAndExactAmountScore95WithoutRate: patientAmountStrong.length,
     patientAmountWithExplicitReferenceAndExactAmount: patientAmountDoubleEvidence.length,
+    safeBasisAndExactAmountWithoutConflictingFullReference: safeBasisAndExactAmount.length,
+    safeSingleInvoiceNumberCandidates: safeSingleInvoiceCandidates.length,
     patientAmountMethods: Object.fromEntries(Object.entries(patientAmountStrong.reduce((counts, { tx }) => {
       const method = String(tx.matching_details?.methode || "unbekannt");
       counts[method] = (counts[method] || 0) + 1;
@@ -293,6 +445,9 @@ async function main() {
     safeOneToOneTotal: oneToOne.reduce((sum, row) => sum + Number(row.tx.betrag), 0),
     applied,
     appliedCash,
+    appliedBasisAmount,
+    appliedInvoiceTransactions,
+    appliedInvoiceItems,
     safeCandidateSample: safe.slice(0, 20).map(({ tx, item, evidence }) => ({
       txId: tx.id,
       datum: tx.datum,
