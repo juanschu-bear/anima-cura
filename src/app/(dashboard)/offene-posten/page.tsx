@@ -214,10 +214,10 @@ export default function OffenePostenPage() {
         }}
       >
         <p className="text-sm font-semibold" style={{ color: theme === "dark" ? "#f3d06a" : "#8f6115" }}>
-          Ungeprüfter historischer Forderungsbestand – nicht kontaktfreigegeben
+          Historischer Forderungsbestand – bis zum Zahlungsabgleich nicht kontaktfreigegeben
         </p>
         <p className="mt-1 text-sm" style={{ color: "var(--ac-text-soft)" }}>
-          Die offenen Beträge stammen überwiegend aus dem IVORIS-Export vom 04.06.2026. Ein fehlender Banktreffer beweist keine offene Forderung. Vor Anruf, Erinnerung oder Mahnung sind ein aktueller IVORIS-Saldo und ein zweiter Zahlungsnachweis erforderlich.
+          Die offenen Beträge stammen überwiegend aus dem Import vom 04.06.2026. Ein fehlender automatischer Treffer beweist allein keine offene Forderung. Vor Anruf, Erinnerung oder Mahnung müssen Bank-, Kassen- und Patientenzuordnung abgeschlossen und nachvollziehbar dokumentiert sein.
         </p>
       </div>
 

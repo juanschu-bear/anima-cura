@@ -455,13 +455,17 @@ function isOpenItemSyncStamped(details: MatchingDetails | null | undefined) {
 export function extractUnserZeichen(verwendungszweck: string): { full: string | null; base: string | null } {
   if (!verwendungszweck) return { full: null, base: null };
   const norm = verwendungszweck.replace(/\s*([-/])\s*/g, "$1");
-  const m = norm.match(/(\d{8})\s*-\s*(\d+)\s*[/.]\s*(\d)\s*(\d)\s*(\d)\s*(\d)(?:\s*-\s*(\d+))?/);
+  const m = norm.match(/(\d{8})\s*-\s*(\d+)\s*[/.]\s*(\d)\s*(\d)\s*(\d)\s*(\d)(?:\s*-\s*(\d+))?/)
+    || norm.match(/(\d{8})[\s,;]+(\d+)[\s,;/.]+(\d)\s*(\d)\s*(\d)\s*(\d)(?:[\s,;-]+(\d+))?/)
+    || norm.match(/(\d{8})(\d)[\s,;/.]+(\d)\s*(\d)\s*(\d)\s*(\d)(?:[\s,;-]+(\d+))?/)
+    || norm.match(/(?<!\d)(\d{4,7})\s*-\s*(\d+)\s*[/.]\s*(\d)\s*(\d)\s*(\d)\s*(\d)(?:\s*-\s*(\d+))?/);
   if (m) {
+    const base = m[1].padStart(8, "0");
     const sequence = String(Number(m[2]));
     const suffix = m[7] ? String(Number(m[7])) : null;
     return {
-      full: `${m[1]}-${sequence}/${m[3]}${m[4]}${m[5]}${m[6]}${suffix ? `-${suffix}` : ""}`,
-      base: m[1],
+      full: `${base}-${sequence}/${m[3]}${m[4]}${m[5]}${m[6]}${suffix ? `-${suffix}` : ""}`,
+      base,
     };
   }
   const b = norm.match(/(?<!\d)(\d{8})(?!\d)/);

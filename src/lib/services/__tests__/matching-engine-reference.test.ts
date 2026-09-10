@@ -39,3 +39,24 @@ test("extractUnserZeichen normalizes leading zeroes in sequence and suffix", () 
     base: "00004521",
   });
 });
+
+test("extractUnserZeichen accepts space and comma separated references", () => {
+  assert.deepEqual(extractUnserZeichen("Zahlung 00004735 3 2025"), {
+    full: "00004735-3/2025",
+    base: "00004735",
+  });
+});
+
+test("extractUnserZeichen separates a glued sequence digit", () => {
+  assert.deepEqual(extractUnserZeichen("Zahlung 000047361 2025"), {
+    full: "00004736-1/2025",
+    base: "00004736",
+  });
+});
+
+test("extractUnserZeichen restores omitted leading base zeroes", () => {
+  assert.deepEqual(extractUnserZeichen("Zahlung 4865-4/2023-1"), {
+    full: "00004865-4/2023-1",
+    base: "00004865",
+  });
+});
