@@ -30,6 +30,16 @@ const repairs = [
   { itemId: "ebde9ad3-ff57-419b-99b0-7ce570ea488a", txId: "c3f2e9ee-72cd-46aa-b4a5-e7f213bb6a53", reference: "00006268-2/2025-1", amount: 15 },
   { itemId: "d39d1fa8-f9af-40f2-bc16-9fca8a79b754", txId: "8c55f405-f12e-4cef-bb80-db1902a819c1", reference: "00006795-3/2025", amount: 41.37 },
   { itemId: "f3422767-9ba1-47e0-bb3e-18f46e05e259", txId: "35940844-f843-463e-b02d-13ea0bc385d6", reference: "00003165-4/2025", amount: 13.98 },
+  { itemId: "f00c5c5d-704d-412d-a70e-dcf0ecd26e1d", txId: "dc50aef4-2f7c-4d29-a795-9fdc4d1a158c", reference: "00004740-2/2023-1", amount: 500.09 },
+  { itemId: "93b6f17f-0532-45c5-bd8e-856358da9312", txId: "8a2c6b66-6f81-44f1-8bc8-e3610149084d", reference: "00004741-2/2023-1", amount: 523.38 },
+  { itemId: "c3c8f311-dbd4-4e6d-82ce-b45710e75e0c", txId: "56042e11-2140-4520-a4cb-1a073c2b4dcd", reference: "00003804-1/2024-1", amount: 20.1 },
+  { itemId: "5cc5ce30-3b31-43ba-b835-f2a337e7ce5e", txId: "e0a31e93-ca75-4e0b-911e-2edabc486156", reference: "00005147-4/2024", amount: 22.77 },
+  { itemId: "6ce9f106-d0f1-4021-9046-a8917ed1b348", txId: "21483303-e4d3-4d91-a791-0da78eb05650", reference: "00004706-4/2024-1", amount: 432.42 },
+  { itemId: "d973afc8-c8be-4fc1-9c82-ea85703ea28a", txId: "5cec4eb3-449a-4029-83d4-c40e8259f152", reference: "00003804-2/2025-3", amount: 561.34 },
+  { itemId: "6936f1d6-290f-46d4-b654-69a8cdffc2fe", txId: "51ea747a-73aa-45a8-a019-ca9f779dfac0", reference: "00003804-2/2025-1", amount: 350.01 },
+  { itemId: "5d099ed0-8655-4954-aee0-8ed77fdeff4c", txId: "4560d857-1c8b-4045-a8d9-0bb2650087c4", reference: "00006160-2/2025-1", amount: 544.42 },
+  { itemId: "62e98191-9d36-4e18-9f84-10bd2cd27ab0", txId: "b3eedd5a-6d02-46b3-b7f0-1180f18636d6", reference: "00006406-4/2025", amount: 18.78 },
+  { itemId: "3e7280eb-a0af-42d0-8849-4d45824b27ba", txId: "1ee01877-5b96-4b30-bfae-83e132e87a96", reference: "00006631-4/2025", amount: 102.44 },
 ] as const;
 
 async function main() {
