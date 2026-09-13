@@ -44,6 +44,7 @@ export const DEFAULT_AUTH_USERS: DefaultAuthUser[] = [
 
 const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/uebersicht", roles: ["admin"] },
+  { path: "/animapay", roles: ["admin", "verwaltung"] },
   { path: "/zahlungen", roles: ["admin", "verwaltung"] },
   { path: "/kasse", roles: ["admin", "verwaltung"] },
   { path: "/patienten", roles: ["admin", "verwaltung", "lesezugriff"] },
@@ -63,7 +64,6 @@ const DASHBOARD_ROUTE_ACCESS: Array<{ path: string; roles: AppRole[] }> = [
   { path: "/import", roles: ["admin", "verwaltung"] },
   { path: "/einstellungen", roles: ["admin"] },
   { path: "/tagesplan", roles: ["admin", "verwaltung", "lesezugriff"] },
-  { path: "/finanzen", roles: ["admin"] },
   { path: "/finanzen", roles: ["admin"] },
 ];
 

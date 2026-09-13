@@ -10,12 +10,18 @@ type CookieMutation = {
 
 const DASHBOARD_MATCHERS = [
   "/uebersicht",
+  "/animapay",
+  "/finanzen",
   "/zahlungen",
+  "/kasse",
   "/patienten",
   "/ratenplan",
   "/mahnwesen",
   "/quartal",
   "/berichte",
+  "/rechnungen",
+  "/offene-posten",
+  "/intelligence",
   "/nachrichten",
   "/automatisierungen",
   "/import",
@@ -148,5 +154,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/zahlungen/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/nachrichten/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
+  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/animapay/:path*", "/finanzen/:path*", "/zahlungen/:path*", "/kasse/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/rechnungen/:path*", "/offene-posten/:path*", "/intelligence/:path*", "/nachrichten/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };

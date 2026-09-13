@@ -34,6 +34,10 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "patient-checkin-api.ts",
+    "patient-checkin-screen.tsx",
+    "sabine-tagesplan-dashboard.tsx",
+    "sabine-termin-eintragen.tsx"
   ]
 }

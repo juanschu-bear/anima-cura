@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { AlertTriangle,
   BarChart3,
   CalendarRange,
@@ -14,9 +14,11 @@ import { AlertTriangle,
   Brain,
   FolderKanban,
   Languages,
+  LayoutDashboard,
   LogOut,
   MessageSquare,
   Moon,
+  QrCode,
   Receipt,
   Search,
   Settings,
@@ -38,6 +40,11 @@ import AuthSessionManager from "@/components/auth/AuthSessionManager";
 import ICuraVoiceCompanion from "@/components/icura/ICuraVoiceCompanion";
 
 type NavItem = { href: string; icon: typeof CreditCard; key: string };
+
+const NAV_STANDALONE: NavItem[] = [
+  { href: "/uebersicht", icon: LayoutDashboard, key: "nav.overview" },
+  { href: "/animapay", icon: QrCode, key: "nav.animapay" },
+];
 
 const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
   {
@@ -124,6 +131,9 @@ export default function DashboardShell({
     day: "2-digit",
     month: "short",
   });
+  const visibleStandalone = NAV_STANDALONE.filter((item) =>
+    canAccessPath(activeUser.role, item.href, activeUser.permissions)
+  );
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => canAccessPath(activeUser.role, item.href, activeUser.permissions)),
@@ -228,6 +238,11 @@ export default function DashboardShell({
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+          {visibleStandalone.length > 0 && (
+            <div className="space-y-0.5 pb-2">
+              {visibleStandalone.map((item) => renderNavItem(item))}
+            </div>
+          )}
           {visibleGroups.map((group) => {
             const isOpen = openGroups[group.key] ?? true;
             return (
