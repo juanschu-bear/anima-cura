@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@/lib/db/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * /app/checkin/page.tsx
  *
- * Patient Check-in Screen fur AnimaHost.
+ * Patient Check-in Screen für AnimaHost.
  * Der Patient kommt hierher via:
  * - Push Notification (BLE Beacon / Geofencing)
  * - Direkter Link in der App
@@ -41,7 +42,7 @@ interface CheckinResult {
 type PageState = "loading" | "ready" | "no_termin" | "checked_in" | "error";
 
 export default function CheckinPage() {
-  const supabase = createBrowserClient();
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [state, setState] = useState<PageState>("loading");
   const [termin, setTermin] = useState<Termin | null>(null);
   const [aktionen, setAktionen] = useState<Aktionen | null>(null);
@@ -49,19 +50,24 @@ export default function CheckinPage() {
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    loadTermin();
+    setSupabase(createBrowserClient());
   }, []);
 
-  async function loadTermin() {
+  useEffect(() => {
+    if (!supabase) return;
+    void loadTermin(supabase);
+  }, [supabase]);
+
+  async function loadTermin(client: SupabaseClient) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await client.auth.getSession();
       if (!session) {
         window.location.href = "/login?redirect=/checkin";
         return;
       }
 
       // Patient-Profil holen
-      const { data: profile } = await supabase
+      const { data: profile } = await client
         .from("user_profiles")
         .select("patient_id, vorname, nachname")
         .eq("user_id", session.user.id)
@@ -76,7 +82,7 @@ export default function CheckinPage() {
 
       // Heutigen Termin prüfen
       const today = new Date().toISOString().split("T")[0];
-      const { data: termine } = await supabase
+      const { data: termine } = await client
         .from("tagesplan_termine")
         .select("*")
         .eq("patient_id", profile.patient_id)
@@ -87,7 +93,7 @@ export default function CheckinPage() {
 
       if (!termine || termine.length === 0) {
         // Vielleicht schon eingecheckt?
-        const { data: eingecheckt } = await supabase
+        const { data: eingecheckt } = await client
           .from("tagesplan_termine")
           .select("*")
           .eq("patient_id", profile.patient_id)
@@ -124,20 +130,11 @@ export default function CheckinPage() {
   }
 
   async function handleCheckin() {
-    if (!termin || checking) return;
+    if (!termin || checking || !supabase) return;
     setChecking(true);
 
     try {
-      const res = await fetch("/api/patient/checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: termin.id,
-          via: "qr_scan",
-        }),
-      });
-
-      // Patient-ID aus Profil holen fur den API Call
+      // Patient-ID aus Profil holen für den API Call
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
@@ -199,7 +196,7 @@ export default function CheckinPage() {
               {patientName ? `Hallo ${patientName}!` : "Hallo!"}
             </p>
             <p style={styles.text}>
-              Fur heute ist kein Termin hinterlegt.
+              Für heute ist kein Termin hinterlegt.
               Falls Sie einen Termin haben, melden Sie sich
               bitte an der Rezeption.
             </p>
@@ -288,7 +285,11 @@ export default function CheckinPage() {
               Bitte melden Sie sich an der Rezeption.
             </p>
             <button
-              onClick={() => { setState("loading"); loadTermin(); }}
+              onClick={() => {
+                if (!supabase) return;
+                setState("loading");
+                void loadTermin(supabase);
+              }}
               style={styles.retryButton}
             >
               Nochmal versuchen
@@ -301,7 +302,7 @@ export default function CheckinPage() {
 }
 
 // ============================================================
-// Inline Styles (kein Tailwind-Dependency fur PWA-Standalone)
+// Inline Styles (kein Tailwind-Dependency für PWA-Standalone)
 // ============================================================
 
 const styles: Record<string, React.CSSProperties> = {
