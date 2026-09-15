@@ -4,13 +4,14 @@ import { useMemo, useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Search, Users } from "lucide-react";
+import { Clock3, Plus, RefreshCw, Search, Users } from "lucide-react";
 import { usePatienten } from "@/hooks/useData";
 import { EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { isReadOnlyRole } from "@/lib/auth";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { parseRecentPatients, RECENT_PATIENTS_STORAGE_KEY, type RecentPatient } from "@/lib/patient-recents";
 
 function normalizePersonValue(value: string) {
   return value
@@ -47,6 +48,7 @@ export default function PatientenPage() {
   const isDark = theme === "dark";
   const readOnly = isReadOnlyRole(authUser?.role ?? "lesezugriff");
   const [search, setSearch] = useState("");
+  const [recentPatients, setRecentPatients] = useState<RecentPatient[]>([]);
 
   useEffect(() => {
     const stored = window.sessionStorage.getItem("ac-patient-search");
@@ -54,6 +56,7 @@ export default function PatientenPage() {
       setSearch(stored);
       window.sessionStorage.removeItem("ac-patient-search");
     }
+    setRecentPatients(parseRecentPatients(window.localStorage.getItem(RECENT_PATIENTS_STORAGE_KEY)));
   }, []);
 
   const [statusPopoverFor, setStatusPopoverFor] = useState<string | null>(null);
@@ -190,6 +193,31 @@ export default function PatientenPage() {
         <div className={`rounded-lg border px-4 py-3 text-sm ${isDark ? "border-white/6 bg-white/3 text-white/70" : "border-surface-200 bg-white text-praxis-600"}`}>
           {syncHint}
         </div>
+      )}
+
+      {!search && recentPatients.length > 0 && (
+        <section aria-labelledby="recent-patients-heading">
+          <div className="mb-2 flex items-center gap-2">
+            <Clock3 size={15} className="text-praxis-400" />
+            <h2 id="recent-patients-heading" className="text-sm font-semibold text-praxis-600">
+              {locale === "en" ? "Recently opened patients" : "Zuletzt aufgerufene Patienten"}
+            </h2>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {recentPatients.map((recent) => (
+              <Link
+                key={recent.id}
+                href={`/patienten/${recent.id}`}
+                className={`min-w-[210px] rounded-xl border px-3 py-2 transition-colors ${isDark ? "border-white/8 bg-white/3 hover:bg-white/6" : "border-surface-200 bg-white hover:bg-surface-50"}`}
+              >
+                <span className="block truncate text-sm font-semibold text-praxis-800">{recent.nachname}, {recent.vorname}</span>
+                <span className="mt-0.5 block text-xs text-praxis-400">
+                  {recent.geburtsdatum ? new Date(`${recent.geburtsdatum}T00:00:00`).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE") : (locale === "en" ? "Birth date unknown" : "Geburtsdatum unbekannt")}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="relative max-w-[420px]">

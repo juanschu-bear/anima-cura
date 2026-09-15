@@ -14,6 +14,7 @@ import { reconcileInstallments } from "@/lib/raten/reconciliation";
 import { resolveOpenItemAmount, resolveOpenItemStatus, resolvePaidItemAmount } from "@/lib/open-items";
 import { summarizePatientFinance } from "@/lib/patient-finance";
 import { buildReceiptPreviewHref } from "@/lib/kasse-receipt";
+import { addRecentPatient, parseRecentPatients, RECENT_PATIENTS_STORAGE_KEY } from "@/lib/patient-recents";
 
 const supabaseDetail = createBrowserClient();
 
@@ -32,6 +33,18 @@ export default function PatientDetailPage() {
   const [geldbewegungen, setGeldbewegungen] = useState<any[]>([]);
   const [bankZahlungen, setBankZahlungen] = useState<any[]>([]);
   const [offenePosten, setOffenePosten] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!patient?.id) return;
+    const recent = addRecentPatient(parseRecentPatients(window.localStorage.getItem(RECENT_PATIENTS_STORAGE_KEY)), {
+      id: patient.id,
+      vorname: patient.vorname || "",
+      nachname: patient.nachname || "",
+      geburtsdatum: patient.geburtsdatum || null,
+      viewedAt: new Date().toISOString(),
+    });
+    window.localStorage.setItem(RECENT_PATIENTS_STORAGE_KEY, JSON.stringify(recent));
+  }, [patient?.id, patient?.vorname, patient?.nachname, patient?.geburtsdatum]);
 
   useEffect(() => {
     const pid = params.id as string;
