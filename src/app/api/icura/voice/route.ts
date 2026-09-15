@@ -277,6 +277,7 @@ async function getPatientFinancialSnapshot(input: z.infer<typeof patientFinancia
       .from("offene_posten")
       .select("id, status, offen, gezahlt, betrag, typ, rechnung_datum, unser_zeichen")
       .eq("patient_id", patientId)
+      .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
       .order("rechnung_datum", { ascending: false })
       .limit(8),
     db

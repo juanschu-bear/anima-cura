@@ -13,6 +13,7 @@ export async function GET() {
     .from("offene_posten")
     .select("id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
     .eq("patient_id", patient.patientId)
+    .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
     .order("rechnung_datum", { ascending: false })
     .limit(20);
 

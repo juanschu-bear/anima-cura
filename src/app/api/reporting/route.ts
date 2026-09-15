@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
         .gt("betrag", 0)
         .neq("matching_status", "ignoriert"),
       sc.from("offene_posten")
-        .select("id, betrag, offen, gezahlt, status, patient_id, rechnung_datum, bezahlt_am, mahnstufe"),
+        .select("id, betrag, offen, gezahlt, status, patient_id, rechnung_datum, bezahlt_am, mahnstufe")
+        .or("nicht_mahnen.is.null,nicht_mahnen.eq.false"),
     ]);
 
     let bArr = bezahlt || [], fArr = faellig || [], uArr = ueberfaellig || [], mArr = mahnungen || [];

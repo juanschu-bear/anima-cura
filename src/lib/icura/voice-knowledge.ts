@@ -149,8 +149,8 @@ async function loadLiveFacts() {
   ] = await Promise.all([
     db.from("patients").select("*", { count: "exact", head: true }),
     db.from("transaktionen").select("*", { count: "exact", head: true }),
-    db.from("offene_posten").select("*", { count: "exact", head: true }).eq("status", "offen"),
-    db.from("offene_posten").select("*", { count: "exact", head: true }).eq("status", "teilbezahlt"),
+    db.from("offene_posten").select("*", { count: "exact", head: true }).eq("status", "offen").or("nicht_mahnen.is.null,nicht_mahnen.eq.false"),
+    db.from("offene_posten").select("*", { count: "exact", head: true }).eq("status", "teilbezahlt").or("nicht_mahnen.is.null,nicht_mahnen.eq.false"),
     db.from("offene_posten").select("*", { count: "exact", head: true }).eq("status", "bezahlt"),
     db.from("anamnese_submissions").select("*", { count: "exact", head: true }).eq("status", "signatur_ausstehend"),
     db.from("anamnese_submissions").select("*", { count: "exact", head: true }).eq("status", "signiert").gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),

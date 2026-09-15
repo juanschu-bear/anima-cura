@@ -11,6 +11,7 @@ type OpenItemLike = {
   offen?: number | null;
   gezahlt?: number | null;
   status?: string | null;
+  nicht_mahnen?: boolean | null;
 };
 
 export type PatientFinanceSummary = {
@@ -59,17 +60,21 @@ export function summarizeRates(rates: RateLike[]): PatientFinanceSummary {
 }
 
 export function summarizeOpenItems(items: OpenItemLike[]): PatientFinanceSummary {
-  const paidCount = items.filter((item) => resolveOpenItemStatus(item) === "bezahlt").length;
-  const partialCount = items.filter((item) => resolveOpenItemStatus(item) === "teilbezahlt").length;
-  const hasOverdue = items.some((item) => resolveOpenItemStatus(item) === "überfällig");
-  const restschuld = items.reduce((sum, item) => sum + resolveOpenItemAmount(item), 0);
-  const bezahltBetrag = items.reduce((sum, item) => sum + resolvePaidItemAmount(item), 0);
+  // `nicht_mahnen=true` marks imported/reconciled records that are still under
+  // review. They remain available to the matching engine, but must never be
+  // presented to staff or patients as an established debt.
+  const confirmedItems = items.filter((item) => item.nicht_mahnen !== true);
+  const paidCount = confirmedItems.filter((item) => resolveOpenItemStatus(item) === "bezahlt").length;
+  const partialCount = confirmedItems.filter((item) => resolveOpenItemStatus(item) === "teilbezahlt").length;
+  const hasOverdue = confirmedItems.some((item) => resolveOpenItemStatus(item) === "überfällig");
+  const restschuld = confirmedItems.reduce((sum, item) => sum + resolveOpenItemAmount(item), 0);
+  const bezahltBetrag = confirmedItems.reduce((sum, item) => sum + resolvePaidItemAmount(item), 0);
 
   return {
     source: "open_items",
     restschuld,
     bezahltBetrag,
-    totalCount: items.length,
+    totalCount: confirmedItems.length,
     paidCount,
     partialCount,
     hasOverdue,

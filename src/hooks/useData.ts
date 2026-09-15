@@ -127,6 +127,7 @@ export function usePatienten(search?: string) {
       supabase
         .from("offene_posten")
         .select("patient_id, betrag, offen, gezahlt, status")
+        .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
         .limit(10000),
     ]);
 

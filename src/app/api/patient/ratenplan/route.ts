@@ -89,6 +89,7 @@ export async function GET() {
         .from("offene_posten")
         .select("id, offen, status, rechnung_datum")
         .eq("patient_id", patient.patientId)
+        .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
         .in("status", ["offen", "teilbezahlt"]),
       supabase
         .from("transaktionen")
