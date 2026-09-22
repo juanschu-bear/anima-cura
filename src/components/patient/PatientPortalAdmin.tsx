@@ -36,7 +36,14 @@ const phaseStatuses = [
 const docTypes = patientDocumentTypeOptions;
 
 export default function PatientPortalAdmin({ patientId, patientName }: Props) {
-  const [portalAccess, setPortalAccess] = useState<{ has_access: boolean; portal: { email: string } | null }>({ has_access: false, portal: null });
+  const [portalAccess, setPortalAccess] = useState<{
+    has_access: boolean;
+    portal: {
+      email: string;
+      has_logged_in?: boolean;
+      has_shareable_password?: boolean;
+    } | null;
+  }>({ has_access: false, portal: null });
   const [phasen, setPhasen] = useState<Phase[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +53,9 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const [invitePassword, setInvitePassword] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   // Phase form
   const [newPhaseName, setNewPhaseName] = useState("");
@@ -103,7 +113,14 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
       const d = await res.json();
       if (res.ok) {
         setInviteMsg("✓ Portal-Zugang erstellt für " + inviteEmail);
-        setPortalAccess({ has_access: true, portal: { email: inviteEmail } });
+        setPortalAccess({
+          has_access: true,
+          portal: {
+            email: inviteEmail,
+            has_logged_in: false,
+            has_shareable_password: true,
+          },
+        });
         setInviteEmail("");
         setInvitePassword("");
       } else {
@@ -111,6 +128,41 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
       }
     } catch { setInviteMsg("✗ Netzwerkfehler"); }
     setInviting(false);
+  };
+
+  const handleResetPassword = async () => {
+    setResetting(true);
+    setResetMsg("");
+    try {
+      const res = await fetch("/api/patient/admin/invite", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: patientId, ...(resetPassword.trim() ? { password: resetPassword.trim() } : {}) }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setResetMsg(`✓ Neues Startpasswort: ${d.portal?.password}`);
+        setPortalAccess((prev) => ({
+          has_access: prev.has_access,
+          portal: prev.portal
+            ? {
+                ...prev.portal,
+                has_shareable_password: true,
+              }
+            : {
+                email: d.portal?.email || "",
+                has_logged_in: d.portal?.has_logged_in || false,
+                has_shareable_password: true,
+              },
+        }));
+        setResetPassword("");
+      } else {
+        setResetMsg("✗ " + (d.error || "Fehler"));
+      }
+    } catch {
+      setResetMsg("✗ Netzwerkfehler");
+    }
+    setResetting(false);
   };
 
   const handleAddPhase = async () => {
@@ -200,11 +252,46 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
       <div className={sectionStyle}>
         <h3 className={headingStyle}>Portal-Zugang</h3>
         {portalAccess.has_access ? (
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-sm font-bold">✓</span>
-            <div>
-              <p className="text-sm font-bold text-praxis-700">Zugang aktiv</p>
-              <p className="text-xs text-praxis-400">{portalAccess.portal?.email}</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-sm font-bold">✓</span>
+              <div>
+                <p className="text-sm font-bold text-praxis-700">Zugang aktiv</p>
+                <p className="text-xs text-praxis-400">{portalAccess.portal?.email}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
+                <div className="font-semibold text-praxis-700">Bereits eingeloggt</div>
+                <div>{portalAccess.portal?.has_logged_in ? "Ja" : "Nein / unbekannt"}</div>
+              </div>
+              <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
+                <div className="font-semibold text-praxis-700">Startpasswort vorhanden</div>
+                <div>{portalAccess.portal?.has_shareable_password ? "Ja" : "Nein"}</div>
+              </div>
+              <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
+                <div className="font-semibold text-praxis-700">Soforthilfe</div>
+                <div>Neues Startpasswort direkt hier erzeugen</div>
+              </div>
+            </div>
+            <div className="space-y-3 rounded-lg border border-surface-200 bg-surface-50 p-3">
+              <p className="text-sm font-semibold text-praxis-700">Startpasswort neu ausstellen</p>
+              <p className="text-xs text-praxis-500">
+                Für Fälle mit leerer Passwort-Anzeige oder Login-Problemen kann hier sofort ein neues Startpasswort erzeugt werden.
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Optional eigenes Passwort eingeben"
+                  className={inputStyle}
+                />
+                <button onClick={handleResetPassword} disabled={resetting} className={btnStyle}>
+                  {resetting ? "Erzeuge..." : "Neues Startpasswort"}
+                </button>
+              </div>
+              {resetMsg && <p className={`text-sm ${resetMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{resetMsg}</p>}
             </div>
           </div>
         ) : (

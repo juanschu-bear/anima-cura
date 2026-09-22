@@ -425,7 +425,7 @@ const DONE_APP_URL = "https://animacura.io/patient/login";
 const DONE_QR_URL = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(DONE_APP_URL) + "&bgcolor=fdfbf7&color=1d2a27";
 
 function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setGuideOpen, vorname }: {
-  account: { login_email: string; password: string } | null;
+  account: { login_email: string; password: string | null; has_logged_in?: boolean } | null;
   lang: "de"|"en"|"es"|"ru"|"tr"; setLang: (l: "de"|"en"|"es"|"ru"|"tr") => void;
   showPw: boolean; setShowPw: (v: boolean) => void;
   guideOpen: boolean; setGuideOpen: (v: boolean) => void;
@@ -452,6 +452,17 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
   const and = t.and as string[];
   const loadingTxts = t.loading as string[];
   const name = vorname || "Patient";
+  const passwordAvailable = Boolean(account?.password);
+  const passwordUnavailableText =
+    lang === "en"
+      ? "This account already exists. If the password is missing, the practice can issue a new starter password directly."
+      : lang === "es"
+      ? "Esta cuenta ya existe. Si falta la contraseña, la consulta puede generar una nueva contraseña inicial."
+      : lang === "ru"
+      ? "Этот аккаунт уже существует. Если пароль отсутствует, клиника может выдать новый стартовый пароль."
+      : lang === "tr"
+      ? "Bu hesap zaten mevcut. Şifre yoksa muayenehane yeni bir başlangıç şifresi verebilir."
+      : "Dieser Zugang existiert bereits. Falls das Passwort fehlt, kann die Praxis direkt ein neues Startpasswort ausstellen.";
   const check = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>;
 
   return (
@@ -478,11 +489,15 @@ function DoneScreen({ account, lang, setLang, showPw, setShowPw, guideOpen, setG
         <div className="done-slabel">{t.credLabel as string}</div>
         <div className="cred-card"><div className="cred-title">{t.credTitle as string}</div>
           <div className="cred-row"><span className="cred-label">{t.emailLabel as string}</span><span className="cred-val">{account.login_email}</span></div>
-          <div className="cred-row"><span className="cred-label">{t.pwLabel as string}</span>
-            <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
-              {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">{"●".repeat(10)}</span>}
-              <span className="pw-reveal">{showPw ? (t.pwHide as string) : (t.pwTap as string)}</span>
-            </div></div>
+          {passwordAvailable ? (
+            <div className="cred-row"><span className="cred-label">{t.pwLabel as string}</span>
+              <div className="pw-toggle" onClick={() => setShowPw(!showPw)}>
+                {showPw ? <span className="cred-val">{account.password}</span> : <span className="pw-dots">{"●".repeat(10)}</span>}
+                <span className="pw-reveal">{showPw ? (t.pwHide as string) : (t.pwTap as string)}</span>
+              </div></div>
+          ) : (
+            <div className="cred-note" style={{marginBottom:10}}><span>{"ℹ️"}</span><div>{passwordUnavailableText}</div></div>
+          )}
           <div className="cred-note" style={{marginBottom:10}}><span>{"🔒"}</span><div>{t.secNote as string}</div></div>
           <div className="cred-note"><span>{"📸"}</span><div>{t.screenshot as string}</div></div></div>
         <div className="done-divider" />
@@ -517,7 +532,7 @@ export function AnamneseForm({ patientId }: Props) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fehlen, setFehlen] = useState<string[]>([]);
-  const [account, setAccount] = useState<{ login_email: string; password: string } | null>(null);
+  const [account, setAccount] = useState<{ login_email: string; password: string | null; has_logged_in?: boolean } | null>(null);
   const [lang, setLang] = useState<"de"|"en"|"es"|"ru"|"tr">("de");
   const [showPw, setShowPw] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);

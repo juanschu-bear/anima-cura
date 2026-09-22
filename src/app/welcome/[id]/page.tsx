@@ -30,7 +30,7 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
   let loginEmail = sub.account_email || "";
   let password = sub.account_password || "";
 
-  if (!loginEmail) {
+  if (!loginEmail || !password) {
     const ensured = await ensurePatientPortalAccount({
       vorname: sub.vorname || null,
       nachname: sub.nachname || null,
@@ -40,7 +40,7 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
 
     if (ensured.status === "created" || ensured.status === "existing") {
       loginEmail = ensured.login_email;
-      if (ensured.status === "created") {
+      if (ensured.password) {
         password = ensured.password;
       }
 

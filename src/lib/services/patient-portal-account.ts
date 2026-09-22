@@ -17,9 +17,93 @@ function generatePassword(length = 10): string {
 }
 
 export type EnsuredPatientPortalAccount =
-  | { status: "created"; login_email: string; password: string; user_id: string }
-  | { status: "existing"; login_email: string; user_id: string }
+  | { status: "created"; login_email: string; password: string; user_id: string; has_logged_in: false }
+  | {
+      status: "existing";
+      login_email: string;
+      user_id: string;
+      password: string | null;
+      has_logged_in: boolean;
+      password_source: "stored_submission" | "reissued" | "unavailable";
+    }
   | { status: "unavailable"; reason: string };
+
+type ResetPatientPortalPasswordResult =
+  | {
+      status: "reset";
+      login_email: string;
+      password: string;
+      user_id: string;
+      has_logged_in: boolean;
+    }
+  | { status: "unavailable"; reason: string };
+
+async function loadLatestKnownSubmissionPassword(loginEmail: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("anamnese_submissions")
+    .select("account_password, created_at")
+    .eq("account_email", loginEmail)
+    .not("account_password", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`submission_password_lookup_failed:${error.message}`);
+  }
+
+  return typeof data?.account_password === "string" && data.account_password.trim()
+    ? data.account_password.trim()
+    : null;
+}
+
+async function persistPasswordToLinkedSubmissions(params: {
+  patientId: string;
+  loginEmail: string;
+  password: string;
+}) {
+  const admin = createAdminClient();
+  const { patientId, loginEmail, password } = params;
+
+  await admin
+    .from("anamnese_submissions")
+    .update({ account_email: loginEmail, account_password: password })
+    .or(`patient_id.eq.${patientId},matched_patient_id.eq.${patientId}`);
+}
+
+async function readPortalAuthState(userId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error) {
+    throw new Error(`auth_get_user_failed:${error.message}`);
+  }
+  return {
+    hasLoggedIn: Boolean(data.user?.last_sign_in_at),
+  };
+}
+
+async function issueTemporaryPassword(params: {
+  userId: string;
+  patientId: string;
+  loginEmail: string;
+  password?: string;
+}) {
+  const admin = createAdminClient();
+  const password = params.password ?? generatePassword(10);
+  const { error } = await admin.auth.admin.updateUserById(params.userId, { password });
+  if (error) {
+    throw new Error(`auth_update_failed:${error.message}`);
+  }
+
+  await persistPasswordToLinkedSubmissions({
+    patientId: params.patientId,
+    loginEmail: params.loginEmail,
+    password,
+  });
+
+  return password;
+}
 
 export async function ensurePatientPortalAccount(params: {
   vorname: string | null;
@@ -42,10 +126,43 @@ export async function ensurePatientPortalAccount(params: {
     .maybeSingle();
 
   if (existingProfile?.id && existingProfile.email) {
+    const authState = await readPortalAuthState(existingProfile.id);
+    const knownPassword = await loadLatestKnownSubmissionPassword(existingProfile.email);
+
+    if (knownPassword) {
+      return {
+        status: "existing",
+        login_email: existingProfile.email,
+        user_id: existingProfile.id,
+        password: knownPassword,
+        has_logged_in: authState.hasLoggedIn,
+        password_source: "stored_submission",
+      };
+    }
+
+    if (!authState.hasLoggedIn) {
+      const reissuedPassword = await issueTemporaryPassword({
+        userId: existingProfile.id,
+        patientId,
+        loginEmail: existingProfile.email,
+      });
+      return {
+        status: "existing",
+        login_email: existingProfile.email,
+        user_id: existingProfile.id,
+        password: reissuedPassword,
+        has_logged_in: false,
+        password_source: "reissued",
+      };
+    }
+
     return {
       status: "existing",
       login_email: existingProfile.email,
       user_id: existingProfile.id,
+      password: null,
+      has_logged_in: true,
+      password_source: "unavailable",
     };
   }
 
@@ -96,6 +213,7 @@ export async function ensurePatientPortalAccount(params: {
         login_email: loginEmail,
         password,
         user_id: authData.user.id,
+        has_logged_in: false,
       };
     }
 
@@ -106,4 +224,65 @@ export async function ensurePatientPortalAccount(params: {
   }
 
   return { status: "unavailable", reason: "email_attempts_exhausted" };
+}
+
+export async function resetPatientPortalPassword(params: {
+  patientId: string;
+  password?: string | null;
+}): Promise<ResetPatientPortalPasswordResult> {
+  const admin = createAdminClient();
+  const { patientId } = params;
+
+  const { data: profile, error: profileError } = await admin
+    .from("user_profiles")
+    .select("id, email")
+    .eq("patient_id", patientId)
+    .eq("role", "patient")
+    .maybeSingle();
+
+  if (profileError) {
+    return { status: "unavailable", reason: `profile_lookup_failed:${profileError.message}` };
+  }
+
+  if (!profile?.id || !profile.email) {
+    return { status: "unavailable", reason: "patient_portal_missing" };
+  }
+
+  let hasLoggedIn = false;
+  try {
+    const authState = await readPortalAuthState(profile.id);
+    hasLoggedIn = authState.hasLoggedIn;
+  } catch (error) {
+    return {
+      status: "unavailable",
+      reason: error instanceof Error ? error.message : "auth_state_unknown",
+    };
+  }
+
+  const password =
+    typeof params.password === "string" && params.password.trim().length >= 8
+      ? params.password.trim()
+      : generatePassword(10);
+
+  try {
+    const finalPassword = await issueTemporaryPassword({
+      userId: profile.id,
+      patientId,
+      loginEmail: profile.email,
+      password,
+    });
+
+    return {
+      status: "reset",
+      login_email: profile.email,
+      password: finalPassword,
+      user_id: profile.id,
+      has_logged_in: hasLoggedIn,
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      reason: error instanceof Error ? error.message : "password_reset_failed",
+    };
+  }
 }

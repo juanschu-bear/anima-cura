@@ -244,6 +244,17 @@ export default function WelcomeScreen({
   const features = [s("f1"), s("f2"), s("f3"), s("f4"), s("f5")];
   const ios = (t.ios || []) as string[];
   const and = (t.and || []) as string[];
+  const passwordAvailable = Boolean(password);
+  const passwordUnavailableText =
+    lang === "en"
+      ? "This account already exists. If the password is missing, the practice can issue a new starter password directly."
+      : lang === "es"
+      ? "Esta cuenta ya existe. Si falta la contraseña, la consulta puede generar una nueva contraseña inicial."
+      : lang === "ru"
+      ? "Этот аккаунт уже существует. Если пароль отсутствует, клиника может выдать новый стартовый пароль."
+      : lang === "tr"
+      ? "Bu hesap zaten mevcut. Şifre yoksa muayenehane yeni bir başlangıç şifresi verebilir."
+      : "Dieser Zugang existiert bereits. Falls das Passwort fehlt, kann die Praxis direkt ein neues Startpasswort ausstellen.";
   const appUrl = "https://animacura.io/patient/login";
   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(appUrl) + "&bgcolor=fdfbf7&color=1d2a27";
 
@@ -338,14 +349,22 @@ export default function WelcomeScreen({
               </div>
             </div>
             <div style={{ padding: "12px 0" }}>
-              <div style={{ fontSize: 12, color: "#5f6d67", fontWeight: 500, marginBottom: 6 }}>{s("pw")}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 11, border: "1.5px solid rgba(35,176,143,0.3)", background: "rgba(35,176,143,0.04)", flexWrap: "wrap", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: pwVisible ? "#c2922f" : "#94a09a", fontFamily: "monospace" }}>{pwVisible ? password : "**********"}</span>
-                <span style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setPwVisible(!pwVisible)} style={{ fontSize: 12, color: "#fff", fontWeight: 700, background: "linear-gradient(145deg,#5fd0a8,#0f8a72)", border: "none", borderRadius: 10, padding: "6px 14px", cursor: "pointer", boxShadow: "0 4px 14px -4px #0f8a72" }}>{pwVisible ? s("pwHide") : s("pwTap")}</button>
-                  <button onClick={() => doCopy(password, "pw")} style={{ fontFamily: "inherit", fontSize: 11, color: "#0f8a72", fontWeight: 600, background: "rgba(15,138,114,0.08)", border: "1px solid rgba(15,138,114,0.2)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>{copied === "pw" ? s("copied") : s("copy")}</button>
-                </span>
-              </div>
+              {passwordAvailable ? (
+                <>
+                  <div style={{ fontSize: 12, color: "#5f6d67", fontWeight: 500, marginBottom: 6 }}>{s("pw")}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 11, border: "1.5px solid rgba(35,176,143,0.3)", background: "rgba(35,176,143,0.04)", flexWrap: "wrap", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: pwVisible ? "#c2922f" : "#94a09a", fontFamily: "monospace" }}>{pwVisible ? password : "**********"}</span>
+                    <span style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setPwVisible(!pwVisible)} style={{ fontSize: 12, color: "#fff", fontWeight: 700, background: "linear-gradient(145deg,#5fd0a8,#0f8a72)", border: "none", borderRadius: 10, padding: "6px 14px", cursor: "pointer", boxShadow: "0 4px 14px -4px #0f8a72" }}>{pwVisible ? s("pwHide") : s("pwTap")}</button>
+                      <button onClick={() => doCopy(password, "pw")} style={{ fontFamily: "inherit", fontSize: 11, color: "#0f8a72", fontWeight: 600, background: "rgba(15,138,114,0.08)", border: "1px solid rgba(15,138,114,0.2)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>{copied === "pw" ? s("copied") : s("copy")}</button>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 2, padding: "10px 14px", background: "rgba(194,146,47,0.10)", borderRadius: 10 }}>
+                  ℹ️ {passwordUnavailableText}
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 12, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>\ud83d\udd12 {s("sec")}</div>
             <div style={{ fontSize: 12.5, color: "#5f6d67", marginTop: 8, padding: "10px 14px", background: "rgba(15,138,114,0.10)", borderRadius: 10 }}>\ud83d\udcf8 {s("screenshot")}</div>

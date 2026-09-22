@@ -33,6 +33,9 @@ type SubmitBody = {
 
 type SubmissionReplayRow = {
   id: string;
+  vorname?: string | null;
+  nachname?: string | null;
+  email?: string | null;
   status: string | null;
   fehler_text?: string | null;
   account_email?: string | null;
@@ -210,7 +213,7 @@ async function loadReplayableSubmission(
   const { data, error } = await supabase
     .from("anamnese_submissions")
     .select(
-      "id, status, fehler_text, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token, signed_pdf_path"
+      "id, vorname, nachname, email, status, fehler_text, account_email, account_password, matched_patient_id, patient_id, documenso_envelope_id, documenso_recipient_token, signed_pdf_path"
     )
     .eq("id", submissionId)
     .maybeSingle();
@@ -220,6 +223,38 @@ async function loadReplayableSubmission(
   }
 
   return data as SubmissionReplayRow | null;
+}
+
+async function ensureReplayableAccount(submission: SubmissionReplayRow) {
+  if (!submission.account_email || submission.account_password) {
+    return submission;
+  }
+
+  const ensured = await ensurePatientPortalAccount({
+    vorname: submission.vorname ?? null,
+    nachname: submission.nachname ?? null,
+    patientEmail: submission.email ?? null,
+    patientId: submission.matched_patient_id ?? submission.patient_id ?? null,
+  });
+
+  if ((ensured.status === "created" || ensured.status === "existing") && ensured.password) {
+    const supabase = createServerClient();
+    await supabase
+      .from("anamnese_submissions")
+      .update({
+        account_email: ensured.login_email,
+        account_password: ensured.password,
+      })
+      .eq("id", submission.id);
+
+    return {
+      ...submission,
+      account_email: ensured.login_email,
+      account_password: ensured.password,
+    };
+  }
+
+  return submission;
 }
 
 function buildReplayResponse(submission: SubmissionReplayRow) {
@@ -510,21 +545,21 @@ export async function POST(request: Request) {
           existingIntent.submission_id
         );
         if (replay) {
-          return buildReplayResponse(replay);
+          return buildReplayResponse(await ensureReplayableAccount(replay));
         }
       }
 
       if (existingIntent?.status === "pending") {
         const replay = await waitForResolvedSubmitIntent(supabase, replayFingerprint);
         if (replay) {
-          return buildReplayResponse(replay);
+          return buildReplayResponse(await ensureReplayableAccount(replay));
         }
       } else {
         const reservation = await reserveSubmitIntent(supabase, replayFingerprint);
         if (!reservation.created && reservation.intent?.status === "pending") {
           const replay = await waitForResolvedSubmitIntent(supabase, replayFingerprint);
           if (replay) {
-            return buildReplayResponse(replay);
+            return buildReplayResponse(await ensureReplayableAccount(replay));
           }
         }
 
@@ -534,7 +569,7 @@ export async function POST(request: Request) {
             reservation.intent.submission_id
           );
           if (replay) {
-            return buildReplayResponse(replay);
+            return buildReplayResponse(await ensureReplayableAccount(replay));
           }
         }
       }
@@ -548,7 +583,7 @@ export async function POST(request: Request) {
       });
       if (recentReplay) {
         await finalizeSubmitIntent(supabase, replayFingerprint, recentReplay.id);
-        return buildReplayResponse(recentReplay);
+        return buildReplayResponse(await ensureReplayableAccount(recentReplay));
       }
     }
 
@@ -575,7 +610,7 @@ export async function POST(request: Request) {
 
       if (resumable.kind === "replay") {
         await finalizeSubmitIntent(supabase, replayFingerprint, resumable.submission.id);
-        return buildReplayResponse(resumable.submission);
+        return buildReplayResponse(await ensureReplayableAccount(resumable.submission));
       }
 
       if (resumable.kind === "resume") {
@@ -751,7 +786,7 @@ export async function POST(request: Request) {
         .from("anamnese_submissions")
         .update({
           account_email: account.login_email,
-          ...(account.status === "created" ? { account_password: account.password } : {}),
+          ...(account.password ? { account_password: account.password } : {}),
         })
         .eq("id", submissionId);
 
