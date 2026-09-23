@@ -33,6 +33,7 @@ export default function PatientDetailPage() {
   const [geldbewegungen, setGeldbewegungen] = useState<any[]>([]);
   const [bankZahlungen, setBankZahlungen] = useState<any[]>([]);
   const [offenePosten, setOffenePosten] = useState<any[]>([]);
+  const [showAllRateHistory, setShowAllRateHistory] = useState(false);
 
   useEffect(() => {
     if (!patient?.id) return;
@@ -188,6 +189,9 @@ export default function PatientDetailPage() {
       const db = new Date(b.faellig_am).getTime();
       return db - da;
     });
+  const HISTORY_PREVIEW_COUNT = 15;
+  const hasLongRateHistory = history.length > HISTORY_PREVIEW_COUNT;
+  const visibleHistory = showAllRateHistory ? history : history.slice(0, HISTORY_PREVIEW_COUNT);
   const istAbgleich = aktiverPlan
     ? reconcileInstallments(aktiverPlan, aktivePlanRaten, bankZahlungen)
     : null;
@@ -435,8 +439,28 @@ export default function PatientDetailPage() {
 
       {(history.length > 0 || totalRaten > 0) && (
       <div className="stat-card">
-        <h3 className="mb-4 text-[24px] font-extrabold tracking-tight text-praxis-700">{locale === "en" ? "Installment history (plan state)" : "Raten-Historie (Planstand)"}</h3>
-        <div className="overflow-x-auto">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-[24px] font-extrabold tracking-tight text-praxis-700">{locale === "en" ? "Installment history (plan state)" : "Raten-Historie (Planstand)"}</h3>
+            {hasLongRateHistory ? (
+              <p className="mt-1 text-sm text-praxis-400">
+                {showAllRateHistory
+                  ? `${history.length} Einträge sichtbar`
+                  : `Es werden zuerst die letzten ${HISTORY_PREVIEW_COUNT} Einträge gezeigt.`}
+              </p>
+            ) : null}
+          </div>
+          {hasLongRateHistory ? (
+            <button
+              type="button"
+              onClick={() => setShowAllRateHistory((prev) => !prev)}
+              className="rounded-lg border border-surface-200 px-3 py-2 text-sm font-semibold text-praxis-500 transition hover:bg-surface-50"
+            >
+              {showAllRateHistory ? `Nur letzte ${HISTORY_PREVIEW_COUNT} anzeigen` : `Alle ${history.length} anzeigen`}
+            </button>
+          ) : null}
+        </div>
+        <div className={`overflow-x-auto ${showAllRateHistory && hasLongRateHistory ? "max-h-[520px] overflow-y-auto pr-1" : ""}`}>
           <table className="w-full">
             <thead>
               <tr className="bg-surface-50">
@@ -446,7 +470,7 @@ export default function PatientDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {history.map((h: any) => (
+              {visibleHistory.map((h: any) => (
                 <tr key={h.id} className="hover:bg-surface-50/70">
                   <td className="table-cell text-base text-praxis-700">
                     <div>{formatDate(h.faellig_am, locale)}</div>
