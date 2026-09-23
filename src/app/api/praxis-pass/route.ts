@@ -5,6 +5,16 @@ import { createServerClient } from "@/lib/db/supabase";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const LEERE_STRUKTUR = {
+  template: [],
+  groups: {},
+  vars: [],
+  kontext: "",
+  anima_kopplung: "",
+  abrechnung_titel: "Abrechnung",
+  abrechnung_hinweis: "",
+};
+
 // Zugang: entweder eingeloggter App-User (Juan/Praxis) ODER gueltiger Link-Token.
 // In beiden Faellen wird serverseitig der Service-Role-Client genutzt.
 function tokenGueltig(token: string | null): boolean {
@@ -71,7 +81,8 @@ export async function POST(request: NextRequest) {
 
   // Eigene Termin-Art umbenennen.
   if (body.umbenennen && body.umbenennen.termin_typ) {
-    const { behandlungsart, termin_typ, name } = body.umbenennen;
+    const { behandlungsart, termin_typ, name, basis_termin_typ, sort_index, sofort_aktivieren } = body.umbenennen;
+    const sortIndexZahl = Number.isFinite(Number(sort_index)) ? Number(sort_index) : null;
     if (behandlungsart && termin_typ) {
       const { data: vorhanden } = await supabase
         .from("praxis_pass")
@@ -80,9 +91,74 @@ export async function POST(request: NextRequest) {
         .eq("termin_typ", termin_typ)
         .maybeSingle();
       if (vorhanden) {
-        await supabase.from("praxis_pass").update({ eigener_name: name ?? null }).eq("behandlungsart", behandlungsart).eq("termin_typ", termin_typ);
+        const updatePass: Record<string, unknown> = { eigener_name: name ?? null };
+        if (sortIndexZahl != null) updatePass.position = sortIndexZahl;
+        await supabase.from("praxis_pass").update(updatePass).eq("behandlungsart", behandlungsart).eq("termin_typ", termin_typ);
       } else {
-        await supabase.from("praxis_pass").insert({ behandlungsart, termin_typ, eigener_name: name ?? null, status: "offen" });
+        await supabase.from("praxis_pass").insert({
+          behandlungsart,
+          termin_typ,
+          eigener_name: name ?? null,
+          status: "offen",
+          ...(sortIndexZahl != null ? { position: sortIndexZahl } : {}),
+        });
+      }
+
+      if (sofort_aktivieren === true) {
+        const { data: vorhandeneVorlage, error: vorhandeneVorlageErr } = await supabase
+          .from("doku_vorlagen")
+          .select("id")
+          .eq("behandlungsart", behandlungsart)
+          .eq("termin_typ", termin_typ)
+          .maybeSingle();
+        if (vorhandeneVorlageErr) {
+          return NextResponse.json({ error: vorhandeneVorlageErr.message }, { status: 500 });
+        }
+
+        if (vorhandeneVorlage) {
+          const updateVorlage: Record<string, unknown> = { aktiv: true };
+          if (name != null) updateVorlage.name = name;
+          if (sortIndexZahl != null) updateVorlage.sort_index = sortIndexZahl;
+          const { error: updateVorlageErr } = await supabase
+            .from("doku_vorlagen")
+            .update(updateVorlage)
+            .eq("behandlungsart", behandlungsart)
+            .eq("termin_typ", termin_typ);
+          if (updateVorlageErr) {
+            return NextResponse.json({ error: updateVorlageErr.message }, { status: 500 });
+          }
+        } else {
+          if (!basis_termin_typ) {
+            return NextResponse.json({ error: "basis_termin_typ fehlt für die direkte Übernahme." }, { status: 400 });
+          }
+          const { data: basisVorlage, error: basisVorlageErr } = await supabase
+            .from("doku_vorlagen")
+            .select("struktur, positionen")
+            .eq("behandlungsart", behandlungsart)
+            .eq("termin_typ", basis_termin_typ)
+            .maybeSingle();
+          if (basisVorlageErr) {
+            return NextResponse.json({ error: basisVorlageErr.message }, { status: 500 });
+          }
+          if (!basisVorlage) {
+            return NextResponse.json({ error: "Basisvorlage für die neue Terminart wurde nicht gefunden." }, { status: 400 });
+          }
+
+          const struktur = JSON.parse(JSON.stringify(basisVorlage.struktur ?? LEERE_STRUKTUR));
+          const positionen = JSON.parse(JSON.stringify(basisVorlage.positionen ?? []));
+          const { error: insertVorlageErr } = await supabase.from("doku_vorlagen").insert({
+            behandlungsart,
+            termin_typ,
+            name: String(name ?? "").trim() || termin_typ,
+            sort_index: sortIndexZahl ?? 900,
+            aktiv: true,
+            struktur,
+            positionen,
+          });
+          if (insertVorlageErr) {
+            return NextResponse.json({ error: insertVorlageErr.message }, { status: 500 });
+          }
+        }
       }
     }
     return NextResponse.json({ ok: true, umbenannt: true });

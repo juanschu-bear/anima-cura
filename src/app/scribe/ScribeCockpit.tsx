@@ -947,7 +947,14 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          umbenennen: { behandlungsart: art, termin_typ: slug, name },
+          umbenennen: {
+            behandlungsart: art,
+            termin_typ: slug,
+            name,
+            basis_termin_typ: basisVorlage?.termin_typ ?? null,
+            sort_index: neueVorlage.sort_index,
+            sofort_aktivieren: true,
+          },
         }),
       });
       const json = await res.json().catch(() => ({}));
