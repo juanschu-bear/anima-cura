@@ -56,6 +56,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const [resetPassword, setResetPassword] = useState("");
   const [resetMsg, setResetMsg] = useState("");
   const [resetting, setResetting] = useState(false);
+  const resetSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Phase form
   const [newPhaseName, setNewPhaseName] = useState("");
@@ -243,6 +244,19 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const inputStyle = "w-full rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm text-praxis-700 outline-none focus:border-[#5d4fd8] focus:ring-1 focus:ring-[#5d4fd8]";
   const btnStyle = "rounded-lg bg-[#5d4fd8] px-4 py-2 text-sm font-bold text-white hover:bg-[#4c40be] disabled:opacity-50";
   const btnSecStyle = "rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-semibold text-praxis-500 hover:bg-surface-50";
+  const hasLoggedIn = Boolean(portalAccess.portal?.has_logged_in);
+  const hasShareablePassword = Boolean(portalAccess.portal?.has_shareable_password);
+  const starterPasswordStatus = hasShareablePassword
+    ? "Ja"
+    : hasLoggedIn
+    ? "Nein – Patient nutzt bereits ein eigenes Passwort"
+    : "Nein";
+  const starterPasswordHint = hasShareablePassword
+    ? "Die Praxis kann das aktuelle Startpasswort direkt weitergeben."
+    : hasLoggedIn
+    ? "Es gibt ein gültiges Login-Passwort, aber kein wiederanzeigbares Praxis-Startpasswort mehr."
+    : "Es ist aktuell kein ausstellbares Startpasswort hinterlegt.";
+  const resetButtonLabel = hasLoggedIn ? "Passwort jetzt neu setzen" : "Neues Startpasswort";
 
   return (
     <div className="space-y-4 mt-6">
@@ -266,31 +280,49 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
                 <div>{portalAccess.portal?.has_logged_in ? "Ja" : "Nein / unbekannt"}</div>
               </div>
               <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
-                <div className="font-semibold text-praxis-700">Startpasswort vorhanden</div>
-                <div>{portalAccess.portal?.has_shareable_password ? "Ja" : "Nein"}</div>
+                <div className="font-semibold text-praxis-700">Praxis kennt Startpasswort</div>
+                <div>{starterPasswordStatus}</div>
+                <div className="mt-1 text-[11px] leading-4 text-praxis-400">{starterPasswordHint}</div>
               </div>
-              <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
+              <button
+                type="button"
+                onClick={() => resetSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-left text-xs text-praxis-500 transition hover:border-[#5d4fd8] hover:bg-white"
+              >
                 <div className="font-semibold text-praxis-700">Soforthilfe</div>
-                <div>Neues Startpasswort direkt hier erzeugen</div>
-              </div>
+                <div>Zum Bereich für Passwort-Neuausstellung springen</div>
+                <div className="mt-1 text-[11px] leading-4 text-praxis-400">
+                  {hasLoggedIn
+                    ? "Nur nutzen, wenn der Patient wirklich nicht mehr reinkommt."
+                    : "Hier kann sofort ein nutzbares Startpasswort erzeugt werden."}
+                </div>
+              </button>
             </div>
-            <div className="space-y-3 rounded-lg border border-surface-200 bg-surface-50 p-3">
+            <div ref={resetSectionRef} className="space-y-3 rounded-lg border border-surface-200 bg-surface-50 p-3">
               <p className="text-sm font-semibold text-praxis-700">Startpasswort neu ausstellen</p>
               <p className="text-xs text-praxis-500">
                 Für Fälle mit leerer Passwort-Anzeige oder Login-Problemen kann hier sofort ein neues Startpasswort erzeugt werden.
               </p>
+              {hasLoggedIn && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  Achtung: Dieser Patient hat bereits ein funktionierendes Portalpasswort. Wenn hier ein neues Startpasswort erzeugt wird, ersetzt es das bisherige Passwort sofort.
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
                 <input
                   type="text"
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  placeholder="Optional eigenes Passwort eingeben"
+                  placeholder={hasLoggedIn ? "Optional neues Passwort eingeben" : "Optional eigenes Passwort eingeben"}
                   className={inputStyle}
                 />
                 <button onClick={handleResetPassword} disabled={resetting} className={btnStyle}>
-                  {resetting ? "Erzeuge..." : "Neues Startpasswort"}
+                  {resetting ? "Erzeuge..." : resetButtonLabel}
                 </button>
               </div>
+              <p className="text-[11px] leading-4 text-praxis-400">
+                Ohne Eingabe wird automatisch ein neues Passwort erzeugt, das direkt an den Patienten weitergegeben werden kann.
+              </p>
               {resetMsg && <p className={`text-sm ${resetMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{resetMsg}</p>}
             </div>
           </div>
