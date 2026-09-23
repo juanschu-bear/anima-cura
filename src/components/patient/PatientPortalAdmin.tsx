@@ -246,6 +246,41 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
   const btnSecStyle = "rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-semibold text-praxis-500 hover:bg-surface-50";
   const hasLoggedIn = Boolean(portalAccess.portal?.has_logged_in);
   const hasShareablePassword = Boolean(portalAccess.portal?.has_shareable_password);
+  const portalStateKind = hasShareablePassword
+    ? "shareable_starter"
+    : hasLoggedIn
+    ? "patient_owns_password"
+    : "reset_needed";
+  const portalStateTitle =
+    portalStateKind === "shareable_starter"
+      ? "Startpasswort liegt für die Praxis vor"
+      : portalStateKind === "patient_owns_password"
+      ? "Patient nutzt bereits ein eigenes Passwort"
+      : "Neues Startpasswort erforderlich";
+  const portalStateText =
+    portalStateKind === "shareable_starter"
+      ? "Die Praxis kann dem Patienten das vorhandene Startpasswort direkt mitteilen."
+      : portalStateKind === "patient_owns_password"
+      ? "Der Zugang funktioniert grundsätzlich. Es gibt nur kein wiederanzeigbares Praxis-Startpasswort mehr."
+      : "Der Patient hat aktuell kein ausstellbares Startpasswort. Hier sollte direkt ein neues Passwort erzeugt werden.";
+  const portalStateAction =
+    portalStateKind === "shareable_starter"
+      ? "Passwort mitteilen oder bei Bedarf neu ausstellen"
+      : portalStateKind === "patient_owns_password"
+      ? "Nur bei echtem Login-Problem zurücksetzen"
+      : "Jetzt neues Startpasswort erzeugen";
+  const portalStateTone =
+    portalStateKind === "shareable_starter"
+      ? "border-emerald-200 bg-emerald-50"
+      : portalStateKind === "patient_owns_password"
+      ? "border-sky-200 bg-sky-50"
+      : "border-amber-200 bg-amber-50";
+  const portalStateIconTone =
+    portalStateKind === "shareable_starter"
+      ? "bg-emerald-100 text-emerald-700"
+      : portalStateKind === "patient_owns_password"
+      ? "bg-sky-100 text-sky-700"
+      : "bg-amber-100 text-amber-700";
   const starterPasswordStatus = hasShareablePassword
     ? "Ja"
     : hasLoggedIn
@@ -274,7 +309,29 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
                 <p className="text-xs text-praxis-400">{portalAccess.portal?.email}</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+
+            <div className={`rounded-xl border px-4 py-4 ${portalStateTone}`}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${portalStateIconTone}`}>
+                    {portalStateKind === "shareable_starter" ? "✓" : portalStateKind === "patient_owns_password" ? "i" : "!"}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-praxis-700">{portalStateTitle}</p>
+                    <p className="mt-1 text-sm text-praxis-600">{portalStateText}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => resetSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                  className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-praxis-700 shadow-sm ring-1 ring-black/5 transition hover:border-[#5d4fd8] hover:text-[#5d4fd8]"
+                >
+                  {portalStateAction}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <div className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-praxis-500">
                 <div className="font-semibold text-praxis-700">Bereits eingeloggt</div>
                 <div>{portalAccess.portal?.has_logged_in ? "Ja" : "Nein / unbekannt"}</div>
@@ -284,19 +341,6 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
                 <div>{starterPasswordStatus}</div>
                 <div className="mt-1 text-[11px] leading-4 text-praxis-400">{starterPasswordHint}</div>
               </div>
-              <button
-                type="button"
-                onClick={() => resetSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-left text-xs text-praxis-500 transition hover:border-[#5d4fd8] hover:bg-white"
-              >
-                <div className="font-semibold text-praxis-700">Soforthilfe</div>
-                <div>Zum Bereich für Passwort-Neuausstellung springen</div>
-                <div className="mt-1 text-[11px] leading-4 text-praxis-400">
-                  {hasLoggedIn
-                    ? "Nur nutzen, wenn der Patient wirklich nicht mehr reinkommt."
-                    : "Hier kann sofort ein nutzbares Startpasswort erzeugt werden."}
-                </div>
-              </button>
             </div>
             <div ref={resetSectionRef} className="space-y-3 rounded-lg border border-surface-200 bg-surface-50 p-3">
               <p className="text-sm font-semibold text-praxis-700">Startpasswort neu ausstellen</p>
