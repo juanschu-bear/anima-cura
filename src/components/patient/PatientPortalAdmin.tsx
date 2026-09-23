@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { patientDocumentTypeOptions } from "@/lib/patient-document-types";
+import { useAppStore } from "@/hooks/useAppStore";
 
 interface Props {
   patientId: string;
@@ -36,6 +37,8 @@ const phaseStatuses = [
 const docTypes = patientDocumentTypeOptions;
 
 export default function PatientPortalAdmin({ patientId, patientName }: Props) {
+  const { theme } = useAppStore();
+  const isDark = theme === "dark";
   const [portalAccess, setPortalAccess] = useState<{
     has_access: boolean;
     portal: {
@@ -281,12 +284,15 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
     : hasLoggedIn
     ? "Nein – Patient nutzt bereits ein eigenes Passwort"
     : "Nein";
-  const starterPasswordHint = hasShareablePassword
-    ? "Die Praxis kann das aktuelle Startpasswort direkt weitergeben."
-    : hasLoggedIn
-    ? "Es gibt ein gültiges Login-Passwort, aber kein wiederanzeigbares Praxis-Startpasswort mehr."
-    : "Es ist aktuell kein ausstellbares Startpasswort hinterlegt.";
   const resetButtonLabel = hasLoggedIn ? "Passwort jetzt neu setzen" : "Neues Startpasswort";
+  const panelClass = isDark ? "border-white/10 bg-[#0f1724]" : "border-surface-200 bg-white";
+  const softPanelClass = isDark ? "border-white/10 bg-white/[0.03]" : "border-surface-200 bg-surface-50";
+  const subtleTextClass = isDark ? "text-white/65" : "text-praxis-500";
+  const dimTextClass = isDark ? "text-white/50" : "text-praxis-400";
+  const strongTextClass = isDark ? "text-white" : "text-praxis-700";
+  const buttonGhostClass = isDark
+    ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+    : "border-surface-200 bg-white text-praxis-700 hover:bg-surface-50";
 
   return (
     <div className="space-y-4 mt-6">
@@ -300,23 +306,23 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
             <div className="flex items-center gap-3">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-sm font-bold">✓</span>
               <div>
-                <p className="text-sm font-bold text-praxis-700">Zugang aktiv</p>
-                <p className="text-xs text-praxis-400">{portalAccess.portal?.email}</p>
+                <p className={`text-base font-bold ${strongTextClass}`}>Zugang aktiv</p>
+                <p className={`text-sm ${subtleTextClass}`}>{portalAccess.portal?.email}</p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-4">
+            <div className={`rounded-2xl border px-5 py-5 ${panelClass}`}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${portalStateBadgeTone}`}>
+                    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${portalStateBadgeTone}`}>
                       {portalStateTitle}
                     </span>
-                    <span className="text-xs text-praxis-400">
+                    <span className={`text-sm ${dimTextClass}`}>
                       {hasLoggedIn ? "Login bereits verwendet" : "Noch kein Login erkannt"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-praxis-500">{portalStateText}</p>
+                  <p className={`mt-3 text-[15px] leading-6 ${subtleTextClass}`}>{portalStateText}</p>
                 </div>
                 <button
                   type="button"
@@ -326,44 +332,41 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
                       resetSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
                     }, 0);
                   }}
-                  className={btnSecStyle + " whitespace-nowrap"}
+                  className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${buttonGhostClass}`}
                 >
                   {showResetTools ? "Passwort-Hilfe schließen" : portalStateAction}
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-xs text-praxis-500">
-              <span className="rounded-full border border-surface-200 bg-surface-50 px-3 py-1">
-                Bereits eingeloggt: <span className="font-semibold text-praxis-700">{portalAccess.portal?.has_logged_in ? "Ja" : "Nein / unbekannt"}</span>
-              </span>
-              <span className="rounded-full border border-surface-200 bg-surface-50 px-3 py-1">
-                Praxis-Startpasswort: <span className="font-semibold text-praxis-700">{starterPasswordStatus}</span>
-              </span>
-              {!hasShareablePassword ? (
-                <span className="rounded-full border border-surface-200 bg-surface-50 px-3 py-1 text-praxis-400">
-                  {starterPasswordHint}
-                </span>
-              ) : null}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className={`rounded-xl border px-4 py-3 ${softPanelClass}`}>
+                <div className={`text-sm font-semibold ${strongTextClass}`}>Bereits eingeloggt</div>
+                <div className={`mt-1 text-base ${subtleTextClass}`}>{portalAccess.portal?.has_logged_in ? "Ja" : "Nein / unbekannt"}</div>
+              </div>
+              <div className={`rounded-xl border px-4 py-3 ${softPanelClass}`}>
+                <div className={`text-sm font-semibold ${strongTextClass}`}>Praxis-Startpasswort</div>
+                <div className={`mt-1 text-base ${subtleTextClass}`}>{starterPasswordStatus}</div>
+              </div>
             </div>
 
             {showResetTools ? (
-            <div ref={resetSectionRef} className="space-y-3 rounded-lg border border-surface-200 bg-surface-50 p-3">
+            <div ref={resetSectionRef} className={`space-y-4 rounded-2xl border p-4 ${softPanelClass}`}>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-praxis-700">Passwort-Hilfe</p>
+                <p className={`text-base font-semibold ${strongTextClass}`}>Passwort-Hilfe</p>
                 <button
                   type="button"
                   onClick={() => setShowResetTools(false)}
-                  className="text-xs font-semibold text-praxis-400 hover:text-praxis-700"
+                  className={`text-sm font-semibold ${isDark ? "text-white/50 hover:text-white" : "text-praxis-400 hover:text-praxis-700"}`}
                 >
                   Schließen
                 </button>
               </div>
-              <p className="text-xs text-praxis-500">
+              <p className={`text-sm ${subtleTextClass}`}>
                 Nur nutzen, wenn der Patient wirklich nicht mehr in die App kommt.
               </p>
               {hasLoggedIn && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
                   Ein neues Passwort ersetzt das bisherige Passwort sofort.
                 </div>
               )}
@@ -379,7 +382,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
                   {resetting ? "Erzeuge..." : resetButtonLabel}
                 </button>
               </div>
-              <p className="text-[11px] leading-4 text-praxis-400">Ohne Eingabe wird automatisch ein neues Passwort erzeugt.</p>
+              <p className={`text-sm ${dimTextClass}`}>Ohne Eingabe wird automatisch ein neues Passwort erzeugt.</p>
               {resetMsg && <p className={`text-sm ${resetMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{resetMsg}</p>}
             </div>
             ) : null}
