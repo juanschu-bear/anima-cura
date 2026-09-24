@@ -30,6 +30,54 @@ type Patient = {
   behandlung_status: "aktiv" | "pausiert" | "abgeschlossen" | null;
 };
 
+function normalizePatientSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildSearchVariants(input: string) {
+  const base = normalizePatientSearch(input);
+  const compact = base.replace(/\s+/g, " ").trim();
+  const variants = new Set<string>([compact]);
+  const raw = input.toLowerCase();
+  if (/[ä]/.test(raw) && compact.includes("ae")) variants.add(compact.replace(/ae/g, "a"));
+  if (/[ö]/.test(raw) && compact.includes("oe")) variants.add(compact.replace(/oe/g, "o"));
+  if (/[ü]/.test(raw) && compact.includes("ue")) variants.add(compact.replace(/ue/g, "u"));
+  if (/[ß]/.test(raw) && compact.includes("ss")) variants.add(compact.replace(/ss/g, "s"));
+  return Array.from(variants).filter(Boolean);
+}
+
+function buildSearchTokens(input: string) {
+  return Array.from(
+    new Set(
+      buildSearchVariants(input)
+        .flatMap((variant) => variant.split(/\s+/))
+        .map((token) => token.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function buildDatabaseSearchTokens(input: string) {
+  const rawTokens = String(input)
+    .toLocaleLowerCase("de-DE")
+    .replace(/[^a-z0-9äöüß@._-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...rawTokens, ...buildSearchTokens(input)]));
+}
+
 function normalizeOption(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
@@ -120,6 +168,15 @@ export default function BehandlungenPage() {
 
     const selectBase =
       "id, vorname, nachname, geburtsdatum, behandlungsart, behandlung_status";
+    const suchTokens = search.trim().length >= 2 ? buildDatabaseSearchTokens(search.trim()) : [];
+    const searchPattern = Array.from(
+      new Set(
+        suchTokens.flatMap((token) => [
+          `nachname.ilike.%${token}%`,
+          `vorname.ilike.%${token}%`,
+        ])
+      )
+    ).join(",");
 
     let countQuery = supabase.from("patients").select(selectBase, { count: "exact" });
 
@@ -127,10 +184,8 @@ export default function BehandlungenPage() {
       countQuery = countQuery.eq("behandlung_status", statusFilter);
     }
 
-    if (search.trim().length >= 2) {
-      countQuery = countQuery.or(
-        `nachname.ilike.%${search.trim()}%,vorname.ilike.%${search.trim()}%`
-      );
+    if (searchPattern) {
+      countQuery = countQuery.or(searchPattern);
     }
 
     const { data: scopedPatients, count } = await countQuery.limit(5000);
@@ -155,10 +210,8 @@ export default function BehandlungenPage() {
       query = query.eq("behandlung_status", statusFilter);
     }
 
-    if (search.trim().length >= 2) {
-      query = query.or(
-        `nachname.ilike.%${search.trim()}%,vorname.ilike.%${search.trim()}%`
-      );
+    if (searchPattern) {
+      query = query.or(searchPattern);
     }
 
     const { data } = await query;

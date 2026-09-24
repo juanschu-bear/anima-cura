@@ -276,7 +276,7 @@ export function useTransaktionen(filters?: {
 
     const suchbegriff = (filters?.suche || "").trim();
     if (suchbegriff) {
-      const tokens = buildSearchTokens(suchbegriff);
+      const tokens = buildDatabaseSearchTokens(suchbegriff);
       const patientMuster = Array.from(new Set(tokens.flatMap((token) => [
         `nachname.ilike.%${token}%`,
         `vorname.ilike.%${token}%`,
