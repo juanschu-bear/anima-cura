@@ -43,7 +43,15 @@ function buildSearchTokens(input: string) {
 }
 
 function buildDatabaseSearchTokens(input: string) {
-  return buildSearchTokens(input);
+  const rawTokens = String(input)
+    .toLocaleLowerCase("de-DE")
+    .replace(/[^a-z0-9äöüß@._-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...rawTokens, ...buildSearchTokens(input)]));
 }
 
 function rankPatientMatch(patient: any, search: string) {

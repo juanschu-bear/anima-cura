@@ -43,6 +43,18 @@ function buildSearchTokens(input: string) {
   );
 }
 
+function buildDatabaseSearchTokens(input: string) {
+  const rawTokens = String(input)
+    .toLocaleLowerCase("de-DE")
+    .replace(/[^a-z0-9äöüß@._-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...rawTokens, ...buildSearchTokens(input)]));
+}
+
 function rankPatientMatch(patient: any, search: string) {
   const variants = buildSearchVariants(search);
   const fullName = normalizePatientSearch(`${patient.nachname ?? ""} ${patient.vorname ?? ""}`);
@@ -113,7 +125,7 @@ export function usePatienten(search?: string) {
       .range(0, 9999);
 
     if (search) {
-      const tokens = buildSearchTokens(search);
+      const tokens = buildDatabaseSearchTokens(search);
       const muster = Array.from(new Set(tokens.flatMap((token) => [
         `nachname.ilike.%${token}%`,
         `vorname.ilike.%${token}%`,
