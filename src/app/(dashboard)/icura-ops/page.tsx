@@ -67,6 +67,47 @@ type IvorisSmokeResponse = {
   };
 };
 
+type IvorisDocumentProbeResponse = {
+  ok: boolean;
+  error?: string;
+  patient: {
+    id: string | null;
+    ivorisId: string | null;
+    vorname: string | null;
+    nachname: string | null;
+    geburtsdatum: string | null;
+  } | null;
+  range: {
+    begin: string | null;
+    end: string | null;
+  };
+  entriesTotal: number;
+  documentEntriesTotal: number;
+  entries: Array<{
+    id: string | null;
+    date: string | null;
+    type: string | null;
+    treatment: string | null;
+    tooth: string | null;
+    text: string | null;
+    documentId: string | null;
+    looksLikeInvoice: boolean;
+  }>;
+  hydratedDocuments: Array<{
+    documentId: string;
+    entryId: string | null;
+    entryDate: string | null;
+    entryText: string | null;
+    name: string | null;
+    date: string | null;
+    contentBytes: number;
+    contentType: string;
+    looksLikeInvoice: boolean;
+    downloadUrl: string;
+    error: string | null;
+  }>;
+};
+
 const OPS_ITEMS: OpsItem[] = [
   {
     id: "qr-payment-explanation",
@@ -190,11 +231,19 @@ const PRIORITY_TONE: Record<Priority, string> = {
 export default function ICuraOpsPage() {
   const { theme } = useAppStore();
   const dk = theme === "dark";
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const currentYearStart = `${new Date().getFullYear()}-01-01`;
   const [activeId, setActiveId] = useState<string>(OPS_ITEMS[0]?.id ?? "");
   const [smokeLoading, setSmokeLoading] = useState(false);
   const [smokeData, setSmokeData] = useState<IvorisSmokeResponse | null>(null);
   const [smokeError, setSmokeError] = useState<string | null>(null);
   const [smokeTestedAt, setSmokeTestedAt] = useState<string | null>(null);
+  const [documentProbeRef, setDocumentProbeRef] = useState("");
+  const [documentProbeBegin, setDocumentProbeBegin] = useState(currentYearStart);
+  const [documentProbeEnd, setDocumentProbeEnd] = useState(todayIso);
+  const [documentProbeLoading, setDocumentProbeLoading] = useState(false);
+  const [documentProbeData, setDocumentProbeData] = useState<IvorisDocumentProbeResponse | null>(null);
+  const [documentProbeError, setDocumentProbeError] = useState<string | null>(null);
 
   const fg = dk ? "#edf2f7" : "#162033";
   const muted = dk ? "#94a3b8" : "#66758d";
@@ -223,6 +272,39 @@ export default function ICuraOpsPage() {
       setSmokeError(error instanceof Error ? error.message : "IVORIS-Test fehlgeschlagen");
     } finally {
       setSmokeLoading(false);
+    }
+  };
+
+  const runDocumentProbe = async () => {
+    const ref = documentProbeRef.trim();
+    if (!ref) {
+      setDocumentProbeError("Bitte lokale patient_id oder IVORIS-ID eintragen.");
+      setDocumentProbeData(null);
+      return;
+    }
+
+    setDocumentProbeLoading(true);
+    setDocumentProbeError(null);
+    try {
+      const params = new URLSearchParams({ patient_ref: ref, hydrate_limit: "6" });
+      if (documentProbeBegin) params.set("begin", documentProbeBegin);
+      if (documentProbeEnd) params.set("end", documentProbeEnd);
+
+      const response = await fetch(`/api/ivoris/documents?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as IvorisDocumentProbeResponse | { error?: string };
+      if (!response.ok) {
+        throw new Error(payload?.error || `IVORIS-Dokumentcheck fehlgeschlagen (${response.status})`);
+      }
+      setDocumentProbeData(payload as IvorisDocumentProbeResponse);
+    } catch (error) {
+      setDocumentProbeData(null);
+      setDocumentProbeError(
+        error instanceof Error ? error.message : "IVORIS-Dokumentcheck fehlgeschlagen"
+      );
+    } finally {
+      setDocumentProbeLoading(false);
     }
   };
 
@@ -491,6 +573,250 @@ export default function ICuraOpsPage() {
             ) : (
               <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted, marginTop: 12 }}>
                 Ein Klick reicht. Danach sehen wir direkt, ob die laufende Anima-Cura-Instanz IVORIS wirklich erreicht oder ob Konfiguration, Pfad oder Netzwerk blockieren.
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              border: `1px solid ${border}`,
+              borderRadius: 18,
+              padding: 16,
+              marginBottom: 16,
+              background: dk ? "rgba(74,222,128,0.05)" : "#f7fff9",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: 1.6,
+                textTransform: "uppercase",
+                color: "#4ade80",
+                marginBottom: 10,
+              }}
+            >
+              IVORIS Rechnungsdokumente
+            </div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: fg, marginBottom: 12 }}>
+              Prüft pro Patient direkt über <code style={{ fontSize: "0.92em" }}>DocumentEntries</code> und{" "}
+              <code style={{ fontSize: "0.92em" }}>GetDocument</code>, ob IVORIS echte Dokumente
+              zurückliefert - also genau den Weg, den Sven Möckel für Rechnungsdokumente beschrieben hat.
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <input
+                value={documentProbeRef}
+                onChange={(event) => setDocumentProbeRef(event.target.value)}
+                placeholder="Lokale patient_id oder IVORIS-ID einfügen"
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  border: `1px solid ${border}`,
+                  background: dk ? "rgba(255,255,255,0.03)" : "#fff",
+                  color: fg,
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                <input
+                  type="date"
+                  value={documentProbeBegin}
+                  onChange={(event) => setDocumentProbeBegin(event.target.value)}
+                  style={{
+                    width: "100%",
+                    borderRadius: 12,
+                    border: `1px solid ${border}`,
+                    background: dk ? "rgba(255,255,255,0.03)" : "#fff",
+                    color: fg,
+                    padding: "12px 14px",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+                <input
+                  type="date"
+                  value={documentProbeEnd}
+                  onChange={(event) => setDocumentProbeEnd(event.target.value)}
+                  style={{
+                    width: "100%",
+                    borderRadius: 12,
+                    border: `1px solid ${border}`,
+                    background: dk ? "rgba(255,255,255,0.03)" : "#fff",
+                    color: fg,
+                    padding: "12px 14px",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={runDocumentProbe}
+              disabled={documentProbeLoading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                marginTop: 12,
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "none",
+                background: documentProbeLoading ? (dk ? "#243247" : "#dbe7ff") : "#4ade80",
+                color: documentProbeLoading ? muted : "#08111c",
+                fontSize: 12.5,
+                fontWeight: 800,
+                cursor: documentProbeLoading ? "wait" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {documentProbeLoading ? "Dokumente werden live geprüft…" : "Rechnungsdokumente live prüfen"}
+            </button>
+
+            {documentProbeError ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  borderRadius: 12,
+                  padding: 12,
+                  background: dk ? "rgba(248,113,113,0.10)" : "#fff5f5",
+                  border: "1px solid rgba(248,113,113,0.25)",
+                  color: "#f87171",
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
+                }}
+              >
+                {documentProbeError}
+              </div>
+            ) : null}
+
+            {documentProbeData ? (
+              <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                <div
+                  style={{
+                    borderRadius: 12,
+                    padding: 12,
+                    background: dk ? "rgba(96,165,250,0.07)" : "#f7fbff",
+                    border: `1px solid ${border}`,
+                  }}
+                >
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: fg }}>
+                    {documentProbeData.patient?.vorname || documentProbeData.patient?.nachname
+                      ? `${documentProbeData.patient?.vorname || ""} ${documentProbeData.patient?.nachname || ""}`.trim()
+                      : "IVORIS-Dokumentprüfung"}
+                  </div>
+                  <div style={{ fontSize: 11.5, lineHeight: 1.65, color: muted, marginTop: 6 }}>
+                    {documentProbeData.documentEntriesTotal} Dokument-Einträge gefunden,{" "}
+                    {documentProbeData.hydratedDocuments.length} davon direkt per{" "}
+                    <code style={{ fontSize: "0.92em" }}>GetDocument</code> geöffnet.
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.65, color: muted, marginTop: 8 }}>
+                    Zeitraum: {documentProbeData.range.begin || "offen"} bis{" "}
+                    {documentProbeData.range.end || "offen"}
+                  </div>
+                </div>
+
+                {documentProbeData.hydratedDocuments.length > 0 ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {documentProbeData.hydratedDocuments.map((doc) => (
+                      <div
+                        key={doc.documentId}
+                        style={{
+                          border: `1px solid ${border}`,
+                          borderRadius: 12,
+                          padding: 12,
+                          background: dk ? "rgba(255,255,255,0.02)" : "#fbfcfe",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 800, color: fg }}>
+                              {doc.name || "Dokument ohne Namen"}
+                            </div>
+                            <div style={{ fontSize: 11.5, lineHeight: 1.65, color: muted, marginTop: 6 }}>
+                              {doc.date || doc.entryDate || "Kein Datum"} ·{" "}
+                              {doc.contentBytes > 0
+                                ? `${Math.max(1, Math.round(doc.contentBytes / 1024))} KB`
+                                : "Inhalt nicht gemessen"}
+                            </div>
+                            {doc.entryText ? (
+                              <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted, marginTop: 6 }}>
+                                {doc.entryText}
+                              </div>
+                            ) : null}
+                            {doc.error ? (
+                              <div style={{ fontSize: 11.5, lineHeight: 1.6, color: "#f87171", marginTop: 6 }}>
+                                {doc.error}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                            <span
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 999,
+                                border: `1px solid ${
+                                  doc.looksLikeInvoice
+                                    ? "rgba(74,222,128,0.30)"
+                                    : "rgba(148,163,184,0.22)"
+                                }`,
+                                color: doc.looksLikeInvoice ? "#4ade80" : muted,
+                                background: doc.looksLikeInvoice
+                                  ? "rgba(74,222,128,0.10)"
+                                  : "rgba(148,163,184,0.08)",
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                letterSpacing: 0.4,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {doc.looksLikeInvoice ? "Rechnungs-Kandidat" : "Dokument"}
+                            </span>
+
+                            {!doc.error ? (
+                              <a
+                                href={doc.downloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: "9px 12px",
+                                  borderRadius: 10,
+                                  textDecoration: "none",
+                                  background: "#60a5fa",
+                                  color: "#fff",
+                                  fontSize: 11.5,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                Dokument öffnen
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted }}>
+                    Für diesen Patienten kamen in dem Zeitraum keine direkt verknüpften
+                    Dokument-Einträge zurück.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted, marginTop: 12 }}>
+                Hier geht es nicht um „API da oder nicht da“, sondern um den echten Beweis:
+                kommt für einen konkreten Patienten ein Dokument zurück und lässt es sich öffnen?
               </div>
             )}
           </div>

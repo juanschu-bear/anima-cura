@@ -527,3 +527,168 @@ export async function addIvorisDocument(
   }
   return docId;
 }
+
+export type IvorisDocumentEntry = {
+  id: string | null;
+  profileId: string | null;
+  patientId: string | null;
+  date: string | null;
+  type: string | null;
+  treatment: string | null;
+  tooth: string | null;
+  text: string | null;
+  documentId: string | null;
+  raw: Record<string, unknown>;
+};
+
+export type IvorisDocumentRecord = {
+  id: string | null;
+  profileId: string | null;
+  patientId: string | null;
+  name: string | null;
+  date: string | null;
+  contentBase64: string | null;
+  raw: Record<string, unknown>;
+};
+
+export type FetchIvorisDocumentEntriesInput = {
+  patientIvorisId: string;
+  begin?: string;
+  end?: string;
+};
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function collectRows(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) {
+    return payload
+      .map((item) => asObject(item))
+      .filter((item): item is Record<string, unknown> => Boolean(item));
+  }
+
+  const candidate = asObject(payload);
+  if (!candidate) return [];
+
+  for (const key of ["entries", "documents", "data", "result", "items"]) {
+    const nested = collectRows(candidate[key]);
+    if (nested.length > 0) return nested;
+  }
+
+  return [candidate];
+}
+
+function toDocumentEntry(row: Record<string, unknown>): IvorisDocumentEntry {
+  return {
+    id: pickString(row, ["EntryId", "entryId", "Id", "id"]),
+    profileId: pickString(row, ["ProfileId", "profileId"]),
+    patientId: pickString(row, ["PatientId", "patientId"]),
+    date: pickString(row, ["Date", "date", "EntryDate", "entryDate"]),
+    type: pickString(row, ["Type", "type"]),
+    treatment: pickString(row, ["Treatment", "treatment"]),
+    tooth: pickString(row, ["Tooth", "tooth", "ToothNo", "toothNo"]),
+    text: pickString(row, ["Text", "text", "Content", "content", "Description", "description"]),
+    documentId: pickString(row, ["DocumentId", "documentId"]),
+    raw: row,
+  };
+}
+
+function toDocumentRecord(row: Record<string, unknown>): IvorisDocumentRecord {
+  return {
+    id: pickString(row, ["DocumentId", "documentId", "Id", "id"]),
+    profileId: pickString(row, ["ProfileId", "profileId"]),
+    patientId: pickString(row, ["PatientId", "patientId"]),
+    name: pickString(row, ["Name", "name", "Filename", "filename", "FileName", "fileName"]),
+    date: pickString(row, ["Date", "date", "DocumentDate", "documentDate"]),
+    contentBase64: pickString(row, ["Content", "content"]),
+    raw: row,
+  };
+}
+
+export function normalizeIvorisDocumentEntries(payload: unknown): IvorisDocumentEntry[] {
+  return collectRows(payload).map(toDocumentEntry);
+}
+
+export function normalizeIvorisDocument(payload: unknown): IvorisDocumentRecord | null {
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const normalized = normalizeIvorisDocument(item);
+      if (normalized) return normalized;
+    }
+    return null;
+  }
+
+  const candidate = asObject(payload);
+  if (!candidate) return null;
+
+  const direct = toDocumentRecord(candidate);
+  if (direct.id || direct.name || direct.contentBase64) {
+    return direct;
+  }
+
+  for (const key of ["document", "data", "result", "item"]) {
+    const nested = normalizeIvorisDocument(candidate[key]);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+export async function fetchIvorisDocumentEntries(
+  input: FetchIvorisDocumentEntriesInput
+): Promise<IvorisDocumentEntry[]> {
+  const creds = getCredentials();
+  const url = buildUrl(creds, "/Documentation/v1/DocumentEntries");
+  url.searchParams.set("patientId", normalizePatientIvorisId(input.patientIvorisId));
+  url.searchParams.set("profileId", creds.profileId);
+  if (input.begin) url.searchParams.set("begin", input.begin);
+  if (input.end) url.searchParams.set("end", input.end);
+
+  const response = await fetchIvoris(url, {
+    method: "GET",
+    headers: buildHeaders(creds),
+    cache: "no-store",
+  });
+
+  const payload = await parseBestEffort(response);
+  if (!response.ok) {
+    throw new Error(
+      `IVORIS GetDocumentEntries fehlgeschlagen (${response.status}): ${
+        typeof payload === "string" ? payload : JSON.stringify(payload)
+      }`
+    );
+  }
+
+  return normalizeIvorisDocumentEntries(payload);
+}
+
+export async function fetchIvorisDocument(documentId: string): Promise<IvorisDocumentRecord> {
+  const creds = getCredentials();
+  const url = buildUrl(creds, "/Documentation/v1/Document");
+  url.searchParams.set("documentId", assertNonEmptyString(documentId, "DocumentId"));
+
+  const response = await fetchIvoris(url, {
+    method: "GET",
+    headers: buildHeaders(creds),
+    cache: "no-store",
+  });
+
+  const payload = await parseBestEffort(response);
+  if (!response.ok) {
+    throw new Error(
+      `IVORIS GetDocument fehlgeschlagen (${response.status}): ${
+        typeof payload === "string" ? payload : JSON.stringify(payload)
+      }`
+    );
+  }
+
+  const document = normalizeIvorisDocument(payload);
+  if (!document) {
+    throw new Error("IVORIS GetDocument lieferte kein lesbares Dokumentobjekt.");
+  }
+
+  return document;
+}
