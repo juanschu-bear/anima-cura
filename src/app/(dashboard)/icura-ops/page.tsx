@@ -24,6 +24,49 @@ type OpsItem = {
   patient?: string;
 };
 
+type SmokeMask = { set: boolean; preview: string };
+
+type IvorisSmokeResponse = {
+  ok: boolean;
+  reason?: "missing_env";
+  env: {
+    relayHost: SmokeMask;
+    linkname: SmokeMask;
+    app: SmokeMask;
+    appVersion: SmokeMask;
+    apiKey: SmokeMask;
+    username: SmokeMask;
+    password: SmokeMask;
+    profileId: SmokeMask;
+    missing: string[];
+  };
+  testedBaseUrl?: string;
+  ping?: {
+    endpoint: string;
+    ok: boolean;
+    status: number | null;
+    durationMs: number;
+    preview?: string;
+    error?: string | null;
+  };
+  documentation?: {
+    endpoint: string;
+    ok: boolean;
+    status: number | null;
+    durationMs: number;
+    preview?: string;
+    error?: string | null;
+    inspection?: {
+      isOpenApiLike: boolean;
+      pathCount: number;
+      hasDocumentGet: boolean;
+      hasDocumentPost: boolean;
+      hasDocumentEntries: boolean;
+      hasPatientGet: boolean;
+    };
+  };
+};
+
 const OPS_ITEMS: OpsItem[] = [
   {
     id: "qr-payment-explanation",
@@ -148,6 +191,10 @@ export default function ICuraOpsPage() {
   const { theme } = useAppStore();
   const dk = theme === "dark";
   const [activeId, setActiveId] = useState<string>(OPS_ITEMS[0]?.id ?? "");
+  const [smokeLoading, setSmokeLoading] = useState(false);
+  const [smokeData, setSmokeData] = useState<IvorisSmokeResponse | null>(null);
+  const [smokeError, setSmokeError] = useState<string | null>(null);
+  const [smokeTestedAt, setSmokeTestedAt] = useState<string | null>(null);
 
   const fg = dk ? "#edf2f7" : "#162033";
   const muted = dk ? "#94a3b8" : "#66758d";
@@ -160,6 +207,24 @@ export default function ICuraOpsPage() {
     () => OPS_ITEMS.find((item) => item.id === activeId) ?? OPS_ITEMS[0],
     [activeId],
   );
+
+  const runSmokeTest = async () => {
+    setSmokeLoading(true);
+    setSmokeError(null);
+    try {
+      const response = await fetch("/api/ivoris/smoke-test", { cache: "no-store" });
+      const payload = (await response.json()) as IvorisSmokeResponse | { error?: string };
+      if (!response.ok && !("env" in payload)) {
+        throw new Error(payload?.error || `IVORIS-Test fehlgeschlagen (${response.status})`);
+      }
+      setSmokeData(payload as IvorisSmokeResponse);
+      setSmokeTestedAt(new Date().toISOString());
+    } catch (error) {
+      setSmokeError(error instanceof Error ? error.message : "IVORIS-Test fehlgeschlagen");
+    } finally {
+      setSmokeLoading(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 1380, margin: "0 auto" }}>
@@ -293,6 +358,143 @@ export default function ICuraOpsPage() {
             top: 24,
           }}
         >
+          <div
+            style={{
+              border: `1px solid ${border}`,
+              borderRadius: 18,
+              padding: 16,
+              marginBottom: 16,
+              background: dk ? "rgba(96,165,250,0.06)" : "#f8fbff",
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: "#60a5fa", marginBottom: 10 }}>
+              IVORIS Live-Check
+            </div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: fg, marginBottom: 12 }}>
+              Prüft direkt in der echten Runtime, ob Anima Cura die aktuelle IVORIS-API wirklich erreicht und ob die Dokument-Endpunkte sichtbar sind.
+            </div>
+
+            <button
+              type="button"
+              onClick={runSmokeTest}
+              disabled={smokeLoading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "none",
+                background: smokeLoading ? (dk ? "#243247" : "#dbe7ff") : "#60a5fa",
+                color: smokeLoading ? muted : "#fff",
+                fontSize: 12.5,
+                fontWeight: 800,
+                cursor: smokeLoading ? "wait" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {smokeLoading ? "IVORIS wird geprüft…" : "IVORIS-Zugang jetzt testen"}
+            </button>
+
+            {smokeError ? (
+              <div style={{ marginTop: 12, borderRadius: 12, padding: 12, background: dk ? "rgba(248,113,113,0.10)" : "#fff5f5", border: "1px solid rgba(248,113,113,0.25)", color: "#f87171", fontSize: 12.5, lineHeight: 1.6 }}>
+                {smokeError}
+              </div>
+            ) : null}
+
+            {smokeData ? (
+              <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                <div style={{ borderRadius: 12, padding: 12, background: smokeData.ok ? (dk ? "rgba(74,222,128,0.10)" : "#f2fff6") : (dk ? "rgba(251,191,36,0.10)" : "#fff9eb"), border: `1px solid ${smokeData.ok ? "rgba(74,222,128,0.28)" : "rgba(251,191,36,0.28)"}` }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: smokeData.ok ? "#4ade80" : "#fbbf24" }}>
+                    {smokeData.ok ? "IVORIS erreichbar" : smokeData.reason === "missing_env" ? "Runtime unvollständig konfiguriert" : "IVORIS noch nicht sauber bestätigt"}
+                  </div>
+                  <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted, marginTop: 6 }}>
+                    {smokeData.ok
+                      ? "Mindestens einer der Kernchecks antwortet in der echten App-Runtime."
+                      : smokeData.reason === "missing_env"
+                        ? "Die laufende Umgebung hat nicht alle nötigen IVORIS-Variablen."
+                        : "Die App hat getestet, aber weder Ping noch Dokumentation konnten eindeutig erfolgreich bestätigt werden."}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                  <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 6 }}>Ping</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: smokeData.ping?.ok ? "#4ade80" : "#f87171" }}>
+                      {smokeData.ping ? `${smokeData.ping.ok ? "OK" : "Fehler"}${smokeData.ping.status ? ` · HTTP ${smokeData.ping.status}` : ""}` : "—"}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: muted, marginTop: 6 }}>
+                      {smokeData.ping ? `${smokeData.ping.durationMs} ms` : "Noch nicht getestet"}
+                    </div>
+                  </div>
+
+                  <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 6 }}>Dokumentation</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: smokeData.documentation?.ok ? "#4ade80" : "#f87171" }}>
+                      {smokeData.documentation ? `${smokeData.documentation.ok ? "OK" : "Fehler"}${smokeData.documentation.status ? ` · HTTP ${smokeData.documentation.status}` : ""}` : "—"}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: muted, marginTop: 6 }}>
+                      {smokeData.documentation ? `${smokeData.documentation.durationMs} ms` : "Noch nicht getestet"}
+                    </div>
+                  </div>
+                </div>
+
+                {smokeData.documentation?.inspection ? (
+                  <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, textTransform: "uppercase", color: muted, marginBottom: 8 }}>
+                      Dokument-Endpunkte
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {[
+                        { label: "GetDocument", ok: smokeData.documentation.inspection.hasDocumentGet },
+                        { label: "DocumentEntries", ok: smokeData.documentation.inspection.hasDocumentEntries },
+                        { label: "Patient", ok: smokeData.documentation.inspection.hasPatientGet },
+                      ].map((item) => (
+                        <span
+                          key={item.label}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            border: `1px solid ${item.ok ? "rgba(74,222,128,0.32)" : "rgba(248,113,113,0.22)"}`,
+                            color: item.ok ? "#4ade80" : "#f87171",
+                            background: item.ok ? "rgba(74,222,128,0.10)" : "rgba(248,113,113,0.08)",
+                            fontSize: 11,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: muted, marginTop: 8 }}>
+                      {smokeData.documentation.inspection.isOpenApiLike
+                        ? `${smokeData.documentation.inspection.pathCount} dokumentierte API-Pfade erkannt`
+                        : "Antwort war keine klar erkennbare OpenAPI-Struktur"}
+                    </div>
+                  </div>
+                ) : null}
+
+                {smokeData.env.missing.length > 0 ? (
+                  <div style={{ borderRadius: 12, padding: 12, background: dk ? "rgba(248,113,113,0.08)" : "#fff5f5", border: "1px solid rgba(248,113,113,0.22)" }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, color: "#f87171" }}>
+                      Fehlende Runtime-Werte: {smokeData.env.missing.join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div style={{ fontSize: 11, lineHeight: 1.55, color: muted }}>
+                  Basis: {smokeData.testedBaseUrl || "—"}<br />
+                  Letzter Test: {smokeTestedAt ? new Date(smokeTestedAt).toLocaleString("de-DE") : "—"}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11.5, lineHeight: 1.6, color: muted, marginTop: 12 }}>
+                Ein Klick reicht. Danach sehen wir direkt, ob die laufende Anima-Cura-Instanz IVORIS wirklich erreicht oder ob Konfiguration, Pfad oder Netzwerk blockieren.
+              </div>
+            )}
+          </div>
+
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: purple, marginBottom: 12 }}>
             Detailansicht
           </div>
