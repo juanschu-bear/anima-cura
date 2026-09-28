@@ -49,6 +49,19 @@ export function NodeConfigPanel({ node, onClose, onChange, onDelete }: Props) {
     }, 520);
   }
 
+  if (data.systemManaged) {
+    return <aside className="wf-config-panel">
+      <div className="wf-config-head"><h3 className="wf-config-title">{title}</h3>
+        <button onClick={onClose} className="wf-iconbtn" aria-label={t("common.close", locale)}><X size={16} /></button>
+      </div>
+      <div className="wf-config-body" style={{ fontSize: 16, lineHeight: 1.6 }}>
+        <p>{t("activation.managedHint", locale)}</p>
+        {data.subject && <h4>{data.subject}</h4>}
+        {data.body && <p style={{ whiteSpace: "pre-wrap" }}>{data.body}</p>}
+      </div>
+    </aside>;
+  }
+
   return (
     <aside className="wf-config-panel">
       <div className="wf-config-head">
@@ -138,6 +151,7 @@ function TriggerForm({ data, patch, locale }: any) {
     <div className="wf-form">
       <Field label={t("config.triggerType", locale)}>
         <select className="input" value={data.event || "rate_overdue"} onChange={(e) => patch({ event: e.target.value })}>
+          {data.event === "portal_activation_24h" && <option value="portal_activation_24h">{t("nodes.trigger.eventPortalActivation", locale)}</option>}
           <option value="rate_overdue">{t("config.triggerOption.rateOverdue", locale)}</option>
           <option value="rate_returned">{t("config.triggerOption.rateReturned", locale)}</option>
           <option value="daily_at">{t("config.triggerOption.dailyAt", locale)}</option>

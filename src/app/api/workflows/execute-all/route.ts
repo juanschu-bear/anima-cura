@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeStoredWorkflow, loadStoredWorkflows, resolveBatchContexts } from "@/app/api/workflows/execute/route";
+import { PORTAL_ACTIVATION_WORKFLOW_ID, runPortalActivationWorkflow } from "@/lib/services/portal-activation-workflow";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    if (request.nextUrl.searchParams.get("group") === "patient-access") {
+      const result = await runPortalActivationWorkflow();
+      return NextResponse.json(result, { status: result.status === "failed" ? 500 : 200 });
+    }
     const workflows = await loadStoredWorkflows();
     const activeWorkflows = workflows.filter((workflow) => workflow.active);
     const results: Array<Record<string, unknown>> = [];
@@ -17,6 +23,10 @@ export async function GET(request: NextRequest) {
     let skipped = 0;
 
     for (const workflow of activeWorkflows) {
+      if (workflow.id === PORTAL_ACTIVATION_WORKFLOW_ID) {
+        results.push(await runPortalActivationWorkflow());
+        continue;
+      }
       const contexts = await resolveBatchContexts(workflow);
 
       if (contexts.length === 0) {

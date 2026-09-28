@@ -11,6 +11,7 @@ export type NodeKind =
   | "action_wait";
 
 export type TriggerEvent =
+  | "portal_activation_24h"
   | "rate_overdue"
   | "rate_returned"
   | "daily_at"

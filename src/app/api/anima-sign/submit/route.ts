@@ -596,7 +596,8 @@ export async function POST(request: Request) {
       patient_anrede: asString(answers["patient_anrede"]),
       versicherter_anrede: asString(answers["vp_anrede"]),
       answers,
-      status: "signiert",
+      // Save the draft without claiming that patient signing has completed.
+      status: "offen",
     } as const;
 
     let submissionId: string;
@@ -922,14 +923,17 @@ export async function POST(request: Request) {
         redirectUrl: welcomeUrl,
       });
 
-      await supabase
+      const { error: signingStateError } = await supabase
         .from("anamnese_submissions")
         .update({
           status: "signatur_ausstehend",
           documenso_envelope_id: signing.envelopeId,
           documenso_recipient_token: signing.token,
         })
-        .eq("id", submissionId);
+        .eq("id", submissionId)
+        // A fast completion webhook must not be overwritten with "pending".
+        .is("signiert_am", null);
+      if (signingStateError) throw new Error(signingStateError.message);
 
       // Host fuer die Einbettung (Basis ohne /api/v2), damit der Client weiss,
       // welche Documenso-Instanz das Signier-Fenster laedt.
@@ -943,8 +947,7 @@ export async function POST(request: Request) {
         account: account ?? null,
       });
     } catch (documensoError) {
-      // Daten sind gespeichert. Ohne Signier-Link faellt das Frontend auf die
-      // Eingangsbestaetigung zurueck, die Praxis kann die Signatur nachholen.
+      // Keep the saved draft, but return an error rather than completion.
       await supabase
         .from("anamnese_submissions")
         .update({

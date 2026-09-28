@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { downloadSignedPdf } from "@/lib/documenso/client";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
+import { hasCompletedPatientSignature } from "@/lib/services/animasign-completion";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -77,10 +78,12 @@ export async function POST(request: Request) {
     const reason =
       payload.recipients?.find((r) => r.signingStatus === "REJECTED")
         ?.rejectionReason ?? "ohne Angabe";
-    await supabase
+    const { error: rejectionError } = await supabase
       .from("anamnese_submissions")
       .update({ status: "fehler", fehler_text: `Signatur abgelehnt: ${reason}` })
-      .eq("id", submissionId);
+      .eq("id", submissionId)
+      .is("signiert_am", null);
+    if (rejectionError) return NextResponse.json({ error: "Rejection update failed" }, { status: 503 });
     return NextResponse.json({ received: true });
   }
 
@@ -91,15 +94,19 @@ export async function POST(request: Request) {
   }
 
   // Idempotenz: schon signiert -> nichts tun.
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from("anamnese_submissions")
-    .select("status, patient_id, matched_patient_id, vorname, nachname, signiert_am")
+    .select("status, patient_id, matched_patient_id, vorname, nachname, signiert_am, signed_pdf_path")
     .eq("id", submissionId)
     .maybeSingle();
+  if (readError) {
+    // A transient database error must be retried, not acknowledged as processed.
+    return NextResponse.json({ error: "Submission lookup failed" }, { status: 503 });
+  }
   if (!existing) {
     return NextResponse.json({ received: true });
   }
-  if (existing.status === "signiert") {
+  if (hasCompletedPatientSignature(existing)) {
     return NextResponse.json({ received: true });
   }
 
@@ -117,7 +124,7 @@ export async function POST(request: Request) {
       throw new Error(`Storage: ${uploadError.message}`);
     }
 
-    await supabase
+    const { error: completionError } = await supabase
       .from("anamnese_submissions")
       .update({
         status: "signiert",
@@ -125,6 +132,7 @@ export async function POST(request: Request) {
         signiert_am: payload.completedAt ?? new Date().toISOString(),
       })
       .eq("id", submissionId);
+    if (completionError) throw new Error(completionError.message);
 
     await syncSignedAnamnesisToPatientDocuments(supabase, {
       id: submissionId,

@@ -1,27 +1,33 @@
 import { NextResponse } from "next/server";
-import { buildWelcomeEmail } from "@/lib/email/animasign-welcome";
+import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
+import { requirePraxisRole } from "@/lib/require-praxis";
+import { z } from "zod";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const to = searchParams.get("to");
-  if (!to) return NextResponse.json({ error: "?to=email fehlt" }, { status: 400 });
+// A preview/link scanner must never send email. Test sends require practice auth.
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
+}
+
+export async function POST(req: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+  const parsed = z.object({ to: z.string().email(), firstName: z.string().max(80).optional(), requestId: z.string().uuid() })
+    .safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid test request" }, { status: 400 });
+  const { to, firstName, requestId } = parsed.data;
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.ANIMASIGN_EMAIL_FROM;
   if (!apiKey || !from) return NextResponse.json({ error: "RESEND nicht konfiguriert" }, { status: 500 });
 
-  const { subject, html } = buildWelcomeEmail({
-    vorname: "Juan",
-    welcomeUrl: "https://animacura.io/welcome/test-preview",
-    lang: "de",
-  });
+  const { subject, html, text } = buildPortalActivationEmail({ firstName });
 
   const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to, subject, html }),
+    method: "POST", signal: AbortSignal.timeout(8000),
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `activation-test-${requestId}` },
+    body: JSON.stringify({ from, to, reply_to: "orthoschub@web.de", subject: `[TEST] ${subject}`, html, text }),
   });
 
   const data = await res.json();
-  return NextResponse.json({ status: res.ok ? "GESENDET" : "FEHLER", to, data });
+  return NextResponse.json({ status: res.ok ? "ACCEPTED" : "FAILED", providerId: res.ok ? data.id : undefined }, { status: res.ok ? 200 : 502 });
 }

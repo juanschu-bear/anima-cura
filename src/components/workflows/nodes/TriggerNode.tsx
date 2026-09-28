@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n";
 import type { TriggerData } from "../types";
 
 const EVENT_KEY: Record<string, string> = {
+  portal_activation_24h: "nodes.trigger.eventPortalActivation",
   rate_overdue: "nodes.trigger.eventOverdue",
   rate_returned: "nodes.trigger.eventReturned",
   daily_at: "nodes.trigger.eventDaily",

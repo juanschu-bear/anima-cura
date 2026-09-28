@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/lib/db/supabase";
 import { sendEmail } from "@/lib/services/email-send";
+import { requirePraxisRole } from "@/lib/require-praxis";
+import { PORTAL_ACTIVATION_WORKFLOW_ID, runPortalActivationWorkflow } from "@/lib/services/portal-activation-workflow";
 
 export const runtime = "nodejs";
 
@@ -677,6 +679,7 @@ export async function executeStoredWorkflow(
   workflow: StoredWorkflow,
   providedContext?: ExecutionContext | null
 ) {
+  if (workflow.id === PORTAL_ACTIVATION_WORKFLOW_ID) return runPortalActivationWorkflow();
   const triggerNode = getTriggerNode(workflow);
   if (!triggerNode) {
     throw new Error("Der Workflow hat keinen Trigger.");
@@ -935,6 +938,8 @@ export async function executeStoredWorkflow(
 }
 
 export async function POST(request: Request) {
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
   try {
     const parsed = postSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
