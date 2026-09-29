@@ -43,7 +43,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "activation.invoices": { de: "Dein Zugang ist für den digitalen Rechnungsempfang vorgesehen. Über neu bereitgestellte Rechnungen wirst du gesondert informiert. Du kannst anschließend über AnimaPay bzw. den QR-Code oder per normaler Überweisung bezahlen.", en: "Your account is intended for digital invoice delivery. You will receive a separate notification when a new invoice becomes available. You can then pay using AnimaPay, the QR code or a regular bank transfer." },
   "activation.help": { de: "Du hast keine Zugangsdaten oder kannst dich nicht anmelden? Antworte auf diese E-Mail. Fülle den Anamnesebogen nicht erneut aus und sende uns kein Passwort.", en: "Missing your credentials or unable to sign in? Reply to this email. Do not submit the medical history form again or send us your password." },
   "activation.cta": { de: "Anima Cura öffnen", en: "Open Anima Cura" },
-  "activation.signature": { de: "Dein Team der KFO-Praxis Dr. Schubert", en: "Your team at KFO-Praxis Dr. Schubert" },
+  "activation.signature": { de: "Liebe Grüße, dein Praxisteam Dr. Schubert", en: "Warm regards, your practice team at Dr. Schubert" },
   "nodes.trigger.eventPortalActivation": { de: "24 Stunden ohne erste Anmeldung", en: "24 hours without a first sign-in" },
   // ─── Navigation ─────────────────────────────────────────
   "nav.overview": { de: "Übersicht", en: "Overview" },

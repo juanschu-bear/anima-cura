@@ -3,8 +3,9 @@ import { createServerClient } from "@/lib/db/supabase";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
 import { loadActivationCohort } from "./portal-activation-workflow";
 
-const ID = "e8c5f5ae-2092-4b6b-89c0-f063e512a688";
-const KEY = "portal_invitation_campaign_20260929";
+// Separate, explicitly approved resend. Never reuse the old campaign's claims.
+const ID = "20fdc53a-d5cb-4de0-9c90-9b2b7d809342";
+const KEY = "portal_invitation_campaign_20260929_approved_resend";
 type Recipient = { email: string; patientIds: string[]; accountIds: string[]; firstName?: string; accessLinks?: { name: string; submissionId: string }[] };
 type Manifest = { version: string; createdAt: string; recipients: Recipient[]; paused?: boolean };
 type Db = ReturnType<typeof createServerClient>;
@@ -141,12 +142,13 @@ export async function testInvitationCampaign() {
   return progress(db, await manifest(db));
 }
 
-export async function sendInvitationBatch() {
+export async function sendInvitationBatch(limit = 3) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 15) throw new Error("Invalid batch limit");
   const db = createServerClient();
   const saved = await manifest(db);
   if (!saved || saved.paused || saved.version !== invitationVersion() || !(await progress(db, saved)).testAccepted) throw new Error("Reviewed campaign and accepted test required");
   const prior = new Set((await runs(db)).map(row => row.id));
-  const batch = saved.recipients.filter(r => !prior.has(invitationClaimId(r.email))).slice(0, 3);
+  const batch = saved.recipients.filter(r => !prior.has(invitationClaimId(r.email))).slice(0, limit);
   const cohort = await loadActivationCohort(db, new Date().toISOString());
   const fresh = new Map(invitationRecipients(cohort).map(r => [r.email, r]));
   let dispatchFailed = false;
