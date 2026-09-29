@@ -247,14 +247,14 @@ export default function WelcomeScreen({
   const passwordAvailable = Boolean(password);
   const passwordUnavailableText =
     lang === "en"
-      ? "This account already exists. If the password is missing, the practice can issue a new starter password directly."
+      ? "Use your current password if you have already signed in or changed it. We do not show an old starter password here. If you no longer know your password, contact the practice; do not submit the form again."
       : lang === "es"
       ? "Esta cuenta ya existe. Si falta la contraseña, la consulta puede generar una nueva contraseña inicial."
       : lang === "ru"
       ? "Этот аккаунт уже существует. Если пароль отсутствует, клиника может выдать новый стартовый пароль."
       : lang === "tr"
       ? "Bu hesap zaten mevcut. Şifre yoksa muayenehane yeni bir başlangıç şifresi verebilir."
-      : "Dieser Zugang existiert bereits. Falls das Passwort fehlt, kann die Praxis direkt ein neues Startpasswort ausstellen.";
+      : "Nutze dein bisheriges Passwort, wenn du dich bereits angemeldet oder es geändert hast. Ein altes Startpasswort zeigen wir hier nicht an. Falls du dein Passwort nicht mehr weißt, kontaktiere die Praxis – fülle den Bogen nicht erneut aus.";
   const appUrl = "https://animacura.io/patient/login";
   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + encodeURIComponent(appUrl) + "&bgcolor=fdfbf7&color=1d2a27";
 

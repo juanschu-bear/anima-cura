@@ -34,11 +34,19 @@ test("campaign claims are normalized and separate from the 24-hour workflow", ()
 test("invitation explains access without claiming invoices are already available or threatening fees", () => {
   const email = buildPortalActivationEmail({ purpose: "invitation", firstName: "<Juan>" });
   assert.ok(email.text.includes("Wir bereiten die digitale Bereitstellung"));
-  assert.ok(email.text.includes("keine Zahlungsaufforderung"));
-  assert.ok(email.text.includes("Anmelde-E-Mail kann von deiner persönlichen E-Mail-Adresse abweichen"));
+  assert.ok(email.text.includes("keine Rechnung oder Zahlungsaufforderung"));
+  assert.ok(email.text.includes("kein neues privates E-Mail-Postfach"));
   assert.ok(email.html.includes("&lt;Juan&gt;"));
   assert.ok(!email.html.includes("<Juan>"));
   assert.ok(!email.text.includes("24 Stunden"));
   assert.ok(!email.text.includes("Mahngebühren"));
   assert.ok(!buildPortalActivationEmail().text.includes("Wir bereiten die digitale Bereitstellung"));
+});
+test("personal access buttons point only to our welcome pages, with escaped family labels", () => {
+  const id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+  const email = buildPortalActivationEmail({ purpose: "invitation", accessLinks: [{ name: "<Kind>", submissionId: id }] });
+  assert.ok(email.html.includes(`https://animacura.io/welcome/${id}`));
+  assert.ok(email.html.includes("Meine Zugangsdaten öffnen – &lt;Kind&gt;"));
+  assert.ok(email.text.includes(`/welcome/${id}`));
+  assert.throws(() => buildPortalActivationEmail({ purpose: "invitation", accessLinks: [{ name: "", submissionId: "https://evil.example" }] }));
 });

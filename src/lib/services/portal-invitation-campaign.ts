@@ -5,10 +5,10 @@ import { loadActivationCohort } from "./portal-activation-workflow";
 
 const ID = "e8c5f5ae-2092-4b6b-89c0-f063e512a688";
 const KEY = "portal_invitation_campaign_20260929";
-type Recipient = { email: string; patientIds: string[]; accountIds: string[]; firstName?: string };
-type Manifest = { version: string; createdAt: string; recipients: Recipient[] };
+type Recipient = { email: string; patientIds: string[]; accountIds: string[]; firstName?: string; accessLinks?: { name: string; submissionId: string }[] };
+type Manifest = { version: string; createdAt: string; recipients: Recipient[]; paused?: boolean };
 type Db = ReturnType<typeof createServerClient>;
-const mail = (firstName?: string) => buildPortalActivationEmail({ purpose: "invitation", firstName });
+const mail = (firstName?: string, accessLinks: Recipient["accessLinks"] = [{ name: "TEST – Beispieldaten", submissionId: "test-preview" }]) => buildPortalActivationEmail({ purpose: "invitation", firstName, accessLinks });
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export const invitationVersion = () => hash(mail("{{vorname}}").subject + mail("{{vorname}}").text);
 export function invitationClaimId(email: string) {
@@ -24,7 +24,12 @@ export function invitationRecipients(cohort: Awaited<ReturnType<typeof loadActiv
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] : null;
     const firstName = latest?.guardian_email?.trim().toLowerCase() === r.email ? latest.guardian_first_name
       : latest?.form_email?.trim().toLowerCase() === r.email ? latest.vorname : undefined;
-    return { email: r.email, patientIds: r.patientIds.slice().sort(),
+    const accessLinks = rows.map(row => {
+      const sub = cohort.submissions.filter(s => row.submissionIds.includes(s.id))
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+      return { name: sub?.vorname || "", submissionId: sub?.id || "" };
+    });
+    return { email: r.email, patientIds: r.patientIds.slice().sort(), accessLinks,
       accountIds: rows.map(row => row.portalAccountId!).sort(), firstName: firstName || undefined };
   });
 }
@@ -33,7 +38,7 @@ async function manifest(db: Db): Promise<Manifest | null> {
   const q = await db.from("einstellungen").select("value").eq("key", KEY).maybeSingle();
   if (q.error) throw new Error("Campaign manifest unavailable");
   const value = q.data?.value as Manifest | undefined;
-  if (value && (value.version !== invitationVersion() || !Array.isArray(value.recipients))) throw new Error("Campaign content changed; review required");
+  if (value && !Array.isArray(value.recipients)) throw new Error("Invalid campaign manifest");
   return value || null;
 }
 
@@ -51,7 +56,7 @@ async function progress(db: Db, saved: Manifest | null) {
   const history = await runs(db);
   const claims = new Map(history.map(row => [row.id, row.status]));
   const recipients = saved?.recipients || [];
-  return { prepared: !!saved, testAccepted: claims.get(testId()) === "success",
+  return { prepared: !!saved, paused: !!saved?.paused, contentChanged: !!saved && saved.version !== invitationVersion(), testAccepted: claims.get(testId()) === "success",
     total: recipients.length, accepted: recipients.filter(r => claims.get(invitationClaimId(r.email)) === "success").length,
     held: recipients.filter(r => ["failed", "skipped", "running"].includes(claims.get(invitationClaimId(r.email)) || "")).length,
     pending: recipients.filter(r => !claims.has(invitationClaimId(r.email))).length };
@@ -70,6 +75,7 @@ export async function previewInvitationCampaign() {
 export async function prepareInvitationCampaign() {
   const db = createServerClient();
   let saved = await manifest(db);
+  if (saved && (saved.paused || saved.version !== invitationVersion())) throw new Error("Campaign paused or changed; explicit review required");
   if (!saved) {
     const cohort = await loadActivationCohort(db, new Date().toISOString());
     saved = { createdAt: new Date().toISOString(), version: invitationVersion(), recipients: invitationRecipients(cohort) };
@@ -79,6 +85,16 @@ export async function prepareInvitationCampaign() {
     saved = await manifest(db);
   }
   return progress(db, saved);
+}
+
+export async function pauseInvitationCampaign() {
+  const db = createServerClient();
+  const saved = await manifest(db);
+  if (saved) {
+    const q = await db.from("einstellungen").update({ value: { ...saved, paused: true } }).eq("key", KEY);
+    if (q.error) throw new Error("Could not pause campaign");
+  }
+  return progress(db, saved ? { ...saved, paused: true } : null);
 }
 
 async function dispatch(db: Db, id: string, recipient: Recipient, test: boolean) {
@@ -99,7 +115,8 @@ async function dispatch(db: Db, id: string, recipient: Recipient, test: boolean)
             (user.banned_until && Date.parse(user.banned_until) > Date.now())) throw new Error("Account verification changed");
       }
     }
-    const content = mail(recipient.firstName);
+    if (!test && (!recipient.accessLinks?.length || recipient.accessLinks.some(link => link.submissionId === "test-preview"))) throw new Error("Personal links required");
+    const content = mail(recipient.firstName, recipient.accessLinks);
     const response = await fetch("https://api.resend.com/emails", { method: "POST", signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": id },
       body: JSON.stringify({ from, to: recipient.email, reply_to: "orthoschub@web.de", ...content,
@@ -127,13 +144,14 @@ export async function testInvitationCampaign() {
 export async function sendInvitationBatch() {
   const db = createServerClient();
   const saved = await manifest(db);
-  if (!saved || !(await progress(db, saved)).testAccepted) throw new Error("Reviewed campaign and accepted test required");
+  if (!saved || saved.paused || saved.version !== invitationVersion() || !(await progress(db, saved)).testAccepted) throw new Error("Reviewed campaign and accepted test required");
   const prior = new Set((await runs(db)).map(row => row.id));
   const batch = saved.recipients.filter(r => !prior.has(invitationClaimId(r.email))).slice(0, 3);
   const cohort = await loadActivationCohort(db, new Date().toISOString());
   const fresh = new Map(invitationRecipients(cohort).map(r => [r.email, r]));
   let dispatchFailed = false;
   for (const recipient of batch) {
+    if ((await manifest(db))?.paused) break;
     const current = fresh.get(recipient.email);
     if (!current || JSON.stringify(current.patientIds) !== JSON.stringify(recipient.patientIds) ||
         JSON.stringify(current.accountIds) !== JSON.stringify(recipient.accountIds)) {

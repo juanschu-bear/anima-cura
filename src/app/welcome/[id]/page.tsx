@@ -1,6 +1,8 @@
 import { createServerClient } from "@/lib/db/supabase";
-import { ensurePatientPortalAccount } from "@/lib/services/patient-portal-account";
 import WelcomeScreen from "./WelcomeScreen";
+
+export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 export default async function WelcomePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,27 +32,23 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
   let loginEmail = sub.account_email || "";
   let password = sub.account_password || "";
 
-  if (!loginEmail || !password) {
-    const ensured = await ensurePatientPortalAccount({
-      vorname: sub.vorname || null,
-      nachname: sub.nachname || null,
-      patientEmail: sub.email || null,
-      patientId: sub.matched_patient_id || sub.patient_id || null,
-    });
-
-    if (ensured.status === "created" || ensured.status === "existing") {
-      loginEmail = ensured.login_email;
-      if (ensured.password) {
-        password = ensured.password;
-      }
-
-      await supabase
-        .from("anamnese_submissions")
-        .update({
-          account_email: loginEmail,
-          ...(password ? { account_password: password } : {}),
-        })
-        .eq("id", id);
+  // Opening a link (including an email scanner) must never create an account
+  // or reset credentials. Only show the already linked account.
+  const patientId = sub.matched_patient_id || sub.patient_id;
+  const { data: profile } = patientId ? await supabase.from("user_profiles")
+    .select("id,email").eq("patient_id", patientId).eq("role", "patient").maybeSingle() : { data: null };
+  if (!profile?.id || !profile.email || profile.email.toLowerCase() !== loginEmail.toLowerCase()) {
+    loginEmail = "";
+    password = "";
+  } else {
+    const { data, error } = await supabase.auth.admin.getUserById(profile.id);
+    if (error || !data.user || data.user.user_metadata?.patient_id !== patientId ||
+        (data.user.banned_until && Date.parse(data.user.banned_until) > Date.now())) {
+      loginEmail = "";
+      password = "";
+    } else if (data.user.last_sign_in_at) {
+      // A stored initial password is not evidence of the current password.
+      password = "";
     }
   }
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { z } from "zod";
-import { previewInvitationCampaign, prepareInvitationCampaign, testInvitationCampaign, sendInvitationBatch } from "@/lib/services/portal-invitation-campaign";
+import { previewInvitationCampaign, prepareInvitationCampaign, testInvitationCampaign, sendInvitationBatch, pauseInvitationCampaign } from "@/lib/services/portal-invitation-campaign";
 
 export const maxDuration = 60;
 
@@ -20,10 +20,10 @@ export async function POST(req: Request) {
   const origin = req.headers.get("origin");
   if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   const body = await req.json().catch(() => null);
-  const campaign = z.object({ action: z.enum(["prepare", "test", "send"]) }).strict().safeParse(body);
+  const campaign = z.object({ action: z.enum(["prepare", "test", "send", "pause"]) }).strict().safeParse(body);
   if (campaign.success) {
     try {
-      const result = campaign.data.action === "prepare" ? await prepareInvitationCampaign()
+      const result = campaign.data.action === "pause" ? await pauseInvitationCampaign() : campaign.data.action === "prepare" ? await prepareInvitationCampaign()
         : campaign.data.action === "test" ? await testInvitationCampaign() : await sendInvitationBatch();
       return NextResponse.json(result);
     } catch { return NextResponse.json({ error: "Campaign operation failed; review dispatch status before retrying" }, { status: 503 }); }

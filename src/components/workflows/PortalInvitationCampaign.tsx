@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 
-type Progress = { prepared: boolean; testAccepted: boolean; total: number; accepted: number; held: number; pending: number; dispatchFailed?: boolean };
+type Progress = { prepared: boolean; paused?: boolean; contentChanged?: boolean; testAccepted: boolean; total: number; accepted: number; held: number; pending: number; dispatchFailed?: boolean };
 type Preview = Progress & { eligible: number; patients: number; heldAddresses: number; subject: string; text: string };
 const endpoint = "/api/anima-sign/test-email";
 
@@ -36,6 +36,7 @@ export function PortalInvitationCampaign({ locale }: { locale: string }) {
         while (result.pending > 0 && !stop.current) {
           result = await request("send"); setProgress(result);
           if (result.dispatchFailed) throw new Error("Batch stopped");
+          if (result.paused || result.contentChanged) break;
         }
       }
     } catch { setError(true); }
@@ -47,14 +48,15 @@ export function PortalInvitationCampaign({ locale }: { locale: string }) {
     <div className="invitation-actions">
       <button disabled={busy} onClick={() => void run("preview")}>{t("campaign.preview", locale)}</button>
       {preview && <button disabled={busy} onClick={() => void run("test")}>{t("campaign.test", locale)}</button>}
-      {preview && <button className="invitation-send" disabled={busy || !progress?.testAccepted || (progress.prepared && progress.pending === 0)} onClick={() => void run("send")}>{t("campaign.send", locale)}</button>}
-      {sending && <button onClick={() => { stop.current = true; }}>{t("campaign.pause", locale)}</button>}
+      {preview && <button className="invitation-send" disabled={busy || !progress?.testAccepted || progress.paused || progress.contentChanged || (progress.prepared && progress.pending === 0)} onClick={() => void run("send")}>{t("campaign.send", locale)}</button>}
+      {sending && <button onClick={() => { stop.current = true; void request("pause").then(setProgress).catch(() => setError(true)); }}>{t("campaign.pause", locale)}</button>}
     </div>
     {preview && <>
       <p>{label("campaign.counts", { eligible: preview.eligible, patients: preview.patients, held: preview.heldAddresses })}</p>
       <details><summary>{preview.subject}</summary><p className="invitation-copy">{preview.text}</p></details>
     </>}
     <div role="status" aria-live="polite">
+      {(progress?.paused || progress?.contentChanged) && <p>{t("campaign.paused", locale)}</p>}
       {busy && !sending && <p>{t("campaign.busy", locale)}</p>}
       {progress?.testAccepted && <p>{t("campaign.testAccepted", locale)}</p>}
       {progress?.prepared && <p>{label("campaign.status", { accepted: progress.accepted, held: progress.held, pending: progress.pending })}</p>}
