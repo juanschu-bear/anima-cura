@@ -75,6 +75,26 @@ function identity(value: { vorname: string | null; nachname: string | null; gebu
   return [normalizeName(value.vorname), normalizeName(value.nachname), value.geburtsdatum.slice(0, 10)].join("|");
 }
 
+// A missing second given name is not a different person. Accept this variant
+// only with matching DOB/surname, independent contact agreement and exactly one
+// compatible record in the entire patient population. Never reassign records.
+export function verifiedGivenNameVariant(submission: OutreachSubmission, patient: OutreachPatient, population: OutreachPatient[]) {
+  const tokens = (value: string | null) => (value || "").trim().split(/[\s-]+/).map(normalizeName).filter(Boolean);
+  const compatible = (candidate: OutreachPatient) => {
+    if (!identity(submission) || !identity(candidate) ||
+        submission.geburtsdatum!.slice(0, 10) !== candidate.geburtsdatum!.slice(0, 10) ||
+        normalizeName(submission.nachname) !== normalizeName(candidate.nachname)) return false;
+    const a = tokens(submission.vorname), b = tokens(candidate.vorname);
+    return a.length > 0 && b.length > 0 && a.slice(0, Math.min(a.length, b.length)).every((token, i) => token === b[i]);
+  };
+  if (!compatible(patient)) return false;
+  const matches = population.filter(compatible);
+  if (matches.length !== 1 || matches[0].id !== patient.id) return false;
+  const contacts = [patient.email, patient.versicherter_email].map(normalizeEmail).filter(Boolean);
+  const contact = normalizeEmail(submission.email);
+  return Boolean(contact && !contactEmailIssue(contact, new Set()) && contacts.includes(contact));
+}
+
 export function latestDigitalConsent(submissions: OutreachSubmission[], consent?: OutreachConsent) {
   const evidence = submissions.filter(s => typeof s.digital_consent === "boolean").map(s => ({
     value: s.digital_consent as boolean, at: s.created_at, source: `submission:${s.id}`,
@@ -127,7 +147,8 @@ export function buildPatientOutreachAudit(input: {
     const issues: string[] = [];
     if (!patient) issues.push("patient_missing");
     if (submissions.some(s => s.patient_id && s.matched_patient_id && s.patient_id !== s.matched_patient_id)) issues.push("conflicting_patient_links");
-    if (patient && submissions.some(s => !identity(s) || !identity(patient) || identity(s) !== identity(patient))) issues.push("patient_identity_review");
+    if (patient && submissions.some(s => (!identity(s) || !identity(patient) || identity(s) !== identity(patient)) &&
+      !verifiedGivenNameVariant(s, patient, input.patients))) issues.push("patient_identity_review");
     if (submissions.some(s => (identityPatientIds.get(identity(s) || "")?.size || 0) > 1)) issues.push("duplicate_patient_identity");
     if (/\b(test|testpatient|demo)\b/i.test(`${latest.vorname} ${latest.nachname}`)) issues.push("possible_test_record");
 

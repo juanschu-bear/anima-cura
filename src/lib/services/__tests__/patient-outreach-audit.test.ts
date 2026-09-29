@@ -23,6 +23,25 @@ function audit(submissions: OutreachSubmission[] = [submission], patients = [pat
   return buildPatientOutreachAudit({ submissions, patients, accounts, consents: [], now: "2026-09-28T12:00:00Z" });
 }
 
+test("accepts omitted extra given names only for one matching patient with contact agreement", () => {
+  assert.deepEqual(audit([submission], [{ ...patient, vorname: "Nora-Marie" }])[0].issues, []);
+  assert.deepEqual(audit([{ ...submission, vorname: "Nora Marie" }])[0].issues, []);
+  for (const change of [{ email: "other@outlook.com" }, { geburtsdatum: "2015-01-02" }, { nachname: "Andere" }, { vorname: "Norah Marie" }]) {
+    assert.ok(audit([submission], [{ ...patient, vorname: "Nora Marie", ...change }])[0].issues.includes("patient_identity_review"));
+  }
+});
+
+test("does not accept a name prefix shared by two patients, even without a second form", () => {
+  const patients = [{ ...patient, vorname: "Nora Marie" }, { ...patient, id: "p2", vorname: "Nora Anna" }];
+  assert.ok(audit([submission], patients)[0].issues.includes("patient_identity_review"));
+});
+
+test("does not treat swapped siblings or a partial token as an omitted given name", () => {
+  assert.ok(audit([{ ...submission, vorname: "No" }])[0].issues.includes("patient_identity_review"));
+  assert.ok(audit([{ ...submission, vorname: "Marie Nora" }])[0].issues.includes("patient_identity_review"));
+  assert.ok(audit([submission, { ...submission, id: "s2", vorname: "Finn" }])[0].issues.includes("patient_identity_review"));
+});
+
 test("takes all submitted statuses, not only signed forms, and deduplicates by linked patient", () => {
   const rows = audit([submission, { ...submission, id: "s2", created_at: "2026-09-21T12:00:00Z", status: "fehler" }]);
   assert.equal(rows.length, 1);
