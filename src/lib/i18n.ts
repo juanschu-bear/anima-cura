@@ -6,6 +6,21 @@
 // ============================================================
 
 const translations: Record<string, { de: string; en: string }> = {
+  "invitation.subject": { de: "Wichtig: Jetzt deinen Anima-Cura-Zugang prüfen", en: "Important: check your Anima Cura access now" },
+  "invitation.intro": { de: "Für unsere digitale Praxis-Kommunikation nutzen wir Anima Cura. Öffne deinen Zugang heute und prüfe, ob du dich anmelden kannst. Wenn du die App bereits erfolgreich nutzt, musst du keinen neuen Zugang erstellen.", en: "We use Anima Cura for our digital practice communication. Open your account today and check that you can sign in. If you already use the app successfully, do not create another account." },
+  "invitation.action": { de: "Nutze die Anmelde-E-Mail und das Passwort aus deiner Zugangsbestätigung. Die Anmelde-E-Mail kann von deiner persönlichen E-Mail-Adresse abweichen. Du kannst Anima Cura im Browser öffnen und anschließend zum Home-Bildschirm hinzufügen.", en: "Use the sign-in email and password from your access confirmation. Your sign-in email may differ from your personal email address. Open Anima Cura in your browser and then add it to your home screen." },
+  "invitation.invoices": { de: "Wir bereiten die digitale Bereitstellung der Rechnungen vor. Sobald eine Rechnung für dich verfügbar ist, erhältst du eine gesonderte Benachrichtigung. Diese Nachricht ist keine Rechnung und keine Zahlungsaufforderung.", en: "We are preparing digital invoice access. You will receive a separate notification when an invoice is available for you. This message is not an invoice or a payment request." },
+  "campaign.title": { de: "App-Einladung an bestehende Patienten", en: "App invitation for existing patients" },
+  "campaign.hint": { de: "Einmalige Rundmail an geprüfte Anamnesekontakte. Getrennt von der 24-Stunden-Erinnerung. Unklare Zuordnungen werden nicht angeschrieben.", en: "One invitation per verified anamnesis contact, separate from the 24-hour reminder. Unclear assignments are excluded." },
+  "campaign.preview": { de: "Empfänger und Text prüfen", en: "Review recipients and message" },
+  "campaign.test": { de: "Testmail an Juan senden", en: "Send test email to Juan" },
+  "campaign.send": { de: "Geprüfte Rundmail jetzt senden", en: "Send reviewed invitations now" },
+  "campaign.pause": { de: "Nach diesem Paket pausieren", en: "Pause after this batch" },
+  "campaign.counts": { de: "{eligible} geprüfte E-Mail-Adressen · {patients} Patientenakten · {held} Adressen zurückgestellt", en: "{eligible} reviewed email addresses · {patients} patient records · {held} addresses held" },
+  "campaign.status": { de: "Vom Versanddienst angenommen: {accepted} · Zurückgestellt/Fehler: {held} · Noch nicht bearbeitet: {pending}", en: "Accepted by email provider: {accepted} · Held/errors: {held} · Not yet processed: {pending}" },
+  "campaign.testAccepted": { de: "Testmail vom Versanddienst angenommen. Das ist noch keine Zustellbestätigung.", en: "Test email accepted by the provider. Delivery is not yet confirmed." },
+  "campaign.error": { de: "Versandprüfung fehlgeschlagen. Es wird nicht automatisch weitergesendet. Erneut prüfen; bereits bearbeitete Empfänger werden nicht doppelt angeschrieben.", en: "Dispatch check failed. Sending will not continue automatically. Review again; already processed recipients will not be emailed twice." },
+  "campaign.busy": { de: "Wird geprüft …", en: "Checking …" },
   "activation.subject": { de: "Wichtig: Dein Zugang zur Anima Cura App ist noch nicht aktiviert", en: "Important: activate your Anima Cura app access" },
   "activation.workflowName": { de: "App-Zugang · Erinnerung nach 24 Stunden", en: "App access · 24-hour reminder" },
   "activation.workflowDescription": { de: "Neue Einreichungen: nach 24 Stunden ohne erste Anmeldung einmal erinnern. Ältere Einreichungen und unklare Zuordnungen bleiben im Prüfbericht. Keine Zahlungserinnerung.", en: "New submissions: one reminder after 24 hours without a first sign-in. Historical submissions and unclear assignments remain in the audit. Not a payment reminder." },

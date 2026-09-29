@@ -5,13 +5,14 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({
 }[char]!));
 
 /** No credentials, patient documents or private welcome tokens in reminder email. */
-export function buildPortalActivationEmail(input: { firstName?: string; locale?: string } = {}) {
+export function buildPortalActivationEmail(input: { firstName?: string; locale?: string; purpose?: "invitation" } = {}) {
   const locale = input.locale || "de";
-  const subject = t("activation.subject", locale);
+  const prefix = input.purpose === "invitation" ? "invitation" : "activation";
+  const subject = t(`${prefix}.subject`, locale);
   const greeting = input.firstName?.trim()
     ? t("activation.greeting", locale, { name: input.firstName.trim() })
     : t("activation.neutralGreeting", locale);
-  const paragraphs = [greeting, ...["intro", "action", "invoices", "help", "signature"].map(key => t(`activation.${key}`, locale))];
+  const paragraphs = [greeting, ...["intro", "action", "invoices"].map(key => t(`${prefix}.${key}`, locale)), t("activation.help", locale), t("activation.signature", locale)];
   const url = "https://animacura.io/patient/login";
   const text = [...paragraphs.slice(0, 3), `${t("activation.cta", locale)}: ${url}`, ...paragraphs.slice(3)].join("\n\n");
   const p = (value: string) => `<p style="margin:0 0 20px;color:#172b35;font:16px/1.6 Arial,sans-serif">${escapeHtml(value)}</p>`;

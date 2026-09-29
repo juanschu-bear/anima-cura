@@ -2,17 +2,34 @@ import { NextResponse } from "next/server";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { z } from "zod";
+import { previewInvitationCampaign, prepareInvitationCampaign, testInvitationCampaign, sendInvitationBatch } from "@/lib/services/portal-invitation-campaign";
+
+export const maxDuration = 60;
 
 // A preview/link scanner must never send email. Test sends require practice auth.
 export async function GET() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
+  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  if (authError) return authError;
+  try { return NextResponse.json(await previewInvitationCampaign(), { headers: { "Cache-Control": "no-store" } }); }
+  catch { return NextResponse.json({ error: "Campaign preview unavailable" }, { status: 503 }); }
 }
 
 export async function POST(req: Request) {
   const authError = await requirePraxisRole(["admin", "verwaltung"]);
   if (authError) return authError;
+  const origin = req.headers.get("origin");
+  if (origin && origin !== new URL(req.url).origin) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  const body = await req.json().catch(() => null);
+  const campaign = z.object({ action: z.enum(["prepare", "test", "send"]) }).strict().safeParse(body);
+  if (campaign.success) {
+    try {
+      const result = campaign.data.action === "prepare" ? await prepareInvitationCampaign()
+        : campaign.data.action === "test" ? await testInvitationCampaign() : await sendInvitationBatch();
+      return NextResponse.json(result);
+    } catch { return NextResponse.json({ error: "Campaign operation failed; review dispatch status before retrying" }, { status: 503 }); }
+  }
   const parsed = z.object({ to: z.string().email(), firstName: z.string().max(80).optional(), requestId: z.string().uuid() })
-    .safeParse(await req.json().catch(() => null));
+    .safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid test request" }, { status: 400 });
   const { to, firstName, requestId } = parsed.data;
 

@@ -31,6 +31,7 @@ import type { Workflow, WorkflowEdge, WorkflowNode } from "@/components/workflow
 import { t } from "@/lib/i18n";
 import { AutomationPortalBackground } from "@/components/workflows/AutomationPortalBackground";
 import { useCountUp } from "@/components/workflows/useCountUp";
+import { PortalInvitationCampaign } from "@/components/workflows/PortalInvitationCampaign";
 
 const SETTING_KEY = "workflows";
 
@@ -379,6 +380,8 @@ export default function AutomatisierungenPage() {
           </div>
         </div>
       </section>
+
+      <PortalInvitationCampaign locale={locale} />
 
       <section className="portal-kpis">
         <PortalKpi icon={Zap}        label={t("workflow.activeCount", locale)} value={activeCount}  hint={`${workflows.length} ${t("workflow.totalCount", locale)}`} accent="#8d86ff" gradient="linear-gradient(135deg, #8d86ff 0%, #b78bff 50%, #4cc9f0 100%)" />
