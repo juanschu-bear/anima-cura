@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
+import { prepareScribeBillingExport } from "@/lib/billing-foundation";
+import { t } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type Position = { code?: unknown; text?: unknown; anzahl?: unknown };
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerComponentClient();
@@ -30,24 +30,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Nur bestätigte, versionierte Einträge dürfen exportiert werden" }, { status: 409 });
   }
 
-  const positions = (Array.isArray(entry.positionen) ? entry.positionen : [])
-    .map((position: Position) => ({
-      code: String(position.code ?? "").trim(),
-      text: String(position.text ?? "").trim(),
-      anzahl: Math.max(1, Number(position.anzahl ?? 1) || 1),
-    }))
-    .filter((position) => position.code);
-  const copyText = positions
-    .map((position) => `${position.code}${position.anzahl > 1 ? ` x${position.anzahl}` : ""}\t${position.text}`.trim())
-    .join("\n");
+  const locale = new URL(_request.url).searchParams.get("lang") === "en" ? "en" : "de";
+  const prepared = prepareScribeBillingExport(entry.positionen);
+  if (!prepared.ok) return NextResponse.json({
+    status: "needs_position_review",
+    error: t("billing.exportReview", locale),
+  }, { status: 409, headers: { "Cache-Control": "private, no-store" } });
 
   return NextResponse.json({
     status: "manual_transfer_required",
     source_entry_id: entry.id,
     source_version: entry.version,
     confirmed_at: entry.bestaetigt_am,
-    positions,
-    copy_text: copyText,
+    positions: prepared.positions,
+    copy_text: prepared.copyText,
     notice: "Noch keine bestätigte IVORIS-Abrechnungsschnittstelle. Positionen fachlich prüfen und manuell in IVORIS erfassen.",
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

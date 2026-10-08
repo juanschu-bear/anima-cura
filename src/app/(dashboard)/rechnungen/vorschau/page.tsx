@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import Link from "next/link";
+import { t } from "@/lib/i18n";
+import { parseBillingPreview, formatBillingServiceDate } from "@/lib/billing-preview";
 
 interface Pos { goz_nr: string; bezeichnung: string; faktor: number; anzahl: number; preis: number; gkv_abzug: number; endpreis: number; begruendung: string; datum?: string; region?: string; material?: number; }
 interface PreviewData {
@@ -21,27 +23,26 @@ interface PreviewData {
 }
 
 export default function VorschauPage() {
-  const { theme } = useAppStore();
+  const { theme, locale } = useAppStore();
   const dk = theme === "dark";
   const [data, setData] = useState<PreviewData | null>(null);
-  const [rNr] = useState(() => String(Math.floor(Math.random() * 90000) + 10000).padStart(8, "0"));
+  const rNr = t("billing.numberPending", locale);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("ac-rechnung-preview");
-    if (raw) setData(JSON.parse(raw));
+    try { setData(parseBillingPreview(sessionStorage.getItem("ac-rechnung-preview"))); }
+    catch { setData(null); }
   }, []);
 
   if (!data) return (
     <div style={{ textAlign: "center", padding: 60 }}>
-      <p style={{ color: "#666", fontSize: 14 }}>Keine Rechnungsdaten gefunden.</p>
+      <p style={{ color: dk ? "#cbd5e1" : "#465765", fontSize: 16 }}>{t("billing.invalidPreview", locale)}</p>
       <Link href="/rechnungen" style={{ color: "#4ade80", fontSize: 14, fontWeight: 600 }}>Zur Rechnungs-Engine</Link>
     </div>
   );
 
   const fE = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const today = new Date();
-  const datum = today.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const faellig = new Date(today.getTime() + 14 * 864e5).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const datum = today.toLocaleDateString(locale === "de" ? "de-DE" : "en-GB", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
   const uz = data.patient.id.slice(0, 8).toUpperCase() + "-1";
   const isGOZ = data.patientArt === "privat";
 
@@ -86,14 +87,13 @@ export default function VorschauPage() {
       </div>
 
       {/* === RECHNUNG === */}
-      <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>RECHNUNG</div>
+      <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>{t("billing.draftTitle", locale)}</div>
 
       {/* === RECHNUNGSDATEN === */}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 4 }}>
-        <div>Unser Zeichen: <strong>{uz}</strong></div>
-        <div>Rechnungsdatum: {datum}</div>
+        <div>{t("billing.draftReference", locale)}: <strong>{uz}</strong></div>
+        <div>{t("billing.draftDate", locale)}: {datum}</div>
       </div>
-      <div style={{ fontSize: 9, marginBottom: 2 }}>Bitte bei &Uuml;berweisung Unser Zeichen angeben.</div>
       <div style={{ fontSize: 9, marginBottom: 8 }}>Rechnungsnummer: {rNr}</div>
 
       {/* === BEHANDELTE PERSON === */}
@@ -122,7 +122,7 @@ export default function VorschauPage() {
             const bgrIdx = bgrList.findIndex(b => b.text === p.begruendung);
             return (
               <tr key={i} style={{ borderBottom: "0.5px solid #ddd" }}>
-                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.datum ? new Date(p.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : ""}</td>
+                <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{formatBillingServiceDate(p.datum, locale, true)}</td>
                 <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.region || ""}</td>
                 <td style={{ padding: "3px", verticalAlign: "top" }}>{p.goz_nr}</td>
                 <td style={{ padding: "3px", verticalAlign: "top" }}>{p.bezeichnung}</td>
@@ -166,13 +166,13 @@ export default function VorschauPage() {
 
       {/* === ZAHLUNGSHINWEIS === */}
       <div style={{ fontSize: 9, lineHeight: 1.5, marginBottom: 12 }}>
-        Bitte &uuml;berweisen Sie den Betrag in H&ouml;he von <strong>{fE(data.gesamtEndpreis)} EUR</strong> bis sp&auml;testens {faellig} auf eines unserer unten angegebenen Konten.
+        {t("billing.draftPayment", locale)}
       </div>
 
       {/* === RATENPLAN === */}
       {data.ratenAnzahl > 1 && (
         <div style={{ fontSize: 9, marginBottom: 12 }}>
-          <strong>Ratenplan:</strong> {data.ratenAnzahl} Raten &agrave; {fE(data.rateProMonat)} EUR/Monat, Beginn {new Date(data.startDatum).toLocaleDateString("de-DE")}
+          <strong>Ratenplan:</strong> {data.ratenAnzahl} Raten &agrave; {fE(data.rateProMonat)} EUR/Monat, Beginn {formatBillingServiceDate(data.startDatum, locale)}
         </div>
       )}
 
@@ -226,14 +226,13 @@ export default function VorschauPage() {
         {data.patient.name}
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>RECHNUNG</div>
+      <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>{t("billing.draftTitle", locale)}</div>
 
       {/* Rechnungsdaten */}
       <table style={{ fontSize: 9, marginBottom: 4, borderCollapse: "collapse" }}>
         <tbody>
-          <tr><td style={{ fontWeight: "bold", paddingRight: 16, paddingBottom: 2 }}>Rechnungsdatum:</td><td>{datum}</td></tr>
-          <tr><td style={{ fontWeight: "bold", paddingRight: 16, paddingBottom: 2 }}>Unser Zeichen:</td><td>{uz}</td></tr>
-          <tr><td colSpan={2} style={{ fontSize: 8, paddingBottom: 2 }}>Bitte bei &Uuml;berweisung Unser Zeichen angeben.</td></tr>
+          <tr><td style={{ fontWeight: "bold", paddingRight: 16, paddingBottom: 2 }}>{t("billing.draftDate", locale)}:</td><td>{datum}</td></tr>
+          <tr><td style={{ fontWeight: "bold", paddingRight: 16, paddingBottom: 2 }}>{t("billing.draftReference", locale)}:</td><td>{uz}</td></tr>
           <tr><td style={{ fontWeight: "bold", paddingRight: 16, paddingBottom: 2 }}>Rechnungsnummer:</td><td>{rNr}</td></tr>
         </tbody>
       </table>
@@ -244,7 +243,7 @@ export default function VorschauPage() {
         </tbody>
       </table>
 
-      <div style={{ fontSize: 9, marginBottom: 10 }}>F&uuml;r die erbrachten kieferorthop&auml;dischen und zahn&auml;rztlichen Leistungen erlaube ich mir in Rechnung zu stellen:</div>
+      <div style={{ fontSize: 9, marginBottom: 10 }}>{t("billing.draftServices", locale)}</div>
 
       {/* MKV Positions Table */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 8.5 }}>
@@ -263,7 +262,7 @@ export default function VorschauPage() {
         <tbody>
           {data.positionen.map((p, i) => (
             <tr key={i} style={{ borderBottom: "0.5px solid #ddd" }}>
-              <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.datum ? new Date(p.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</td>
+              <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{formatBillingServiceDate(p.datum, locale)}</td>
               <td style={{ padding: "3px", verticalAlign: "top" }}>{p.goz_nr}</td>
               <td style={{ padding: "3px", verticalAlign: "top", fontSize: 8 }}>{p.region || ""}</td>
               <td style={{ padding: "3px", verticalAlign: "top" }}>
@@ -313,13 +312,12 @@ export default function VorschauPage() {
 
       {data.ratenAnzahl > 1 && (
         <div style={{ fontSize: 9, marginBottom: 8 }}>
-          <strong>Ratenplan:</strong> {data.ratenAnzahl} Raten &agrave; {fE(data.rateProMonat)} EUR/Monat, Beginn {new Date(data.startDatum).toLocaleDateString("de-DE")}
+          <strong>Ratenplan:</strong> {data.ratenAnzahl} Raten &agrave; {fE(data.rateProMonat)} EUR/Monat, Beginn {formatBillingServiceDate(data.startDatum, locale)}
         </div>
       )}
 
       <div style={{ fontSize: 9, lineHeight: 1.5, marginBottom: 12 }}>
-        Bitte &uuml;berweisen Sie den Betrag in H&ouml;he von <strong>{fE(data.gesamtEndpreis)} EUR</strong> bis sp&auml;testens {faellig} auf unser Konto Nr. 1090118941 bei der Sparkasse Leipzig Bankleitzahl: 86055592.<br/>
-        IBAN: DE03860555921090118941 &middot; BIC: WELADE8LXXX
+        {t("billing.draftPayment", locale)}
       </div>
 
       <div style={{ fontSize: 7, color: "#666", marginTop: 16, lineHeight: 1.4 }}>
@@ -337,8 +335,8 @@ export default function VorschauPage() {
   return (
     <div>
       {/* Action Bar */}
-      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, padding: "12px 20px", borderRadius: 14, background: dk ? "rgba(16,18,28,0.75)" : "#fff", border: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "#e5e8ef"}` }}>
-        <Link href="/rechnungen" style={{ display: "flex", alignItems: "center", gap: 6, color: "#4ade80", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+      <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 20, padding: "12px 20px", borderRadius: 14, background: dk ? "rgba(16,18,28,0.75)" : "#fff", border: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "#e5e8ef"}` }}>
+        <Link href="/rechnungen" style={{ display: "flex", alignItems: "center", gap: 6, color: dk ? "#4ade80" : "#176144", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
           <ArrowLeft size={15} /> Zur&uuml;ck
         </Link>
         <div style={{ fontSize: 12, color: dk ? "#888" : "#666" }}>
@@ -346,21 +344,28 @@ export default function VorschauPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${dk ? "rgba(255,255,255,0.06)" : "#e5e8ef"}`, background: "transparent", color: dk ? "#f0f0f0" : "#1c3044", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            <Printer size={14} /> Drucken
+            <Printer size={14} /> {t("billing.printDraft", locale)}
           </button>
-          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#4ade80", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            <Download size={14} /> Als PDF
+          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#176144", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            <Download size={14} /> {t("billing.saveDraft", locale)}
           </button>
         </div>
       </div>
 
       {/* A4 Document */}
       <div id="invoice" style={{ width: 210 * 2.83, minHeight: 297 * 2.83, margin: "0 auto", background: "#fff", color: "#000", padding: "20mm 18mm", borderRadius: dk ? 4 : 0, boxShadow: dk ? "0 2px 40px rgba(0,0,0,0.5)" : "0 1px 8px rgba(0,0,0,0.1)" }}>
+        <div className="draft-notice" role="note" style={{ fontSize: 16, lineHeight: 1.5, color: "#624200", background: "#fff4d6", border: "1px solid #b99138", padding: 16, borderRadius: 8, marginBottom: 24 }}>
+          <strong>{t("billing.draftTitle", locale)}</strong><br />{t("billing.draftNotice", locale)}
+        </div>
         <Template />
       </div>
 
       <style>{`
+        @media screen and (max-width: 850px) {
+          #invoice { box-sizing: border-box; width: 100% !important; padding: 20px !important; overflow-x: auto; }
+        }
         @media print {
+          .draft-notice { color: #000 !important; background: #fff !important; border-color: #000 !important; break-inside: avoid; }
           .no-print { display: none !important; }
           body, html { background: white !important; margin: 0 !important; padding: 0 !important; }
           #invoice { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; width: auto !important; min-height: auto !important; }
