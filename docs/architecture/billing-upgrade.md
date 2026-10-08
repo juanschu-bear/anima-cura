@@ -31,3 +31,13 @@ Prüfnachweise: automatisierte Tests für Rechenregeln, Quellenlücken, Dublette
 Noch nicht enthalten: persistenter Tarifkatalog/Positionseditor, vollständiger IVORIS-Rückabgleich, Quartalslistenimport, transaktionale Rechnungsausstellung und Veröffentlichung im Patientenportal. Bestehende Paketpreise im Entwurfseditor sind keine neu geprüften Tarife. Der Status `ready_for_review` ist ausschließlich eine technische Vorprüfung, keine Abrechnungsfreigabe oder Zusicherung rechtlicher Vollständigkeit. Die browserseitige Prüfung ersetzt keinen authentifizierten Produktions-Durchlauf mit freigegebenen Praxisbeispielen.
 
 Dieser Ausbauschritt führt keine Datenmigration aus, ändert keine Patientensalden und erstellt oder versendet keine Patientenrechnungen.
+
+## Stand des zweiten Inkrements
+
+Implementiert: persistente, unveränderliche Versionen für Tarifnachweise und einzelne Leistungspositionen; eindeutige Herkunft aus Scribe, IVORIS, Praxisimport oder manuellem Beleg; Schutz vor einer zweiten Erfassung derselben Quellposition; optimistische Versionssperre; idempotente Schreibaufrufe; serverseitige Berechnung und erneute Quellenprüfung bei der fachlichen Freigabe. Korrekturen erzeugen neue Versionen und erhalten den bisherigen Verlauf. Schreibrechte werden sowohl am API-Zugang als auch innerhalb der Datenbanktransaktion geprüft.
+
+Die Oberfläche trennt Tarif, Leistungsentwurf, Versionsverlauf, fachliche Freigabe und Rechnungsausstellung. Bestätigte Scribe-Einträge erscheinen ausschließlich als Vorschläge. Fehlende Menge, Einzelcode, Tarif, Kassenkennung, Region, GOZ-Faktor oder Begründung verhindern die Freigabe. Der angezeigte Leistungsbetrag ist kein bestätigter Patientensaldo. Diese Stufe stellt weiterhin keine Rechnung aus und versendet nichts.
+
+Prüfnachweise: isolierte echte PostgreSQL-Tests der Migration einschließlich paralleler Änderungen, Wiederholungen, Rechte, unveränderlicher Historie, Dublettensperre, falscher Summen und veralteter Scribe-Quellen; API-Tests für Anmeldung, Herkunft, Browserursprung, serverseitige Betragsberechnung und sichere Fehler; vollständiger Projekt-Testlauf und Produktionsbuild; synthetische Browserprüfung auf Desktop und Mobilgerät.
+
+Produktiv aktiviert wurden ausschließlich die drei neuen, zunächst leeren Abrechnungstabellen und die zugriffsgeschützte Schreibfunktion. Bestehende Patienten, Rechnungen, Zahlungen, offene Posten und Nachrichten wurden dabei nicht verändert. Reale Tarife und Leistungsfreigaben müssen erst mit Praxisbelegen erfasst werden.

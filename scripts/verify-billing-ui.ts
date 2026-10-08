@@ -24,6 +24,13 @@ async function main() {
         : `export const useAppStore=()=>({theme:window.__billingTheme||'light',locale:'de'});` }));
     } }],
   });
+  const workspaceBundle = await build({
+    stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import Workspace from './src/components/billing/BillingWorkspace'; createRoot(document.getElementById('root')).render(<Workspace locale="de" theme={window.__billingTheme||'light'}/>);`, loader: "tsx", resolveDir: process.cwd() },
+    bundle: true, write: false, outdir: 'isolated-workspace', platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
+  });
+  const workspaceScript=workspaceBundle.outputFiles.find(file=>file.path.endsWith('.js'))?.text;
+  const workspaceStyles=workspaceBundle.outputFiles.find(file=>file.path.endsWith('.css'))?.text;
+  assert.ok(workspaceScript&&workspaceStyles,'workspace bundle must include JavaScript and CSS');
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   try {
     for (const [name, width, height] of [["desktop", 1440, 1100], ["mobile", 390, 844]] as const) {
@@ -58,6 +65,30 @@ async function main() {
       await page.getByText("Was diese Prüfung abdeckt").click();
       assert.equal(await page.getByText(/Ein bestätigter Behandlungstext/).isVisible(), true);
       await page.screenshot({ path: `output/billing-preflight-${name}.png`, fullPage: true });
+      await page.setContent('<!doctype html><html lang="de"><body style="margin:20px;font-family:Arial;background:#eef2f5"><main style="max-width:1100px;margin:auto"><div id="root"></div></main></body></html>');
+      await page.evaluate(() => {
+        const patient = { id: "00000000-0000-4000-8000-000000000001", name: "Musterpatientin Beispiel", ivoris_nummer: "SYN-1001", geburtsdatum: "2000-01-01" };
+        const item = { id: "10000000-0000-4000-8000-000000000001", kind: "service", patient_id: patient.id, head_version: 1, sourceCurrent: true,
+          current: { id: "20000000-0000-4000-8000-000000000001", record_id: "10000000-0000-4000-8000-000000000001", revision: 1, state: "draft", tariff_version_id: null, gross_cents: null, reason: "Synthetischer Prüffall", created_at: "2026-10-08T10:00:00Z", created_by: "fixture", decided_at: null, decided_by: null, decision_reason: null,
+            data: { patientId: patient.id, serviceDate: "2026-07-05", schedule: "BEMA", code: "126a", description: "Beispielleistung – synthetische Daten", quantity: 1, region: "11", factor: null, justification: null, insurerId: "SYN-KASSE", tariffVersionId: null, source: { system: "scribe", recordId: "30000000-0000-4000-8000-000000000001", version: 1, positionIndex: 0 } } } };
+        window.fetch = (async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/api/praxis/search')) return new Response(JSON.stringify({ results: [patient] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          if (url.includes('kind=service')) return new Response(JSON.stringify({ items: [item], tariffs: [], hasMore: false, writable: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          if (url.includes('kind=source')) return new Response(JSON.stringify({ lines: [], entriesWithoutPositions: 1, hasMore: false, writable: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          if (url.includes('kind=tariff')) return new Response(JSON.stringify({ items: [], tariffs: [], hasMore: false, writable: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Unerwarteter Testaufruf' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }) as typeof fetch;
+      });
+      await page.addStyleTag({ content: workspaceStyles });
+      await page.addScriptTag({ content: workspaceScript });
+      const search = page.getByLabel('Patient auswählen');
+      await search.fill('Muster');
+      await page.getByRole('button', { name: /Musterpatientin Beispiel/ }).click();
+      await page.locator('strong', { hasText: 'Beispielleistung' }).waitFor();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      assert.ok(Number.parseFloat(await page.locator('section').evaluate((el) => getComputedStyle(el).fontSize)) >= 16);
+      await page.screenshot({ path: `.impeccable/review/${name}.png`, fullPage: true });
       assert.deepEqual(errors, []);
       await page.close();
     }

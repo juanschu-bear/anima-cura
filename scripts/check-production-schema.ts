@@ -96,6 +96,21 @@ async function main() {
       "patient_documents",
       "id,patient_id,name,typ,file_url,hochgeladen_am",
     ),
+    runSelectCheck(
+      "billing version records",
+      "billing_records",
+      "id,kind,patient_id,source_system,source_record_id,source_position_index,head_version",
+    ),
+    runSelectCheck(
+      "billing immutable versions",
+      "billing_versions",
+      "id,record_id,revision,data,tariff_version_id,state,gross_cents,reason,created_by,created_at,decided_by,decided_at,decision_reason",
+    ),
+    runSelectCheck(
+      "billing idempotency records",
+      "billing_requests",
+      "id,actor_id,request,result_id,created_at",
+    ),
   ];
 
   const results = await Promise.all(checks);

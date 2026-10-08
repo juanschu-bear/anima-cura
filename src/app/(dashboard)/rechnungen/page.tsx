@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import BillingWorkspace from "@/components/billing/BillingWorkspace";
 import { FileText, Plus, Trash2, Eye, Search, Package, User, ChevronDown } from "lucide-react";
 
 interface Patient { id: string; name: string; email?: string; }
@@ -172,6 +173,7 @@ type PatientArt = "kasse" | "privat" | "mkv";
 
 export default function RechnungenPage() {
   const { theme, locale } = useAppStore();
+  const [billingView, setBillingView] = useState<'workspace'|'draft'>('workspace');
   const dk = theme === "dark";
   const fg = dk ? "#f0f0f0" : "#1c3044";
   const muted = dk ? "#666" : "#999";
@@ -305,10 +307,11 @@ export default function RechnungenPage() {
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: fg, margin: 0, fontFamily: "'Fraunces', serif" }}>Rechnungs-Engine</h1>
-        <p style={{ fontSize: 13, color: muted, marginTop: 4 }}>Rechnungen erstellen mit GOZ-Katalog, Behandlungspaketen und automatischer Berechnung</p>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: fg, margin: 0, fontFamily: "'Fraunces', serif" }}>{t('billing.work.pageTitle',locale)}</h1>
+        <p style={{ fontSize: 16, color: muted, marginTop: 8 }}>{t('billing.work.pageIntro',locale)}</p>
+        <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:16}}>{(['workspace','draft'] as const).map(view=><button key={view} aria-pressed={billingView===view} onClick={()=>setBillingView(view)} style={{fontSize:16,minHeight:44,padding:'10px 16px',borderRadius:8,border:`1px solid ${border}`,background:billingView===view?grn:cardBg,color:billingView===view?'#082a17':fg,fontWeight:600,cursor:'pointer'}}>{t(view==='workspace'?'billing.work.workspace':'billing.work.tabDraft',locale)}</button>)}</div>
       </div>
-
+      {billingView==='workspace'?<BillingWorkspace locale={locale} theme={theme}/>:(
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
@@ -538,6 +541,7 @@ export default function RechnungenPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

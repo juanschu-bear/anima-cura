@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T16:05:24Z",
+  "title": "Design System: Anima Cura",
+  "extensions": {
+    "colorMeta": {
+      "workspace-dark": {
+        "role": "neutral",
+        "displayName": "Night Workspace",
+        "canonical": "#10121c",
+        "tonalRamp": ["#08090e", "#10121c", "#242732", "#41444e", "#636670", "#898b93", "#b7b8bd", "#eeeef0"]
+      },
+      "field-dark": {
+        "role": "neutral",
+        "displayName": "Night Field",
+        "canonical": "#191e29",
+        "tonalRamp": ["#0c0f15", "#191e29", "#2b3240", "#444b58", "#626975", "#858a93", "#b2b5ba", "#eeeff0"]
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Night Border",
+        "canonical": "#445166",
+        "tonalRamp": ["#151a22", "#27303e", "#445166", "#607087", "#7d8da1", "#9cabbc", "#c0cad4", "#edf0f3"]
+      },
+      "operational-green": {
+        "role": "primary",
+        "displayName": "Operational Green",
+        "canonical": "#4ade80",
+        "tonalRamp": ["#082a17", "#0d4925", "#176a39", "#258e4f", "#36b767", "#4ade80", "#92edb0", "#defbe7"]
+      },
+      "workspace-light": {
+        "role": "neutral",
+        "displayName": "Clinical White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#17191c", "#303338", "#51555a", "#74787d", "#9a9da1", "#c0c2c4", "#e3e4e5", "#ffffff"]
+      },
+      "field-light": {
+        "role": "neutral",
+        "displayName": "Pale Field",
+        "canonical": "#f5f7fa",
+        "tonalRamp": ["#16191d", "#30343a", "#50565e", "#737a83", "#999fa7", "#bfc4ca", "#e1e5e9", "#f5f7fa"]
+      },
+      "border-light": {
+        "role": "neutral",
+        "displayName": "Light Border",
+        "canonical": "#aebdcb",
+        "tonalRamp": ["#131a21", "#263542", "#40576a", "#5e798e", "#7e99ad", "#aebdcb", "#d0d9e1", "#f0f3f6"]
+      },
+      "operational-green-light": {
+        "role": "primary",
+        "displayName": "Deep Operational Green",
+        "canonical": "#176a40",
+        "tonalRamp": ["#071c11", "#0e3821", "#176a40", "#218954", "#31aa6b", "#56ca89", "#98e3b5", "#e2f7e9"]
+      },
+      "danger-dark": {
+        "role": "tertiary",
+        "displayName": "Soft Danger Red",
+        "canonical": "#f19a91",
+        "tonalRamp": ["#32110e", "#5b211c", "#87372f", "#b7544a", "#dc746b", "#f19a91", "#f7c1bc", "#fce9e7"]
+      },
+      "danger-light": {
+        "role": "tertiary",
+        "displayName": "Deep Danger Red",
+        "canonical": "#a8322b",
+        "tonalRamp": ["#2a0b08", "#531713", "#7d251f", "#a8322b", "#c8544e", "#df817c", "#efb2ae", "#fae5e3"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Workspace Headline", "purpose": "The billing workspace title." },
+      "title": { "displayName": "Section Title", "purpose": "Editor, review, and subsection titles." },
+      "body": { "displayName": "Operational Body", "purpose": "Readable instructions, values, and context." },
+      "label": { "displayName": "Visible Label", "purpose": "Persistent form and action labels." }
+    },
+    "shadows": [
+      { "name": "dashboard-card-soft", "value": "0 3px 8px rgba(26, 44, 68, 0.04)", "purpose": "Subtle depth for dashboard cards outside the flat billing workspace." },
+      { "name": "dashboard-card-hover", "value": "0 12px 28px rgba(26, 44, 68, 0.08)", "purpose": "Hover depth for interactive dashboard cards outside the billing workspace." }
+    ],
+    "motion": [
+      { "name": "control-state", "value": "0.2s ease", "purpose": "Short hover and border feedback on controls." },
+      { "name": "page-enter", "value": "0.3s ease-out", "purpose": "Dashboard page entrance from 12px below at zero opacity." }
+    ],
+    "breakpoints": [
+      { "name": "billing-mobile", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary-dark",
+      "description": "Primary save, create, approve, and selected-state action.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary { min-height:44px; padding:8px 14px; font:600 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#082a17; background:#4ade80; border:1px solid #4ade80; border-radius:8px; cursor:pointer; transition:filter .2s ease,transform .1s ease; } .ds-btn-primary:hover { filter:brightness(.93); } .ds-btn-primary:active { transform:translateY(1px); } .ds-btn-primary:focus-visible { outline:3px solid #4ade80; outline-offset:3px; }"
+    },
+    {
+      "name": "Neutral Button",
+      "kind": "button",
+      "refersTo": "button-neutral-dark",
+      "description": "Default secondary action on the dark operational surface.",
+      "html": "<button class=\"ds-btn-neutral\">Cancel</button>",
+      "css": ".ds-btn-neutral { min-height:44px; padding:8px 14px; font:600 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; background:#191e29; border:1px solid #445166; border-radius:8px; cursor:pointer; transition:background .2s ease,border-color .2s ease,transform .1s ease; } .ds-btn-neutral:hover { background:#222938; border-color:#b0bdcd; } .ds-btn-neutral:active { transform:translateY(1px); } .ds-btn-neutral:focus-visible { outline:3px solid #4ade80; outline-offset:3px; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "description": "Outlined destructive action that fills only on hover.",
+      "html": "<button class=\"ds-btn-danger\">Withdraw</button>",
+      "css": ".ds-btn-danger { min-height:44px; padding:8px 14px; font:600 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f19a91; background:transparent; border:1px solid #f19a91; border-radius:8px; cursor:pointer; transition:color .2s ease,background .2s ease; } .ds-btn-danger:hover { color:#10121c; background:#f19a91; } .ds-btn-danger:focus-visible { outline:3px solid #4ade80; outline-offset:3px; }"
+    },
+    {
+      "name": "Labeled Field",
+      "kind": "input",
+      "refersTo": "input-dark",
+      "description": "Visible label paired with a full-width 44px operational input.",
+      "html": "<label class=\"ds-field\">Patient<input class=\"ds-input\" placeholder=\"Search by name\"></label>",
+      "css": ".ds-field { display:grid; gap:6px; font:600 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; } .ds-input { box-sizing:border-box; width:100%; min-height:44px; padding:10px; font:400 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; caret-color:#4ade80; background:#191e29; border:1px solid #445166; border-radius:8px; } .ds-input::placeholder { color:#b0bdcd; opacity:1; } .ds-input:hover { background:#222938; } .ds-input:focus-visible { outline:3px solid #4ade80; outline-offset:3px; }"
+    },
+    {
+      "name": "Version Badge",
+      "kind": "chip",
+      "description": "Compact neutral metadata for lifecycle state and record version.",
+      "html": "<span class=\"ds-badge\">Approved · v3</span>",
+      "css": ".ds-badge { display:inline-block; padding:2px 9px; font:600 14px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; background:#10121c; border:1px solid #445166; border-radius:6px; } .ds-badge:hover { background:#191e29; } .ds-badge:focus-visible { outline:3px solid #4ade80; outline-offset:3px; }"
+    },
+    {
+      "name": "Billing Panel",
+      "kind": "card",
+      "refersTo": "panel-dark",
+      "description": "Flat bordered container for the clinical billing workbench.",
+      "html": "<section class=\"ds-panel\"><h2>Billing workspace</h2><p>Review services and tariff versions.</p></section>",
+      "css": ".ds-panel { padding:24px; font:400 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; background:#10121c; border:1px solid #445166; border-radius:14px; } .ds-panel h2 { margin:0; font-size:22px; line-height:1.3; } .ds-panel p { margin:8px 0 0; color:#b0bdcd; } @media (max-width:640px) { .ds-panel { padding:16px; } }"
+    },
+    {
+      "name": "Inline Details",
+      "kind": "custom",
+      "description": "Native progressive disclosure for record detail and history.",
+      "html": "<details class=\"ds-details\"><summary>Details</summary><p>Source and version information stays in context.</p></details>",
+      "css": ".ds-details { font:400 16px/1.5 Manrope,ui-sans-serif,system-ui,sans-serif; color:#f0f3f8; border-top:1px solid #445166; } .ds-details summary { padding:10px 0; font-weight:600; cursor:pointer; } .ds-details summary:hover { color:#4ade80; } .ds-details summary:focus-visible { outline:3px solid #4ade80; outline-offset:3px; } .ds-details p { margin:8px 0 16px; color:#b0bdcd; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clinical Workbench",
+    "overview": "Anima Cura is a restrained clinical operations workspace: calm enough for sustained administrative work, explicit enough for billing decisions, and dense only where the task requires it. Neutral light and dark layers establish hierarchy; borders, spacing, and typography do more work than decoration.\n\nThe billing workspace extends the incumbent dashboard with a deliberately utilitarian surface. It keeps labels visible, exposes additional detail inline, and reserves color for state and action rather than atmosphere.",
+    "keyCharacteristics": [
+      "Neutral, high-contrast light and dark operational surfaces.",
+      "Green reserved for selected, primary, focus, and success states.",
+      "Readable 16px body copy and labeled 44px controls.",
+      "Progressive disclosure stays in context through details, editors, and review panels.",
+      "Responsive two-column forms collapse to one column on mobile."
+    ],
+    "rules": [
+      { "name": "The Operational Green Rule", "body": "Green means selected, primary, focused, or successful; do not use it as general decoration.", "section": "colors" },
+      { "name": "The Visible Boundary Rule", "body": "Inputs, controls, and status regions retain a discernible border in both themes.", "section": "colors" },
+      { "name": "The Read-Once Rule", "body": "Operational body text and form labels remain readable at 16px; compact metadata may step down to 14px but cannot replace a visible label.", "section": "typography" },
+      { "name": "The In-Context Rule", "body": "Editors, approval decisions, history, and source detail replace or expand within the workspace instead of opening detached overlays.", "section": "layout" },
+      { "name": "The Flat Workbench Rule", "body": "Do not add shadows to billing fields, action groups, notices, or list rows; preserve depth through surfaces and borders.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep operational body copy and visible form labels at 16px.",
+      "Do preserve 44px minimum heights for buttons, inputs, text areas, and selects.",
+      "Do use green only for selected, primary, focus, and success meaning.",
+      "Do keep destructive actions red, outlined, and visually separate from the primary path.",
+      "Do collapse two-column forms and definition lists to one column at 640px.",
+      "Do disclose details, editing, and confirmation inline where their record context remains visible."
+    ],
+    "donts": [
+      "Don't use green as decorative ambient color inside the billing workspace.",
+      "Don't remove labels in favor of placeholder-only fields or icon-only operational actions.",
+      "Don't introduce modal detours for detail, history, revision, or approval flows already handled inline.",
+      "Don't add shadows to billing controls, list rows, or status regions.",
+      "Don't compress action controls below their 44px target or preserve two columns on narrow screens."
+    ]
+  }
+}
