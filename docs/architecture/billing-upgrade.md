@@ -2,6 +2,8 @@
 
 Stand: 2026-10-08. Dieser Plan ist keine Freigabe zum Versand von Rechnungen.
 
+Ergänzung vom 09.10.2026: [Praxisregeln für behandlungsbezogene Abrechnung und sichere Patientenidentität](practice-billing-identity-addendum.md). Sie erweitert diesen Plan um Behandlungskonten, nachvollziehbare Bogen-/Quartalsvorschläge, regelbezogenes Lernen nach fachlicher Freigabe und die Erkennung vertauschter Vor-/Nachnamen. Status: spezifiziert, noch nicht implementiert.
+
 ## Unveränderliche Regeln
 
 - Identität: Die bestehende `patients.id` ist der gemeinsame Bezug. Patient, Rechnungsempfänger und Zahlender sind unterschiedliche Rollen. Keine automatische Zusammenführung anhand eines Namens.
@@ -21,6 +23,13 @@ Stand: 2026-10-08. Dieser Plan ist keine Freigabe zum Versand von Rechnungen.
 6. **Betrieb und Freigabe:** durchgängige Tests einschließlich Doppelaufrufen und fremden Portalzugriffen; Fehleralarme, Wiederholungen, Wiederherstellungstest und stufenweise Aktivierung.
 
 Erst nach der jeweiligen Abnahme darf ein Inkrement als produktiv abgeschlossen gelten. Das Vorhandensein von Code oder ein erfolgreicher Build beweist weder korrekte historische Daten noch vollständige Abrechnungen.
+
+### Einordnung der Praxisergänzung
+
+- **P0, vor weiteren automatischen Patientenanlagen:** gemeinsamer Identitätsresolver einschließlich vertauschter Namen, vollständiger Kandidatensuche, Konfliktprüfung und transaktionalem Wiederholschutz. Eine Anamnesezuordnung erteilt keine Portalberechtigung.
+- **Inkrement 2a, aufbauend auf den Leistungs-/Tarifversionen:** versionierter Behandlungsplan, belegte Ereignisse, Abrechnungshistorie und erklärbare Kontextregeln in der vorhandenen Prüfoberfläche. Planrest löst keine automatische Leistung oder A/B-Umklassifizierung aus.
+- **Inkrement 3:** Quartalsabgleich um mögliche übersehene, tatsächlich erbrachte Leistungen erweitern. Unvollständige Historie ausdrücklich anzeigen; BEMA und GOZ getrennt prüfen.
+- **Inkremente 4–6:** nur bestätigte Positionen weiterreichen; Herkunft, Regelversion, Korrekturen und Doppelverwendung durchgängig prüfen. Die konkreten Abnahmefälle stehen in der verlinkten Ergänzung.
 
 ## Stand des ersten Inkrements
 
