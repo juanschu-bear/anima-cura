@@ -6,6 +6,10 @@
 // ============================================================
 
 const translations: Record<string, { de: string; en: string }> = {
+  "billing.document.signIn": { de: "Bitte anmelden, um das Dokument zu öffnen.", en: "Please sign in to open the document." },
+  "billing.document.forbidden": { de: "Für dieses Dokument fehlt die Berechtigung.", en: "You do not have permission to access this document." },
+  "billing.document.notFound": { de: "Dokument nicht gefunden oder nicht zugänglich.", en: "Document not found or not accessible." },
+  "billing.document.unavailable": { de: "Das Dokument konnte nicht sicher geladen werden. Bitte später erneut versuchen.", en: "The document could not be loaded securely. Please try again later." },
   "billing.issue.invalid_context": { de: "Ungültiger Abrechnungszeitraum oder Patientenkontext.", en: "Invalid billing period or patient context." },
   "billing.issue.patient_mismatch": { de: "Die Leistung gehört zu einer anderen Patientenakte.", en: "The service belongs to a different patient record." },
   "billing.issue.outside_period": { de: "Die Leistung liegt außerhalb des Prüfzeitraums.", en: "The service falls outside the review period." },
