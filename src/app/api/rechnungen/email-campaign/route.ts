@@ -1,5 +1,7 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import {
   q3InvoiceEmailCampaignStatus,
@@ -11,8 +13,33 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET() {
-  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+const DISPATCH_AUTH_SETTING = "q3_2026_invoice_email_dispatch_authorization";
+const dispatchAuthSchema = z.object({
+  tokenHash: z.string().regex(/^[a-f0-9]{64}$/),
+  expiresAt: z.string().datetime(),
+}).strict();
+
+async function hasCampaignDispatchAuthorization(request: Request) {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) return false;
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) return false;
+  const result = await createServerClient().from("einstellungen").select("value")
+    .eq("key", DISPATCH_AUTH_SETTING).maybeSingle();
+  const parsed = dispatchAuthSchema.safeParse(result.data?.value);
+  if (result.error || !parsed.success || new Date(parsed.data.expiresAt).getTime() <= Date.now()) return false;
+  const supplied = Buffer.from(createHash("sha256").update(token).digest("hex"), "utf8");
+  const expected = Buffer.from(parsed.data.tokenHash, "utf8");
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
+
+async function authorizeCampaignRequest(request: Request) {
+  if (await hasCampaignDispatchAuthorization(request)) return null;
+  return requirePraxisRole(["admin", "verwaltung"]);
+}
+
+export async function GET(request: Request) {
+  const authError = await authorizeCampaignRequest(request);
   if (authError) return authError;
   try {
     return NextResponse.json(await q3InvoiceEmailCampaignStatus(), { headers: { "Cache-Control": "no-store" } });
@@ -22,7 +49,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const authError = await requirePraxisRole(["admin", "verwaltung"]);
+  const authError = await authorizeCampaignRequest(request);
   if (authError) return authError;
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) {
