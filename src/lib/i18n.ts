@@ -6,6 +6,10 @@
 // ============================================================
 
 const translations: Record<string, { de: string; en: string }> = {
+  "patient.documentType.invoice": { de: "Rechnung", en: "Invoice" },
+  "billing.publish.documentName": { de: "Rechnung {quarter} · {schedule} · {amount}", en: "Invoice {quarter} · {schedule} · {amount}" },
+  "billing.publish.notificationTitle": { de: "Neue Rechnung {quarter} verfügbar", en: "New invoice {quarter} available" },
+  "billing.publish.notificationBody": { de: "Deine Rechnung für {quarter} steht jetzt im geschützten Patientenportal bereit. Öffne den Bereich Dokumente und prüfe Betrag, Zahlungsfrist und Zahlungsweg.", en: "Your invoice for {quarter} is now available in the secure patient portal. Open Documents and review the amount, payment deadline and payment method." },
   "billing.document.signIn": { de: "Bitte anmelden, um das Dokument zu öffnen.", en: "Please sign in to open the document." },
   "billing.document.forbidden": { de: "Für dieses Dokument fehlt die Berechtigung.", en: "You do not have permission to access this document." },
   "billing.document.notFound": { de: "Dokument nicht gefunden oder nicht zugänglich.", en: "Document not found or not accessible." },

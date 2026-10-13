@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type PatientDocumentTypeOption = {
   value: string;
   label: string;
@@ -12,6 +14,7 @@ export const patientDocumentTypeOptions: PatientDocumentTypeOption[] = [
   { value: "diagnose", label: "Diagnose", storageType: "sonstiges", icon: "🩺" },
   { value: "behandlungsplan", label: "Behandlungsplan", storageType: "kostenplan", icon: "🗂️" },
   { value: "erste_rechnung", label: "Erste Rechnung", storageType: "ratenzahlung", icon: "💶" },
+  { value: "rechnung", label: t("patient.documentType.invoice", "de"), storageType: "ratenzahlung", icon: "🧾" },
   { value: "kostenplan", label: "Heil- und Kostenplan", storageType: "kostenplan", icon: "📋" },
   { value: "vertrag", label: "Behandlungsvertrag", storageType: "vertrag", icon: "📝" },
   { value: "ratenzahlung", label: "Ratenzahlungsvereinbarung", storageType: "ratenzahlung", icon: "🧾" },

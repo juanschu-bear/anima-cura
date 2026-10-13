@@ -40,6 +40,8 @@
     "repair:animasign-duplicate-submissions": "tsx scripts/repair-animasign-duplicate-submissions.ts",
     "repair:patient-portal-access": "tsx scripts/repair-patient-portal-access.ts",
     "audit:patient-outreach": "tsx scripts/audit-patient-outreach.ts",
+    "publish:billing-batch": "tsx scripts/publish-billing-batch.ts",
+    "resolve:billing-manifest-patients": "tsx scripts/resolve-billing-manifest-patients.ts",
     "test:patient-outreach": "tsx --test src/lib/services/__tests__/patient-outreach-audit.test.ts",
     "export:stabilization-snapshot": "tsx scripts/export-stabilization-snapshot.ts",
     "repair:patient-duplicates": "tsx scripts/repair-patient-duplicates.ts",
