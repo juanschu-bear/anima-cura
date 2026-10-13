@@ -6,6 +6,22 @@
 // ============================================================
 
 const translations: Record<string, { de: string; en: string }> = {
+  "accessHelp.open": { de: "Hilfe", en: "Help" },
+  "accessHelp.close": { de: "Hilfe schließen", en: "Close help" },
+  "accessHelp.title": { de: "iCura Zugangshilfe", en: "iCura access help" },
+  "accessHelp.status": { de: "Direkte Hilfe für Zugang und Rechnung", en: "Direct help for access and invoices" },
+  "accessHelp.welcome": { de: "Ich helfe dir sofort bei Anmeldung, Passwort, Rechnung und Zahlung. Was funktioniert gerade nicht?", en: "I can help with sign-in, password, invoices, and payment. What is not working?" },
+  "accessHelp.quickPassword": { de: "Mein Passwort funktioniert nicht", en: "My password does not work" },
+  "accessHelp.quickInvoice": { de: "Wie öffne ich meine Rechnung?", en: "How do I open my invoice?" },
+  "accessHelp.quickPayment": { de: "Wo finde ich QR und Überweisung?", en: "Where are QR and bank transfer?" },
+  "accessHelp.placeholder": { de: "Frage schreiben oder sprechen", en: "Type or speak your question" },
+  "accessHelp.speak": { de: "Frage sprechen", en: "Speak question" },
+  "accessHelp.send": { de: "Frage senden", en: "Send question" },
+  "accessHelp.readAloud": { de: "Antwort vorlesen", en: "Read answer aloud" },
+  "accessHelp.thinking": { de: "iCura prüft den richtigen Weg", en: "iCura is checking the right path" },
+  "accessHelp.emailTeam": { de: "Technisches Problem an das Praxisteam senden", en: "Email a technical issue to the practice team" },
+  "accessHelp.safety": { de: "Niemals Passwort oder Sicherheitscode senden.", en: "Never send a password or security code." },
+  "accessHelp.unavailable": { de: "Die Zugangshilfe ist gerade nicht erreichbar. Schreibe bitte an praxisteam@animacura.io und sende niemals dein Passwort oder deinen Sicherheitscode.", en: "Access help is currently unavailable. Email praxisteam@animacura.io and never send your password or security code." },
   "patientRecovery.forgot": { de: "Passwort vergessen?", en: "Forgot password?" },
   "patientRecovery.title": { de: "Neues Passwort einrichten", en: "Set a new password" },
   "patientRecovery.intro": { de: "Wir senden einen sechsstelligen Sicherheitscode an die bei der Praxis hinterlegte Kontaktadresse.", en: "We will send a six-digit security code to the contact address registered with the practice." },

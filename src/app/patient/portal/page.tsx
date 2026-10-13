@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthenticatedPatient } from "@/lib/patient-auth";
 import PatientPortalShell from "@/components/patient/PatientPortalShell";
+import PatientAccessAssistant from "@/components/patient/PatientAccessAssistant";
 
 function portalTarget(searchParams?: { document?: string; section?: string }) {
   const params = new URLSearchParams();
@@ -18,10 +19,10 @@ export default async function PatientPortalPage({ searchParams }: { searchParams
   }
 
   return (
-    <PatientPortalShell
+    <><PatientPortalShell
       patientId={patient.patientId}
       patientName={patient.name}
       patientEmail={patient.email}
-    />
+    /><PatientAccessAssistant /></>
   );
 }
