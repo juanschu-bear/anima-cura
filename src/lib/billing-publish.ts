@@ -12,7 +12,8 @@ import { encodePatientDocumentName } from "./patient-document-types";
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const QUERY_CHUNK_SIZE = 150;
-const WRITE_CONCURRENCY = 8;
+const WRITE_CONCURRENCY = 2;
+const MAX_WRITE_ATTEMPTS = 6;
 
 const manifestRowSchema = z.object({
   case_key: z.string().min(1),
@@ -167,6 +168,35 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+function transientWriteError(error: unknown) {
+  const value = error && typeof error === "object"
+    ? error as { message?: string; statusCode?: string | number; status?: string | number }
+    : {};
+  const details = `${value.message ?? String(error ?? "")} ${value.statusCode ?? ""} ${value.status ?? ""}`;
+  return /too many connections|connection (?:reset|closed|refused)|timeout|temporar|rate.?limit|fetch failed|\b429\b|\b50[234]\b/i.test(details);
+}
+
+async function withTransientWriteRetry<T extends { error?: unknown }>(operation: () => PromiseLike<T>): Promise<T> {
+  let latestResult: T | null = null;
+  for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await operation();
+      latestResult = result;
+      if (!result.error || !transientWriteError(result.error) || attempt === MAX_WRITE_ATTEMPTS) return result;
+    } catch (error) {
+      if (!transientWriteError(error) || attempt === MAX_WRITE_ATTEMPTS) throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, Math.min(500 * (2 ** (attempt - 1)), 8_000)));
+  }
+  if (latestResult) return latestResult;
+  throw new Error("Transient billing write failed without a response");
+}
+
+function writeErrorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) return String(error.message);
+  return String(error ?? "Unknown write error");
+}
+
 function chunks<T>(input: T[], size: number) {
   const result: T[][] = [];
   for (let index = 0; index < input.length; index += size) result.push(input.slice(index, index + size));
@@ -300,35 +330,35 @@ export async function publishBillingManifest(options: {
     const existingDocument = documentsById.get(record.documentId);
     const pdf = await readFile(record.row.file);
     verifyBillingPdf(record.row, pdf);
-    const upload = await db.storage.from(BILLING_DOCUMENTS_BUCKET).upload(record.storagePath, pdf, {
+    const upload = await withTransientWriteRetry(() => db.storage.from(BILLING_DOCUMENTS_BUCKET).upload(record.storagePath, pdf, {
       contentType: "application/pdf",
       cacheControl: "0",
       upsert: true,
-    });
-    if (upload.error) throw new Error(`Billing PDF upload failed: ${record.row.case_key}: ${upload.error.message}`);
-    const document = await db.from("patient_documents").upsert({
+    }));
+    if (upload.error) throw new Error(`Billing PDF upload failed: ${record.row.case_key}: ${writeErrorMessage(upload.error)}`);
+    const document = await withTransientWriteRetry(() => db.from("patient_documents").upsert({
       id: record.documentId,
       patient_id: record.row.patient_id,
       name: record.documentName,
       typ: "ratenzahlung",
       file_url: record.fileUrl,
       hochgeladen_am: existingDocument?.hochgeladen_am ?? new Date().toISOString(),
-    }, { onConflict: "id" });
-    if (document.error) throw new Error(`Billing document link failed: ${record.row.case_key}: ${document.error.message}`);
+    }, { onConflict: "id" }));
+    if (document.error) throw new Error(`Billing document link failed: ${record.row.case_key}: ${writeErrorMessage(document.error)}`);
     if (existingDocument) documentsUpdated += 1;
     else documentsCreated += 1;
 
     if (!notificationsById.has(record.notificationId)) {
-      const notification = await db.from("patient_notifications").insert({
+      const notification = await withTransientWriteRetry(() => db.from("patient_notifications").insert({
         id: record.notificationId,
         patient_id: record.row.patient_id,
         typ: "eingang",
         titel: record.notificationTitle,
         text: record.notificationBody,
         gelesen: false,
-      });
+      }));
       if (notification.error) {
-        throw new Error(`Billing notification failed: ${record.row.case_key}: ${notification.error.message}`);
+        throw new Error(`Billing notification failed: ${record.row.case_key}: ${writeErrorMessage(notification.error)}`);
       }
       notificationsCreated += 1;
     }
