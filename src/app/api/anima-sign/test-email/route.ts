@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
+import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { z } from "zod";
 import { previewInvitationCampaign, prepareInvitationCampaign, testInvitationCampaign, sendInvitationBatch, pauseInvitationCampaign } from "@/lib/services/portal-invitation-campaign";
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST", signal: AbortSignal.timeout(8000),
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `activation-test-${requestId}` },
-    body: JSON.stringify({ from, to, reply_to: "orthoschub@web.de", subject: `[TEST] ${subject}`, html, text }),
+    body: JSON.stringify({ from, to, reply_to: PATIENT_EMAIL_REPLY_TO, subject: `[TEST] ${subject}`, html, text }),
   });
 
   const data = await res.json();

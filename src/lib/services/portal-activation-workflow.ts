@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { t } from "@/lib/i18n";
 import { createServerClient } from "@/lib/db/supabase";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
+import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { activationDueAt } from "./patient-communication-policy";
 import { buildPatientOutreachAudit, groupOutreachRecipients, type OutreachSubmission, type OutreachPatient, type OutreachAccount, type OutreachConsent } from "./patient-outreach-audit";
 
@@ -143,7 +144,7 @@ export async function runPortalActivationWorkflow(options: { dryRun?: boolean } 
           const response = await fetch("https://api.resend.com/emails", {
             method: "POST", signal: AbortSignal.timeout(8000),
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": id },
-            body: JSON.stringify({ from, to: candidate.email, reply_to: "orthoschub@web.de", ...email }),
+            body: JSON.stringify({ from, to: candidate.email, reply_to: PATIENT_EMAIL_REPLY_TO, ...email }),
           });
           const payload = await response.json().catch(() => null);
           if (!response.ok || !payload?.id) throw new Error("Provider acceptance not confirmed");

@@ -5,13 +5,13 @@ import { deterministicBillingUuid, parseBillingCaseKey } from "@/lib/billing-pub
 import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath, billingDocumentUrl } from "@/lib/billing-document-access";
 import { createServerClient } from "@/lib/db/supabase";
 import { billingInvoiceEmailVersion, buildBillingInvoiceEmail } from "@/lib/email/billing-invoice-campaign";
+import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { contactEmailIssue } from "@/lib/services/patient-outreach-audit";
 
 export const Q3_INVOICE_EMAIL_WORKFLOW_ID = "bedfe0d5-e279-4ad0-be8f-f8e8319f38af";
 export const Q3_INVOICE_EMAIL_SETTING = "q3_2026_invoice_email_campaign";
 const EVENT = "q3_2026_invoice_email";
 const TEST_EMAIL = "psycreeds@gmail.com";
-const REPLY_TO = "orthoschub@web.de";
 
 const invoiceSchema = z.object({
   patientId: z.string().uuid(),
@@ -118,7 +118,7 @@ async function providerSend(input: {
     method: "POST",
     signal: AbortSignal.timeout(15_000),
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": input.idempotencyKey },
-    body: JSON.stringify({ from, to: input.to, reply_to: REPLY_TO, subject: input.subject,
+    body: JSON.stringify({ from, to: input.to, reply_to: PATIENT_EMAIL_REPLY_TO, subject: input.subject,
       html: input.html, text: input.text, attachments: input.attachments }),
   });
   const payload = await response.json().catch(() => null) as { id?: string } | null;

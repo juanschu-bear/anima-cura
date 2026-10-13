@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
+import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { loadActivationCohort } from "./portal-activation-workflow";
 
 // Separate, explicitly approved resend. Never reuse the old campaign's claims.
@@ -120,7 +121,7 @@ async function dispatch(db: Db, id: string, recipient: Recipient, test: boolean)
     const content = mail(recipient.firstName, recipient.accessLinks);
     const response = await fetch("https://api.resend.com/emails", { method: "POST", signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": id },
-      body: JSON.stringify({ from, to: recipient.email, reply_to: "orthoschub@web.de", ...content,
+      body: JSON.stringify({ from, to: recipient.email, reply_to: PATIENT_EMAIL_REPLY_TO, ...content,
         subject: test ? `[TEST] ${content.subject}` : content.subject }) });
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.id) throw new Error("Mail acceptance not confirmed");

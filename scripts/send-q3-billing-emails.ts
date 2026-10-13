@@ -7,6 +7,7 @@ import { z } from "zod";
 import { deterministicBillingUuid, validateBillingManifest, verifyBillingPdf, parseBillingCaseKey } from "../src/lib/billing-publish";
 import { createServerClient } from "../src/lib/db/supabase";
 import { billingInvoiceEmailVersion, buildBillingInvoiceEmail } from "../src/lib/email/billing-invoice-campaign";
+import { PATIENT_EMAIL_REPLY_TO } from "../src/lib/email/delivery";
 import { loadActivationCohort } from "../src/lib/services/portal-activation-workflow";
 import { contactEmailIssue, normalizeEmail } from "../src/lib/services/patient-outreach-audit";
 import { storeQ3InvoiceEmailManifest } from "../src/lib/services/q3-invoice-email-campaign";
@@ -16,7 +17,6 @@ loadEnvConfig(process.cwd());
 const WORKFLOW_ID = "bedfe0d5-e279-4ad0-be8f-f8e8319f38af";
 const EVENT = "q3_2026_invoice_email";
 const TEST_EMAIL = "psycreeds@gmail.com";
-const REPLY_TO = "orthoschub@web.de";
 
 const auditSchema = z.object({
   summary: z.object({ invoice_count: z.number().int(), unique_patients: z.number().int() }),
@@ -125,7 +125,7 @@ async function providerSend(input: {
     body: JSON.stringify({
       from,
       to: input.to,
-      reply_to: REPLY_TO,
+      reply_to: PATIENT_EMAIL_REPLY_TO,
       subject: input.subject,
       html: input.html,
       text: input.text,
