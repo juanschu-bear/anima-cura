@@ -45,7 +45,7 @@ async function main() {
     ...summary,
   };
   if (apply) {
-    await writeFile(resolve(receiptPath!), `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
+    await writeFile(resolve(receiptPath!), `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   }
   console.log(JSON.stringify(receipt, null, 2));
 }
