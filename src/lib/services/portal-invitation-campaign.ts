@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
-import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
+import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { loadActivationCohort } from "./portal-activation-workflow";
 
 // Separate, explicitly approved resend. Never reuse the old campaign's claims.
@@ -100,8 +100,8 @@ export async function pauseInvitationCampaign() {
 }
 
 async function dispatch(db: Db, id: string, recipient: Recipient, test: boolean) {
-  const apiKey = process.env.RESEND_API_KEY, from = process.env.ANIMASIGN_EMAIL_FROM;
-  if (!apiKey || !from) throw new Error("Mail transport unavailable");
+  const apiKey = process.env.RESEND_API_KEY, from = PATIENT_EMAIL_FROM;
+  if (!apiKey) throw new Error("Mail transport unavailable");
   const q = await db.from("workflow_runs").insert({ id, workflow_id: ID, trigger_event: test ? "portal_invitation_test" : "portal_invitation_campaign",
     status: "running", started_at: new Date().toISOString(), result: { test, version: invitationVersion(), patientIds: recipient.patientIds } });
   if (q.error?.code === "23505") return "already_claimed";

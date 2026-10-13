@@ -6,7 +6,7 @@ async function main() {
   if (process.argv[2] !== "--approved-342") throw new Error("Explicit campaign approval flag required");
   // Run only where the mail transport is already configured. Production
   // credentials are non-exportable; use the authenticated app UI otherwise.
-  if (!process.env.RESEND_API_KEY || !process.env.ANIMASIGN_EMAIL_FROM) throw new Error("Transport credential unavailable");
+  if (!process.env.RESEND_API_KEY) throw new Error("Transport credential unavailable");
   const before = await previewInvitationCampaign();
   if ((!before.prepared && before.eligible !== 342) || (before.prepared && before.total !== 342)) throw new Error("Recipient count differs from approval; stopped");
   const prepared = await prepareInvitationCampaign();

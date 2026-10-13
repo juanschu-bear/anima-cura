@@ -5,7 +5,7 @@ import { deterministicBillingUuid, parseBillingCaseKey } from "@/lib/billing-pub
 import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath, billingDocumentUrl } from "@/lib/billing-document-access";
 import { createServerClient } from "@/lib/db/supabase";
 import { billingInvoiceEmailVersion, buildBillingInvoiceEmail } from "@/lib/email/billing-invoice-campaign";
-import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
+import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { contactEmailIssue } from "@/lib/services/patient-outreach-audit";
 
 export const Q3_INVOICE_EMAIL_WORKFLOW_ID = "bedfe0d5-e279-4ad0-be8f-f8e8319f38af";
@@ -112,8 +112,8 @@ async function providerSend(input: {
   attachments: Array<{ filename: string; content: string }>;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ANIMASIGN_EMAIL_FROM;
-  if (!apiKey || !from) throw new Error("Mail transport unavailable");
+  const from = PATIENT_EMAIL_FROM;
+  if (!apiKey) throw new Error("Mail transport unavailable");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     signal: AbortSignal.timeout(15_000),

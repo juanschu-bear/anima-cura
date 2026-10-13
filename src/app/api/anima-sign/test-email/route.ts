@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildPortalActivationEmail } from "@/lib/email/portal-activation";
-import { PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
+import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { z } from "zod";
 import { previewInvitationCampaign, prepareInvitationCampaign, testInvitationCampaign, sendInvitationBatch, pauseInvitationCampaign } from "@/lib/services/portal-invitation-campaign";
@@ -35,8 +35,8 @@ export async function POST(req: Request) {
   const { to, firstName, requestId } = parsed.data;
 
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ANIMASIGN_EMAIL_FROM;
-  if (!apiKey || !from) return NextResponse.json({ error: "RESEND nicht konfiguriert" }, { status: 500 });
+  const from = PATIENT_EMAIL_FROM;
+  if (!apiKey) return NextResponse.json({ error: "RESEND nicht konfiguriert" }, { status: 500 });
 
   const { subject, html, text } = buildPortalActivationEmail({ firstName });
 
