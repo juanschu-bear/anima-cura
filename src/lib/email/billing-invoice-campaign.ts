@@ -4,6 +4,7 @@ import { t } from "@/lib/i18n";
 export type BillingEmailInvoice = {
   patientName: string;
   amountCents: number;
+  documentId?: string;
 };
 
 export type BillingInvoiceEmailInput = {
@@ -41,7 +42,10 @@ export function buildBillingInvoiceEmail(input: BillingInvoiceEmailInput) {
     name: invoice.patientName,
     amount: formatAmount(invoice.amountCents, locale),
   }));
-  const url = "https://animacura.io/patient/login";
+  const portalTarget = input.invoices.length === 1 && input.invoices[0].documentId
+    ? `/patient/portal?document=${encodeURIComponent(input.invoices[0].documentId)}`
+    : "/patient/portal?section=invoices";
+  const url = `https://animacura.io/patient/login?next=${encodeURIComponent(portalTarget)}`;
   const finalSubject = input.test ? `[TEST] ${subject}` : subject;
   const text = [
     t("billingEmail.greeting", locale),

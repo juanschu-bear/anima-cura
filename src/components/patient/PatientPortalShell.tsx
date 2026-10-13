@@ -3,7 +3,7 @@ import { trackEvent } from "@/lib/useTracking";
 import QRCode from "qrcode";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { getPatientDocumentTypeOption } from "@/lib/patient-document-types";
 import AnimaPayOverlay from "@/components/patient/AnimaPayOverlay";
@@ -42,6 +42,8 @@ const docIcon = (doc: Doc) => getPatientDocumentTypeOption(doc.typ).icon;
 
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const deepLinkHandledRef = useRef(false);
   const welcomeGuideStorageKey = `ac_welcome_guide_dismissed:${patientId}`;
   const welcomeGuideVideoUrl = process.env.NEXT_PUBLIC_PATIENT_WELCOME_VIDEO_URL?.trim() || "";
   const [tab, setTab] = useState<Tab>("home");
@@ -245,6 +247,19 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    if (loading || deepLinkHandledRef.current) return;
+    const documentId = searchParams.get("document");
+    const section = searchParams.get("section");
+    if (documentId) {
+      setTab("more");
+      const document = docs.find(item => item.id === documentId);
+      if (document) setDocDrawer(document);
+    } else if (section === "documents" || section === "invoices") {
+      setTab("more");
+    }
+    deepLinkHandledRef.current = true;
+  }, [docs, loading, searchParams]);
   useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab, typing]);
   useEffect(() => {
     try {

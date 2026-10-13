@@ -13,7 +13,7 @@ export function buildPortalActivationEmail(input: { firstName?: string; locale?:
     ? t("activation.greeting", locale, { name: input.firstName.trim() })
     : t("activation.neutralGreeting", locale);
   const paragraphs = [greeting, ...["intro", "action", "invoices"].map(key => t(`${prefix}.${key}`, locale)), t("activation.help", locale), t("activation.signature", locale)];
-  const url = "https://animacura.io/patient/login";
+  const url = "https://animacura.io/patient/login?next=%2Fpatient%2Fportal%3Fsection%3Dinvoices";
   const links = input.purpose === "invitation" && input.accessLinks?.length ? input.accessLinks.map(link => {
     if (!/^(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|test-preview)$/i.test(link.submissionId)) throw new Error("Invalid personal access link");
     return { label: `${t("invitation.cta", locale)}${link.name ? ` – ${link.name}` : ""}`, url: `https://animacura.io/welcome/${link.submissionId}` };

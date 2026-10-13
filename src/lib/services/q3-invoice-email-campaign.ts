@@ -181,7 +181,7 @@ async function loadRecipientContent(db: Db, recipient: Q3InvoiceEmailManifest["r
   if (documentResult.error || documentResult.data.length !== documentIds.length) throw new Error("Invoice document verification failed");
   const documents = new Map(documentResult.data.map(row => [row.id, row]));
   const attachments: Array<{ filename: string; content: string }> = [];
-  const invoiceLines: Array<{ patientName: string; amountCents: number }> = [];
+  const invoiceLines: Array<{ patientName: string; amountCents: number; documentId: string }> = [];
   for (const invoice of recipient.invoices) {
     const patient = patients.get(invoice.patientId);
     const document = documents.get(invoice.documentId);
@@ -198,7 +198,7 @@ async function loadRecipientContent(db: Db, recipient: Q3InvoiceEmailManifest["r
     }
     const parsed = parseBillingCaseKey(invoice.caseKey);
     attachments.push({ filename: `Rechnung-Q${parsed.quarter}-${parsed.year}-${parsed.schedule}-${parsed.patientNumber}-${parsed.sequence}.pdf`, content: pdf.toString("base64") });
-    invoiceLines.push({ patientName: [patient.vorname, patient.nachname].filter(Boolean).join(" ") || "Patient/in", amountCents: invoice.amountCents });
+    invoiceLines.push({ patientName: [patient.vorname, patient.nachname].filter(Boolean).join(" ") || "Patient/in", amountCents: invoice.amountCents, documentId: invoice.documentId });
   }
   return { attachments, invoiceLines };
 }

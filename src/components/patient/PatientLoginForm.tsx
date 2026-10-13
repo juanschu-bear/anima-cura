@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Mail,
@@ -11,12 +11,22 @@ import {
   Loader2,
   AlertCircle,
   ShieldCheck,
+  ArrowLeft,
+  KeyRound,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { pruefeEmail } from "@/lib/validation/feldpruefung";
+import { t } from "@/lib/i18n";
+
+function safePatientTarget(value: string | null) {
+  if (!value || !value.startsWith("/patient/portal") || value.startsWith("//")) return "/patient/portal";
+  return value;
+}
 
 export default function PatientLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const target = safePatientTarget(searchParams.get("next"));
   const reduceMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [email, setEmail] = useState("");
@@ -26,6 +36,12 @@ export default function PatientLoginForm() {
   const [loading, setLoading] = useState(false);
   const [emailFehlt, setEmailFehlt] = useState(false);
   const [passwortFehlt, setPasswortFehlt] = useState(false);
+  const [recoveryStep, setRecoveryStep] = useState<"closed" | "identify" | "verify">("closed");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
+  const [recoveryMessage, setRecoveryMessage] = useState("");
 
   const isPatientAuthUser = (user: {
     app_metadata?: Record<string, unknown> | null;
@@ -172,7 +188,7 @@ export default function PatientLoginForm() {
     } = await supabase.auth.getUser();
 
     if (isPatientAuthUser(user)) {
-      router.replace("/patient/portal");
+      router.replace(target);
       router.refresh();
       return;
     }
@@ -183,7 +199,7 @@ export default function PatientLoginForm() {
       });
 
       if (repairResponse.ok) {
-        router.replace("/patient/portal");
+        router.replace(target);
         router.refresh();
         return;
       }
@@ -202,8 +218,91 @@ export default function PatientLoginForm() {
       }
     }
 
-    router.replace("/patient/portal");
+    router.replace(target);
     router.refresh();
+  }
+
+  function openRecovery() {
+    setRecoveryEmail(email.trim());
+    setRecoveryStep("identify");
+    setError("");
+    setRecoveryMessage("");
+  }
+
+  function closeRecovery() {
+    setRecoveryStep("closed");
+    setError("");
+    setRecoveryMessage("");
+    setRecoveryCode("");
+    setNewPassword("");
+    setRepeatPassword("");
+  }
+
+  async function requestRecoveryCode(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const normalized = recoveryEmail.trim();
+    const validation = pruefeEmail(normalized);
+    if (!normalized || !validation.ok) {
+      setError(t("patientRecovery.invalidEmail"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setRecoveryMessage("");
+    try {
+      const response = await fetch("/api/patient/password-recovery/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalized }),
+      });
+      if (!response.ok) throw new Error("request_failed");
+      setRecoveryEmail(normalized);
+      setRecoveryStep("verify");
+      setRecoveryMessage(t("patientRecovery.codeSent"));
+    } catch {
+      setError(t("patientRecovery.unavailable"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmRecovery(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(recoveryCode)) {
+      setError(t("patientRecovery.invalidCode"));
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError(t("patientRecovery.passwordLength"));
+      return;
+    }
+    if (newPassword !== repeatPassword) {
+      setError(t("patientRecovery.passwordMismatch"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/patient/password-recovery/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail, code: recoveryCode, password: newPassword }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        setError(payload?.error === "invalid_or_expired" ? t("patientRecovery.invalidCode") : t("patientRecovery.unavailable"));
+        return;
+      }
+      const supabase = createBrowserClient();
+      const signIn = await supabase.auth.signInWithPassword({ email: recoveryEmail, password: newPassword });
+      if (signIn.error) throw new Error("signin_failed");
+      router.replace(target);
+      router.refresh();
+    } catch {
+      setError(t("patientRecovery.unavailable"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Entrance container/children - staggered, spring-based, reduced-motion aware.
@@ -260,8 +359,8 @@ export default function PatientLoginForm() {
 
             <div className="acl-divider" aria-hidden="true" />
 
-            <h2 className="acl-title">Willkommen zurück</h2>
-            <p className="acl-subtitle">Melde dich mit deinen Zugangsdaten an</p>
+            <h2 className="acl-title">{recoveryStep === "closed" ? "Willkommen zurück" : t("patientRecovery.title")}</h2>
+            <p className="acl-subtitle">{recoveryStep === "closed" ? "Melde dich mit deinen Zugangsdaten an" : t("patientRecovery.intro")}</p>
 
             <AnimatePresence mode="wait">
               {error && (
@@ -285,7 +384,7 @@ export default function PatientLoginForm() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} noValidate>
+            {recoveryStep === "closed" ? <form onSubmit={handleSubmit} noValidate>
               {/* Email */}
               <div className="acl-field">
                 <label htmlFor="patient-email" className="acl-label">
@@ -310,9 +409,10 @@ export default function PatientLoginForm() {
 
               {/* Password */}
               <div className="acl-field">
-                <label htmlFor="patient-password" className="acl-label">
-                  Passwort
-                </label>
+                <div className="acl-label-row">
+                  <label htmlFor="patient-password" className="acl-label">Passwort</label>
+                  <button type="button" className="acl-text-button" onClick={openRecovery}>{t("patientRecovery.forgot")}</button>
+                </div>
                 <div className="acl-input-wrap">
                   <LockKeyhole size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
                   <input
@@ -359,7 +459,44 @@ export default function PatientLoginForm() {
                   "Anmelden"
                 )}
               </motion.button>
-            </form>
+            </form> : recoveryStep === "identify" ? (
+              <form onSubmit={requestRecoveryCode} noValidate>
+                <div className="acl-field">
+                  <label htmlFor="recovery-email" className="acl-label">{t("patientRecovery.email")}</label>
+                  <div className="acl-input-wrap">
+                    <Mail size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
+                    <input id="recovery-email" type="email" inputMode="email" autoComplete="username" required value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} placeholder="vorname.nachname@animacura.de" className="acl-input" />
+                  </div>
+                </div>
+                <motion.button type="submit" disabled={loading} className="acl-submit" whileHover={reduceMotion || loading ? undefined : { y: -2 }} whileTap={reduceMotion || loading ? undefined : { scale: 0.98 }}>
+                  {loading ? <><Loader2 size={18} className="acl-spin" aria-hidden="true" />{t("patientRecovery.sending")}</> : <><KeyRound size={18} aria-hidden="true" />{t("patientRecovery.sendCode")}</>}
+                </motion.button>
+                <button type="button" className="acl-back" onClick={closeRecovery}><ArrowLeft size={15} aria-hidden="true" />{t("patientRecovery.back")}</button>
+              </form>
+            ) : (
+              <form onSubmit={confirmRecovery} noValidate>
+                {recoveryMessage ? <p className="acl-recovery-note">{recoveryMessage}</p> : null}
+                <div className="acl-field">
+                  <label htmlFor="recovery-code" className="acl-label">{t("patientRecovery.code")}</label>
+                  <div className="acl-input-wrap">
+                    <KeyRound size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
+                    <input id="recovery-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="acl-input acl-code" />
+                  </div>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="new-password" className="acl-label">{t("patientRecovery.newPassword")}</label>
+                  <div className="acl-input-wrap"><LockKeyhole size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" /><input id="new-password" type="password" autoComplete="new-password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="acl-input" /></div>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="repeat-password" className="acl-label">{t("patientRecovery.repeatPassword")}</label>
+                  <div className="acl-input-wrap"><LockKeyhole size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" /><input id="repeat-password" type="password" autoComplete="new-password" required value={repeatPassword} onChange={(e) => setRepeatPassword(e.target.value)} className="acl-input" /></div>
+                </div>
+                <motion.button type="submit" disabled={loading} className="acl-submit" whileHover={reduceMotion || loading ? undefined : { y: -2 }} whileTap={reduceMotion || loading ? undefined : { scale: 0.98 }}>
+                  {loading ? <><Loader2 size={18} className="acl-spin" aria-hidden="true" />{t("patientRecovery.saving")}</> : t("patientRecovery.savePassword")}
+                </motion.button>
+                <button type="button" className="acl-back" onClick={closeRecovery}><ArrowLeft size={15} aria-hidden="true" />{t("patientRecovery.back")}</button>
+              </form>
+            )}
           </div>
 
           <p className="acl-foot">
@@ -506,10 +643,18 @@ export default function PatientLoginForm() {
 
         /* ---------- Fields ---------- */
         .acl-field { margin-bottom: 16px; }
+        .acl-label-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
         .acl-label {
           display: block; font-size: 12px; font-weight: 600; color: #c4c8d0;
           margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.07em;
         }
+        .acl-text-button { margin:0 0 6px; padding:0; border:0; background:none; color:#7fd8a8; font:600 12px/1.4 'DM Sans',sans-serif; cursor:pointer; }
+        .acl-text-button:hover { color:#a7f3c7; text-decoration:underline; }
+        .acl-text-button:focus-visible, .acl-back:focus-visible { outline:2px solid rgba(34,197,94,.7); outline-offset:4px; border-radius:4px; }
+        .acl-recovery-note { margin:0 0 18px; padding:12px 14px; border:1px solid rgba(34,197,94,.28); border-radius:12px; background:rgba(34,197,94,.08); color:#bce8ce; font-size:13px; line-height:1.5; }
+        .acl-code { font-size:20px; font-weight:700; letter-spacing:.28em; font-variant-numeric:tabular-nums; }
+        .acl-back { width:100%; margin:16px 0 0; padding:8px; border:0; background:none; color:#aeb4bd; display:flex; align-items:center; justify-content:center; gap:6px; font:600 13px/1.4 'DM Sans',sans-serif; cursor:pointer; }
+        .acl-back:hover { color:#fff; }
         .acl-input-wrap { position: relative; }
         .acl-input-icon {
           position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
