@@ -15,8 +15,22 @@ function authorized(request: NextRequest) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+function logRejectedAuthorization(request: NextRequest) {
+  const expected = process.env.HOSTINGER_MAIL_WEBHOOK_SECRET || "";
+  const header = request.headers.get("authorization") || "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  console.warn("[hostinger-support] webhook authorization rejected", {
+    hasConfiguredSecret: Boolean(expected),
+    configuredSecretLength: expected.length,
+    hasAuthorizationHeader: Boolean(header),
+    authorizationScheme: header.split(/\s+/, 1)[0] || null,
+    providedSecretLength: provided.length,
+  });
+}
+
 export async function POST(request: NextRequest) {
   if (!authorized(request)) {
+    logRejectedAuthorization(request);
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
   const raw = await request.text();
