@@ -6,6 +6,8 @@ import {
   hostingerSupportRunId,
   parseHostingerSupportEvent,
 } from "../hostinger-support-mail";
+import { isSafeGeneratedSupportCore, SUPPORT_AGENT_SYSTEM_PROMPT } from "../hostinger-support-ai";
+import { retrieveSupportKnowledge, SUPPORT_KNOWLEDGE_VERSION } from "@/lib/support/knowledge-base";
 
 function event(subject: string, excerpt: string) {
   const parsed = parseHostingerSupportEvent({
@@ -39,6 +41,7 @@ test("auto-replies only to deterministic technical questions", () => {
   });
   assert.equal(classifySupportEvent(event("Rechnung öffnen", "Wo finde ich das Dokument in der App?")).autoReply, true);
   assert.equal(classifySupportEvent(event("Zahlung", "Wie nutze ich den Banking-QR?")).autoReply, true);
+  assert.equal(classifySupportEvent(event("App installieren", "Wie füge ich sie zum Home-Bildschirm hinzu?")).autoReply, true);
 });
 
 test("holds medical and case-specific billing messages for human review", () => {
@@ -79,4 +82,18 @@ test("accepts common nested webhook field variants", () => {
   assert.equal(parsed.senderEmail, "max@example.com");
   assert.equal(parsed.senderName, "Max Muster");
   assert.equal(parsed.mailboxResourceId, "AC-nested");
+});
+
+test("retrieves versioned knowledge for each automatic support category", () => {
+  assert.match(SUPPORT_KNOWLEDGE_VERSION, /^\d{4}-\d{2}-\d{2}\.\d+$/);
+  assert.ok(retrieveSupportKnowledge("login_password", "Passwort vergessen").some(entry => entry.id === "access.password-recovery"));
+  assert.ok(retrieveSupportKnowledge("invoice_access", "Wo ist meine Rechnung?").some(entry => entry.id === "invoice.find-documents"));
+  assert.ok(retrieveSupportKnowledge("payment_method", "Wie nutze ich den Banking-QR?").some(entry => entry.id === "payment.supported-methods"));
+  assert.ok(retrieveSupportKnowledge("portal_setup", "App zum Home-Bildschirm hinzufügen").some(entry => entry.id === "portal.install"));
+});
+
+test("system prompt and output guard prohibit credential collection", () => {
+  assert.match(SUPPORT_AGENT_SYSTEM_PROMPT, /ausschließlich mit Fakten/i);
+  assert.equal(isSafeGeneratedSupportCore("Sende uns bitte dein Passwort per E-Mail."), false);
+  assert.equal(isSafeGeneratedSupportCore("Öffne „Passwort vergessen?“ und vergib dort ein neues Passwort."), true);
 });

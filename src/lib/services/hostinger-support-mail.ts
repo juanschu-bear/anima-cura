@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
+import { generateGroundedSupportCore } from "@/lib/services/hostinger-support-ai";
+import { retrieveSupportKnowledge } from "@/lib/support/knowledge-base";
 
 export const HOSTINGER_SUPPORT_WORKFLOW_ID = "31480537-b9a8-4b93-b4d1-c011dfab415f";
 export const HOSTINGER_SUPPORT_EVENT = "hostinger_support_message_received";
@@ -10,6 +12,7 @@ export type SupportCategory =
   | "login_password"
   | "invoice_access"
   | "payment_method"
+  | "portal_setup"
   | "medical"
   | "billing_specific"
   | "other";
@@ -195,6 +198,9 @@ export function classifySupportEvent(event: ParsedSupportEvent): SupportClassifi
   if (/banking.?qr|überweis|ueberweis|wie.*zahl|zahlung.*qr|zahlungsweg/.test(text)) {
     return { category: "payment_method", autoReply: true, reason: "generic_payment_navigation" };
   }
+  if (/app.*(install|einricht|hinzufüg)|home.?bildschirm|homescreen|startbildschirm|benachrichtigung|push.?nachricht/.test(text)) {
+    return { category: "portal_setup", autoReply: true, reason: "portal_setup" };
+  }
   return { category: "other", autoReply: false, reason: "human_review_required" };
 }
 
@@ -215,14 +221,44 @@ export function buildSupportReply(event: ParsedSupportEvent, classification: Sup
     message = `${hello}\n\ndeinen Zugang kannst du direkt in Anima Cura wiederherstellen:\n\n1. Öffne „Passwort vergessen“.\n2. Gib deine Anima-Cura-Anmeldeadresse ein.\n3. Trage den sechsstelligen Sicherheitscode aus deiner Kontakt-E-Mail in der geöffneten App ein.\n4. Vergib dein neues Passwort zweimal.\n\nDanach führt dich Anima Cura direkt zu der zuvor geöffneten Rechnung zurück.\n\nPasswort jetzt neu einrichten:\n${PORTAL_RECOVERY_URL}${commonEnd}`;
   } else if (classification.category === "invoice_access") {
     message = `${hello}\n\nöffne den Rechnungsbutton oder QR-Code erneut und melde dich in Anima Cura an. Nach der Anmeldung wird die passende Rechnung automatisch geöffnet. Bereits bereitgestellte Rechnungen findest du außerdem im Patientenportal unter „Dokumente“.\n\nFalls das Passwort nicht mehr funktioniert, wähle auf der Anmeldeseite „Passwort vergessen“.${commonEnd}`;
-  } else {
+  } else if (classification.category === "payment_method") {
     message = `${hello}\n\ndie Rechnung und die sicheren Zahlungswege findest du nach der Anmeldung in Anima Cura. Öffne dort die Rechnung oder den Zahlungsbereich und wähle Banking-QR oder normale Überweisung. Beide Wege sind möglich.\n\nBei Fragen zu einem konkreten Betrag wird deine Nachricht persönlich geprüft.${commonEnd}`;
+  } else {
+    message = `${hello}\n\nöffne deinen persönlichen Anima-Cura-Link auf dem Smartphone und füge das Patientenportal über die Browserfunktion zum Home- oder Startbildschirm hinzu. Aktiviere anschließend die Benachrichtigungen, damit du neue Rechnungen und wichtige Praxisnachrichten nicht übersiehst.${commonEnd}`;
   }
   const paragraphs = message.split("\n\n").map(paragraph => `<p style="margin:0 0 16px">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
   return {
     subject: event.subject.toLocaleLowerCase("de-DE").startsWith("re:") ? event.subject : `Re: ${event.subject}`,
     text: message,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173b32;max-width:620px">${paragraphs}</div>`,
+  };
+}
+
+async function buildGroundedSupportReply(event: ParsedSupportEvent, classification: SupportClassification) {
+  const fallback = buildSupportReply(event, classification);
+  if (!classification.autoReply || !["login_password", "invoice_access", "payment_method", "portal_setup"].includes(classification.category)) {
+    return {
+      reply: fallback,
+      mode: "template" as const,
+      model: null,
+      knowledgeVersion: null,
+      sourceIds: [] as string[],
+    };
+  }
+  const category = classification.category as "login_password" | "invoice_access" | "payment_method" | "portal_setup";
+  const knowledge = retrieveSupportKnowledge(category, normalizedText(event));
+  const generated = await generateGroundedSupportCore({ category, knowledge });
+  if (!generated.core) return { reply: fallback, ...generated };
+
+  const message = `${salutation(event.senderName)}\n\n${generated.core}\n\nBitte sende uns niemals dein Passwort oder einen Sicherheitscode per E-Mail.\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
+  const paragraphs = message.split("\n\n").map(paragraph => `<p style="margin:0 0 16px">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
+  return {
+    reply: {
+      subject: fallback.subject,
+      text: message,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173b32;max-width:620px">${paragraphs}</div>`,
+    },
+    ...generated,
   };
 }
 
@@ -235,7 +271,8 @@ async function sendHostingerReply(event: ParsedSupportEvent, classification: Sup
   const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
   const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
   if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
-  const reply = buildSupportReply(event, classification);
+  const generated = await buildGroundedSupportReply(event, classification);
+  const reply = generated.reply;
   const body: Record<string, unknown> = {
     to: [event.senderEmail],
     displayName: "Anima Cura Praxisteam",
@@ -251,6 +288,7 @@ async function sendHostingerReply(event: ParsedSupportEvent, classification: Sup
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`hostinger_mail_rejected:${response.status}`);
+  return generated;
 }
 
 export async function processHostingerSupportEvent(payload: unknown) {
@@ -295,11 +333,18 @@ export async function processHostingerSupportEvent(payload: unknown) {
   }
 
   try {
-    await sendHostingerReply(event, classification);
+    const generated = await sendHostingerReply(event, classification);
     const saved = await db.from("workflow_runs").update({
       status: "success",
       finished_at: new Date().toISOString(),
-      result: { ...audit, autoReplied: true },
+      result: {
+        ...audit,
+        autoReplied: true,
+        replyMode: generated.mode,
+        knowledgeVersion: generated.knowledgeVersion,
+        knowledgeSourceIds: generated.sourceIds,
+        model: generated.model,
+      },
     }).eq("id", id);
     if (saved.error) throw new Error("support_audit_finalize_failed");
     return { ok: true as const, autoReplied: true, category: classification.category };
