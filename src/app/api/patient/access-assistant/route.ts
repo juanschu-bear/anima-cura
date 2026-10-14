@@ -27,7 +27,7 @@ function answer(message: string, locale: "de" | "en") {
   if (/passwort|password|anmelden|login|einlog|zugang|code/.test(value)) {
     return locale === "en"
       ? "Tap ‘Forgot password?’ below the password field. Enter your Anima Cura sign-in address, type the six-digit code from your contact email in the open app, and set your new password twice. You will then return to the invoice you originally opened."
-      : "Tippe unter dem Passwortfeld auf „Passwort vergessen?“. Gib deine Anima-Cura-Anmeldeadresse ein, trage den sechsstelligen Code aus deiner Kontakt-E-Mail in der geöffneten App ein und vergib dein neues Passwort zweimal. Danach kommst du direkt zur zuvor geöffneten Rechnung zurück.";
+      : "Tippe unter dem Passwortfeld auf „Passwort vergessen?“. Gib dort deine persönliche Anima-Cura-Anmeldeadresse ein. Sie endet meist auf @animacura.de, dient nur als Benutzername und empfängt selbst keine E-Mails. Den sechsstelligen Code erhältst du an deine bei der Praxis hinterlegte private Kontakt-E-Mail. Trage den Code in der geöffneten App ein und vergib dein neues Passwort zweimal. Danach kommst du direkt zur zuvor geöffneten Rechnung zurück.";
   }
   if (/rechnung|invoice|dokument|document|öffnen|oeffnen/.test(value)) {
     return locale === "en"

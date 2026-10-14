@@ -465,12 +465,18 @@ export default function PatientLoginForm() {
                   <label htmlFor="recovery-email" className="acl-label">{t("patientRecovery.email")}</label>
                   <div className="acl-input-wrap">
                     <Mail size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
-                    <input id="recovery-email" type="email" inputMode="email" autoComplete="username" required value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} placeholder="vorname.nachname@animacura.de" className="acl-input" />
+                    <input id="recovery-email" type="email" inputMode="email" autoComplete="username" required value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} placeholder="z. B. vorname.nachname@animacura.de" aria-describedby="recovery-email-help recovery-code-destination" className="acl-input" />
                   </div>
+                  <p id="recovery-email-help" className="acl-field-help">{t("patientRecovery.loginAddressHint")}</p>
+                </div>
+                <div id="recovery-code-destination" className="acl-recovery-explainer">
+                  <ShieldCheck size={17} strokeWidth={1.8} aria-hidden="true" />
+                  <p>{t("patientRecovery.codeDestination")}</p>
                 </div>
                 <motion.button type="submit" disabled={loading} className="acl-submit" whileHover={reduceMotion || loading ? undefined : { y: -2 }} whileTap={reduceMotion || loading ? undefined : { scale: 0.98 }}>
                   {loading ? <><Loader2 size={18} className="acl-spin" aria-hidden="true" />{t("patientRecovery.sending")}</> : <><KeyRound size={18} aria-hidden="true" />{t("patientRecovery.sendCode")}</>}
                 </motion.button>
+                <a className="acl-recovery-help" href="mailto:praxisteam@animacura.io?subject=Anima-Cura-Anmeldeadresse%20nicht%20bekannt">{t("patientRecovery.unknownLogin")}</a>
                 <button type="button" className="acl-back" onClick={closeRecovery}><ArrowLeft size={15} aria-hidden="true" />{t("patientRecovery.back")}</button>
               </form>
             ) : (
@@ -652,6 +658,13 @@ export default function PatientLoginForm() {
         .acl-text-button:hover { color:#a7f3c7; text-decoration:underline; }
         .acl-text-button:focus-visible, .acl-back:focus-visible { outline:2px solid rgba(34,197,94,.7); outline-offset:4px; border-radius:4px; }
         .acl-recovery-note { margin:0 0 18px; padding:12px 14px; border:1px solid rgba(34,197,94,.28); border-radius:12px; background:rgba(34,197,94,.08); color:#bce8ce; font-size:13px; line-height:1.5; }
+        .acl-field-help { margin:8px 2px 0; color:#aeb4bd; font-size:12.5px; line-height:1.5; }
+        .acl-recovery-explainer { display:flex; align-items:flex-start; gap:10px; margin:2px 0 18px; padding:13px 14px; border-radius:12px; background:rgba(34,197,94,.08); color:#c8ead7; font-size:13px; line-height:1.5; }
+        .acl-recovery-explainer svg { flex:0 0 auto; margin-top:1px; color:#7fd8a8; }
+        .acl-recovery-explainer p { margin:0; }
+        .acl-recovery-help { display:block; margin:14px 0 0; color:#7fd8a8; font:600 13px/1.5 'DM Sans',sans-serif; text-align:center; text-underline-offset:3px; }
+        .acl-recovery-help:hover { color:#a7f3c7; }
+        .acl-recovery-help:focus-visible { outline:2px solid rgba(34,197,94,.7); outline-offset:4px; border-radius:4px; }
         .acl-code { font-size:20px; font-weight:700; letter-spacing:.28em; font-variant-numeric:tabular-nums; }
         .acl-back { width:100%; margin:16px 0 0; padding:8px; border:0; background:none; color:#aeb4bd; display:flex; align-items:center; justify-content:center; gap:6px; font:600 13px/1.4 'DM Sans',sans-serif; cursor:pointer; }
         .acl-back:hover { color:#fff; }
