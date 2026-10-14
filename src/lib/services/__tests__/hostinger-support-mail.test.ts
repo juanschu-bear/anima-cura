@@ -3,9 +3,11 @@ import test from "node:test";
 import {
   buildSupportReply,
   buildSupportEmailHtml,
+  buildManualReviewAlert,
   classifySupportEvent,
   hostingerSupportRunId,
   parseHostingerSupportEvent,
+  resolveSupportContactName,
 } from "../hostinger-support-mail";
 import { isSafeGeneratedSupportCore, SUPPORT_AGENT_SYSTEM_PROMPT } from "../hostinger-support-ai";
 import { retrieveSupportKnowledge, SUPPORT_KNOWLEDGE_VERSION } from "@/lib/support/knowledge-base";
@@ -43,6 +45,14 @@ test("auto-replies only to deterministic technical questions", () => {
   assert.equal(classifySupportEvent(event("Rechnung öffnen", "Wo finde ich das Dokument in der App?")).autoReply, true);
   assert.equal(classifySupportEvent(event("Zahlung", "Wie nutze ich den Banking-QR?")).autoReply, true);
   assert.equal(classifySupportEvent(event("App installieren", "Wie füge ich sie zum Home-Bildschirm hinzu?")).autoReply, true);
+  const invoice = event("Wo finde ich meine Rechnung?", "Der Rechnungslink zeigt zuerst die Anmeldung.");
+  assert.equal(classifySupportEvent(invoice).category, "invoice_access");
+  const login = event("Ich kann mich nicht anmelden", "Der Login funktioniert nicht.");
+  assert.equal(classifySupportEvent(login).category, "login_password");
+  assert.notEqual(
+    buildSupportReply(invoice, classifySupportEvent(invoice)).text,
+    buildSupportReply(login, classifySupportEvent(login)).text,
+  );
 });
 
 test("holds medical and case-specific billing messages for human review", () => {
@@ -78,6 +88,20 @@ test("renders branded responsive support email with a direct reply path", () => 
   assert.match(html, /praxisteam@animacura\.io/);
   assert.match(html, /@media only screen and \(max-width:620px\)/);
   assert.doesNotMatch(html, /font-family:Arial,sans-serif/);
+});
+
+test("personalizes only when the contact identity is unambiguous", () => {
+  assert.equal(resolveSupportContactName("mutter@example.com", [], [{ nachname: "Meyer", answers: { vp_email: "mutter@example.com", vp_vorname: "Anna" } }], [], []), "Anna");
+  assert.equal(resolveSupportContactName("familie@example.com", [], [], [], [{ nachname: "Meyer" }, { nachname: "Meyer" }]), "Familie Meyer");
+  assert.equal(resolveSupportContactName("shared@example.com", [], [], [{ vorname: "Lena", email: "shared@example.com" }, { vorname: "Paul", email: "shared@example.com" }], []), null);
+});
+
+test("manual review alert contains the original context and direct patient reply", () => {
+  const incoming = event("Schmerzen", "Mein Kind hat starke Zahnschmerzen.");
+  const alert = buildManualReviewAlert(incoming, classifySupportEvent(incoming));
+  assert.match(alert.subject, /Prüfung erforderlich/);
+  assert.match(alert.text, /erika@example\.com/);
+  assert.match(alert.html, /Patient direkt antworten/);
 });
 
 test("accepts common nested webhook field variants", () => {

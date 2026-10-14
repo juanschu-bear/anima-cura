@@ -6,6 +6,7 @@ import { retrieveSupportKnowledge } from "@/lib/support/knowledge-base";
 export const HOSTINGER_SUPPORT_WORKFLOW_ID = "31480537-b9a8-4b93-b4d1-c011dfab415f";
 export const HOSTINGER_SUPPORT_EVENT = "hostinger_support_message_received";
 const SUPPORT_ADDRESS = "praxisteam@animacura.io";
+const MANUAL_REVIEW_ADDRESS = "orthoschub@web.de";
 const PORTAL_RECOVERY_URL = "https://animacura.io/patient/login?recovery=1";
 const PORTAL_INVOICES_URL = "https://animacura.io/patient/login?next=%2Fpatient%2Fportal%3Fsection%3Dinvoices";
 const PORTAL_LOGIN_URL = "https://animacura.io/patient/login";
@@ -191,10 +192,12 @@ export function classifySupportEvent(event: ParsedSupportEvent): SupportClassifi
   if (/(\d+[.,]\d{2}\s*(€|eur)|betrag|falsch berechnet|zu hoch|zu viel|mahnung|inkasso|widerspruch|reklamation|bezahlt|zahlung verbucht|ratenplan|rate(n)?\b)/.test(text)) {
     return { category: "billing_specific", autoReply: false, reason: "case_specific_billing" };
   }
-  if (/passwort|password|anmeld|login|einlog|zugang|sicherheitscode|code kommt|kennwort/.test(text)) {
+  if (/passwort|password|sicherheitscode|code kommt|kennwort/.test(text)) {
     return { category: "login_password", autoReply: true, reason: "technical_access" };
   }
-  if (/rechnung.*(öffn|seh|find|abruf|zugriff)|dokument.*(öffn|seh|find)|qr.*login|rechnung.*app/.test(text)) {
+  const invoiceNavigation = /(rechnung|rechnungslink|dokument)/.test(text)
+    && /(öffn|seh|find|abruf|zugriff|anmeld|login|app)/.test(text);
+  if (invoiceNavigation || /qr.*login/.test(text)) {
     return { category: "invoice_access", autoReply: true, reason: "invoice_navigation" };
   }
   if (/banking.?qr|überweis|ueberweis|wie.*zahl|zahlung.*qr|zahlungsweg/.test(text)) {
@@ -202,6 +205,9 @@ export function classifySupportEvent(event: ParsedSupportEvent): SupportClassifi
   }
   if (/app.*(install|einricht|hinzufüg)|home.?bildschirm|homescreen|startbildschirm|benachrichtigung|push.?nachricht/.test(text)) {
     return { category: "portal_setup", autoReply: true, reason: "portal_setup" };
+  }
+  if (/anmeld|login|einlog|zugang/.test(text)) {
+    return { category: "login_password", autoReply: true, reason: "technical_access" };
   }
   return { category: "other", autoReply: false, reason: "human_review_required" };
 }
@@ -211,8 +217,72 @@ function escapeHtml(value: string) {
 }
 
 function salutation(name: string | null) {
-  const first = name?.trim().split(/\s+/)[0];
+  const normalized = name?.trim();
+  if (normalized?.toLocaleLowerCase("de-DE").startsWith("familie ")) return `Hallo ${normalized},`;
+  const first = normalized?.split(/\s+/)[0];
   return first && first.length <= 60 ? `Hallo ${first},` : "Guten Tag,";
+}
+
+type SupportIdentitySubmission = { vorname?: string | null; nachname?: string | null; email?: string | null; answers?: unknown };
+type SupportIdentityPatient = { vorname?: string | null; nachname?: string | null; email?: string | null; versicherter_email?: string | null };
+
+function normalizedEmail(value: unknown) {
+  return typeof value === "string" ? value.trim().toLocaleLowerCase("de-DE") : "";
+}
+
+function answerValue(answers: unknown, key: string) {
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return "";
+  const value = (answers as Record<string, unknown>)[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function resolveSupportContactName(
+  email: string,
+  directSubmissions: SupportIdentitySubmission[],
+  guardianSubmissions: SupportIdentitySubmission[],
+  directPatients: SupportIdentityPatient[],
+  guardianPatients: SupportIdentityPatient[],
+) {
+  const target = normalizedEmail(email);
+  const guardianNames = guardianSubmissions
+    .filter(row => normalizedEmail(answerValue(row.answers, "vp_email")) === target)
+    .map(row => answerValue(row.answers, "vp_vorname"))
+    .filter(Boolean);
+  const uniqueGuardianNames = Array.from(new Set(guardianNames.map(name => name.toLocaleLowerCase("de-DE"))));
+  if (uniqueGuardianNames.length === 1) return guardianNames[0];
+
+  const directNames = [
+    ...directSubmissions.filter(row => normalizedEmail(row.email) === target).map(row => row.vorname?.trim()),
+    ...directPatients.filter(row => normalizedEmail(row.email) === target).map(row => row.vorname?.trim()),
+  ].filter((value): value is string => Boolean(value));
+  const uniqueDirectNames = Array.from(new Set(directNames.map(name => name.toLocaleLowerCase("de-DE"))));
+  if (uniqueDirectNames.length === 1) return directNames[0];
+
+  const familyNames = [...guardianPatients, ...guardianSubmissions, ...directPatients, ...directSubmissions]
+    .map(row => row.nachname?.trim())
+    .filter((value): value is string => Boolean(value));
+  const uniqueFamilyNames = Array.from(new Set(familyNames.map(name => name.toLocaleLowerCase("de-DE"))));
+  if (uniqueFamilyNames.length === 1) return `Familie ${familyNames[0]}`;
+  return null;
+}
+
+async function enrichSupportContact(event: ParsedSupportEvent) {
+  if (event.senderName) return event;
+  const db = createServerClient();
+  const [directSubmissions, guardianSubmissions, directPatients, guardianPatients] = await Promise.all([
+    db.from("anamnese_submissions").select("vorname,nachname,email,answers").eq("email", event.senderEmail).order("created_at", { ascending: false }).limit(8),
+    db.from("anamnese_submissions").select("vorname,nachname,email,answers").eq("answers->>vp_email", event.senderEmail).order("created_at", { ascending: false }).limit(8),
+    db.from("patients").select("vorname,nachname,email,versicherter_email").eq("email", event.senderEmail).limit(8),
+    db.from("patients").select("vorname,nachname,email,versicherter_email").eq("versicherter_email", event.senderEmail).limit(8),
+  ]);
+  const senderName = resolveSupportContactName(
+    event.senderEmail,
+    directSubmissions.data ?? [],
+    guardianSubmissions.data ?? [],
+    directPatients.data ?? [],
+    guardianPatients.data ?? [],
+  );
+  return senderName ? { ...event, senderName } : event;
 }
 
 function supportEmailPresentation(category: SupportCategory) {
@@ -368,9 +438,43 @@ async function sendHostingerReply(event: ParsedSupportEvent, classification: Sup
   return generated;
 }
 
+export function buildManualReviewAlert(event: ParsedSupportEvent, classification: SupportClassification) {
+  const patient = event.senderName?.trim() || event.senderEmail;
+  const reason = classification.category === "medical"
+    ? "Medizinische Frage – keine automatische Fachantwort"
+    : classification.category === "billing_specific"
+      ? "Individuelle Abrechnungsfrage – persönliche Prüfung erforderlich"
+      : "Supportanfrage – persönliche Prüfung erforderlich";
+  const subject = `[Anima Cura · Prüfung erforderlich] ${event.subject}`;
+  const text = `${reason}\n\nVon: ${patient} <${event.senderEmail}>\nBetreff: ${event.subject}\n\nNachricht:\n${event.excerpt || "Keine Vorschau verfügbar."}\n\nDirekt an den Absender antworten: mailto:${event.senderEmail}`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:680px;color:#1d2d28;line-height:1.6"><h1 style="font-size:22px">Prüfung erforderlich</h1><p><strong>${escapeHtml(reason)}</strong></p><p>Von: ${escapeHtml(patient)} &lt;${escapeHtml(event.senderEmail)}&gt;<br>Betreff: ${escapeHtml(event.subject)}</p><div style="margin:20px 0;padding:18px;background:#f4f6f5;border:1px solid #d9e0dc;border-radius:10px;white-space:pre-wrap">${escapeHtml(event.excerpt || "Keine Vorschau verfügbar.")}</div><p><a href="mailto:${escapeHtml(event.senderEmail)}?subject=${encodeURIComponent(`Re: ${event.subject}`)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#1d5f4e;color:#fff;text-decoration:none;font-weight:700">Patient direkt antworten</a></p><p style="font-size:13px;color:#687770">Diese Nachricht wurde nicht automatisch fachlich beantwortet.</p></div>`;
+  return { subject, text, html };
+}
+
+async function sendManualReviewAlert(event: ParsedSupportEvent, classification: SupportClassification) {
+  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
+  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
+  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
+  const alert = buildManualReviewAlert(event, classification);
+  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
+    method: "POST",
+    signal: AbortSignal.timeout(12_000),
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: [process.env.SUPPORT_MANUAL_REVIEW_TO?.trim() || MANUAL_REVIEW_ADDRESS],
+      displayName: "Anima Cura · Support-Prüfung",
+      subject: alert.subject,
+      text: alert.text,
+      html: alert.html,
+    }),
+  });
+  if (!response.ok) throw new Error(`manual_review_notification_rejected:${response.status}`);
+}
+
 export async function processHostingerSupportEvent(payload: unknown) {
-  const event = parseHostingerSupportEvent(payload);
-  if (!event || event.event !== "message.received") return { ok: false as const, reason: "unsupported_event" };
+  const parsedEvent = parseHostingerSupportEvent(payload);
+  if (!parsedEvent || parsedEvent.event !== "message.received") return { ok: false as const, reason: "unsupported_event" };
+  const event = await enrichSupportContact(parsedEvent);
   const expectedMailbox = (process.env.HOSTINGER_MAILBOX_ADDRESS || SUPPORT_ADDRESS).trim().toLowerCase();
   if (event.mailboxAddress && event.mailboxAddress !== expectedMailbox) return { ok: false as const, reason: "wrong_mailbox" };
 
@@ -399,14 +503,35 @@ export async function processHostingerSupportEvent(payload: unknown) {
   if (claim.error?.code === "23505") return { ok: true as const, duplicate: true, category: classification.category };
   if (claim.error) throw new Error("support_audit_claim_failed");
 
-  if (!classification.autoReply) {
+  if (classification.reason === "automated_or_loop_risk") {
     const saved = await db.from("workflow_runs").update({
       status: "skipped",
       finished_at: new Date().toISOString(),
-      result: { ...audit, manualReview: true },
+      result: { ...audit, ignored: true },
     }).eq("id", id);
     if (saved.error) throw new Error("support_audit_finalize_failed");
-    return { ok: true as const, autoReplied: false, category: classification.category };
+    return { ok: true as const, autoReplied: false, ignored: true, category: classification.category };
+  }
+
+  if (!classification.autoReply) {
+    try {
+      await sendManualReviewAlert(event, classification);
+      const saved = await db.from("workflow_runs").update({
+        status: "success",
+        finished_at: new Date().toISOString(),
+        result: { ...audit, manualReview: true, practiceNotified: true },
+      }).eq("id", id);
+      if (saved.error) throw new Error("support_audit_finalize_failed");
+      return { ok: true as const, autoReplied: false, practiceNotified: true, category: classification.category };
+    } catch (error) {
+      await db.from("workflow_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "manual_review_notification_failed",
+        result: { ...audit, manualReview: true, practiceNotified: false },
+      }).eq("id", id);
+      throw error;
+    }
   }
 
   try {
