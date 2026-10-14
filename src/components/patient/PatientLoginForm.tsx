@@ -17,11 +17,7 @@ import {
 import { createBrowserClient } from "@/lib/db/supabase";
 import { pruefeEmail } from "@/lib/validation/feldpruefung";
 import { t } from "@/lib/i18n";
-
-function safePatientTarget(value: string | null) {
-  if (!value || !value.startsWith("/patient/portal") || value.startsWith("//")) return "/patient/portal";
-  return value;
-}
+import { safePatientTarget } from "@/lib/patient-navigation";
 
 export default function PatientLoginForm() {
   const router = useRouter();
