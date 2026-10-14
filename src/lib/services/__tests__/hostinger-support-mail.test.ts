@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildSupportReply,
+  buildSupportEmailHtml,
   classifySupportEvent,
   hostingerSupportRunId,
   parseHostingerSupportEvent,
@@ -67,6 +68,16 @@ test("prevents reply loops and never asks for passwords", () => {
   assert.match(reply.text, /Passwort vergessen/);
   assert.match(reply.text, /niemals dein Passwort/);
   assert.doesNotMatch(reply.text, /sende.*Passwort per E-Mail/i);
+});
+
+test("renders branded responsive support email with a direct reply path", () => {
+  const html = buildSupportEmailHtml("Hallo Erika,\n\nÖffne bitte dein Patientenportal.", "invoice_access");
+  assert.match(html, /Anima Cura/);
+  assert.match(html, /Rechnung sicher öffnen/);
+  assert.match(html, /Zu meinen Rechnungen/);
+  assert.match(html, /praxisteam@animacura\.io/);
+  assert.match(html, /@media only screen and \(max-width:620px\)/);
+  assert.doesNotMatch(html, /font-family:Arial,sans-serif/);
 });
 
 test("accepts common nested webhook field variants", () => {

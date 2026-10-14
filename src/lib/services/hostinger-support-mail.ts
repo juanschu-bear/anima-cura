@@ -7,6 +7,8 @@ export const HOSTINGER_SUPPORT_WORKFLOW_ID = "31480537-b9a8-4b93-b4d1-c011dfab41
 export const HOSTINGER_SUPPORT_EVENT = "hostinger_support_message_received";
 const SUPPORT_ADDRESS = "praxisteam@animacura.io";
 const PORTAL_RECOVERY_URL = "https://animacura.io/patient/login?recovery=1";
+const PORTAL_INVOICES_URL = "https://animacura.io/patient/login?next=%2Fpatient%2Fportal%3Fsection%3Dinvoices";
+const PORTAL_LOGIN_URL = "https://animacura.io/patient/login";
 
 export type SupportCategory =
   | "login_password"
@@ -213,6 +215,83 @@ function salutation(name: string | null) {
   return first && first.length <= 60 ? `Hallo ${first},` : "Guten Tag,";
 }
 
+function supportEmailPresentation(category: SupportCategory) {
+  if (category === "login_password") return {
+    title: "Zugang sicher wiederherstellen",
+    summary: "Wir führen dich direkt zurück in dein persönliches Patientenportal.",
+    action: "Passwort neu einrichten",
+    url: PORTAL_RECOVERY_URL,
+  };
+  if (category === "invoice_access") return {
+    title: "Rechnung sicher öffnen",
+    summary: "Deine Dokumente bleiben geschützt und werden nach der Anmeldung angezeigt.",
+    action: "Zu meinen Rechnungen",
+    url: PORTAL_INVOICES_URL,
+  };
+  if (category === "payment_method") return {
+    title: "Zahlungsweg öffnen",
+    summary: "Banking-QR und klassische Überweisung stehen dir im geschützten Bereich zur Verfügung.",
+    action: "Rechnung und Zahlung öffnen",
+    url: PORTAL_INVOICES_URL,
+  };
+  return {
+    title: "Anima Cura einrichten",
+    summary: "Richte dein Patientenportal ein und aktiviere wichtige Benachrichtigungen.",
+    action: "Anima Cura öffnen",
+    url: PORTAL_LOGIN_URL,
+  };
+}
+
+export function buildSupportEmailHtml(message: string, category: SupportCategory) {
+  const presentation = supportEmailPresentation(category);
+  const paragraphs = message.split("\n\n").map(value => value.trim()).filter(Boolean);
+  const greeting = paragraphs.shift() || "Guten Tag,";
+  const body = paragraphs.filter(paragraph =>
+    !paragraph.startsWith("Bitte sende uns niemals") &&
+    !paragraph.startsWith("Liebe Grüße") &&
+    !paragraph.includes(PORTAL_RECOVERY_URL),
+  );
+  const bodyHtml = body.map(paragraph => `<p style="margin:0 0 18px;color:#33443f;font-size:16px;line-height:1.7;">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
+
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(presentation.title)}</title>
+<style>@media only screen and (max-width:620px){.ac-shell{padding:18px 10px!important}.ac-card{border-radius:16px!important}.ac-pad{padding-left:22px!important;padding-right:22px!important}.ac-title{font-size:28px!important}.ac-button{display:block!important;text-align:center!important}}</style></head>
+<body style="margin:0;padding:0;background:#eef2ef;color:#17372f;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(presentation.summary)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#eef2ef;"><tr><td class="ac-shell" align="center" style="padding:38px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ac-card" style="width:100%;max-width:640px;background:#fffdf9;border:1px solid #dbe3de;border-radius:20px;overflow:hidden;box-shadow:0 18px 50px rgba(24,55,47,.12);">
+    <tr><td style="height:5px;background:#1d5f4e;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td class="ac-pad" style="padding:30px 42px 24px;border-bottom:1px solid #e5ebe7;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="vertical-align:middle;"><div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;color:#17372f;">Anima Cura</div><div style="margin-top:7px;color:#65766f;font-size:12px;letter-spacing:.08em;text-transform:uppercase;">Digitaler Patientenservice</div></td>
+        <td align="right" style="vertical-align:middle;"><span style="display:inline-block;border:1px solid #bfd3ca;border-radius:7px;padding:7px 10px;color:#1d5f4e;font-size:12px;font-weight:700;">Antwort des Praxisteams</span></td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="ac-pad" style="padding:38px 42px 14px;">
+      <p style="margin:0 0 18px;color:#1d5f4e;font-size:16px;font-weight:700;">${escapeHtml(greeting)}</p>
+      <h1 class="ac-title" style="margin:0;max-width:520px;color:#142f28;font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:500;line-height:1.16;letter-spacing:-.02em;">${escapeHtml(presentation.title)}</h1>
+      <p style="margin:14px 0 0;max-width:540px;color:#65766f;font-size:16px;line-height:1.65;">${escapeHtml(presentation.summary)}</p>
+    </td></tr>
+    <tr><td class="ac-pad" style="padding:22px 42px 8px;">${bodyHtml}</td></tr>
+    <tr><td class="ac-pad" style="padding:18px 42px 34px;">
+      <a class="ac-button" href="${presentation.url}" target="_blank" style="display:inline-block;background:#1d5f4e;border:1px solid #1d5f4e;border-radius:10px;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:750;line-height:1.2;">${escapeHtml(presentation.action)} &nbsp;→</a>
+      <p style="margin:14px 0 0;color:#788780;font-size:12px;line-height:1.6;word-break:break-all;">Falls der Button nicht öffnet: <a href="${presentation.url}" style="color:#1d5f4e;text-decoration:underline;">${presentation.url}</a></p>
+    </td></tr>
+    <tr><td class="ac-pad" style="padding:0 42px 34px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f6f3;border:1px solid #d8e4de;border-radius:12px;"><tr><td style="padding:17px 18px;">
+        <div style="color:#1d5f4e;font-size:13px;font-weight:750;">Sicherer Umgang mit Zugangsdaten</div>
+        <div style="margin-top:5px;color:#5d6f68;font-size:13px;line-height:1.55;">Wir fragen niemals per E-Mail nach deinem Passwort oder einem Sicherheitscode. Gib beides ausschließlich in der geöffneten Anima-Cura-Anwendung ein.</div>
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="ac-pad" style="padding:24px 42px 30px;background:#17372f;color:#dce9e3;">
+      <div style="font-size:15px;font-weight:700;">Dein Anima-Cura-Praxisteam</div>
+      <div style="margin-top:7px;color:#a9c0b6;font-size:13px;line-height:1.6;">KFO-Praxis Dr. Maria Elena Schubert · Leipzig</div>
+      <div style="margin-top:14px;color:#a9c0b6;font-size:12px;line-height:1.6;">Du kannst direkt auf diese E-Mail antworten. Deine Nachricht geht an <a href="mailto:${SUPPORT_ADDRESS}" style="color:#ffffff;text-decoration:underline;">${SUPPORT_ADDRESS}</a>.</div>
+    </td></tr>
+  </table>
+</td></tr></table></body></html>`;
+}
+
 export function buildSupportReply(event: ParsedSupportEvent, classification: SupportClassification) {
   const hello = salutation(event.senderName);
   const commonEnd = "\n\nBitte sende uns niemals dein Passwort oder einen Sicherheitscode per E-Mail.\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam";
@@ -226,11 +305,10 @@ export function buildSupportReply(event: ParsedSupportEvent, classification: Sup
   } else {
     message = `${hello}\n\nöffne deinen persönlichen Anima-Cura-Link auf dem Smartphone und füge das Patientenportal über die Browserfunktion zum Home- oder Startbildschirm hinzu. Aktiviere anschließend die Benachrichtigungen, damit du neue Rechnungen und wichtige Praxisnachrichten nicht übersiehst.${commonEnd}`;
   }
-  const paragraphs = message.split("\n\n").map(paragraph => `<p style="margin:0 0 16px">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
   return {
     subject: event.subject.toLocaleLowerCase("de-DE").startsWith("re:") ? event.subject : `Re: ${event.subject}`,
     text: message,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173b32;max-width:620px">${paragraphs}</div>`,
+    html: buildSupportEmailHtml(message, classification.category),
   };
 }
 
@@ -251,12 +329,11 @@ async function buildGroundedSupportReply(event: ParsedSupportEvent, classificati
   if (!generated.core) return { reply: fallback, ...generated };
 
   const message = `${salutation(event.senderName)}\n\n${generated.core}\n\nBitte sende uns niemals dein Passwort oder einen Sicherheitscode per E-Mail.\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
-  const paragraphs = message.split("\n\n").map(paragraph => `<p style="margin:0 0 16px">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
   return {
     reply: {
       subject: fallback.subject,
       text: message,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173b32;max-width:620px">${paragraphs}</div>`,
+      html: buildSupportEmailHtml(message, classification.category),
     },
     ...generated,
   };

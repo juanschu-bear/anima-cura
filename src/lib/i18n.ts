@@ -403,6 +403,8 @@ const translations: Record<string, { de: string; en: string }> = {
   "support.kind.explanation": { de: "Erklärung", en: "Explanation" },
   "support.kind.policy": { de: "Sicherheitsregel", en: "Policy" },
   "support.approvedFact": { de: "Freigegebener Inhalt", en: "Approved content" },
+  "support.knowledgeInternalTitle": { de: "Interner Wissensbaustein", en: "Internal knowledge module" },
+  "support.knowledgeInternalText": { de: "Dieser Text ist weder der System-Prompt noch die fertige Patienten-E-Mail. Er enthält ausschließlich die freigegebenen Fakten, aus denen eine passende Antwort erstellt wird.", en: "This text is neither the system prompt nor the finished patient email. It contains only the approved facts used to create an appropriate reply." },
   "support.answerScope": { de: "Dafür darf der Artikel verwendet werden", en: "Permitted answer scope" },
   "support.noScope": { de: "Nur für das bezeichnete Thema verwenden.", en: "Use only for the stated topic." },
   "support.auditUsage": { de: "Nutzung in echten Antworten", en: "Usage in real replies" },
