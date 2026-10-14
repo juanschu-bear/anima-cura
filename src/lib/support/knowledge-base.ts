@@ -25,6 +25,15 @@ export const SUPPORT_CATEGORY_LABELS: Record<SupportKnowledgeCategory, string> =
 
 export const SUPPORT_KNOWLEDGE: readonly SupportKnowledgeEntry[] = [
   {
+    id: "access.self-activation",
+    title: "Bestehenden Patientenzugang selbst aktivieren",
+    categories: ["login_password"],
+    keywords: ["noch kein zugang", "noch keinen zugang", "kein konto", "account erstellen", "aktivieren", "patientennummer", "noch nie angemeldet"],
+    content: "Wer bereits Patient der Praxis ist, aber noch keinen Anima-Cura-Zugang genutzt hat, wählt auf der Anmeldeseite „Noch keinen Zugang? Patientenkonto aktivieren“. Benötigt werden Patientennummer, Geburtsdatum und die private Kontakt-E-Mail, die bereits bei der Praxis hinterlegt ist. Stimmen alle Angaben überein, wird ein sechsstelliger Sicherheitscode an diese private Kontakt-E-Mail geschickt. Danach legt der Patient sein eigenes Passwort fest und wird direkt angemeldet. Es wird keine neue Patientenakte und kein neuer Anamnesebogen erstellt.",
+    kind: "procedure",
+    answerScope: "Leitet bestehende Patienten durch die sichere erstmalige Aktivierung.",
+  },
+  {
     id: "access.portal-address",
     title: "Anima-Cura-Anmeldeadresse",
     categories: ["login_password"],

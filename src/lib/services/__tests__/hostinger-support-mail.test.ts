@@ -122,6 +122,7 @@ test("accepts common nested webhook field variants", () => {
 test("retrieves versioned knowledge for each automatic support category", () => {
   assert.match(SUPPORT_KNOWLEDGE_VERSION, /^\d{4}-\d{2}-\d{2}\.\d+$/);
   assert.ok(retrieveSupportKnowledge("login_password", "Passwort vergessen").some(entry => entry.id === "access.password-recovery"));
+  assert.ok(retrieveSupportKnowledge("login_password", "Ich habe noch keinen Zugang").some(entry => entry.id === "access.self-activation"));
   assert.ok(retrieveSupportKnowledge("invoice_access", "Wo ist meine Rechnung?").some(entry => entry.id === "invoice.find-documents"));
   assert.ok(retrieveSupportKnowledge("payment_method", "Wie nutze ich den Banking-QR?").some(entry => entry.id === "payment.supported-methods"));
   assert.ok(retrieveSupportKnowledge("portal_setup", "App zum Home-Bildschirm hinzufügen").some(entry => entry.id === "portal.install"));

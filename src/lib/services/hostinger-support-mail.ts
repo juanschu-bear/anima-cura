@@ -365,8 +365,11 @@ export function buildSupportEmailHtml(message: string, category: SupportCategory
 export function buildSupportReply(event: ParsedSupportEvent, classification: SupportClassification) {
   const hello = salutation(event.senderName);
   const commonEnd = "\n\nBitte sende uns niemals dein Passwort oder einen Sicherheitscode per E-Mail.\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam";
+  const activationRequest = /noch kein.*(zugang|konto)|kein.*(zugang|konto)|account.*(erstellen|aktivieren)|noch nie.*angemeldet/.test(normalizedText(event));
   let message: string;
-  if (classification.category === "login_password") {
+  if (classification.category === "login_password" && activationRequest) {
+    message = `${hello}\n\ndeinen bestehenden Patientenzugang kannst du direkt in Anima Cura aktivieren:\n\n1. Öffne auf der Anmeldeseite „Noch keinen Zugang? Patientenkonto aktivieren“.\n2. Gib deine Patientennummer, dein Geburtsdatum und die private Kontakt-E-Mail ein, die bei der Praxis hinterlegt ist.\n3. Trage den sechsstelligen Sicherheitscode aus dieser privaten E-Mail in der geöffneten App ein.\n4. Lege dein eigenes Passwort fest. Danach wirst du direkt angemeldet.\n\nEs wird keine neue Patientenakte und kein neuer Anamnesebogen erstellt.\n\nAnima Cura jetzt öffnen:\n${PORTAL_LOGIN_URL}${commonEnd}`;
+  } else if (classification.category === "login_password") {
     message = `${hello}\n\ndeinen Zugang kannst du direkt in Anima Cura wiederherstellen:\n\n1. Öffne „Passwort vergessen“.\n2. Gib deine persönliche Anima-Cura-Anmeldeadresse ein. Sie endet meist auf @animacura.de, dient aber nur als Benutzername und empfängt keine E-Mails.\n3. Den sechsstelligen Sicherheitscode erhältst du an deine bei der Praxis hinterlegte private Kontakt-E-Mail, zum Beispiel Gmail, GMX oder Web.de.\n4. Trage den Code in der geöffneten App ein und vergib dein neues Passwort zweimal.\n\nDanach führt dich Anima Cura direkt zu der zuvor geöffneten Rechnung zurück.\n\nPasswort jetzt neu einrichten:\n${PORTAL_RECOVERY_URL}${commonEnd}`;
   } else if (classification.category === "invoice_access") {
     message = `${hello}\n\nöffne den Rechnungsbutton oder QR-Code erneut und melde dich in Anima Cura an. Nach der Anmeldung wird die passende Rechnung automatisch geöffnet. Bereits bereitgestellte Rechnungen findest du außerdem im Patientenportal unter „Dokumente“.\n\nFalls das Passwort nicht mehr funktioniert, wähle auf der Anmeldeseite „Passwort vergessen“.${commonEnd}`;

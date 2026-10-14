@@ -13,6 +13,9 @@ import {
   ShieldCheck,
   ArrowLeft,
   KeyRound,
+  Hash,
+  CalendarDays,
+  UserRoundCheck,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { pruefeEmail } from "@/lib/validation/feldpruefung";
@@ -38,6 +41,14 @@ export default function PatientLoginForm() {
   const [newPassword, setNewPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [activationStep, setActivationStep] = useState<"closed" | "identify" | "verify">("closed");
+  const [activationPatientNumber, setActivationPatientNumber] = useState("");
+  const [activationBirthDate, setActivationBirthDate] = useState("");
+  const [activationContactEmail, setActivationContactEmail] = useState("");
+  const [activationCode, setActivationCode] = useState("");
+  const [activationPassword, setActivationPassword] = useState("");
+  const [activationRepeatPassword, setActivationRepeatPassword] = useState("");
+  const [activationMessage, setActivationMessage] = useState("");
 
   useEffect(() => {
     if (searchParams.get("recovery") === "1") setRecoveryStep("identify");
@@ -223,10 +234,111 @@ export default function PatientLoginForm() {
   }
 
   function openRecovery() {
+    setActivationStep("closed");
     setRecoveryEmail(email.trim());
     setRecoveryStep("identify");
     setError("");
     setRecoveryMessage("");
+  }
+
+  function openActivation() {
+    setRecoveryStep("closed");
+    setActivationStep("identify");
+    setError("");
+    setActivationMessage("");
+  }
+
+  function closeActivation() {
+    setActivationStep("closed");
+    setError("");
+    setActivationMessage("");
+    setActivationCode("");
+    setActivationPassword("");
+    setActivationRepeatPassword("");
+  }
+
+  async function requestActivationCode(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!/^\d{1,12}$/.test(activationPatientNumber.trim())) {
+      setError(t("patientActivation.invalidPatientNumber"));
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(activationBirthDate)) {
+      setError(t("patientActivation.invalidBirthDate"));
+      return;
+    }
+    const contactEmail = activationContactEmail.trim();
+    if (!contactEmail || !pruefeEmail(contactEmail).ok) {
+      setError(t("patientActivation.invalidEmail"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setActivationMessage("");
+    try {
+      const response = await fetch("/api/patient/self-activation/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientNumber: activationPatientNumber.trim(),
+          birthDate: activationBirthDate,
+          contactEmail,
+        }),
+      });
+      if (!response.ok) throw new Error("request_failed");
+      setActivationContactEmail(contactEmail);
+      setActivationStep("verify");
+      setActivationMessage(t("patientActivation.codeSent"));
+    } catch {
+      setError(t("patientActivation.unavailable"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmActivation(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(activationCode)) {
+      setError(t("patientActivation.invalidCode"));
+      return;
+    }
+    if (activationPassword.length < 8) {
+      setError(t("patientRecovery.passwordLength"));
+      return;
+    }
+    if (activationPassword !== activationRepeatPassword) {
+      setError(t("patientRecovery.passwordMismatch"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/patient/self-activation/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientNumber: activationPatientNumber.trim(),
+          birthDate: activationBirthDate,
+          contactEmail: activationContactEmail,
+          code: activationCode,
+          password: activationPassword,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; loginEmail?: string } | null;
+      if (!response.ok || !payload?.loginEmail) {
+        setError(payload?.error === "invalid_or_expired" ? t("patientActivation.invalidCode") : t("patientActivation.unavailable"));
+        return;
+      }
+      const supabase = createBrowserClient();
+      const signIn = await supabase.auth.signInWithPassword({ email: payload.loginEmail, password: activationPassword });
+      if (signIn.error) throw new Error("signin_failed");
+      router.replace(target);
+      router.refresh();
+    } catch {
+      setError(t("patientActivation.unavailable"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function closeRecovery() {
@@ -359,8 +471,12 @@ export default function PatientLoginForm() {
 
             <div className="acl-divider" aria-hidden="true" />
 
-            <h2 className="acl-title">{recoveryStep === "closed" ? "Willkommen zurück" : t("patientRecovery.title")}</h2>
-            <p className="acl-subtitle">{recoveryStep === "closed" ? "Melde dich mit deinen Zugangsdaten an" : t("patientRecovery.intro")}</p>
+            <h2 className="acl-title">
+              {activationStep !== "closed" ? t("patientActivation.title") : recoveryStep !== "closed" ? t("patientRecovery.title") : "Willkommen zurück"}
+            </h2>
+            <p className="acl-subtitle">
+              {activationStep !== "closed" ? t("patientActivation.intro") : recoveryStep !== "closed" ? t("patientRecovery.intro") : "Melde dich mit deinen Zugangsdaten an"}
+            </p>
 
             <AnimatePresence mode="wait">
               {error && (
@@ -384,7 +500,7 @@ export default function PatientLoginForm() {
               )}
             </AnimatePresence>
 
-            {recoveryStep === "closed" ? <form onSubmit={handleSubmit} noValidate>
+            {recoveryStep === "closed" && activationStep === "closed" ? <form onSubmit={handleSubmit} noValidate>
               {/* Email */}
               <div className="acl-field">
                 <label htmlFor="patient-email" className="acl-label">
@@ -459,7 +575,75 @@ export default function PatientLoginForm() {
                   "Anmelden"
                 )}
               </motion.button>
-            </form> : recoveryStep === "identify" ? (
+              <div className="acl-activation-entry">
+                <button type="button" className="acl-activation-open" onClick={openActivation}>
+                  <UserRoundCheck size={18} strokeWidth={1.8} aria-hidden="true" />
+                  <span>{t("patientActivation.open")}</span>
+                </button>
+                <p>{t("patientActivation.openHint")}</p>
+              </div>
+            </form> : activationStep === "identify" ? (
+              <form onSubmit={requestActivationCode} noValidate>
+                <div className="acl-activation-progress" aria-label="Schritt 1 von 2">
+                  <span className="is-current">1 · Angaben</span><span>2 · Code und Passwort</span>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="activation-patient-number" className="acl-label">{t("patientActivation.patientNumber")}</label>
+                  <div className="acl-input-wrap">
+                    <Hash size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
+                    <input id="activation-patient-number" type="text" inputMode="numeric" autoComplete="off" required value={activationPatientNumber} onChange={(e) => setActivationPatientNumber(e.target.value.replace(/\D/g, "").slice(0, 12))} placeholder="z. B. 00003728" aria-describedby="activation-patient-number-help" className="acl-input acl-number" />
+                  </div>
+                  <p id="activation-patient-number-help" className="acl-field-help">{t("patientActivation.patientNumberHint")}</p>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="activation-birth-date" className="acl-label">{t("patientActivation.birthDate")}</label>
+                  <div className="acl-input-wrap">
+                    <CalendarDays size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
+                    <input id="activation-birth-date" type="date" autoComplete="bday" required value={activationBirthDate} onChange={(e) => setActivationBirthDate(e.target.value)} className="acl-input acl-date" />
+                  </div>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="activation-contact-email" className="acl-label">{t("patientActivation.contactEmail")}</label>
+                  <div className="acl-input-wrap">
+                    <Mail size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" />
+                    <input id="activation-contact-email" type="email" inputMode="email" autoComplete="email" required value={activationContactEmail} onChange={(e) => setActivationContactEmail(e.target.value)} placeholder="z. B. name@gmail.com" aria-describedby="activation-contact-help" className="acl-input" />
+                  </div>
+                  <p id="activation-contact-help" className="acl-field-help">{t("patientActivation.contactEmailHint")}</p>
+                </div>
+                <div className="acl-recovery-explainer">
+                  <ShieldCheck size={17} strokeWidth={1.8} aria-hidden="true" />
+                  <p>{t("patientActivation.privacy")}</p>
+                </div>
+                <motion.button type="submit" disabled={loading} className="acl-submit" whileHover={reduceMotion || loading ? undefined : { y: -2 }} whileTap={reduceMotion || loading ? undefined : { scale: 0.98 }}>
+                  {loading ? <><Loader2 size={18} className="acl-spin" aria-hidden="true" />{t("patientActivation.requesting")}</> : <><KeyRound size={18} aria-hidden="true" />{t("patientActivation.requestCode")}</>}
+                </motion.button>
+                <button type="button" className="acl-back" onClick={closeActivation}><ArrowLeft size={15} aria-hidden="true" />{t("patientActivation.back")}</button>
+              </form>
+            ) : activationStep === "verify" ? (
+              <form onSubmit={confirmActivation} noValidate>
+                <div className="acl-activation-progress" aria-label="Schritt 2 von 2">
+                  <span>1 · Angaben</span><span className="is-current">2 · Code und Passwort</span>
+                </div>
+                {activationMessage ? <p className="acl-recovery-note">{activationMessage}</p> : null}
+                <div className="acl-field">
+                  <label htmlFor="activation-code" className="acl-label">{t("patientActivation.code")}</label>
+                  <div className="acl-input-wrap"><KeyRound size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" /><input id="activation-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={activationCode} onChange={(e) => setActivationCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="acl-input acl-code" /></div>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="activation-password" className="acl-label">{t("patientActivation.newPassword")}</label>
+                  <div className="acl-input-wrap"><LockKeyhole size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" /><input id="activation-password" type="password" autoComplete="new-password" minLength={8} required value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} className="acl-input" /></div>
+                </div>
+                <div className="acl-field">
+                  <label htmlFor="activation-repeat-password" className="acl-label">{t("patientActivation.repeatPassword")}</label>
+                  <div className="acl-input-wrap"><LockKeyhole size={18} strokeWidth={1.75} className="acl-input-icon" aria-hidden="true" /><input id="activation-repeat-password" type="password" autoComplete="new-password" minLength={8} required value={activationRepeatPassword} onChange={(e) => setActivationRepeatPassword(e.target.value)} className="acl-input" /></div>
+                </div>
+                <motion.button type="submit" disabled={loading} className="acl-submit" whileHover={reduceMotion || loading ? undefined : { y: -2 }} whileTap={reduceMotion || loading ? undefined : { scale: 0.98 }}>
+                  {loading ? <><Loader2 size={18} className="acl-spin" aria-hidden="true" />{t("patientActivation.activating")}</> : t("patientActivation.activate")}
+                </motion.button>
+                <a className="acl-recovery-help" href="mailto:praxisteam@animacura.io?subject=Kein%20Aktivierungscode%20erhalten">{t("patientActivation.noCode")}</a>
+                <button type="button" className="acl-back" onClick={closeActivation}><ArrowLeft size={15} aria-hidden="true" />{t("patientActivation.back")}</button>
+              </form>
+            ) : recoveryStep === "identify" ? (
               <form onSubmit={requestRecoveryCode} noValidate>
                 <div className="acl-field">
                   <label htmlFor="recovery-email" className="acl-label">{t("patientRecovery.email")}</label>
@@ -524,7 +708,8 @@ export default function PatientLoginForm() {
           align-items: center;
           justify-content: center;
           padding: 32px 24px;
-          overflow: hidden;
+          overflow-x: hidden;
+          overflow-y: auto;
           background: #05070b;
           font-family: 'DM Sans', -apple-system, sans-serif;
           isolation: isolate;
@@ -666,6 +851,15 @@ export default function PatientLoginForm() {
         .acl-recovery-help:hover { color:#a7f3c7; }
         .acl-recovery-help:focus-visible { outline:2px solid rgba(34,197,94,.7); outline-offset:4px; border-radius:4px; }
         .acl-code { font-size:20px; font-weight:700; letter-spacing:.28em; font-variant-numeric:tabular-nums; }
+        .acl-number { font-variant-numeric:tabular-nums; letter-spacing:.04em; }
+        .acl-date { color-scheme:dark; }
+        .acl-activation-entry { margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.11); text-align:center; }
+        .acl-activation-entry p { margin:7px 0 0; color:#aeb4bd; font-size:13px; line-height:1.45; }
+        .acl-activation-open { width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; gap:9px; padding:11px 14px; border:1px solid rgba(127,216,168,.42); border-radius:14px; background:rgba(34,197,94,.08); color:#d9f7e6; font:700 14px/1.4 'DM Sans',sans-serif; cursor:pointer; transition:background .2s ease,border-color .2s ease,transform .2s ease; }
+        .acl-activation-open:hover { background:rgba(34,197,94,.14); border-color:rgba(127,216,168,.68); }
+        .acl-activation-open:focus-visible { outline:2px solid #7fd8a8; outline-offset:3px; }
+        .acl-activation-progress { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 20px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,.1); color:#8f98a4; font-size:12px; font-weight:700; }
+        .acl-activation-progress .is-current { color:#9be3bb; }
         .acl-back { width:100%; margin:16px 0 0; padding:8px; border:0; background:none; color:#aeb4bd; display:flex; align-items:center; justify-content:center; gap:6px; font:600 13px/1.4 'DM Sans',sans-serif; cursor:pointer; }
         .acl-back:hover { color:#fff; }
         .acl-input-wrap { position: relative; }
@@ -679,7 +873,7 @@ export default function PatientLoginForm() {
           border-radius: 14px;
           background: rgba(8,10,16,0.6);
           border: 1px solid rgba(255,255,255,0.1);
-          color: #fff; font-size: 15px; font-family: inherit;
+          color: #fff; font-size: 16px; font-family: inherit;
           outline: none;
           transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
@@ -769,6 +963,16 @@ export default function PatientLoginForm() {
             max-width: 420px; max-height: 420px;
             opacity: 0.05;
           }
+        }
+        @media (max-height: 900px) {
+          .acl-root { align-items:flex-start; }
+        }
+        @media (max-width: 460px) {
+          .acl-root { align-items:flex-start; padding:18px 12px 28px; overflow:auto; }
+          .acl-card { padding:26px 20px; border-radius:20px; }
+          .acl-title { font-size:22px; line-height:1.18; }
+          .acl-subtitle { font-size:15px; line-height:1.5; }
+          .acl-activation-progress { align-items:flex-start; font-size:11px; }
         }
 
         /* ---------- Keyframes ---------- */
