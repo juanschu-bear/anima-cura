@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { AlertTriangle,
+import { AlertTriangle, BookOpenCheck,
   BarChart3,
   CalendarRange,
   ChevronDown,
@@ -83,6 +83,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
       { href: "/icura-ops", icon: Brain, key: "nav.icuraOps" },
       { href: "/behandlungslogik", icon: FolderKanban, key: "nav.treatmentLogic" },
       { href: "/automatisierungen", icon: Zap, key: "nav.automations" },
+      { href: "/support-zentrale", icon: BookOpenCheck, key: "nav.supportCenter" },
       { href: "/import", icon: Upload, key: "nav.import" },
       { href: "/einstellungen", icon: Settings, key: "nav.settings" },
     ],

@@ -14,6 +14,13 @@ export type SupportKnowledgeEntry = {
   content: string;
 };
 
+export const SUPPORT_CATEGORY_LABELS: Record<SupportKnowledgeCategory, string> = {
+  login_password: "Anmeldung und Passwort",
+  invoice_access: "Rechnungszugang",
+  payment_method: "Zahlungsweg",
+  portal_setup: "App und Benachrichtigungen",
+};
+
 export const SUPPORT_KNOWLEDGE: readonly SupportKnowledgeEntry[] = [
   {
     id: "access.portal-address",

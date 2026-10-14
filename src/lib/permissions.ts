@@ -35,6 +35,7 @@ export const MODULE: { schluessel: string; pfad: string; label: string }[] = [
   { schluessel: "patienten", pfad: "/patienten", label: "Patienten" },
   { schluessel: "nachrichten", pfad: "/nachrichten", label: "Nachrichten" },
   { schluessel: "automatisierungen", pfad: "/automatisierungen", label: "Automatisierungen" },
+  { schluessel: "support_zentrale", pfad: "/support-zentrale", label: "Support-Zentrale" },
   { schluessel: "import", pfad: "/import", label: "Import" },
   { schluessel: "einstellungen", pfad: "/einstellungen", label: "Einstellungen" },
 ];
