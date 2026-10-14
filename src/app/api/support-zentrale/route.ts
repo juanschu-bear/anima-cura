@@ -5,11 +5,18 @@ import { createServerClient } from "@/lib/db/supabase";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { SUPPORT_AGENT_SYSTEM_PROMPT } from "@/lib/services/hostinger-support-ai";
-import { HOSTINGER_SUPPORT_WORKFLOW_ID } from "@/lib/services/hostinger-support-mail";
+import {
+  buildSupportReply,
+  classifySupportEvent,
+  HOSTINGER_SUPPORT_WORKFLOW_ID,
+  type ParsedSupportEvent,
+} from "@/lib/services/hostinger-support-mail";
 import {
   SUPPORT_CATEGORY_LABELS,
   SUPPORT_KNOWLEDGE,
   SUPPORT_KNOWLEDGE_VERSION,
+  retrieveSupportKnowledge,
+  type SupportKnowledgeCategory,
 } from "@/lib/support/knowledge-base";
 
 const noteSchema = z.object({
@@ -47,6 +54,48 @@ function containsSensitiveData(value: string) {
 
 function resultOf(row: Record<string, unknown>) {
   return row.result && typeof row.result === "object" ? row.result as Record<string, unknown> : {};
+}
+
+const previewScenarios = [
+  { id: "password", subject: "Ich kann mich nicht anmelden", excerpt: "Mein Passwort funktioniert nicht mehr." },
+  { id: "invoice", subject: "Wo finde ich meine Rechnung?", excerpt: "Der Rechnungslink zeigt zuerst die Anmeldung." },
+  { id: "payment", subject: "Wie kann ich die Rechnung bezahlen?", excerpt: "Kann ich Banking-QR oder Überweisung verwenden?" },
+  { id: "setup", subject: "App installieren", excerpt: "Wie bekomme ich Anima Cura auf den Startbildschirm?" },
+  { id: "billing", subject: "Mein Rechnungsbetrag stimmt nicht", excerpt: "Warum soll ich diesen konkreten Betrag bezahlen?" },
+  { id: "medical", subject: "Medizinische Frage", excerpt: "Mein Kind hat Schmerzen am Zahn." },
+] as const;
+
+function answerPreviews() {
+  return previewScenarios.map((scenario) => {
+    const event: ParsedSupportEvent = {
+      event: "message.received",
+      eventKey: `preview-${scenario.id}`,
+      mailboxAddress: "praxisteam@animacura.io",
+      mailboxResourceId: null,
+      senderEmail: "patient@example.com",
+      senderName: null,
+      subject: scenario.subject,
+      excerpt: scenario.excerpt,
+      timestamp: null,
+      uid: null,
+      folder: "inbox",
+      messageId: null,
+    };
+    const classification = classifySupportEvent(event);
+    const supportedCategory = ["login_password", "invoice_access", "payment_method", "portal_setup"].includes(classification.category)
+      ? classification.category as SupportKnowledgeCategory
+      : null;
+    return {
+      ...scenario,
+      category: classification.category,
+      autoReply: classification.autoReply,
+      reason: classification.reason,
+      reply: classification.autoReply ? buildSupportReply(event, classification).text : null,
+      sources: supportedCategory
+        ? retrieveSupportKnowledge(supportedCategory, `${scenario.subject} ${scenario.excerpt}`).map((entry) => entry.id)
+        : [],
+    };
+  });
 }
 
 export async function GET() {
@@ -88,6 +137,10 @@ export async function GET() {
     counts[row.category] = (counts[row.category] ?? 0) + 1;
     return counts;
   }, {});
+  const sourceUsage = safeRuns.reduce<Record<string, number>>((counts, row) => {
+    row.knowledgeSourceIds.forEach((id) => { counts[String(id)] = (counts[String(id)] ?? 0) + 1; });
+    return counts;
+  }, {});
 
   return NextResponse.json({
     knowledge: SUPPORT_KNOWLEDGE,
@@ -100,7 +153,11 @@ export async function GET() {
       manualReview: safeRuns.filter((row) => row.manualReview).length,
       failed: safeRuns.filter((row) => row.status === "failed").length,
       categories,
+      sourceUsage,
+      automatedCoverage: 4,
+      protectedBoundaries: 3,
     },
+    answerPreviews: answerPreviews(),
     recentCases: safeRuns.slice(0, 50),
     learningNotes: noteError ? [] : learningNotes(notesSetting?.value).slice(0, 100),
     learningAvailable: !noteError,
