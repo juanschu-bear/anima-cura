@@ -43,6 +43,10 @@ export default function PatientLoginForm() {
   const [repeatPassword, setRepeatPassword] = useState("");
   const [recoveryMessage, setRecoveryMessage] = useState("");
 
+  useEffect(() => {
+    if (searchParams.get("recovery") === "1") setRecoveryStep("identify");
+  }, [searchParams]);
+
   const isPatientAuthUser = (user: {
     app_metadata?: Record<string, unknown> | null;
     user_metadata?: Record<string, unknown> | null;
