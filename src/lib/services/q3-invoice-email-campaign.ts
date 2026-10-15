@@ -7,6 +7,11 @@ import { createServerClient } from "@/lib/db/supabase";
 import { billingInvoiceEmailVersion, buildBillingInvoiceEmail } from "@/lib/email/billing-invoice-campaign";
 import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { contactEmailIssue } from "@/lib/services/patient-outreach-audit";
+import {
+  prepareTrackedEmail,
+  safeCreateCommunicationMessage,
+  safeRecordCommunicationEvent,
+} from "@/lib/services/communication-ledger";
 
 export const Q3_INVOICE_EMAIL_WORKFLOW_ID = "bedfe0d5-e279-4ad0-be8f-f8e8319f38af";
 export const Q3_INVOICE_EMAIL_SETTING = "q3_2026_invoice_email_campaign";
@@ -155,15 +160,25 @@ export async function testQ3InvoiceEmailCampaign() {
     const claim = await db.from("workflow_runs").insert({ id, workflow_id: Q3_INVOICE_EMAIL_WORKFLOW_ID,
       trigger_event: `${EVENT}_test`, status: "running", started_at: new Date().toISOString(), result: { version: manifest.version, test: true } });
     if (claim.error) throw new Error("Could not reserve test dispatch");
-    const email = buildBillingInvoiceEmail({ activationRequired: true, dueDate: manifest.dueDate, test: true,
+    let email = buildBillingInvoiceEmail({ activationRequired: true, dueDate: manifest.dueDate, test: true,
       invoices: [{ patientName: "TEST – Beispieldaten", amountCents: 1234 }] });
+    const ledgerMessage = await safeCreateCommunicationMessage({
+      campaignKey: EVENT,
+      provider: "resend",
+      recipient: TEST_EMAIL,
+      subject: email.subject,
+      metadata: { test: true, version: manifest.version },
+    });
+    if (ledgerMessage) email = { ...email, ...await prepareTrackedEmail(ledgerMessage, email) };
     try {
       const providerId = await providerSend({ idempotencyKey: id, to: TEST_EMAIL, ...email,
         attachments: [{ filename: "TEST-keine-Rechnung.pdf", content: (await makeTestPdf()).toString("base64") }] });
+      if (ledgerMessage) await safeRecordCommunicationEvent({ messageId: ledgerMessage.id, eventType: "accepted", source: "transport", providerMessageId: providerId });
       const finish = await db.from("workflow_runs").update({ status: "success", finished_at: new Date().toISOString(),
         result: { version: manifest.version, test: true, providerId, deliveryConfirmed: false } }).eq("id", id);
       if (finish.error) throw new Error("Test audit finalization failed");
     } catch (error) {
+      if (ledgerMessage) await safeRecordCommunicationEvent({ messageId: ledgerMessage.id, eventType: "failed", source: "transport" });
       await db.from("workflow_runs").update({ status: "failed", finished_at: new Date().toISOString(),
         error: error instanceof Error ? error.message : "Test failed" }).eq("id", id);
       throw error;
@@ -219,15 +234,27 @@ export async function sendQ3InvoiceEmailBatch(limit = 8) {
       result: { version: manifest.version, patientIds: recipient.patientIds } });
     if (claim.error?.code === "23505") continue;
     if (claim.error) throw new Error("Could not reserve dispatch");
+    let ledgerMessage: Awaited<ReturnType<typeof safeCreateCommunicationMessage>> = null;
     try {
       const content = await loadRecipientContent(db, recipient);
-      const email = buildBillingInvoiceEmail({ activationRequired: recipient.priority === "activation",
+      let email = buildBillingInvoiceEmail({ activationRequired: recipient.priority === "activation",
         dueDate: manifest.dueDate, invoices: content.invoiceLines });
+      ledgerMessage = await safeCreateCommunicationMessage({
+        patientId: recipient.patientIds.length === 1 ? recipient.patientIds[0] : null,
+        campaignKey: EVENT,
+        provider: "resend",
+        recipient: recipient.email,
+        subject: email.subject,
+        metadata: { patientIds: recipient.patientIds, documentIds: recipient.invoices.map(invoice => invoice.documentId) },
+      });
+      if (ledgerMessage) email = { ...email, ...await prepareTrackedEmail(ledgerMessage, email) };
       const providerId = await providerSend({ idempotencyKey: id, to: recipient.email, ...email, attachments: content.attachments });
+      if (ledgerMessage) await safeRecordCommunicationEvent({ messageId: ledgerMessage.id, eventType: "accepted", source: "transport", providerMessageId: providerId });
       const finish = await db.from("workflow_runs").update({ status: "success", finished_at: new Date().toISOString(),
         result: { version: manifest.version, patientIds: recipient.patientIds, providerId, deliveryConfirmed: false } }).eq("id", id);
       if (finish.error) throw new Error("Dispatch audit finalization failed");
     } catch (error) {
+      if (ledgerMessage) await safeRecordCommunicationEvent({ messageId: ledgerMessage.id, eventType: "failed", source: "transport" });
       await db.from("workflow_runs").update({ status: "failed", finished_at: new Date().toISOString(),
         error: error instanceof Error ? error.message : "Dispatch requires review",
         result: { version: manifest.version, patientIds: recipient.patientIds, deliveryConfirmed: false } }).eq("id", id);

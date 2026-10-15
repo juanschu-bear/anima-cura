@@ -34,6 +34,7 @@ export const MODULE: { schluessel: string; pfad: string; label: string }[] = [
   { schluessel: "icura_ops", pfad: "/icura-ops", label: "iCura Ops" },
   { schluessel: "patienten", pfad: "/patienten", label: "Patienten" },
   { schluessel: "nachrichten", pfad: "/nachrichten", label: "Nachrichten" },
+  { schluessel: "versand", pfad: "/versand", label: "Versandstatus" },
   { schluessel: "automatisierungen", pfad: "/automatisierungen", label: "Automatisierungen" },
   { schluessel: "support_zentrale", pfad: "/support-zentrale", label: "Support-Zentrale" },
   { schluessel: "import", pfad: "/import", label: "Import" },

@@ -1,6 +1,11 @@
 import { Resend } from "resend";
 import { z } from "zod";
 import { createServerClient } from "@/lib/db/supabase";
+import {
+  prepareTrackedEmail,
+  safeCreateCommunicationMessage,
+  safeRecordCommunicationEvent,
+} from "@/lib/services/communication-ledger";
 
 const PRACTICE_NAME = "Kieferorthopädische Praxis Dr. Maria Schubert";
 const DEFAULT_FROM = "praxis@anima-cura.app";
@@ -84,8 +89,18 @@ export async function sendEmail(params: SendEmailParams): Promise<{ ok: boolean;
     };
 
     const subject = replaceTemplateVars(params.subject, context);
-    const body = replaceTemplateVars(params.body, context);
+    let body = replaceTemplateVars(params.body, context);
     const from = params.from || provider.from || DEFAULT_FROM;
+    const ledgerMessage = await safeCreateCommunicationMessage({
+      patientId: params.context?.patient_id || null,
+      campaignKey: params.context?.campaign_key || null,
+      provider: provider.provider || "resend",
+      recipient: params.to,
+      subject,
+    });
+    if (ledgerMessage) {
+      body = (await prepareTrackedEmail(ledgerMessage, { html: body, text: "" })).html;
+    }
 
     const resend = new Resend(apiKey);
     const response = await resend.emails.send({
@@ -97,6 +112,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ ok: boolean;
 
     if (response.error) {
       const error = response.error.message || "E-Mail-Versand fehlgeschlagen.";
+      if (ledgerMessage) await safeRecordCommunicationEvent({ messageId: ledgerMessage.id, eventType: "failed", source: "transport" });
       await logAudit(db, {
         status: "error",
         provider: provider.provider || "resend",
@@ -114,6 +130,12 @@ export async function sendEmail(params: SendEmailParams): Promise<{ ok: boolean;
       subject,
       from,
       resend_id: response.data?.id || null,
+    });
+    if (ledgerMessage) await safeRecordCommunicationEvent({
+      messageId: ledgerMessage.id,
+      eventType: "accepted",
+      source: "transport",
+      providerMessageId: response.data?.id || null,
     });
 
     return { ok: true };
