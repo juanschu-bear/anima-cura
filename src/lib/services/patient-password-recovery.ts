@@ -27,6 +27,13 @@ type SubmissionContact = {
   created_at: string;
 };
 
+type PortalProfile = {
+  id: string;
+  patient_id: string;
+  email: string;
+  role: string;
+};
+
 function secret() {
   const value = process.env.PATIENT_PASSWORD_RECOVERY_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!value) throw new Error("password_recovery_secret_missing");
@@ -71,16 +78,64 @@ export function selectRecoveryContactEmail(
   return null;
 }
 
-async function resolveIdentity(portalEmail: string) {
+async function patientIdsForContact(contactEmail: string) {
   const db = createServerClient();
-  const profileResult = await db.from("user_profiles")
+  const [direct, guardian, submissionDirect, submissionPatient, submissionGuardian] = await Promise.all([
+    db.from("patients").select("id").ilike("email", contactEmail).limit(10),
+    db.from("patients").select("id").ilike("versicherter_email", contactEmail).limit(10),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").ilike("email", contactEmail).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>patient_email", contactEmail).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>vp_email", contactEmail).limit(20),
+  ]);
+  if (direct.error || guardian.error || submissionDirect.error || submissionPatient.error || submissionGuardian.error) {
+    throw new Error("password_recovery_contact_lookup_failed");
+  }
+  return Array.from(new Set([
+    ...(direct.data ?? []).map(row => row.id),
+    ...(guardian.data ?? []).map(row => row.id),
+    ...(submissionDirect.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
+    ...(submissionPatient.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
+    ...(submissionGuardian.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
+  ].filter((id): id is string => typeof id === "string" && id.length > 0)));
+}
+
+async function canonicalPortalProfile(profiles: PortalProfile[]) {
+  if (profiles.length === 1) return profiles[0];
+  if (!profiles.length) return null;
+  const db = createServerClient();
+  const candidates = await Promise.all(profiles.map(async profile => {
+    const auth = await db.auth.admin.getUserById(profile.id);
+    return { profile, lastSignInAt: auth.data.user?.last_sign_in_at ?? null };
+  }));
+  const previouslyUsed = candidates
+    .filter(candidate => candidate.lastSignInAt)
+    .sort((left, right) => Date.parse(right.lastSignInAt!) - Date.parse(left.lastSignInAt!));
+  return previouslyUsed[0]?.profile ?? null;
+}
+
+async function resolveIdentity(recoveryEmail: string) {
+  const db = createServerClient();
+  const exactProfileResult = await db.from("user_profiles")
     .select("id,patient_id,email,role")
-    .eq("email", portalEmail)
+    .eq("email", recoveryEmail)
     .eq("role", "patient")
-    .maybeSingle();
-  const profile = profileResult.data;
-  if (profileResult.error) throw new Error("password_recovery_profile_lookup_failed");
-  if (!profile?.id || !profile.patient_id || normalizeEmail(profile.email) !== portalEmail) return null;
+    .limit(2);
+  if (exactProfileResult.error) throw new Error("password_recovery_profile_lookup_failed");
+  let profile = (exactProfileResult.data?.length === 1 ? exactProfileResult.data[0] : null) as PortalProfile | null;
+
+  if (!profile) {
+    const patientIds = await patientIdsForContact(recoveryEmail);
+    if (patientIds.length !== 1) return null;
+    const profiles = await db.from("user_profiles")
+      .select("id,patient_id,email,role")
+      .eq("patient_id", patientIds[0])
+      .eq("role", "patient")
+      .limit(10);
+    if (profiles.error) throw new Error("password_recovery_profile_lookup_failed");
+    profile = await canonicalPortalProfile((profiles.data ?? []) as PortalProfile[]);
+  }
+  if (!profile?.id || !profile.patient_id || !normalizeEmail(profile.email)) return null;
+  const portalEmail = normalizeEmail(profile.email)!;
 
   const [authResult, patientResult, submissionResult] = await Promise.all([
     db.auth.admin.getUserById(profile.id),
@@ -101,7 +156,7 @@ async function resolveIdentity(portalEmail: string) {
     typeof patientResult.data?.versicherter_email === "string" ? patientResult.data.versicherter_email : null,
   );
   if (!contactEmail) return null;
-  return { authUserId: profile.id as string, patientId: profile.patient_id as string, contactEmail };
+  return { authUserId: profile.id as string, patientId: profile.patient_id as string, contactEmail, portalEmail };
 }
 
 function recoveryState(value: unknown): RecoveryState | null {
@@ -150,8 +205,8 @@ async function genericResult(startedAt: number) {
   return GENERIC_REQUEST_RESULT;
 }
 
-async function sendCode(to: string, code: string, id: string, patientId: string) {
-  await sendPatientAccessCode({ purpose: "recovery", patientId, to, code, requestId: id });
+async function sendCode(to: string, code: string, id: string, patientId: string, portalEmail: string) {
+  await sendPatientAccessCode({ purpose: "recovery", patientId, to, code, requestId: id, loginEmail: portalEmail });
 }
 
 export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string }) {
@@ -187,7 +242,7 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   const stored = await db.auth.admin.updateUserById(identity.authUserId, { app_metadata: appMetadata });
   if (stored.error) throw new Error(`password_recovery_store_failed:${stored.error.message}`);
   try {
-    await sendCode(identity.contactEmail, code, id, identity.patientId);
+    await sendCode(identity.contactEmail, code, id, identity.patientId, identity.portalEmail);
   } catch (error) {
     await db.auth.admin.updateUserById(identity.authUserId, {
       app_metadata: { ...authUser.app_metadata, patient_password_recovery: previousState },

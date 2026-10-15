@@ -330,7 +330,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "patientRecovery.unavailable": { de: "Der Zugangsdienst ist gerade nicht erreichbar. Bitte versuche es in wenigen Minuten erneut.", en: "The access service is currently unavailable. Try again in a few minutes." },
   "patientRecovery.emailSubject": { de: "Dein Sicherheitscode für Anima Cura", en: "Your Anima Cura security code" },
   "patientRecovery.emailTitle": { de: "Passwort sicher neu einrichten", en: "Securely set a new password" },
-  "patientRecovery.emailIntro": { de: "Gib diesen Code in der geöffneten Anima-Cura-App ein. Du musst keinen Link öffnen.", en: "Enter this code in the open Anima Cura app. You do not need to open a link." },
+  "patientRecovery.emailIntro": { de: "Öffne über den Button die Anima-Cura-Anwendung und gib dort diesen Sicherheitscode ein, um dein neues Passwort festzulegen.", en: "Open the Anima Cura application using the button and enter this security code there to set your new password." },
   "patientRecovery.emailExpiry": { de: "Der Code ist 30 Minuten gültig und kann nur einmal verwendet werden.", en: "The code is valid for 30 minutes and can only be used once." },
   "patientRecovery.emailWarning": { de: "Du hast keinen neuen Code angefordert? Dann ignoriere diese Nachricht. Teile den Code niemals telefonisch oder per E-Mail mit anderen.", en: "Did not request a new code? Ignore this message. Never share the code by phone or email." },
   "patientRecovery.emailSignature": { de: "Liebe Grüße, dein Praxisteam Dr. Schubert", en: "Kind regards, Dr. Schubert's practice team" },

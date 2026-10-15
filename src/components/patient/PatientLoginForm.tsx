@@ -51,7 +51,12 @@ export default function PatientLoginForm() {
   const [activationMessage, setActivationMessage] = useState("");
 
   useEffect(() => {
-    if (searchParams.get("recovery") === "1") setRecoveryStep("identify");
+    const linkedEmail = searchParams.get("email")?.trim() || "";
+    if (linkedEmail) setRecoveryEmail(linkedEmail);
+    if (searchParams.get("recovery") === "1") {
+      setRecoveryStep(searchParams.get("step") === "verify" && linkedEmail ? "verify" : "identify");
+      if (searchParams.get("step") === "verify" && linkedEmail) setRecoveryMessage(t("patientRecovery.codeSent"));
+    }
   }, [searchParams]);
 
   const isPatientAuthUser = (user: {

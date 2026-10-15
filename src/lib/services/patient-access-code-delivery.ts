@@ -2,7 +2,7 @@ import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery
 import { buildPatientPasswordRecoveryEmail, buildPatientPortalActivationCodeEmail } from "@/lib/email/patient-password-recovery";
 import { safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "./communication-ledger";
 
-type CodeRequest = { purpose: "activation" | "recovery"; patientId: string; to: string; code: string; requestId: string };
+type CodeRequest = { purpose: "activation" | "recovery"; patientId: string; to: string; code: string; requestId: string; loginEmail?: string };
 type Dependencies = {
   apiKey: string | undefined;
   fetch: typeof fetch;
@@ -13,7 +13,7 @@ type Dependencies = {
 /** Record transport evidence, never the security code or rendered email body. */
 export async function sendPatientAccessCode(input: CodeRequest, dependencies?: Dependencies) {
   const deps = dependencies ?? { apiKey: process.env.RESEND_API_KEY, fetch, create: safeCreateCommunicationMessage, record: safeRecordCommunicationEvent };
-  const email = input.purpose === "activation" ? buildPatientPortalActivationCodeEmail(input.code) : buildPatientPasswordRecoveryEmail(input.code);
+  const email = input.purpose === "activation" ? buildPatientPortalActivationCodeEmail(input.code) : buildPatientPasswordRecoveryEmail(input.code, "de", input.loginEmail);
   const message = await deps.create({
     patientId: input.patientId, campaignKey: `patient_access_code_${input.purpose}`, provider: "resend", recipient: input.to, subject: email.subject,
     metadata: { contentRestricted: true, securityPurpose: input.purpose, requestId: input.requestId },

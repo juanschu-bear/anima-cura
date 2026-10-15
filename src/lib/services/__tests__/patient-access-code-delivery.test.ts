@@ -66,3 +66,19 @@ test("records a failed transport without leaking the security code", async () =>
   }]);
   assert.doesNotMatch(JSON.stringify(events), /654321/);
 });
+
+test("recovery email opens the password step with the resolved login address", async () => {
+  let transportedBody = "";
+  await sendPatientAccessCode({ ...request, purpose: "recovery", loginEmail: "nora.eiselt2@animacura.de" }, {
+    apiKey: "test-key",
+    fetch: async (_url, init) => {
+      transportedBody = String(init?.body ?? "");
+      return new Response(JSON.stringify({ id: "provider-message-3" }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    create: async () => ({ id: "ledger-message-3", trackingToken: "tracking-token" }),
+    record: async () => undefined,
+  });
+  assert.match(transportedBody, /Neues Passwort einrichten/);
+  assert.match(transportedBody, /step=verify/);
+  assert.match(transportedBody, /nora.eiselt2%40animacura.de/);
+});
