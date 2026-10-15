@@ -17,10 +17,34 @@ type MessageRow = {
   first_opened_at: string | null; first_clicked_at: string | null; created_at: string;
   events: EventRow[]; portalEvents: PortalEvent[];
 };
+type BillingReconciliation = {
+  quarter: string;
+  expectedInvoices: number;
+  expectedPatients: number;
+  publishedInvoices: number;
+  publishedPatients: number;
+  portalMissingInvoices: number;
+  portalMissingPatients: number;
+  preparedRecipients: number;
+  preparedPatients: number;
+  preparedInvoices: number;
+  acceptedRecipients: number;
+  acceptedPatients: number;
+  acceptedInvoices: number;
+  clarificationMessages: number;
+  clarificationRecipients: number;
+  noContactInvoices: number;
+  noContactPatients: number;
+  transportIssueInvoices: number;
+  transportIssuePatients: number;
+  unnotifiedInvoices: number;
+  unnotifiedPatients: number;
+};
 type Overview = {
   ready: boolean; schemaMissing?: boolean;
   summary: { total: number; accepted: number; delivered: number; opened: number; clicked: number; problems: number };
   messages: MessageRow[];
+  billingReconciliation: BillingReconciliation | null;
 };
 
 const statusTone: Record<string, string> = {
@@ -34,6 +58,10 @@ function fmt(value: string | null | undefined, locale: string) {
   return new Date(value).toLocaleString(locale === "de" ? "de-DE" : "en-GB", {
     day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
   });
+}
+
+function fmtNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-GB").format(value);
 }
 
 export default function VersandPage() {
@@ -69,6 +97,7 @@ export default function VersandPage() {
   const rule = dark ? "border-white/10" : "border-[#d7e0e7]";
   const messages = data?.messages ?? [];
   const summary = data?.summary ?? { total: 0, accepted: 0, delivered: 0, opened: 0, clicked: 0, problems: 0 };
+  const billing = data?.billingReconciliation ?? null;
   const stages = useMemo(() => [
     ["total", summary.total, MailCheck], ["accepted", summary.accepted, Clock3],
     ["delivered", summary.delivered, CheckCircle2], ["opened", summary.opened, Eye],
@@ -78,16 +107,33 @@ export default function VersandPage() {
   return <div className="mx-auto max-w-[1580px] pb-12">
     <header className={`flex flex-wrap items-end justify-between gap-5 border-b pb-6 ${rule}`}>
       <div className="max-w-3xl">
-        <div className="flex items-center gap-3"><MailCheck size={25} className="text-emerald-400" /><h1 className="text-[26px] font-bold tracking-[-0.025em]">{t("dispatch.title", locale)}</h1></div>
+        <div className="flex items-center gap-3"><MailCheck size={25} className="text-emerald-400" /><h1 className="text-[22px] font-bold tracking-[-0.025em]">{t("dispatch.title", locale)}</h1></div>
         <p className={`mt-2 text-base leading-7 ${muted}`}>{t("dispatch.subtitle", locale)}</p>
       </div>
       <button className="btn btn-secondary min-h-11" onClick={() => void load()} disabled={busy}><RefreshCw size={17} className={busy ? "animate-spin" : ""} />{t("dispatch.refresh", locale)}</button>
     </header>
 
-    {!data?.ready && !busy && <section className={`mt-6 border-l-4 border-amber-400 p-5 ${surface}`}><h2 className="font-bold">{t("dispatch.setupTitle", locale)}</h2><p className={`mt-2 max-w-[80ch] ${muted}`}>{t("dispatch.setupText", locale)}</p></section>}
+    {!data?.ready && !busy && <section className={`mt-6 rounded-[14px] border p-5 ${surface}`}>
+      <div className="flex items-start gap-3">
+        <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${dark ? "bg-amber-400/12 text-amber-300" : "bg-[#fff3cf] text-[#9b6a12]"}`}><AlertCircle size={18} /></div>
+        <div>
+          <h2 className="text-lg font-bold">{t("dispatch.setupTitle", locale)}</h2>
+          <p className={`mt-2 max-w-[80ch] text-sm leading-6 ${muted}`}>{t("dispatch.setupText", locale)}</p>
+        </div>
+      </div>
+    </section>}
     {error && <div className="mt-6 border-l-4 border-red-400 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
+    {billing && <BillingReconciliationPanel billing={billing} locale={locale} dark={dark} surface={surface} rule={rule} muted={muted} />}
+
     <section className={`mt-6 overflow-hidden rounded-[14px] border ${surface}`}>
+      <div className={`flex flex-wrap items-start justify-between gap-4 border-b px-5 py-4 ${rule}`}>
+        <div className="max-w-3xl">
+          <h2 className="text-lg font-bold tracking-[-0.02em]">{t("dispatch.techSignalsTitle", locale)}</h2>
+          <p className={`mt-1 text-sm leading-6 ${muted}`}>{t("dispatch.techSignalsText", locale)}</p>
+        </div>
+        <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${rule} ${muted}`}>{t("dispatch.techSignalsBadge", locale)}</div>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5">
         {stages.map(([key, value, Icon], index) => {
           const previous = index === 0 ? value : stages[index - 1][1];
@@ -120,6 +166,152 @@ export default function VersandPage() {
     </section>
 
     {selected && <TimelineDrawer row={selected} locale={locale} dark={dark} muted={muted} rule={rule} close={() => setSelected(null)} />}
+  </div>;
+}
+
+function BillingReconciliationPanel({
+  billing,
+  locale,
+  dark,
+  surface,
+  rule,
+  muted,
+}: {
+  billing: BillingReconciliation;
+  locale: string;
+  dark: boolean;
+  surface: string;
+  rule: string;
+  muted: string;
+}) {
+  const portalComplete = billing.portalMissingInvoices === 0;
+  const attention = billing.unnotifiedInvoices > 0;
+  const quietSurface = dark ? "bg-white/[0.03]" : "bg-[#f7fafc]";
+  const heroSurface = dark ? "bg-emerald-400/[0.07]" : "bg-[#eef8f1]";
+  const alertSurface = attention ? (dark ? "bg-amber-400/[0.08]" : "bg-[#fff7df]") : heroSurface;
+  const heroText = portalComplete ? "text-emerald-400" : "text-amber-400";
+  const totalMessages = billing.acceptedRecipients + billing.clarificationMessages;
+  const equation = `${fmtNumber(totalMessages, locale)} = ${fmtNumber(billing.acceptedRecipients, locale)} + ${fmtNumber(billing.clarificationMessages, locale)}`;
+
+  return <section className={`mt-6 overflow-hidden rounded-[14px] border ${surface}`}>
+    <div className={`border-b px-5 py-5 ${rule}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-4xl">
+          <h2 className="text-[22px] font-bold tracking-[-0.03em]">{t("dispatch.reconciliation.title", locale, { quarter: billing.quarter })}</h2>
+          <p className={`mt-2 max-w-[72ch] text-sm leading-7 ${muted}`}>{t("dispatch.reconciliation.subtitle", locale)}</p>
+        </div>
+        <div className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] ${portalComplete ? "border-emerald-400/30 text-emerald-400" : `border-amber-400/30 ${heroText}`}`}>{portalComplete ? t("dispatch.reconciliation.portalComplete", locale) : t("dispatch.reconciliation.portalReview", locale)}</div>
+      </div>
+    </div>
+
+    <div className="grid gap-6 px-5 py-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.95fr)]">
+      <div className="space-y-5">
+        <div className={`rounded-[16px] border p-5 ${rule} ${heroSurface}`}>
+          <div className="flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className={`text-sm font-semibold uppercase tracking-[0.16em] ${muted}`}>{t("dispatch.reconciliation.portalLabel", locale)}</p>
+              <div className={`mt-3 text-[clamp(2rem,4vw,3.5rem)] font-bold tracking-[-0.05em] ${heroText}`}>{fmtNumber(billing.publishedInvoices, locale)} / {fmtNumber(billing.expectedInvoices, locale)}</div>
+              <p className={`mt-2 text-base ${muted}`}>{t("dispatch.reconciliation.portalPatients", locale, { patients: fmtNumber(billing.publishedPatients, locale), expectedPatients: fmtNumber(billing.expectedPatients, locale) })}</p>
+            </div>
+            <div className={`min-w-[220px] rounded-[14px] border p-4 ${rule} ${quietSurface}`}>
+              <div className="flex items-center gap-3">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-full ${portalComplete ? "bg-emerald-400/15 text-emerald-400" : "bg-amber-400/15 text-amber-400"}`}><FileCheck2 size={18} /></div>
+                <div>
+                  <div className="text-sm font-semibold">{t("dispatch.reconciliation.statusTitle", locale)}</div>
+                  <div className={`mt-1 text-sm leading-6 ${muted}`}>{portalComplete ? t("dispatch.reconciliation.statusComplete", locale) : t("dispatch.reconciliation.statusMissing", locale, { count: fmtNumber(billing.portalMissingInvoices, locale) })}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className={`rounded-[16px] border p-5 ${rule}`}>
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${dark ? "bg-white/[0.06] text-[#dce6f2]" : "bg-[#eef4f8] text-[#21415d]"}`}><FileCheck2 size={18} /></div>
+              <div>
+                <h3 className="text-base font-bold tracking-[-0.02em]">{t("dispatch.reconciliation.invoiceFlow", locale)}</h3>
+                <p className={`mt-1 text-sm leading-6 ${muted}`}>{t("dispatch.reconciliation.invoiceFlowText", locale)}</p>
+              </div>
+            </div>
+            <div className={`mt-5 space-y-3 border-t pt-4 ${rule}`}>
+              <FlowRow label={t("dispatch.reconciliation.expectedInvoices", locale)} value={fmtNumber(billing.expectedInvoices, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.portalInvoices", locale)} value={fmtNumber(billing.publishedInvoices, locale)} muted={muted} emphasize />
+              <FlowRow label={t("dispatch.reconciliation.preparedInvoices", locale)} value={fmtNumber(billing.preparedInvoices, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.acceptedInvoices", locale)} value={fmtNumber(billing.acceptedInvoices, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.unnotifiedInvoices", locale)} value={fmtNumber(billing.unnotifiedInvoices, locale)} muted={muted} tone={attention ? "warn" : "neutral"} />
+            </div>
+          </div>
+
+          <div className={`rounded-[16px] border p-5 ${rule}`}>
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${dark ? "bg-white/[0.06] text-[#dce6f2]" : "bg-[#eef4f8] text-[#21415d]"}`}><MailCheck size={18} /></div>
+              <div>
+                <h3 className="text-base font-bold tracking-[-0.02em]">{t("dispatch.reconciliation.communicationFlow", locale)}</h3>
+                <p className={`mt-1 text-sm leading-6 ${muted}`}>{t("dispatch.reconciliation.communicationFlowText", locale)}</p>
+              </div>
+            </div>
+            <div className={`mt-5 space-y-3 border-t pt-4 ${rule}`}>
+              <FlowRow label={t("dispatch.reconciliation.totalMessages", locale)} value={fmtNumber(totalMessages, locale)} muted={muted} emphasize />
+              <FlowRow label={t("dispatch.reconciliation.invoiceEmails", locale)} value={fmtNumber(billing.acceptedRecipients, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.clarificationEmails", locale)} value={fmtNumber(billing.clarificationMessages, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.coveredPatients", locale)} value={fmtNumber(billing.acceptedPatients, locale)} muted={muted} />
+              <FlowRow label={t("dispatch.reconciliation.coveredAddresses", locale)} value={fmtNumber(billing.acceptedRecipients, locale)} muted={muted} />
+            </div>
+            <div className={`mt-4 rounded-[12px] border px-4 py-3 text-sm leading-6 ${rule} ${quietSurface}`}>
+              <div className="font-semibold">{t("dispatch.reconciliation.equationTitle", locale)}</div>
+              <p className={`mt-1 ${muted}`}>{t("dispatch.reconciliation.equationBody", locale, {
+                total: fmtNumber(totalMessages, locale),
+                invoice: fmtNumber(billing.acceptedRecipients, locale),
+                clarification: fmtNumber(billing.clarificationMessages, locale),
+              })}</p>
+              <div className="mt-2 font-semibold tabular-nums">{equation}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside className={`rounded-[16px] border p-5 ${rule} ${alertSurface}`}>
+        <div className="flex items-start gap-3">
+          <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${attention ? "bg-amber-400/15 text-amber-400" : "bg-emerald-400/15 text-emerald-400"}`}><AlertCircle size={18} /></div>
+          <div>
+            <h3 className="text-base font-bold tracking-[-0.02em]">{t("dispatch.reconciliation.attentionTitle", locale)}</h3>
+            <p className={`mt-1 text-sm leading-6 ${muted}`}>{attention ? t("dispatch.reconciliation.attentionBody", locale, {
+              invoices: fmtNumber(billing.unnotifiedInvoices, locale),
+              patients: fmtNumber(billing.unnotifiedPatients, locale),
+            }) : t("dispatch.reconciliation.attentionClear", locale)}</p>
+          </div>
+        </div>
+        <div className={`mt-5 space-y-3 border-t pt-4 ${rule}`}>
+          <FlowRow label={t("dispatch.reconciliation.noContact", locale)} value={`${fmtNumber(billing.noContactInvoices, locale)} · ${fmtNumber(billing.noContactPatients, locale)}`} muted={muted} />
+          <FlowRow label={t("dispatch.reconciliation.transportIssues", locale)} value={`${fmtNumber(billing.transportIssueInvoices, locale)} · ${fmtNumber(billing.transportIssuePatients, locale)}`} muted={muted} />
+        </div>
+        <div className={`mt-5 rounded-[12px] border px-4 py-3 text-sm leading-6 ${rule} ${quietSurface}`}>
+          <div className="font-semibold">{t("dispatch.reconciliation.interpretationTitle", locale)}</div>
+          <p className={`mt-2 ${muted}`}>{t("dispatch.reconciliation.interpretationBody", locale)}</p>
+        </div>
+      </aside>
+    </div>
+  </section>;
+}
+
+function FlowRow({
+  label,
+  value,
+  muted,
+  emphasize = false,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  muted: string;
+  emphasize?: boolean;
+  tone?: "neutral" | "warn";
+}) {
+  const toneClass = tone === "warn" ? "text-amber-400" : "text-current";
+  return <div className="flex items-start justify-between gap-4">
+    <div className={`text-sm leading-6 ${muted}`}>{label}</div>
+    <div className={`shrink-0 text-right tabular-nums ${emphasize ? "text-lg font-bold tracking-[-0.03em]" : "font-semibold"} ${toneClass}`}>{value}</div>
   </div>;
 }
 
