@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
+import { loadActivationCohort } from "@/lib/services/portal-activation-workflow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,24 @@ type BillingReconciliation = {
   unnotifiedPatients: number;
 };
 
+type BillingSnapshot = {
+  reconciliation: BillingReconciliation;
+  publishedPatientIds: string[];
+  preparedPatientIds: Set<string>;
+  acceptedPatientIds: Set<string>;
+};
+
+type BillingReviewRow = {
+  patientId: string;
+  patientName: string;
+  patientNumber: string | null;
+  category: "no_contact" | "transport_issue";
+  primaryReason: string;
+  currentContactEmail: string | null;
+  masterDataEmails: string[];
+  alternativeContacts: string[];
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
@@ -71,7 +90,7 @@ function readManifestRecipients(value: unknown): ManifestRecipient[] {
   });
 }
 
-async function loadBillingReconciliation(db: ReturnType<typeof createServerClient>): Promise<BillingReconciliation | null> {
+async function loadBillingSnapshot(db: ReturnType<typeof createServerClient>): Promise<BillingSnapshot | null> {
   const [documentsResult, manifestResult, campaignResult] = await Promise.all([
     db.from("patient_documents").select("id,patient_id").ilike("name", "%Rechnung 3/2026%").limit(1000),
     db.from("einstellungen").select("value").eq("key", Q3_CAMPAIGN_MANIFEST).maybeSingle(),
@@ -106,28 +125,86 @@ async function loadBillingReconciliation(db: ReturnType<typeof createServerClien
   const unnotifiedPatientIds = new Set(Array.from(publishedPatientIds).filter((id) => !acceptedPatientIds.has(id)));
 
   return {
-    quarter: "Q3/2026",
-    expectedInvoices: Q3_EXPECTED_INVOICES,
-    expectedPatients: Q3_EXPECTED_PATIENTS,
-    publishedInvoices: publishedDocIds.size,
-    publishedPatients: publishedPatientIds.size,
-    portalMissingInvoices: Math.max(0, Q3_EXPECTED_INVOICES - publishedDocIds.size),
-    portalMissingPatients: Math.max(0, Q3_EXPECTED_PATIENTS - publishedPatientIds.size),
-    preparedRecipients: preparedRecipients.size,
-    preparedPatients: preparedPatientIds.size,
-    preparedInvoices: preparedInvoiceIds.size,
-    acceptedRecipients: acceptedRecipients.size,
-    acceptedPatients: acceptedPatientIds.size,
-    acceptedInvoices: acceptedInvoiceIds.size,
-    clarificationMessages: clarificationRows.length,
-    clarificationRecipients: clarificationRecipients.size,
-    noContactInvoices: noContactInvoiceIds.size,
-    noContactPatients: noContactPatientIds.size,
-    transportIssueInvoices: transportIssueInvoiceIds.size,
-    transportIssuePatients: transportIssuePatientIds.size,
-    unnotifiedInvoices: unnotifiedInvoiceIds.size,
-    unnotifiedPatients: unnotifiedPatientIds.size,
+    reconciliation: {
+      quarter: "Q3/2026",
+      expectedInvoices: Q3_EXPECTED_INVOICES,
+      expectedPatients: Q3_EXPECTED_PATIENTS,
+      publishedInvoices: publishedDocIds.size,
+      publishedPatients: publishedPatientIds.size,
+      portalMissingInvoices: Math.max(0, Q3_EXPECTED_INVOICES - publishedDocIds.size),
+      portalMissingPatients: Math.max(0, Q3_EXPECTED_PATIENTS - publishedPatientIds.size),
+      preparedRecipients: preparedRecipients.size,
+      preparedPatients: preparedPatientIds.size,
+      preparedInvoices: preparedInvoiceIds.size,
+      acceptedRecipients: acceptedRecipients.size,
+      acceptedPatients: acceptedPatientIds.size,
+      acceptedInvoices: acceptedInvoiceIds.size,
+      clarificationMessages: clarificationRows.length,
+      clarificationRecipients: clarificationRecipients.size,
+      noContactInvoices: noContactInvoiceIds.size,
+      noContactPatients: noContactPatientIds.size,
+      transportIssueInvoices: transportIssueInvoiceIds.size,
+      transportIssuePatients: transportIssuePatientIds.size,
+      unnotifiedInvoices: unnotifiedInvoiceIds.size,
+      unnotifiedPatients: unnotifiedPatientIds.size,
+    },
+    publishedPatientIds: Array.from(publishedPatientIds),
+    preparedPatientIds,
+    acceptedPatientIds,
   };
+}
+
+async function loadBillingReviewRows(
+  db: ReturnType<typeof createServerClient>,
+  publishedPatientIds: string[],
+  preparedPatientIds: Set<string>,
+  acceptedPatientIds: Set<string>,
+): Promise<BillingReviewRow[]> {
+  if (!publishedPatientIds.length) return [];
+
+  const [patientsResult, activation] = await Promise.all([
+    Promise.all(chunk(publishedPatientIds).map((ids) =>
+      db.from("patients").select("id,vorname,nachname,ivoris_nummer,email,versicherter_email").in("id", ids),
+    )),
+    loadActivationCohort(db, new Date().toISOString()),
+  ]);
+
+  const patientError = patientsResult.find((result) => result.error);
+  if (patientError?.error) return [];
+
+  const patients = new Map(
+    patientsResult.flatMap((result) => result.data ?? []).map((row) => [row.id, row]),
+  );
+  const activationRows = new Map(activation.rows.map((row) => [row.patientId, row]));
+  const reviewIds = publishedPatientIds.filter((patientId) => !acceptedPatientIds.has(patientId));
+
+  return reviewIds.map((patientId) => {
+    const patient = patients.get(patientId);
+    const audit = activationRows.get(patientId);
+    const masterDataEmails = Array.from(new Set(
+      [patient?.email, patient?.versicherter_email].filter((value): value is string => typeof value === "string" && value.trim().length > 0),
+    ));
+    const category: BillingReviewRow["category"] = preparedPatientIds.has(patientId) ? "transport_issue" : "no_contact";
+    const primaryReason = category === "transport_issue"
+      ? "transport_issue"
+      : audit?.contactIssue
+        || audit?.issues.find((issue) => issue !== "portal_account_missing")
+        || "contact_review_required";
+
+    return {
+      patientId,
+      patientName: patient ? [patient.vorname, patient.nachname].filter(Boolean).join(" ").trim() || "Patient/in" : "Patient/in",
+      patientNumber: patient?.ivoris_nummer ?? null,
+      category,
+      primaryReason,
+      currentContactEmail: audit?.email ?? null,
+      masterDataEmails,
+      alternativeContacts: audit?.alternativeContacts ?? [],
+    };
+  }).sort((a, b) => {
+    if (a.category !== b.category) return a.category.localeCompare(b.category);
+    return a.patientName.localeCompare(b.patientName, "de");
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -157,14 +234,15 @@ export async function GET(request: NextRequest) {
       summary: { total: 0, accepted: 0, delivered: 0, opened: 0, clicked: 0, problems: 0 },
       messages: [],
       billingReconciliation: null,
+      billingReviewRows: [],
     }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const rawMessages = messagesResult.data ?? [];
   const patientIds = Array.from(new Set(rawMessages.map(row => row.patient_id).filter(Boolean))) as string[];
   const messageIds = rawMessages.map(row => row.id);
-  const [billingReconciliation, patientBatches, eventBatches, engagementBatches] = await Promise.all([
-    loadBillingReconciliation(db),
+  const [billingSnapshot, patientBatches, eventBatches, engagementBatches] = await Promise.all([
+    loadBillingSnapshot(db),
     Promise.all(chunk(patientIds).map(ids => db.from("patients").select("id,vorname,nachname,ivoris_nummer").in("id", ids))),
     Promise.all(chunk(messageIds).map(ids => db.from("communication_events")
       .select("id,message_id,event_type,source,occurred_at,metadata")
@@ -221,5 +299,15 @@ export async function GET(request: NextRequest) {
     problems: allStatuses.filter(value => PROBLEM_STATUSES.has(value)).length,
   };
 
-  return NextResponse.json({ ready: true, summary, messages, billingReconciliation }, { headers: { "Cache-Control": "no-store" } });
+  const billingReconciliation = billingSnapshot?.reconciliation ?? null;
+  const billingReviewRows = billingSnapshot
+    ? await loadBillingReviewRows(
+        db,
+        billingSnapshot.publishedPatientIds,
+        billingSnapshot.preparedPatientIds,
+        billingSnapshot.acceptedPatientIds,
+      )
+    : [];
+
+  return NextResponse.json({ ready: true, summary, messages, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "no-store" } });
 }

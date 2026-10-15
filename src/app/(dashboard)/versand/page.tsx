@@ -40,11 +40,22 @@ type BillingReconciliation = {
   unnotifiedInvoices: number;
   unnotifiedPatients: number;
 };
+type BillingReviewRow = {
+  patientId: string;
+  patientName: string;
+  patientNumber: string | null;
+  category: "no_contact" | "transport_issue";
+  primaryReason: string;
+  currentContactEmail: string | null;
+  masterDataEmails: string[];
+  alternativeContacts: string[];
+};
 type Overview = {
   ready: boolean; schemaMissing?: boolean;
   summary: { total: number; accepted: number; delivered: number; opened: number; clicked: number; problems: number };
   messages: MessageRow[];
   billingReconciliation: BillingReconciliation | null;
+  billingReviewRows: BillingReviewRow[];
 };
 
 const statusTone: Record<string, string> = {
@@ -98,6 +109,7 @@ export default function VersandPage() {
   const messages = data?.messages ?? [];
   const summary = data?.summary ?? { total: 0, accepted: 0, delivered: 0, opened: 0, clicked: 0, problems: 0 };
   const billing = data?.billingReconciliation ?? null;
+  const billingReviewRows = data?.billingReviewRows ?? [];
   const stages = useMemo(() => [
     ["total", summary.total, MailCheck], ["accepted", summary.accepted, Clock3],
     ["delivered", summary.delivered, CheckCircle2], ["opened", summary.opened, Eye],
@@ -124,7 +136,7 @@ export default function VersandPage() {
     </section>}
     {error && <div className="mt-6 border-l-4 border-red-400 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
-    {billing && <BillingReconciliationPanel billing={billing} locale={locale} dark={dark} surface={surface} rule={rule} muted={muted} />}
+    {billing && <BillingReconciliationPanel billing={billing} reviewRows={billingReviewRows} locale={locale} dark={dark} surface={surface} rule={rule} muted={muted} />}
 
     <section className={`mt-6 overflow-hidden rounded-[14px] border ${surface}`}>
       <div className={`flex flex-wrap items-start justify-between gap-4 border-b px-5 py-4 ${rule}`}>
@@ -171,6 +183,7 @@ export default function VersandPage() {
 
 function BillingReconciliationPanel({
   billing,
+  reviewRows,
   locale,
   dark,
   surface,
@@ -178,6 +191,7 @@ function BillingReconciliationPanel({
   muted,
 }: {
   billing: BillingReconciliation;
+  reviewRows: BillingReviewRow[];
   locale: string;
   dark: boolean;
   surface: string;
@@ -292,6 +306,49 @@ function BillingReconciliationPanel({
         </div>
       </aside>
     </div>
+
+    {reviewRows.length > 0 && <div className={`border-t px-5 py-5 ${rule}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <h3 className="text-base font-bold tracking-[-0.02em]">{t("dispatch.review.title", locale)}</h3>
+          <p className={`mt-1 text-sm leading-6 ${muted}`}>{t("dispatch.review.subtitle", locale)}</p>
+        </div>
+        <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${rule} ${muted}`}>{fmtNumber(reviewRows.length, locale)} {t("dispatch.review.cases", locale)}</div>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[980px] text-left text-sm">
+          <thead className={`${muted} ${dark ? "bg-white/[0.025]" : "bg-slate-50"}`}>
+            <tr>
+              <th className="px-4 py-3">{t("dispatch.review.patient", locale)}</th>
+              <th className="px-4 py-3">{t("dispatch.review.category", locale)}</th>
+              <th className="px-4 py-3">{t("dispatch.review.reason", locale)}</th>
+              <th className="px-4 py-3">{t("dispatch.review.currentEmail", locale)}</th>
+              <th className="px-4 py-3">{t("dispatch.review.practiceEmails", locale)}</th>
+              <th className="px-4 py-3">{t("dispatch.review.alternatives", locale)}</th>
+            </tr>
+          </thead>
+          <tbody className={`divide-y ${rule}`}>
+            {reviewRows.map((row) => <tr key={row.patientId}>
+              <td className="px-4 py-4">
+                <div className="font-semibold">{row.patientName}</div>
+                <div className={`mt-1 text-xs ${muted}`}>{row.patientNumber || "–"}</div>
+              </td>
+              <td className="px-4 py-4">
+                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.category === "no_contact"
+                  ? (dark ? "bg-amber-400/12 text-amber-300" : "bg-[#fff3cf] text-[#9b6a12]")
+                  : (dark ? "bg-red-400/12 text-red-300" : "bg-[#fde8e6] text-[#ad342f]")}`}>
+                  {t(`dispatch.review.category.${row.category}`, locale)}
+                </span>
+              </td>
+              <td className="px-4 py-4 font-medium">{t(`dispatch.review.reason.${row.primaryReason}`, locale)}</td>
+              <td className="px-4 py-4">{row.currentContactEmail || "–"}</td>
+              <td className="px-4 py-4">{row.masterDataEmails.length ? row.masterDataEmails.join(", ") : "–"}</td>
+              <td className="px-4 py-4">{row.alternativeContacts.length ? row.alternativeContacts.join(", ") : "–"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>}
   </section>;
 }
 
