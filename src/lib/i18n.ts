@@ -100,6 +100,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "dispatch.crm.liveStatus": { de: "Aktueller Transportstatus", en: "Current transport status" },
   "dispatch.crm.loadingOriginal": { de: "Verschickte E-Mail wird geladen …", en: "Loading the sent email …" },
   "dispatch.crm.original": { de: "Verschickte E-Mail", en: "Sent email" },
+  "dispatch.crm.securityContent": { de: "Diese E-Mail enthält einen persönlichen Sicherheitscode. Versand und Zustellung werden protokolliert; der Code selbst wird hier weder gespeichert noch angezeigt.", en: "This email contains a personal security code. Dispatch and delivery are recorded; the code itself is neither stored nor shown here." },
   "dispatch.crm.design": { de: "Gestaltete Ansicht", en: "Formatted view" },
   "dispatch.crm.plainText": { de: "Textansicht", en: "Plain text" },
   "dispatch.crm.noPlainText": { de: "Für diese Nachricht wurde keine separate Textfassung gespeichert.", en: "No separate plain-text version was saved for this message." },

@@ -180,7 +180,7 @@ function PatientDossierView({ seed, locale, dark, onBack }: { seed: DispatchMess
   </>;
 }
 
-type Preview = { available: boolean; html?: string; text?: string; from?: string; replyTo?: string[]; source?: string; transportStatus?: string; checkedAt?: string };
+type Preview = { available: boolean; contentRestricted?: boolean; html?: string; text?: string; from?: string; replyTo?: string[]; source?: string; transportStatus?: string; checkedAt?: string };
 function EmailPreview({ row, locale, dark }: { row: DispatchMessage; locale: string; dark: boolean }) {
   const [content, setContent] = useState<Preview | null>(null);
   const [textMode, setTextMode] = useState(false);
@@ -201,7 +201,7 @@ function EmailPreview({ row, locale, dark }: { row: DispatchMessage; locale: str
     <div className={`my-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y py-4 text-xs sm:grid-cols-4 ${rule}`}>{["accepted", "delivered", "opened", "clicked"].map(type => { const at = mailEvidence(row, type as "accepted" | "delivered" | "opened" | "clicked"); return <div key={type}><p className="mb-1.5 font-semibold">{t(`dispatch.crm.evidence.${type}`, locale)}</p><Signal positive={Boolean(at)} dark={dark} label={at ? date(at, locale) : t("dispatch.crm.noSignal", locale)} /></div>; })}</div>
     <p className={`text-xs leading-5 ${muted}`}>{t("dispatch.crm.evidenceNote", locale)}</p>
     {content?.transportStatus && <p className={`mt-2 text-xs ${muted}`}>{t("dispatch.crm.liveStatus", locale)}: {t(`dispatch.status.${content.transportStatus === "sent" ? "accepted" : content.transportStatus === "delivery_delayed" ? "delayed" : content.transportStatus}`, locale)} · {date(content.checkedAt, locale)}</p>}
-    {!content ? <p role="status" className={`flex items-center gap-2 py-10 ${muted}`}><RefreshCw className="animate-spin" size={16} />{t("dispatch.crm.loadingOriginal", locale)}</p> : content.available ? <>
+    {!content ? <p role="status" className={`flex items-center gap-2 py-10 ${muted}`}><RefreshCw className="animate-spin" size={16} />{t("dispatch.crm.loadingOriginal", locale)}</p> : content.contentRestricted ? <p className={`py-8 text-sm leading-6 ${muted}`}>{t("dispatch.crm.securityContent", locale)}</p> : content.available ? <>
       <div className="mb-3 mt-6 flex flex-wrap items-center justify-between gap-3"><span className="inline-flex items-center gap-2 text-sm font-semibold"><Mail size={16} />{t("dispatch.crm.original", locale)}</span><button type="button" className="btn btn-secondary min-h-11 text-sm" onClick={() => setTextMode(value => !value)}>{t(textMode ? "dispatch.crm.design" : "dispatch.crm.plainText", locale)}</button></div>
       {textMode || !srcDoc ? <pre className={`max-h-[700px] overflow-auto whitespace-pre-wrap break-words rounded-xl border p-5 font-sans text-sm leading-7 ${rule}`}>{content.text || t("dispatch.crm.noPlainText", locale)}</pre> : <iframe title={t("dispatch.crm.original", locale)} sandbox="" referrerPolicy="no-referrer" srcDoc={srcDoc} className="h-[650px] w-full rounded-xl bg-white" />}
       <p className={`mt-2 text-xs leading-5 ${muted}`}>{t("dispatch.crm.previewNote", locale)}</p>

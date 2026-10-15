@@ -15,6 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   const result = await db.from("communication_messages").select("provider,provider_message_id,recipient,metadata").eq("id", params.id).maybeSingle();
   if (result.error || !result.data) return NextResponse.json({ error: "unavailable" }, { status: result.error ? 503 : 404, headers });
   const row = result.data;
+  if (row.metadata?.contentRestricted === true) return NextResponse.json({ available: false, contentRestricted: true }, { headers });
   const snapshot = row.metadata?.emailSnapshot;
   if (snapshot && typeof snapshot.html === "string") return NextResponse.json({ available: true, ...snapshot, source: "archive" }, { headers });
   // Retrieve the actual historical email; never substitute today's template.

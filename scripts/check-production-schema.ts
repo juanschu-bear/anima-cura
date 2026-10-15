@@ -42,6 +42,16 @@ async function runSelectCheck(
 async function main() {
   const checks: Promise<CheckResult>[] = [
     runSelectCheck(
+      "patient activation profile linkage",
+      "user_profiles",
+      "id,email,display_name,role,patient_id",
+    ),
+    runSelectCheck(
+      "patient activation identity and recovery contacts",
+      "patients",
+      "id,ivoris_nummer,geburtsdatum,email,versicherter_email",
+    ),
+    runSelectCheck(
       "anamnese_submissions core",
       "anamnese_submissions",
       "id,patient_id,vorname,nachname,geburtsdatum,email,answers,status,account_email,matched_patient_id,is_existing,patient_anrede,versicherter_anrede,ivoris_synced,ivoris_sync_error,ivoris_patient_error,ivoris_document_error,ivoris_summary_synced,ivoris_summary_hash,ivoris_field_results",

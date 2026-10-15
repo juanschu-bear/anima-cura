@@ -7,6 +7,7 @@ import {
   classifySupportEvent,
   hostingerSupportRunId,
   parseHostingerSupportEvent,
+  processHostingerSupportEvent,
   resolveSupportContactName,
 } from "../hostinger-support-mail";
 import { isSafeGeneratedSupportCore, SUPPORT_AGENT_SYSTEM_PROMPT } from "../hostinger-support-ai";
@@ -63,6 +64,103 @@ test("holds medical and case-specific billing messages for human review", () => 
     category: "billing_specific", autoReply: false, reason: "case_specific_billing",
   });
   assert.equal(classifySupportEvent(event("Ratenplan", "Die Rate wurde schon bezahlt.")).autoReply, false);
+});
+
+test("escalates missing access codes even under an invoice subject", () => {
+  for (const complaint of [
+    "Beim Versuch, den Zugang einzurichten, ist kein Code angekommen.",
+    "Kein Aktivierungscode erhalten.",
+    "Keinen Zugangscode.",
+    "Sicherheitscodes kommen nicht an.",
+    "Ich bekomme keinen sechsstelligen Code und kann die Rechnung nicht öffnen.",
+    "Der Sicherheitscode kommt nach mehreren Versuchen nicht an.",
+    "Der Zugangscode fehlt weiterhin.",
+  ]) {
+    const incoming = event("Re: Deine Rechnung jetzt im Portal öffnen", complaint);
+    assert.deepEqual(classifySupportEvent(incoming), {
+      category: "login_password", autoReply: false, reason: "security_code_not_received",
+    }, complaint);
+    const alert = buildManualReviewAlert(incoming, classifySupportEvent(incoming));
+    assert.match(alert.text, /Sicherheitscode nicht erhalten.*technische Prüfung der Codezustellung/);
+    assert.match(alert.html, /technische Prüfung der Codezustellung/);
+  }
+});
+
+test("holds missing or whitespace-only message text instead of answering the subject", () => {
+  for (const excerpt of ["", " \n\t "]) {
+    const incoming = event("Re: Deine Rechnung jetzt im Portal öffnen", excerpt);
+    assert.deepEqual(classifySupportEvent(incoming), {
+      category: "other", autoReply: false, reason: "missing_message_body",
+    });
+    const alert = buildManualReviewAlert(incoming, classifySupportEvent(incoming));
+    assert.match(alert.text, /Nachrichtentext fehlt.*Originalnachricht persönlich prüfen/);
+  }
+  assert.equal(classifySupportEvent(event("Rechnung öffnen", "Wo finde ich das Dokument in der App?")).autoReply, true);
+});
+
+test("keeps medical, billing, and reply-loop protections ahead of code escalation", () => {
+  const complaint = "Mein Sicherheitscode kommt nicht an.";
+  assert.equal(classifySupportEvent(event("Schmerzen", complaint)).category, "medical");
+  assert.equal(classifySupportEvent(event("Rechnungsbetrag", complaint)).category, "billing_specific");
+  const automated = { ...event("Rechnung öffnen", complaint), senderEmail: "no-reply@example.com" };
+  assert.equal(classifySupportEvent(automated).reason, "automated_or_loop_risk");
+});
+
+test("notifies only the internal review address for missing codes and missing bodies", async t => {
+  const environment = {
+    NEXT_PUBLIC_SUPABASE_URL: "https://support-fixture.invalid",
+    SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key",
+    HOSTINGER_MAIL_API_TOKEN: "fixture-mail-token",
+    HOSTINGER_MAILBOX_RESOURCE_ID: "fixture-mailbox",
+    HOSTINGER_MAILBOX_ADDRESS: "praxisteam@animacura.io",
+    SUPPORT_MANUAL_REVIEW_TO: "review@example.com",
+  };
+  const originalEnvironment = new Map(Object.keys(environment).map(key => [key, process.env[key]]));
+  Object.assign(process.env, environment);
+  t.after(() => {
+    originalEnvironment.forEach((value, key) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  });
+
+  const sent: Array<{ to: string[]; text: string }> = [];
+  const completed: Array<{ result: { manualReview: boolean; practiceNotified: boolean; reason: string } }> = [];
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input.toString());
+    const body = JSON.parse(String(init?.body));
+    if (url.hostname === "support-fixture.invalid" && url.pathname === "/rest/v1/workflow_runs") {
+      if (init?.method === "PATCH") completed.push(body);
+      return new Response(null, { status: 204 });
+    }
+    assert.equal(url.href, "https://api.mail.hostinger.com/api/v1/mailboxes/fixture-mailbox/send");
+    sent.push(body);
+    return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+
+  for (const text of ["Kein Aktivierungscode erhalten.", ""]) {
+    const result = await processHostingerSupportEvent({
+      event: "message.received",
+      mailbox: "praxisteam@animacura.io",
+      message: {
+        from: { name: "Erika Beispiel", address: "erika@example.com" },
+        subject: "Re: Deine Rechnung jetzt im Portal öffnen",
+        text,
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.ok("autoReplied" in result && result.autoReplied === false);
+    assert.ok("practiceNotified" in result && result.practiceNotified === true);
+  }
+  assert.equal(sent.length, 2);
+  for (const alert of sent) assert.deepEqual(alert.to, ["review@example.com"]);
+  assert.match(sent[0].text, /technische Prüfung der Codezustellung/);
+  assert.match(sent[1].text, /Originalnachricht persönlich prüfen/);
+  assert.deepEqual(completed.map(row => row.result.reason), ["security_code_not_received", "missing_message_body"]);
+  for (const row of completed) {
+    assert.equal(row.result.manualReview, true);
+    assert.equal(row.result.practiceNotified, true);
+  }
 });
 
 test("prevents reply loops and never asks for passwords", () => {

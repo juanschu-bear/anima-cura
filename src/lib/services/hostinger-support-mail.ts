@@ -180,6 +180,11 @@ function normalizedText(event: ParsedSupportEvent) {
   return `${event.subject}\n${event.excerpt}`.toLocaleLowerCase("de-DE");
 }
 
+function reportsMissingSecurityCode(text: string) {
+  return /\b(?:kein(?:e|en|er|es|em)?|ohne)\b[^.!?\n]{0,80}\b(?:aktivierungs|sicherheits|zugangs|bestätigungs|bestaetigungs)?codes?\b/.test(text)
+    || /\b(?:aktivierungs|sicherheits|zugangs|bestätigungs|bestaetigungs)?codes?\b[^.!?\n]{0,100}\b(?:fehlt|fehlen|(?:nicht|nie)\b[^.!?\n]{0,40}\b(?:an|angekommen|erhalten|bekommen|zugestellt|eingetroffen|gesendet|versendet|empfangen))\b/.test(text);
+}
+
 export function classifySupportEvent(event: ParsedSupportEvent): SupportClassification {
   const text = normalizedText(event);
   const automatedSender = /^(no-?reply|mailer-daemon|postmaster)@/i.test(event.senderEmail);
@@ -191,6 +196,12 @@ export function classifySupportEvent(event: ParsedSupportEvent): SupportClassifi
   }
   if (/(\d+[.,]\d{2}\s*(€|eur)|betrag|falsch berechnet|zu hoch|zu viel|mahnung|inkasso|widerspruch|reklamation|bezahlt|zahlung verbucht|ratenplan|rate(n)?\b)/.test(text)) {
     return { category: "billing_specific", autoReply: false, reason: "case_specific_billing" };
+  }
+  if (!event.excerpt.trim()) {
+    return { category: "other", autoReply: false, reason: "missing_message_body" };
+  }
+  if (reportsMissingSecurityCode(text)) {
+    return { category: "login_password", autoReply: false, reason: "security_code_not_received" };
   }
   if (/passwort|password|sicherheitscode|code kommt|kennwort/.test(text)) {
     return { category: "login_password", autoReply: true, reason: "technical_access" };
@@ -447,7 +458,11 @@ export function buildManualReviewAlert(event: ParsedSupportEvent, classification
     ? "Medizinische Frage – keine automatische Fachantwort"
     : classification.category === "billing_specific"
       ? "Individuelle Abrechnungsfrage – persönliche Prüfung erforderlich"
-      : "Supportanfrage – persönliche Prüfung erforderlich";
+      : classification.reason === "security_code_not_received"
+        ? "Sicherheitscode nicht erhalten – technische Prüfung der Codezustellung erforderlich"
+        : classification.reason === "missing_message_body"
+          ? "Nachrichtentext fehlt – Originalnachricht persönlich prüfen"
+          : "Supportanfrage – persönliche Prüfung erforderlich";
   const subject = `[Anima Cura · Prüfung erforderlich] ${event.subject}`;
   const text = `${reason}\n\nVon: ${patient} <${event.senderEmail}>\nBetreff: ${event.subject}\n\nNachricht:\n${event.excerpt || "Keine Vorschau verfügbar."}\n\nDirekt an den Absender antworten: mailto:${event.senderEmail}`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:680px;color:#1d2d28;line-height:1.6"><h1 style="font-size:22px">Prüfung erforderlich</h1><p><strong>${escapeHtml(reason)}</strong></p><p>Von: ${escapeHtml(patient)} &lt;${escapeHtml(event.senderEmail)}&gt;<br>Betreff: ${escapeHtml(event.subject)}</p><div style="margin:20px 0;padding:18px;background:#f4f6f5;border:1px solid #d9e0dc;border-radius:10px;white-space:pre-wrap">${escapeHtml(event.excerpt || "Keine Vorschau verfügbar.")}</div><p><a href="mailto:${escapeHtml(event.senderEmail)}?subject=${encodeURIComponent(`Re: ${event.subject}`)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#1d5f4e;color:#fff;text-decoration:none;font-weight:700">Patient direkt antworten</a></p><p style="font-size:13px;color:#687770">Diese Nachricht wurde nicht automatisch fachlich beantwortet.</p></div>`;

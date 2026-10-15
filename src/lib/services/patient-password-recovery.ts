@@ -1,7 +1,6 @@
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
-import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
-import { buildPatientPasswordRecoveryEmail } from "@/lib/email/patient-password-recovery";
+import { sendPatientAccessCode } from "./patient-access-code-delivery";
 import { contactEmailIssue, normalizeEmail } from "@/lib/services/patient-outreach-audit";
 
 const CODE_TTL_MINUTES = 10;
@@ -53,17 +52,18 @@ function answerString(answers: Record<string, unknown> | null, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function selectContactEmail(
+export function selectRecoveryContactEmail(
   portalEmail: string,
   submissions: SubmissionContact[],
   patientEmail: string | null,
+  guardianEmail: string | null,
 ) {
   const portalAliases = new Set([portalEmail]);
   const candidates = submissions.flatMap(row => [
     row.email,
     answerString(row.answers, "patient_email"),
     answerString(row.answers, "vp_email"),
-  ]).concat(patientEmail || "");
+  ]).concat(patientEmail || "", guardianEmail || "");
   for (const candidate of candidates) {
     const normalized = normalizeEmail(candidate);
     if (normalized && !contactEmailIssue(normalized, portalAliases)) return normalized;
@@ -79,11 +79,12 @@ async function resolveIdentity(portalEmail: string) {
     .eq("role", "patient")
     .maybeSingle();
   const profile = profileResult.data;
-  if (profileResult.error || !profile?.id || !profile.patient_id || normalizeEmail(profile.email) !== portalEmail) return null;
+  if (profileResult.error) throw new Error("password_recovery_profile_lookup_failed");
+  if (!profile?.id || !profile.patient_id || normalizeEmail(profile.email) !== portalEmail) return null;
 
   const [authResult, patientResult, submissionResult] = await Promise.all([
     db.auth.admin.getUserById(profile.id),
-    db.from("patients").select("email").eq("id", profile.patient_id).maybeSingle(),
+    db.from("patients").select("email,versicherter_email").eq("id", profile.patient_id).maybeSingle(),
     db.from("anamnese_submissions")
       .select("email,answers,created_at")
       .or(`patient_id.eq.${profile.patient_id},matched_patient_id.eq.${profile.patient_id}`)
@@ -91,11 +92,13 @@ async function resolveIdentity(portalEmail: string) {
       .limit(10),
   ]);
   const authUser = authResult.data.user;
-  if (authResult.error || !authUser || authUser.app_metadata?.role !== "patient") return null;
-  const contactEmail = selectContactEmail(
+  if (authResult.error || patientResult.error || submissionResult.error) throw new Error("password_recovery_identity_lookup_failed");
+  if (!authUser || (authUser.app_metadata?.role && authUser.app_metadata.role !== "patient")) return null;
+  const contactEmail = selectRecoveryContactEmail(
     portalEmail,
     (submissionResult.data || []) as SubmissionContact[],
     typeof patientResult.data?.email === "string" ? patientResult.data.email : null,
+    typeof patientResult.data?.versicherter_email === "string" ? patientResult.data.versicherter_email : null,
   );
   if (!contactEmail) return null;
   return { authUserId: profile.id as string, patientId: profile.patient_id as string, contactEmail };
@@ -147,28 +150,8 @@ async function genericResult(startedAt: number) {
   return GENERIC_REQUEST_RESULT;
 }
 
-async function sendCode(to: string, code: string, id: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("password_recovery_mail_unavailable");
-  const email = buildPatientPasswordRecoveryEmail(code);
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    signal: AbortSignal.timeout(15_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": `patient-password-recovery-${id}`,
-    },
-    body: JSON.stringify({
-      from: PATIENT_EMAIL_FROM,
-      to,
-      reply_to: PATIENT_EMAIL_REPLY_TO,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-    }),
-  });
-  if (!response.ok) throw new Error(`password_recovery_mail_rejected:${response.status}`);
+async function sendCode(to: string, code: string, id: string, patientId: string) {
+  await sendPatientAccessCode({ purpose: "recovery", patientId, to, code, requestId: id });
 }
 
 export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string }) {
@@ -204,7 +187,7 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   const stored = await db.auth.admin.updateUserById(identity.authUserId, { app_metadata: appMetadata });
   if (stored.error) throw new Error(`password_recovery_store_failed:${stored.error.message}`);
   try {
-    await sendCode(identity.contactEmail, code, id);
+    await sendCode(identity.contactEmail, code, id, identity.patientId);
   } catch (error) {
     await db.auth.admin.updateUserById(identity.authUserId, {
       app_metadata: { ...authUser.app_metadata, patient_password_recovery: previousState },

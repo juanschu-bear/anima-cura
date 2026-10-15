@@ -1,7 +1,6 @@
 import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
-import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
-import { buildPatientPortalActivationCodeEmail } from "@/lib/email/patient-password-recovery";
+import { sendPatientAccessCode } from "./patient-access-code-delivery";
 import { contactEmailIssue, normalizeEmail } from "@/lib/services/patient-outreach-audit";
 
 const CODE_TTL_MINUTES = 10;
@@ -11,6 +10,7 @@ const MAX_IP_REQUESTS_PER_HOUR = 10;
 const MIN_GENERIC_RESPONSE_MS = 350;
 const GENERIC_RESULT = { ok: true, expiresInMinutes: CODE_TTL_MINUTES } as const;
 const STATE_KEY = "patient_self_activation";
+type ActivationDb = ReturnType<typeof createServerClient>;
 
 type ActivationState = {
   id: string;
@@ -114,8 +114,7 @@ async function genericResult(startedAt: number) {
   return GENERIC_RESULT;
 }
 
-async function resolvePatient(input: { patientNumber: string; birthDate: string; contactEmail: string }) {
-  const db = createServerClient();
+async function resolvePatient(input: { patientNumber: string; birthDate: string; contactEmail: string }, db = createServerClient()) {
   const normalizedNumber = normalizePatientNumber(input.patientNumber);
   const contactEmail = normalizeEmail(input.contactEmail);
   if (!normalizedNumber || !contactEmail || contactEmailIssue(contactEmail, new Set())) return null;
@@ -131,7 +130,8 @@ async function resolvePatient(input: { patientNumber: string; birthDate: string;
     .eq("geburtsdatum", input.birthDate)
     .limit(2);
   const patients = (patientResult.data || []) as PatientIdentity[];
-  if (patientResult.error || patients.length !== 1) return null;
+  if (patientResult.error) throw new Error("patient_activation_identity_lookup_failed");
+  if (patients.length !== 1) return null;
   const patient = patients[0];
 
   const submissions = await db.from("anamnese_submissions")
@@ -139,6 +139,7 @@ async function resolvePatient(input: { patientNumber: string; birthDate: string;
     .or(`patient_id.eq.${patient.id},matched_patient_id.eq.${patient.id}`)
     .order("created_at", { ascending: false })
     .limit(10);
+  if (submissions.error) throw new Error("patient_activation_contact_lookup_failed");
   const candidateEmails: Array<string | null | undefined> = [patient.email, patient.versicherter_email];
   for (const row of submissions.data || []) {
     const answers = row.answers as Record<string, unknown> | null;
@@ -152,14 +153,14 @@ function portalAlias(patient: PatientIdentity) {
   return `patient.${patient.id}@animacura.de`;
 }
 
-async function ensurePendingPortalUser(patient: PatientIdentity) {
-  const db = createServerClient();
+async function ensurePendingPortalUser(patient: PatientIdentity, db: ActivationDb) {
   const existing = await db.from("user_profiles")
     .select("id,email,patient_id,role")
     .eq("patient_id", patient.id)
     .eq("role", "patient")
     .limit(2);
-  if (existing.error || (existing.data || []).length > 1) return null;
+  if (existing.error) throw new Error("patient_activation_profile_lookup_failed");
+  if ((existing.data || []).length > 1) return null;
   if (existing.data?.[0]?.id && existing.data[0].email) {
     return { userId: existing.data[0].id as string, loginEmail: existing.data[0].email as string };
   }
@@ -187,46 +188,27 @@ async function ensurePendingPortalUser(patient: PatientIdentity) {
       .eq("role", "patient")
       .limit(2);
     if (!retry.error && retry.data?.length === 1) return { userId: retry.data[0].id as string, loginEmail: retry.data[0].email as string };
-    return null;
+    throw new Error("patient_activation_account_creation_failed");
   }
 
-  const profile = await db.from("user_profiles").insert({
+  // Auth can already have created this row through its profile trigger.
+  // Only use columns present in the live schema; full_name belongs to Auth metadata.
+  const profile = await db.from("user_profiles").upsert({
     id: created.data.user.id,
     email: loginEmail,
     display_name: displayName,
-    full_name: displayName,
     role: "patient",
     patient_id: patient.id,
-  });
+  }, { onConflict: "id" });
   if (profile.error) {
     await db.auth.admin.deleteUser(created.data.user.id);
-    return null;
+    throw new Error("patient_activation_profile_store_failed");
   }
   return { userId: created.data.user.id, loginEmail };
 }
 
-async function sendCode(to: string, code: string, id: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("patient_activation_mail_unavailable");
-  const email = buildPatientPortalActivationCodeEmail(code);
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    signal: AbortSignal.timeout(15_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": `patient-self-activation-${id}`,
-    },
-    body: JSON.stringify({
-      from: PATIENT_EMAIL_FROM,
-      to,
-      reply_to: PATIENT_EMAIL_REPLY_TO,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-    }),
-  });
-  if (!response.ok) throw new Error(`patient_activation_mail_rejected:${response.status}`);
+async function sendCode(to: string, code: string, id: string, patientId: string) {
+  await sendPatientAccessCode({ purpose: "activation", patientId, to, code, requestId: id });
 }
 
 export async function requestPatientSelfActivation(input: {
@@ -234,17 +216,20 @@ export async function requestPatientSelfActivation(input: {
   birthDate: string;
   contactEmail: string;
   ip: string;
-}) {
+}, dependencies?: { db: ActivationDb; sendCode: typeof sendCode }) {
   const startedAt = Date.now();
   if (!acceptIpRequest(input.ip, startedAt)) return genericResult(startedAt);
-  const identity = await resolvePatient(input);
+  const db = dependencies?.db ?? createServerClient();
+  const identity = await resolvePatient(input, db);
   if (!identity) return genericResult(startedAt);
-  const portal = await ensurePendingPortalUser(identity.patient);
+  const portal = await ensurePendingPortalUser(identity.patient, db);
   if (!portal) return genericResult(startedAt);
-  const db = createServerClient();
   const authResult = await db.auth.admin.getUserById(portal.userId);
   const authUser = authResult.data.user;
-  if (authResult.error || !authUser || authUser.app_metadata?.role !== "patient") return genericResult(startedAt);
+  if (authResult.error) throw new Error("patient_activation_auth_lookup_failed");
+  // Server-owned user_profiles establishes the role. Older accounts can lack
+  // redundant Auth metadata, but an explicit conflicting role must fail closed.
+  if (!authUser || (authUser.app_metadata?.role && authUser.app_metadata.role !== "patient")) return genericResult(startedAt);
   const previousState = readState(authUser.app_metadata?.[STATE_KEY]);
   const requestTimes = recentRequestTimes(previousState, startedAt);
   if (requestTimes.length >= MAX_REQUESTS_PER_HOUR) return genericResult(startedAt);
@@ -265,7 +250,7 @@ export async function requestPatientSelfActivation(input: {
   });
   if (stored.error) throw new Error(`patient_activation_store_failed:${stored.error.message}`);
   try {
-    await sendCode(identity.contactEmail, code, id);
+    await (dependencies?.sendCode ?? sendCode)(identity.contactEmail, code, id, identity.patient.id);
   } catch (error) {
     await db.auth.admin.updateUserById(portal.userId, {
       app_metadata: { ...authUser.app_metadata, [STATE_KEY]: previousState },
