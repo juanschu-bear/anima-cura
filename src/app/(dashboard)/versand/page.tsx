@@ -63,6 +63,8 @@ const statusTone: Record<string, string> = {
   delivered: "text-emerald-400", opened: "text-teal-300", clicked: "text-cyan-300",
   failed: "text-red-400", bounced: "text-red-400", complained: "text-red-400", suppressed: "text-red-400",
 };
+const MESSAGE_PAGE_SIZE = 15;
+const REVIEW_PAGE_SIZE = 15;
 
 function fmt(value: string | null | undefined, locale: string) {
   if (!value) return "–";
@@ -75,6 +77,32 @@ function fmtNumber(value: number, locale: string) {
   return new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-GB").format(value);
 }
 
+function messageKind(row: MessageRow): "invoice" | "clarification" | "other" {
+  const key = row.campaign_key?.toLocaleLowerCase("en-GB") ?? "";
+  if (key.includes("invoice")) return "invoice";
+  if (key.includes("clarification")) return "clarification";
+  return "other";
+}
+
+function statusHelpKey(status: string) {
+  if (["failed", "bounced", "complained", "suppressed"].includes(status)) return "failed";
+  if (["accepted", "delivered", "opened", "clicked", "queued", "delayed"].includes(status)) return status;
+  return "default";
+}
+
+function messageKindBadge(kind: "invoice" | "clarification" | "other", dark: boolean) {
+  if (kind === "invoice") return dark ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" : "border-[#b7ddc4] bg-[#eef8f1] text-[#176a40]";
+  if (kind === "clarification") return dark ? "border-sky-400/25 bg-sky-400/10 text-sky-300" : "border-[#bfdcf4] bg-[#eef6fd] text-[#195c8f]";
+  return dark ? "border-white/10 bg-white/[0.04] text-[#dce6f2]" : "border-[#d7e0e7] bg-[#f5f7fa] text-[#415468]";
+}
+
+function pageRange(total: number, page: number, pageSize: number) {
+  if (total === 0) return { start: 0, end: 0 };
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return { start, end };
+}
+
 export default function VersandPage() {
   const { locale, theme } = useAppStore();
   const dark = theme === "dark";
@@ -85,6 +113,7 @@ export default function VersandPage() {
   const [days, setDays] = useState("30");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [messagePage, setMessagePage] = useState(1);
 
   const load = useCallback(async () => {
     setBusy(true); setError("");
@@ -103,6 +132,10 @@ export default function VersandPage() {
     return () => window.clearTimeout(timeout);
   }, [load, query]);
 
+  useEffect(() => {
+    setMessagePage(1);
+  }, [days, query, status]);
+
   const surface = dark ? "border-white/10 bg-[#111722]" : "border-[#cbd6df] bg-white";
   const muted = dark ? "text-[#aab7c7]" : "text-[#53677b]";
   const rule = dark ? "border-white/10" : "border-[#d7e0e7]";
@@ -110,11 +143,18 @@ export default function VersandPage() {
   const summary = data?.summary ?? { total: 0, accepted: 0, delivered: 0, opened: 0, clicked: 0, problems: 0 };
   const billing = data?.billingReconciliation ?? null;
   const billingReviewRows = data?.billingReviewRows ?? [];
+  const messagePages = Math.max(1, Math.ceil(messages.length / MESSAGE_PAGE_SIZE));
+  const visibleMessages = useMemo(() => messages.slice((messagePage - 1) * MESSAGE_PAGE_SIZE, messagePage * MESSAGE_PAGE_SIZE), [messagePage, messages]);
+  const technicalSplitTotal = billing ? billing.acceptedRecipients + billing.clarificationMessages : summary.total;
   const stages = useMemo(() => [
     ["total", summary.total, MailCheck], ["accepted", summary.accepted, Clock3],
     ["delivered", summary.delivered, CheckCircle2], ["opened", summary.opened, Eye],
     ["clicked", summary.clicked, MousePointerClick],
   ] as const, [summary]);
+
+  useEffect(() => {
+    setMessagePage((current) => Math.min(current, messagePages));
+  }, [messagePages]);
 
   return <div className="mx-auto max-w-[1580px] pb-12">
     <header className={`flex flex-wrap items-end justify-between gap-5 border-b pb-6 ${rule}`}>
@@ -158,6 +198,20 @@ export default function VersandPage() {
           </button>;
         })}
       </div>
+      <div className={`grid gap-3 border-t px-5 py-4 md:grid-cols-2 ${rule}`}>
+        <div className={`rounded-[12px] border px-4 py-3 text-sm leading-6 ${rule} ${dark ? "bg-white/[0.03]" : "bg-[#f7fafc]"}`}>
+          <div className="font-semibold">{t("dispatch.techMeaningTitle", locale)}</div>
+          <p className={`mt-1 ${muted}`}>{t("dispatch.techMeaningBody", locale)}</p>
+        </div>
+        {billing && <div className={`rounded-[12px] border px-4 py-3 text-sm leading-6 ${rule} ${dark ? "bg-white/[0.03]" : "bg-[#f7fafc]"}`}>
+          <div className="font-semibold">{t("dispatch.techSplitTitle", locale)}</div>
+          <p className={`mt-1 ${muted}`}>{t("dispatch.techSplitBody", locale, {
+            total: fmtNumber(technicalSplitTotal, locale),
+            invoice: fmtNumber(billing.acceptedRecipients, locale),
+            clarification: fmtNumber(billing.clarificationMessages, locale),
+          })}</p>
+        </div>}
+      </div>
       <div className={`flex items-center justify-between gap-4 border-t px-5 py-3 ${rule}`}><p className={`text-sm ${muted}`}>{t("dispatch.signalNote", locale)}</p><button type="button" onClick={() => setStatus("problem")} className={`shrink-0 text-sm font-semibold ${summary.problems ? "text-red-400" : "text-emerald-400"}`}><span className="tabular-nums">{summary.problems}</span> {t("dispatch.problems", locale)}</button></div>
     </section>
 
@@ -170,11 +224,49 @@ export default function VersandPage() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1050px] text-left text-sm">
           <thead className={`${muted} ${dark ? "bg-white/[0.025]" : "bg-slate-50"}`}><tr><th className="px-5 py-3">{t("dispatch.table.patient", locale)}</th><th className="px-5 py-3">{t("dispatch.table.message", locale)}</th><th className="px-5 py-3">{t("dispatch.table.recipient", locale)}</th><th className="px-5 py-3">{t("dispatch.table.sent", locale)}</th><th className="px-5 py-3">{t("dispatch.table.status", locale)}</th><th className="px-5 py-3 text-right">{t("dispatch.table.activity", locale)}</th></tr></thead>
-          <tbody className={`divide-y ${rule}`}>{messages.map(row => <tr key={row.id} onClick={() => setSelected(row)} className="cursor-pointer transition-colors hover:bg-emerald-400/[0.035]"><td className="px-5 py-4"><div className="font-semibold">{row.patientName || t("dispatch.notAssigned", locale)}</div><div className={`mt-1 text-xs ${muted}`}>{row.patientNumber || "–"}</div></td><td className="max-w-[330px] px-5 py-4"><div className="truncate font-medium">{row.subject || "–"}</div><div className={`mt-1 truncate text-xs ${muted}`}>{row.campaign_key || row.channel}</div></td><td className="px-5 py-4">{row.recipient}</td><td className="whitespace-nowrap px-5 py-4 tabular-nums">{fmt(row.sent_at || row.created_at, locale)}</td><td className={`px-5 py-4 font-semibold ${statusTone[row.status] || muted}`}><span className="inline-flex items-center gap-2"><CircleDot size={14} />{t(`dispatch.status.${row.status}`, locale)}</span></td><td className="px-5 py-4 text-right"><span className={`inline-flex items-center gap-2 ${muted}`}>{row.events.length + row.portalEvents.length}<ChevronRight size={16} /></span></td></tr>)}</tbody>
+          <tbody className={`divide-y ${rule}`}>{visibleMessages.map(row => {
+            const kind = messageKind(row);
+            return <tr
+              key={row.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelected(row)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelected(row);
+                }
+              }}
+              className="cursor-pointer transition-colors hover:bg-emerald-400/[0.035] focus-visible:bg-emerald-400/[0.06] focus-visible:outline-none"
+            >
+              <td className="px-5 py-4"><div className="font-semibold">{row.patientName || t("dispatch.notAssigned", locale)}</div><div className={`mt-1 text-xs ${muted}`}>{row.patientNumber || "–"}</div></td>
+              <td className="max-w-[360px] px-5 py-4">
+                <div className="truncate font-medium">{row.subject || "–"}</div>
+                <div className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${muted}`}>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${messageKindBadge(kind, dark)}`}>{t(`dispatch.messageKind.${kind}`, locale)}</span>
+                  <span className="truncate">{row.campaign_key || row.channel}</span>
+                </div>
+              </td>
+              <td className="px-5 py-4">{row.recipient}</td>
+              <td className="whitespace-nowrap px-5 py-4 tabular-nums">{fmt(row.sent_at || row.created_at, locale)}</td>
+              <td className={`px-5 py-4 font-semibold ${statusTone[row.status] || muted}`}><span className="inline-flex items-center gap-2"><CircleDot size={14} />{t(`dispatch.status.${row.status}`, locale)}</span></td>
+              <td className="px-5 py-4 text-right"><span className={`inline-flex items-center gap-2 ${muted}`}>{row.events.length + row.portalEvents.length}<ChevronRight size={16} /></span></td>
+            </tr>;
+          })}</tbody>
         </table>
         {!busy && messages.length === 0 && <div className={`py-20 text-center ${muted}`}><MailCheck size={32} className="mx-auto mb-3 opacity-50" /><p>{t("dispatch.empty", locale)}</p></div>}
         {busy && <div className={`py-20 text-center ${muted}`}><RefreshCw size={24} className="mx-auto mb-3 animate-spin" />{t("dispatch.loading", locale)}</div>}
       </div>
+      {!busy && messages.length > 0 && <PaginationFooter
+        locale={locale}
+        muted={muted}
+        rule={rule}
+        page={messagePage}
+        pages={messagePages}
+        total={messages.length}
+        pageSize={MESSAGE_PAGE_SIZE}
+        onPageChange={setMessagePage}
+      />}
     </section>
 
     {selected && <TimelineDrawer row={selected} locale={locale} dark={dark} muted={muted} rule={rule} close={() => setSelected(null)} />}
@@ -206,6 +298,13 @@ function BillingReconciliationPanel({
   const heroText = portalComplete ? "text-emerald-400" : "text-amber-400";
   const totalMessages = billing.acceptedRecipients + billing.clarificationMessages;
   const equation = `${fmtNumber(totalMessages, locale)} = ${fmtNumber(billing.acceptedRecipients, locale)} + ${fmtNumber(billing.clarificationMessages, locale)}`;
+  const [reviewPage, setReviewPage] = useState(1);
+  const reviewPages = Math.max(1, Math.ceil(reviewRows.length / REVIEW_PAGE_SIZE));
+  const visibleReviewRows = useMemo(() => reviewRows.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE), [reviewPage, reviewRows]);
+
+  useEffect(() => {
+    setReviewPage((current) => Math.min(current, reviewPages));
+  }, [reviewPages]);
 
   return <section className={`mt-6 overflow-hidden rounded-[14px] border ${surface}`}>
     <div className={`border-b px-5 py-5 ${rule}`}>
@@ -328,7 +427,7 @@ function BillingReconciliationPanel({
             </tr>
           </thead>
           <tbody className={`divide-y ${rule}`}>
-            {reviewRows.map((row) => <tr key={row.patientId}>
+            {visibleReviewRows.map((row) => <tr key={row.patientId}>
               <td className="px-4 py-4">
                 <div className="font-semibold">{row.patientName}</div>
                 <div className={`mt-1 text-xs ${muted}`}>{row.patientNumber || "–"}</div>
@@ -348,8 +447,75 @@ function BillingReconciliationPanel({
           </tbody>
         </table>
       </div>
+      <PaginationFooter
+        locale={locale}
+        muted={muted}
+        rule={rule}
+        page={reviewPage}
+        pages={reviewPages}
+        total={reviewRows.length}
+        pageSize={REVIEW_PAGE_SIZE}
+        onPageChange={setReviewPage}
+      />
     </div>}
   </section>;
+}
+
+function PaginationFooter({
+  locale,
+  muted,
+  rule,
+  page,
+  pages,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  locale: string;
+  muted: string;
+  rule: string;
+  page: number;
+  pages: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (value: number | ((current: number) => number)) => void;
+}) {
+  if (total === 0) return null;
+  const { start, end } = pageRange(total, page, pageSize);
+
+  return <div className={`flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 ${rule}`}>
+    <div className={`text-sm ${muted}`}>
+      {t("dispatch.pagination.summary", locale, {
+        start: fmtNumber(start, locale),
+        end: fmtNumber(end, locale),
+        total: fmtNumber(total, locale),
+      })}
+      {pages > 1 && <> · {t("dispatch.pagination.pageOf", locale, {
+        page: fmtNumber(page, locale),
+        pages: fmtNumber(pages, locale),
+      })}</>}
+    </div>
+    {pages > 1 && <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => onPageChange((current) => Math.max(1, typeof current === "number" ? current - 1 : page - 1))}
+        className={`inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-sm font-semibold transition hover:bg-emerald-400/[0.05] ${rule}`}
+        disabled={page <= 1}
+        style={page <= 1 ? { opacity: 0.45, pointerEvents: "none" } : undefined}
+      >
+        {t("dispatch.pagination.prev", locale)}
+      </button>
+      <button
+        type="button"
+        onClick={() => onPageChange((current) => Math.min(pages, typeof current === "number" ? current + 1 : page + 1))}
+        className={`inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-sm font-semibold transition hover:bg-emerald-400/[0.05] ${rule}`}
+        disabled={page >= pages}
+        style={page >= pages ? { opacity: 0.45, pointerEvents: "none" } : undefined}
+      >
+        {t("dispatch.pagination.next", locale)}
+      </button>
+    </div>}
+  </div>;
 }
 
 function FlowRow({
@@ -378,10 +544,32 @@ function TimelineDrawer({ row, locale, dark, muted, rule, close }: { row: Messag
     ...row.portalEvents.map(event => ({ type: event.event_type, at: event.created_at, source: "patient_portal", portal: true })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const iconFor = (type: string) => type === "clicked" || type === "notification_clicked" ? Link2 : type === "opened" ? Eye : type.includes("document") ? FileCheck2 : type === "failed" || type === "bounced" ? AlertCircle : CheckCircle2;
+  const statusKey = statusHelpKey(row.status);
+  const kind = messageKind(row);
+  const statusIcon = statusKey === "failed" ? AlertCircle : statusKey === "accepted" || statusKey === "queued" || statusKey === "delayed" ? Clock3 : CheckCircle2;
+  const StatusIcon = statusIcon;
   return <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]" onMouseDown={event => event.target === event.currentTarget && close()}>
     <aside className={`h-full w-full max-w-[560px] overflow-y-auto border-l p-6 shadow-2xl ${rule} ${dark ? "bg-[#0d121b] text-[#f0f3f8]" : "bg-white text-[#1c3044]"}`}>
       <div className={`flex items-start justify-between gap-4 border-b pb-5 ${rule}`}><div><div className={`text-sm ${muted}`}>{t("dispatch.timeline", locale)}</div><h2 className="mt-1 text-xl font-bold">{row.patientName || row.recipient}</h2><p className={`mt-1 text-sm ${muted}`}>{row.subject}</p></div><button type="button" onClick={close} className="flex h-11 w-11 items-center justify-center rounded-lg border border-current/15" aria-label={t("dispatch.close", locale)}><X size={19} /></button></div>
-      <dl className={`grid grid-cols-2 gap-x-4 gap-y-3 border-b py-5 text-sm ${rule}`}><div><dt className={muted}>{t("dispatch.table.recipient", locale)}</dt><dd className="mt-1 font-semibold">{row.recipient}</dd></div><div><dt className={muted}>{t("dispatch.table.status", locale)}</dt><dd className={`mt-1 font-semibold ${statusTone[row.status] || ""}`}>{t(`dispatch.status.${row.status}`, locale)}</dd></div><div><dt className={muted}>{t("dispatch.campaign", locale)}</dt><dd className="mt-1 font-semibold">{row.campaign_key || "–"}</dd></div><div><dt className={muted}>{t("dispatch.provider", locale)}</dt><dd className="mt-1 font-semibold">{row.provider || t("dispatch.ownSystem", locale)}</dd></div></dl>
+      <dl className={`grid grid-cols-1 gap-x-4 gap-y-3 border-b py-5 text-sm sm:grid-cols-2 ${rule}`}>
+        <div><dt className={muted}>{t("dispatch.table.recipient", locale)}</dt><dd className="mt-1 font-semibold">{row.recipient}</dd></div>
+        <div><dt className={muted}>{t("dispatch.table.status", locale)}</dt><dd className={`mt-1 font-semibold ${statusTone[row.status] || ""}`}>{t(`dispatch.status.${row.status}`, locale)}</dd></div>
+        <div><dt className={muted}>{t("dispatch.messageType", locale)}</dt><dd className="mt-2"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${messageKindBadge(kind, dark)}`}>{t(`dispatch.messageKind.${kind}`, locale)}</span></dd></div>
+        <div><dt className={muted}>{t("dispatch.signalCount", locale)}</dt><dd className="mt-1 font-semibold tabular-nums">{fmtNumber(row.events.length + row.portalEvents.length, locale)}</dd></div>
+        <div><dt className={muted}>{t("dispatch.campaign", locale)}</dt><dd className="mt-1 font-semibold break-all">{row.campaign_key || "–"}</dd></div>
+        <div><dt className={muted}>{t("dispatch.provider", locale)}</dt><dd className="mt-1 font-semibold">{row.provider || t("dispatch.ownSystem", locale)}</dd></div>
+      </dl>
+      <div className={`mt-5 rounded-[12px] border px-4 py-4 text-sm leading-6 ${rule} ${dark ? "bg-white/[0.03]" : "bg-[#f7fafc]"}`}>
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${statusKey === "failed" ? (dark ? "bg-red-400/12 text-red-300" : "bg-[#fde8e6] text-[#ad342f]") : (dark ? "bg-emerald-400/12 text-emerald-300" : "bg-[#eef8f1] text-[#176a40]")}`}>
+            <StatusIcon size={18} />
+          </div>
+          <div>
+            <div className="font-semibold">{t("dispatch.statusMeaningTitle", locale)}</div>
+            <p className={`mt-1 ${muted}`}>{t(`dispatch.statusHint.${statusKey}`, locale)}</p>
+          </div>
+        </div>
+      </div>
       <div className="py-6"><h3 className="font-bold">{t("dispatch.history", locale)}</h3><p className={`mt-1 text-sm ${muted}`}>{t("dispatch.historyHint", locale)}</p><ol className="mt-6">{timeline.map((event, index) => { const Icon = iconFor(event.type); return <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-4 pb-7"><div className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${event.portal ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-400" : `${rule} ${dark ? "bg-[#151d29]" : "bg-white"}`}`}><Icon size={16} /></div>{index < timeline.length - 1 && <div className={`absolute left-[17px] top-9 h-[calc(100%-1.25rem)] border-l ${rule}`} />}<div className="min-w-0 pt-1"><div className="font-semibold">{t(`dispatch.event.${event.type}`, locale)}</div><div className={`mt-1 text-sm ${muted}`}>{fmt(event.at, locale)} · {event.portal ? t("dispatch.portalEvidence", locale) : t("dispatch.technicalSignal", locale)}</div></div></li>; })}{timeline.length === 0 && <li className={muted}>{t("dispatch.noEvents", locale)}</li>}</ol></div>
     </aside>
   </div>;
