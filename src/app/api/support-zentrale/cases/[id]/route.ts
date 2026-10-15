@@ -6,6 +6,7 @@ import { requirePraxisRole } from "@/lib/require-praxis";
 import { normalizeEmail } from "@/lib/services/patient-outreach-audit";
 import { requestPatientSelfActivation } from "@/lib/services/patient-self-activation";
 import { sendPatientAccessCode } from "@/lib/services/patient-access-code-delivery";
+import { findSupportPatientsByEmail, type SupportPatientMatch } from "@/lib/services/support-code-repair";
 import {
   buildAccessCodeReissueNotice,
   HOSTINGER_SUPPORT_WORKFLOW_ID,
@@ -31,16 +32,6 @@ type CaseResult = Record<string, unknown> & {
   caseActions?: unknown;
 };
 
-type PatientMatch = {
-  id: string;
-  ivoris_nummer: string | null;
-  geburtsdatum: string | null;
-  vorname: string | null;
-  nachname: string | null;
-  email: string | null;
-  versicherter_email: string | null;
-};
-
 function resultOf(value: unknown): CaseResult {
   return value && typeof value === "object" ? value as CaseResult : {};
 }
@@ -64,25 +55,11 @@ async function loadRun(id: string) {
   return query.data;
 }
 
-async function findPatients(sender: string): Promise<PatientMatch[]> {
-  if (!sender) return [];
-  const db = createServerClient();
-  const columns = "id,ivoris_nummer,geburtsdatum,vorname,nachname,email,versicherter_email";
-  const [direct, guardian] = await Promise.all([
-    db.from("patients").select(columns).ilike("email", sender).limit(5),
-    db.from("patients").select(columns).ilike("versicherter_email", sender).limit(5),
-  ]);
-  if (direct.error || guardian.error) throw new Error("support_patient_match_failed");
-  const unique = new Map<string, PatientMatch>();
-  for (const row of [...(direct.data ?? []), ...(guardian.data ?? [])] as PatientMatch[]) unique.set(row.id, row);
-  return Array.from(unique.values());
-}
-
 async function caseDetail(row: NonNullable<Awaited<ReturnType<typeof loadRun>>>) {
   const db = createServerClient();
   const result = resultOf(row.result);
   const sender = normalizeEmail(stringValue(result.sender));
-  const patients = await findPatients(sender);
+  const patients: SupportPatientMatch[] = sender ? await findSupportPatientsByEmail(sender) : [];
   const patientIds = patients.map(patient => patient.id);
   const profiles = patientIds.length
     ? await db.from("user_profiles").select("id,email,patient_id,role").in("patient_id", patientIds).eq("role", "patient")
@@ -179,7 +156,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   try {
     if (parsed.data.action === "resend_access_code") {
-      const patients = await findPatients(sender);
+    const patients = sender ? await findSupportPatientsByEmail(sender) : [];
       if (patients.length !== 1) return NextResponse.json({ error: patients.length ? "Kontakt ist mehreren Patienten zugeordnet." : "Kontakt konnte keinem Patienten eindeutig zugeordnet werden." }, { status: 409 });
       const patient = patients[0];
       if (!patient.ivoris_nummer || !patient.geburtsdatum) return NextResponse.json({ error: "Patientennummer oder Geburtsdatum fehlt." }, { status: 409 });

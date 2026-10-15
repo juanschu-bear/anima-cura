@@ -9,7 +9,7 @@ import {
 } from "@/lib/services/hostinger-support-mail";
 
 type SupportRun = { id: string; started_at: string; result: Record<string, unknown> | null };
-type Patient = { id: string; ivoris_nummer: string | null; geburtsdatum: string | null; email: string | null; versicherter_email: string | null };
+export type SupportPatientMatch = { id: string; ivoris_nummer: string | null; geburtsdatum: string | null; vorname: string | null; nachname: string | null; email: string | null; versicherter_email: string | null };
 
 export const missingCodeComplaintPattern = /(kein(?:en|e)?|nicht|nie).{0,45}(aktivierungs|sicherheits|zugangs)?code|code.{0,45}(nicht|nie).{0,25}(erhalten|angekommen|kommen|an\b)|passwort.{0,30}(falsch|funktioniert nicht)|anmeld(?:ung|en).{0,30}(nicht|fehler)/i;
 
@@ -25,16 +25,26 @@ export function isMissingCodeComplaint(run: SupportRun) {
   return missingCodeComplaintPattern.test(text);
 }
 
-async function findPatients(sender: string): Promise<Patient[]> {
+export async function findSupportPatientsByEmail(sender: string): Promise<SupportPatientMatch[]> {
   const db = createServerClient();
-  const columns = "id,ivoris_nummer,geburtsdatum,email,versicherter_email";
-  const [direct, guardian] = await Promise.all([
+  const columns = "id,ivoris_nummer,geburtsdatum,vorname,nachname,email,versicherter_email";
+  const [direct, guardian, submissionDirect, submissionPatient, submissionGuardian] = await Promise.all([
     db.from("patients").select(columns).ilike("email", sender).limit(10),
     db.from("patients").select(columns).ilike("versicherter_email", sender).limit(10),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").ilike("email", sender).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>patient_email", sender).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>vp_email", sender).limit(20),
   ]);
-  if (direct.error || guardian.error) throw new Error("patient_match_failed");
-  const unique = new Map<string, Patient>();
-  for (const patient of [...(direct.data ?? []), ...(guardian.data ?? [])] as Patient[]) unique.set(patient.id, patient);
+  if (direct.error || guardian.error || submissionDirect.error || submissionPatient.error || submissionGuardian.error) throw new Error("patient_match_failed");
+  const linkedIds = Array.from(new Set([
+    ...(submissionDirect.data ?? []),
+    ...(submissionPatient.data ?? []),
+    ...(submissionGuardian.data ?? []),
+  ].flatMap(row => [row.matched_patient_id, row.patient_id]).filter((id): id is string => typeof id === "string" && id.length > 0)));
+  const linked = linkedIds.length ? await db.from("patients").select(columns).in("id", linkedIds) : { data: [], error: null };
+  if (linked.error) throw new Error("patient_match_failed");
+  const unique = new Map<string, SupportPatientMatch>();
+  for (const patient of [...(direct.data ?? []), ...(guardian.data ?? []), ...(linked.data ?? [])] as SupportPatientMatch[]) unique.set(patient.id, patient);
   return Array.from(unique.values());
 }
 
@@ -79,18 +89,20 @@ export async function repairMissingSupportCodes(options: { send: boolean }) {
     grouped.set(sender, [...(grouped.get(sender) ?? []), run]);
   }
 
-  const summary = { cases: candidates.length, contacts: grouped.size, eligible: 0, sent: 0, alreadySignedIn: 0, ambiguous: 0, missing: 0, incomplete: 0, blocked: 0, failed: 0, noticeFailed: 0 };
+  const items: Array<{ sender: string; patientNames: string[]; outcome: string }> = [];
+  const summary = { cases: candidates.length, contacts: grouped.size, eligible: 0, sent: 0, alreadySignedIn: 0, ambiguous: 0, missing: 0, incomplete: 0, blocked: 0, failed: 0, noticeFailed: 0, items };
   for (const [sender, runs] of Array.from(grouped.entries())) {
     try {
-      const patients = await findPatients(sender);
-      if (patients.length === 0) { summary.missing++; continue; }
-      if (patients.length !== 1) { summary.ambiguous++; continue; }
+      const patients = await findSupportPatientsByEmail(sender);
+      const patientNames = patients.map(patient => [patient.vorname, patient.nachname].filter(Boolean).join(" ") || patient.ivoris_nummer || "Patient");
+      if (patients.length === 0) { summary.missing++; items.push({ sender, patientNames, outcome: "missing" }); continue; }
+      if (patients.length !== 1) { summary.ambiguous++; items.push({ sender, patientNames, outcome: "ambiguous" }); continue; }
       const patient = patients[0];
-      if (!patient.ivoris_nummer || !patient.geburtsdatum) { summary.incomplete++; continue; }
+      if (!patient.ivoris_nummer || !patient.geburtsdatum) { summary.incomplete++; items.push({ sender, patientNames, outcome: "incomplete" }); continue; }
       const latestComplaint = runs.reduce((latest, run) => new Date(run.started_at) > new Date(latest.started_at) ? run : latest, runs[0]);
-      if (await successfulLoginAfter(patient.id, latestComplaint.started_at)) { summary.alreadySignedIn++; continue; }
+      if (await successfulLoginAfter(patient.id, latestComplaint.started_at)) { summary.alreadySignedIn++; items.push({ sender, patientNames, outcome: "signed_in" }); continue; }
       summary.eligible++;
-      if (!options.send) continue;
+      if (!options.send) { items.push({ sender, patientNames, outcome: "eligible" }); continue; }
 
       let codeSent = false;
       await requestPatientSelfActivation({
@@ -105,7 +117,7 @@ export async function repairMissingSupportCodes(options: { send: boolean }) {
           codeSent = true;
         },
       });
-      if (!codeSent) { summary.blocked++; continue; }
+      if (!codeSent) { summary.blocked++; items.push({ sender, patientNames, outcome: "blocked" }); continue; }
       const notice = buildAccessCodeReissueNotice();
       let noticeSent = true;
       try {
@@ -116,8 +128,10 @@ export async function repairMissingSupportCodes(options: { send: boolean }) {
       }
       await recordRepair(runs, patient.id, sender, noticeSent);
       summary.sent++;
+      items.push({ sender, patientNames, outcome: noticeSent ? "sent" : "sent_notice_failed" });
     } catch {
       summary.failed++;
+      items.push({ sender, patientNames: [], outcome: "failed" });
     }
   }
   return summary;
