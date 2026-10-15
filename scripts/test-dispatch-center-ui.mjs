@@ -17,7 +17,13 @@ const message = number => ({ id: uuid(number + 100), patient_id: patient.id, pat
   status: 'accepted', sent_at: '2026-10-15T00:48:00Z', created_at: '2026-10-15T00:47:00Z', delivered_at: null,
   first_opened_at: null, first_clicked_at: null, events: [{ id: uuid(number + 300), event_type: 'accepted', source: 'transport', occurred_at: '2026-10-15T00:48:00Z' }], portalEvents: [] });
 const messages = Array.from({ length: 18 }, (_, i) => message(i));
-const indexRows = [messages[0], ...Array.from({ length: 20 }, (_, index) => ({ ...message(index + 30), patients: [{ ...patient, id: uuid(index + 2), name: `Demo Patient ${index + 2}` }] }))];
+const indexRows = [messages[0], ...Array.from({ length: 20 }, (_, index) => ({ ...message(index + 30), recipient: `patient${index + 2}@example.invalid`, patients: [{ ...patient, id: uuid(index + 2), number: String(index + 2).padStart(8, '0'), name: `Demo Patient ${index + 2}` }] }))];
+indexRows[1].delivered_at = '2026-10-15T00:49:00Z';
+indexRows.push({ ...indexRows[1], id: uuid(900), campaign_key: 'q3_2026_invoice_email', delivered_at: null });
+indexRows[2].status = 'bounced';
+indexRows[3].first_opened_at = '2026-10-15T00:51:00Z';
+indexRows[3].portalEvents = [{ patient_id: indexRows[3].patients[0].id, event_type: 'app_open', created_at: '2026-10-15T00:52:00Z' }];
+indexRows[4] = { ...indexRows[4], status: 'pending', sent_at: null, events: [] };
 const dossier = { patients: [{ ...patient, login: { state: 'used', lastAt: '2026-10-15T01:05:00Z' } }], messages,
   portalEvents: [{ id: uuid(500), patient_id: patient.id, event_type: 'document_view', created_at: '2026-10-15T01:06:00Z' }],
   documents: [{ id: uuid(600), patient_id: patient.id, name: 'Rechnung 3/2026 · BEMA', openedAt: null }],
@@ -45,7 +51,23 @@ try {
     await page.goto('http://dispatch.test/');
     await page.getByRole('heading', { name: 'Patienten & Kommunikation' }).waitFor();
     assert.equal(await page.locator('tbody tr').count(), 15);
-    await page.screenshot({ path: join(directory, `${label}-index.png`), fullPage: true });
+    assert.equal(await page.getByText('Kein Nachweis', { exact: true }).count(), 0, 'Index should not repeat unknown evidence columns');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${label}: index overflow`);
+    const search = page.getByLabel('Patient, Nummer oder Kontaktadresse');
+    await search.fill('00000002');
+    assert.ok(await page.getByText('Zustellung bestätigt: 1 von 2', { exact: true }).isVisible());
+    assert.ok(await page.getByText('1 × Rechnungs-E-Mail', { exact: true }).isVisible());
+    assert.ok(await page.getByText('1 × Info-E-Mail', { exact: true }).isVisible());
+    await search.fill('00000003');
+    assert.ok(await page.getByText('Versand prüfen', { exact: true }).isVisible());
+    await search.fill('00000004');
+    assert.ok(await page.getByText('Öffnung bei 1 E-Mail erkannt', { exact: true }).isVisible());
+    assert.ok(await page.getByText('Portalbesuch erfasst', { exact: true }).isVisible());
+    assert.ok(await page.getByText('Zustellung noch unbestätigt', { exact: true }).isVisible());
+    await search.fill('00000005');
+    assert.ok(await page.getByText('Versand nicht bestätigt', { exact: true }).isVisible());
+    await search.fill('');
+    await page.screenshot({ path: join(directory, `${label}-index.png`), fullPage: label !== 'mobile' });
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
     assert.equal(await page.locator('tbody tr').count(), 6);
     await page.getByRole('button', { name: 'Zurück', exact: true }).click();

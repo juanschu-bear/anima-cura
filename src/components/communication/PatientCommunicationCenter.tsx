@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Check, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Inbox, Mail, MessageSquare, RefreshCw, Search, UserRound } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowUpRight, Check, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Inbox, Mail, MessageSquare, RefreshCw, Search, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { inertEmailDocument, mailEvidence, type DispatchMessage, type InboundContact, type PatientDossier } from "@/lib/communication-insights";
 
@@ -38,6 +38,8 @@ export function PatientCommunicationCenter({ messages, inbound, repliesAvailable
     return Array.from(grouped.values()).map(group => {
       const addresses = new Set(group.messages.map(row => row.recipient.toLowerCase()));
       return { ...group, addresses: Array.from(addresses),
+        accepted: group.messages.filter(row => mailEvidence(row, "accepted")).length,
+        delivered: group.messages.filter(row => mailEvidence(row, "delivered")).length,
         opened: group.messages.filter(row => mailEvidence(row, "opened")).length,
         problems: group.messages.some(row => ["failed", "bounced", "complained", "suppressed", "delayed"].includes(row.status)),
         portal: group.messages.some(row => row.portalEvents.some(event => event.patient_id === group.id && event.event_type === "app_open")),
@@ -57,26 +59,51 @@ export function PatientCommunicationCenter({ messages, inbound, repliesAvailable
         <div><h2 className="text-xl font-bold tracking-[-0.02em]">{t("dispatch.crm.title", locale)}</h2><p className={`mt-1 max-w-[70ch] text-sm leading-6 ${muted}`}>{t("dispatch.crm.intro", locale)}</p></div>
         <p className={`text-sm tabular-nums ${muted}`}>{t("dispatch.crm.count", locale, { patients: String(groups.filter(group => !group.id.startsWith("contact:")).length), messages: String(messages.length), addresses: String(new Set(messages.map(row => row.recipient.toLowerCase())).size) })}</p>
       </div>
-      <div className={`flex flex-wrap items-end gap-3 border-b p-4 ${rule}`}>
+      <div className={`flex flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-end ${rule}`}>
         <label className="min-w-0 flex-1"><span className={`mb-1.5 block text-sm font-medium ${muted}`}>{t("dispatch.crm.search", locale)}</span><span className="relative block"><Search size={17} aria-hidden className="absolute left-3 top-3.5" /><input className="input min-h-11 w-full pl-10" value={query} onChange={event => setQuery(event.target.value)} /></span></label>
-        <label><span className={`mb-1.5 block text-sm font-medium ${muted}`}>{t("dispatch.crm.show", locale)}</span><select value={filter} onChange={event => setFilter(event.target.value)} className="input min-h-11 w-auto">{["all", "problems", "opened", "replies", "portal"].map(value => <option key={value} value={value}>{t(`dispatch.crm.filter.${value}`, locale)}</option>)}</select></label>
+        <label><span className={`mb-1.5 block text-sm font-medium ${muted}`}>{t("dispatch.crm.show", locale)}</span><select value={filter} onChange={event => setFilter(event.target.value)} className="input min-h-11 w-full sm:w-auto">{["all", "problems", "opened", "replies", "portal"].map(value => <option key={value} value={value}>{t(`dispatch.crm.filter.${value}`, locale)}</option>)}</select></label>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px] text-left text-sm">
-          <thead className={`${dark ? "bg-white/[0.025]" : "bg-slate-50"} ${muted}`}><tr>{["patient", "messages", "opens", "replies", "portal"].map(key => <th key={key} className="px-5 py-3 font-medium">{t(`dispatch.crm.column.${key}`, locale)}</th>)}<th><span className="sr-only">{t("dispatch.crm.open", locale)}</span></th></tr></thead>
-          <tbody>{filtered.slice((activePage - 1) * SIZE, activePage * SIZE).map(group => <tr key={group.id} className={`border-t ${rule} transition-colors hover:bg-emerald-400/[0.04]`}>
-            <td className="max-w-[300px] px-5 py-4"><button type="button" className="min-h-11 text-left font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-400" onClick={() => onSelect(group.messages[0])}>{group.name}<span className={`mt-1 block text-xs font-normal ${muted}`}>{group.number || t("dispatch.notAssigned", locale)}</span></button></td>
-            <td className="px-5 py-4"><span className="font-semibold tabular-nums">{group.messages.length}</span><span className={`mt-1 block text-xs ${muted}`}>{t("dispatch.crm.types", locale, { invoices: String(group.messages.filter(row => kind(row) === "invoice").length), info: String(group.messages.filter(row => kind(row) === "clarification").length) })}</span></td>
-            <td className="px-5 py-4"><Signal positive={group.opened > 0} dark={dark} label={group.opened ? t("dispatch.crm.openCount", locale, { count: String(group.opened) }) : t("dispatch.crm.noSignal", locale)} /></td>
-            <td className="px-5 py-4"><Signal positive={group.replies > 0} dark={dark} label={!repliesAvailable ? t("dispatch.crm.unknown", locale) : group.replies ? t("dispatch.crm.replyCount", locale, { count: String(group.replies) }) : t("dispatch.crm.noRecordedReply", locale)} /></td>
-            <td className="px-5 py-4"><Signal positive={group.portal} dark={dark} label={t(group.portal ? "dispatch.crm.used" : "dispatch.crm.noSignal", locale)} /></td>
-            <td className="px-3 py-4"><button type="button" onClick={() => onSelect(group.messages[0])} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-emerald-400/10" aria-label={`${t("dispatch.crm.open", locale)}: ${group.name}`}><ChevronRight size={18} /></button></td>
+      <div>
+        <table className="block w-full table-fixed text-left text-sm lg:table">
+          <caption className="sr-only">{t("dispatch.crm.tableCaption", locale)}</caption>
+          <thead className={`hidden lg:table-header-group ${dark ? "bg-white/[0.025]" : "bg-slate-50"} ${muted}`}><tr>
+            <th scope="col" className="w-[30%] px-5 py-3 font-medium">{t("dispatch.crm.column.contact", locale)}</th>
+            <th scope="col" className="w-[21%] px-5 py-3 font-medium">{t("dispatch.crm.column.recordedMail", locale)}</th>
+            <th scope="col" className="w-[31%] px-5 py-3 font-medium">{t("dispatch.crm.column.state", locale)}</th>
+            <th scope="col" className="w-[18%]"><span className="sr-only">{t("dispatch.crm.readMail", locale)}</span></th>
+          </tr></thead>
+          <tbody className="block lg:table-row-group">{filtered.slice((activePage - 1) * SIZE, activePage * SIZE).map(group => <tr key={group.id} className={`grid gap-4 border-t px-5 py-4 sm:grid-cols-2 lg:table-row lg:p-0 ${rule} transition-colors hover:bg-emerald-400/[0.04]`}>
+            <td className="min-w-0 sm:col-span-2 lg:px-5 lg:py-4 lg:align-top">
+              <button type="button" className="min-h-11 break-words text-left font-semibold leading-6 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-400" onClick={() => onSelect(group.messages[0])}>{group.name}<span className={`block text-xs font-normal ${muted}`}>{group.number ? t("dispatch.crm.patientNumber", locale, { number: group.number }) : t("dispatch.notAssigned", locale)}</span></button>
+              <p className={`mt-1 break-all text-xs leading-5 ${muted}`}>{group.addresses.join(" · ")}</p>
+            </td>
+            <td className="min-w-0 lg:px-5 lg:py-4 lg:align-top">
+              <span className={`mb-1 block text-xs lg:hidden ${muted}`}>{t("dispatch.crm.column.recordedMail", locale)}</span>
+              <p className="font-semibold tabular-nums leading-6">{t(group.messages.length === 1 ? "dispatch.crm.emailOne" : "dispatch.crm.emailMany", locale, { count: String(group.messages.length) })}</p>
+              {(["invoice", "clarification", "other"] as const).map(type => { const count = group.messages.filter(row => kind(row) === type).length; return count > 0 && <p key={type} className={`text-xs leading-5 ${muted}`}>{t(`dispatch.crm.mailType.${type}`, locale, { count: String(count) })}</p>; })}
+            </td>
+            <td className="min-w-0 lg:px-5 lg:py-4 lg:align-top">
+              <span className={`mb-1 block text-xs lg:hidden ${muted}`}>{t("dispatch.crm.column.state", locale)}</span>
+              <p className={`flex items-start gap-1.5 font-medium leading-6 ${group.problems ? (dark ? "text-amber-300" : "text-amber-800") : group.delivered === group.messages.length ? (dark ? "text-emerald-300" : "text-emerald-800") : ""}`}>
+                {group.problems && <AlertCircle size={16} className="mt-1 shrink-0" aria-hidden />}
+                {group.delivered === group.messages.length && !group.problems && <Check size={16} className="mt-1 shrink-0" aria-hidden />}
+                {t(group.problems ? "dispatch.crm.state.problem" : group.delivered ? "dispatch.crm.state.delivered" : group.accepted ? "dispatch.crm.state.handedOver" : "dispatch.crm.state.unconfirmed", locale, { count: String(group.delivered || group.accepted), total: String(group.messages.length) })}
+              </p>
+              {!group.problems && !group.delivered && group.accepted > 0 && <p className={`text-xs leading-5 ${muted}`}>{t("dispatch.crm.deliveryUnconfirmed", locale)}</p>}
+              {(group.opened > 0 || group.replies > 0 || group.portal || !repliesAvailable) && <ul className={`mt-2 space-y-1 text-xs leading-5 ${muted}`}>
+                {group.opened > 0 && <li className="flex items-start gap-1.5"><Eye size={14} className="mt-0.5 shrink-0" aria-hidden />{t(group.opened === 1 ? "dispatch.crm.openActivityOne" : "dispatch.crm.openActivityMany", locale, { count: String(group.opened) })}</li>}
+                {repliesAvailable && group.replies > 0 && <li className="flex items-start gap-1.5"><MessageSquare size={14} className="mt-0.5 shrink-0" aria-hidden />{t(group.replies === 1 ? "dispatch.crm.replyActivityOne" : "dispatch.crm.replyActivityMany", locale, { count: String(group.replies) })}</li>}
+                {!repliesAvailable && <li>{t("dispatch.crm.replyStatusUnavailable", locale)}</li>}
+                {group.portal && <li className="flex items-start gap-1.5"><UserRound size={14} className="mt-0.5 shrink-0" aria-hidden />{t("dispatch.crm.portalActivity", locale)}</li>}
+              </ul>}
+            </td>
+            <td className="min-w-0 sm:col-span-2 lg:px-4 lg:py-4 lg:align-top"><button type="button" onClick={() => onSelect(group.messages[0])} className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold ${dark ? "text-emerald-300" : "text-emerald-800"} hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-emerald-400`} aria-label={`${t("dispatch.crm.readMail", locale)}: ${group.name}`}>{t("dispatch.crm.readMail", locale)}<ChevronRight size={16} className="shrink-0" aria-hidden /></button></td>
           </tr>)}</tbody>
         </table>
       </div>
       {!filtered.length && <p className={`px-5 py-12 text-center ${muted}`}>{t(busy ? "dispatch.loading" : "dispatch.empty", locale)}</p>}
       <Pager page={activePage} total={filtered.length} onChange={setPage} locale={locale} />
-      <p className={`border-t px-5 py-3 text-xs leading-5 ${rule} ${muted}`}>{t("dispatch.crm.indexNote", locale)}</p>
+      <details className={`border-t px-5 py-3 text-xs leading-5 ${rule} ${muted}`}><summary className="cursor-pointer py-1 font-medium focus-visible:outline-2 focus-visible:outline-emerald-400">{t("dispatch.crm.explain", locale)}</summary><p className="mt-2 max-w-[85ch]">{t("dispatch.crm.indexNote", locale)} {t("dispatch.crm.evidenceNote", locale)}</p></details>
     </>}
   </section>;
 }
