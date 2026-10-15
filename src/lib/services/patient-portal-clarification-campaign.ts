@@ -4,13 +4,17 @@ import { createServerClient } from "@/lib/db/supabase";
 import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { buildPatientPortalClarificationEmail } from "@/lib/email/patient-portal-clarification";
 import { prepareTrackedEmail, safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
+import { contactEmailIssue } from "@/lib/services/patient-outreach-audit";
 import { loadActivationCohort } from "@/lib/services/portal-activation-workflow";
 
 export const CLARIFICATION_WORKFLOW_ID = "81d31aaa-62f0-49dc-94ae-570c8bf13c29";
 export const CLARIFICATION_AUTH_SETTING = "patient_portal_clarification_dispatch_authorization";
 const SOURCE_SETTING = "q3_2026_invoice_email_campaign";
 const EVENT = "patient_portal_clarification_20261015";
-const sourceSchema = z.object({ recipients: z.array(z.object({ email: z.string().email(), patientIds: z.array(z.string().uuid()).min(1) })) });
+const sourceSchema = z.object({ recipients: z.array(z.object({
+  email: z.string().refine(value => !contactEmailIssue(value, new Set()), "Invalid email"),
+  patientIds: z.array(z.string().uuid()).min(1),
+})) });
 type Db = ReturnType<typeof createServerClient>;
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const claimId = (email: string) => { const value = hash(`${CLARIFICATION_WORKFLOW_ID}:${email.trim().toLowerCase()}`); return `${value.slice(0, 8)}-${value.slice(8, 12)}-5${value.slice(13, 16)}-a${value.slice(17, 20)}-${value.slice(20, 32)}`; };
