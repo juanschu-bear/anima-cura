@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, BookOpenCheck, Bot, CheckCircle2, ChevronRight,
-  FileSearch, Filter, FlaskConical, RefreshCw, Search, ShieldCheck, Sparkles,
-  UserCheck, XCircle,
+  CircleAlert, Clock3, FileSearch, Filter, FlaskConical, KeyRound, MailCheck,
+  RefreshCw, Search, Send, ShieldCheck, Sparkles, UserCheck, UserRoundCheck, XCircle,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/hooks/useAppStore";
@@ -17,7 +17,16 @@ type LearningNote = { id: string; category: string; title: string; content: stri
 type RecentCase = {
   id: string; status: string; startedAt: string; category: string; subject: string;
   sender: string; manualReview: boolean; autoReplied: boolean; replyMode: string;
-  knowledgeSourceIds: string[]; knowledgeVersion: string; error?: string | null;
+  reason: string; caseStatus: string; knowledgeSourceIds: string[]; knowledgeVersion: string; error?: string | null;
+};
+type CaseDetail = {
+  id: string; status: string; startedAt: string; finishedAt?: string | null; error?: string | null;
+  sender: string; senderName: string; subject: string; message: string; category: string; reason: string;
+  autoReplied: boolean; manualReview: boolean; replySubject: string; replyText: string; caseStatus: string;
+  caseActions: Array<{ type?: string; at?: string; text?: string }>;
+  patientMatches: Array<{ id: string; name: string; patientNumber: string | null; contactType: string; portal: { loginEmail: string; lastSignInAt: string | null } | null }>;
+  codeDeliveries: Array<{ id: string; patient_id: string; campaign_key: string; status: string; created_at: string; sent_at: string | null; delivered_at: string | null }>;
+  canResendCode: boolean; matchState: "unique" | "ambiguous" | "missing";
 };
 type AnswerPreview = {
   id: string; subject: string; excerpt: string; category: string; autoReply: boolean;
@@ -76,7 +85,11 @@ export default function SupportZentralePage() {
   }, [data, knowledgeCategory, knowledgeQuery]);
   const selectedKnowledge = data?.knowledge.find((entry) => entry.id === selectedKnowledgeId) ?? filteredKnowledge[0] ?? null;
   const selectedScenario = data?.answerPreviews.find((scenario) => scenario.id === selectedScenarioId) ?? data?.answerPreviews[0] ?? null;
-  const filteredCases = useMemo(() => (data?.recentCases ?? []).filter((item) => caseFilter === "all" || (caseFilter === "auto" ? item.autoReplied : item.manualReview)), [caseFilter, data]);
+  const filteredCases = useMemo(() => (data?.recentCases ?? []).filter((item) => {
+    if (caseFilter === "auto") return item.autoReplied;
+    if (caseFilter === "manual") return item.manualReview && item.caseStatus !== "resolved";
+    return true;
+  }), [caseFilter, data]);
   const topTopics = useMemo(() => Object.entries(data?.stats.categories ?? {}).sort((a, b) => b[1] - a[1]), [data]);
   const maxTopic = Math.max(1, ...topTopics.map(([, count]) => count));
 
@@ -139,7 +152,7 @@ export default function SupportZentralePage() {
         {activeTab === "overview" && data && <OverviewPanel data={data} locale={locale} surface={surface} soft={soft} muted={muted} rule={rule} selectedBg={selectedBg} setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} />}
         {activeTab === "knowledge" && data && <KnowledgePanel data={data} locale={locale} surface={surface} muted={muted} rule={rule} selectedBg={selectedBg} filteredKnowledge={filteredKnowledge} selectedKnowledge={selectedKnowledge} selectedKnowledgeId={selectedKnowledgeId} setSelectedKnowledgeId={setSelectedKnowledgeId} knowledgeQuery={knowledgeQuery} setKnowledgeQuery={setKnowledgeQuery} knowledgeCategory={knowledgeCategory} setKnowledgeCategory={setKnowledgeCategory} />}
         {activeTab === "lab" && data && selectedScenario && <LabPanel data={data} selectedScenario={selectedScenario} locale={locale} surface={surface} soft={soft} muted={muted} rule={rule} selectedBg={selectedBg} setSelectedScenarioId={setSelectedScenarioId} setSelectedKnowledgeId={setSelectedKnowledgeId} setActiveTab={setActiveTab} />}
-        {activeTab === "cases" && data && <CasesPanel filteredCases={filteredCases} caseFilter={caseFilter} setCaseFilter={setCaseFilter} locale={locale} surface={surface} muted={muted} rule={rule} selectedBg={selectedBg} />}
+        {activeTab === "cases" && data && <CasesPanel filteredCases={filteredCases} caseFilter={caseFilter} setCaseFilter={setCaseFilter} locale={locale} surface={surface} muted={muted} rule={rule} selectedBg={selectedBg} onChanged={load} />}
         {activeTab === "learning" && data && <LearningPanel data={data} topTopics={topTopics} maxTopic={maxTopic} locale={locale} surface={surface} soft={soft} muted={muted} rule={rule} form={form} setForm={setForm} busy={busy} saveNote={saveNote} reviewNote={reviewNote} />}
         {activeTab === "rules" && data && <RulesPanel prompt={data.prompt} locale={locale} dark={dark} surface={surface} muted={muted} rule={rule} />}
       </main>
@@ -174,8 +187,110 @@ function LabPanel({ data, selectedScenario, locale, surface, soft, muted, rule, 
   return <section className={`overflow-hidden rounded-[14px] border ${surface}`}><div className={`border-b p-6 ${rule}`}><h2 className="text-lg font-bold">{t("support.labTitle", locale)}</h2><p className={`mt-1 text-base ${muted}`}>{t("support.labIntro", locale)}</p></div><div className="grid lg:grid-cols-[340px_minmax(0,1fr)]"><div className={`border-b p-3 lg:border-b-0 lg:border-r ${rule}`}>{data.answerPreviews.map((scenario) => <button key={scenario.id} type="button" onClick={() => setSelectedScenarioId(scenario.id)} className={`mb-1 w-full rounded-lg border p-4 text-left ${selectedScenario.id === scenario.id ? `border-emerald-400/35 ${selectedBg}` : "border-transparent hover:border-current/10"}`}><div className="font-semibold">{scenario.subject}</div><div className={`mt-2 flex items-center gap-2 text-sm ${scenario.autoReply ? "text-emerald-400" : "text-amber-400"}`}>{scenario.autoReply ? <Bot size={15} /> : <UserCheck size={15} />}{scenario.autoReply ? t("support.autoRoute", locale) : t("support.manualRoute", locale)}</div></button>)}</div><div className="p-6 lg:p-8"><div className={`rounded-lg border p-5 ${rule} ${soft}`}><div className={`text-sm font-semibold ${muted}`}>{t("support.sampleIncoming", locale)}</div><div className="mt-3 font-semibold">{selectedScenario.subject}</div><p className={`mt-2 text-base ${muted}`}>{selectedScenario.excerpt}</p></div><div className={`my-6 flex items-center gap-3 border-y py-4 ${rule}`}><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${selectedScenario.autoReply ? "bg-emerald-400/10 text-emerald-400" : "bg-amber-400/10 text-amber-400"}`}>{selectedScenario.autoReply ? <Bot size={19} /> : <UserCheck size={19} />}</span><div><div className="font-semibold">{selectedScenario.autoReply ? t("support.decisionAutomatic", locale) : t("support.decisionManual", locale)}</div><div className={`mt-1 text-sm ${muted}`}>{t(`support.reason.${selectedScenario.reason}`, locale)}</div></div></div>{selectedScenario.reply ? <><h3 className="font-semibold">{t("support.actualReply", locale)}</h3><div className={`mt-3 whitespace-pre-wrap rounded-lg border p-5 text-base leading-7 ${rule} ${soft}`}>{selectedScenario.reply}</div><div className="mt-5"><div className={`text-sm font-semibold ${muted}`}>{t("support.sourcesUsed", locale)}</div><div className="mt-2 flex flex-wrap gap-2">{selectedScenario.sources.slice(0, 6).map((source) => <button key={source} type="button" onClick={() => { setSelectedKnowledgeId(source); setActiveTab("knowledge"); }} className="rounded-md border border-emerald-400/30 px-2.5 py-1.5 text-sm text-emerald-400">{source}</button>)}</div></div></> : <div className="rounded-lg border border-amber-400/35 bg-amber-400/[0.06] p-5"><div className="flex items-center gap-2 font-semibold text-amber-400"><AlertTriangle size={18} />{t("support.noAutoReply", locale)}</div><p className={`mt-2 text-base leading-7 ${muted}`}>{t("support.noAutoReplyText", locale)}</p></div>}</div></div></section>;
 }
 
-function CasesPanel({ filteredCases, caseFilter, setCaseFilter, locale, surface, muted, rule, selectedBg }: { filteredCases: RecentCase[]; caseFilter: string; setCaseFilter: (value: string) => void; locale: string; surface: string; muted: string; rule: string; selectedBg: string }) {
-  return <section className={`rounded-[14px] border ${surface}`}><div className={`flex flex-wrap items-end justify-between gap-4 border-b p-6 ${rule}`}><div><h2 className="text-lg font-bold">{t("support.caseTitle", locale)}</h2><p className={`mt-1 text-base ${muted}`}>{t("support.caseIntro", locale)}</p></div><div className="flex gap-2"><Filter size={18} className={`mt-3 ${muted}`} />{["all", "manual", "auto"].map((filter) => <button key={filter} type="button" onClick={() => setCaseFilter(filter)} className={`min-h-11 rounded-lg border px-3 text-sm font-semibold ${caseFilter === filter ? `border-emerald-400/40 text-emerald-400 ${selectedBg}` : rule}`}>{t(`support.caseFilter.${filter}`, locale)}</button>)}</div></div><div className="overflow-x-auto p-6"><table className="w-full min-w-[900px] text-left text-sm"><thead className={muted}><tr><th className="pb-3">{t("support.table.time", locale)}</th><th className="pb-3">{t("support.table.topic", locale)}</th><th className="pb-3">{t("support.table.subject", locale)}</th><th className="pb-3">{t("support.table.contact", locale)}</th><th className="pb-3">{t("support.table.route", locale)}</th><th className="pb-3">{t("support.table.evidence", locale)}</th></tr></thead><tbody className={`divide-y ${rule}`}>{filteredCases.map((item) => <tr key={item.id}><td className="py-4 pr-4 tabular-nums">{new Date(item.startedAt).toLocaleString(locale === "de" ? "de-DE" : "en-GB")}</td><td className="py-4 pr-4 font-semibold">{t(`support.category.${item.category}`, locale)}</td><td className="max-w-[300px] truncate py-4 pr-4">{item.subject || "–"}</td><td className="py-4 pr-4">{item.sender || "–"}</td><td className={`py-4 pr-4 font-semibold ${item.autoReplied ? "text-emerald-400" : "text-amber-400"}`}>{item.autoReplied ? t("support.auto", locale) : t("support.manual", locale)}</td><td className="py-4 tabular-nums">{item.knowledgeSourceIds.length || "–"}</td></tr>)}</tbody></table>{filteredCases.length === 0 && <div className={`py-16 text-center ${muted}`}>{t("support.noCasesForFilter", locale)}</div>}</div></section>;
+function CasesPanel({ filteredCases, caseFilter, setCaseFilter, locale, surface, muted, rule, selectedBg, onChanged }: { filteredCases: RecentCase[]; caseFilter: string; setCaseFilter: (value: string) => void; locale: string; surface: string; muted: string; rule: string; selectedBg: string; onChanged: () => Promise<void> }) {
+  const [selectedId, setSelectedId] = useState("");
+  const [detail, setDetail] = useState<CaseDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [caseError, setCaseError] = useState("");
+  const [reply, setReply] = useState("");
+  const [repairBusy, setRepairBusy] = useState(false);
+  const [repair, setRepair] = useState<{ cases: number; contacts: number; eligible: number; sent: number; alreadySignedIn: number; ambiguous: number; missing: number; incomplete: number; blocked: number; failed: number } | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const pageCount = Math.max(1, Math.ceil(filteredCases.length / pageSize));
+  const rows = filteredCases.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => { setPage(1); }, [caseFilter]);
+  useEffect(() => {
+    const next = filteredCases.some(item => item.id === selectedId) ? selectedId : filteredCases[0]?.id || "";
+    if (next !== selectedId) setSelectedId(next);
+  }, [filteredCases, selectedId]);
+  useEffect(() => {
+    if (!selectedId) { setDetail(null); return; }
+    let current = true;
+    setLoading(true); setCaseError("");
+    void fetch(`/api/support-zentrale/cases/${selectedId}`, { cache: "no-store" })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "case_load_failed");
+        if (current) { setDetail(body as CaseDetail); setReply((body as CaseDetail).replyText || ""); }
+      })
+      .catch(() => { if (current) setCaseError(t("support.caseLoadError", locale)); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [locale, selectedId]);
+
+  async function runAction(action: "resend_access_code" | "send_reply" | "resolve") {
+    if (!detail || actionBusy) return;
+    setActionBusy(true); setCaseError("");
+    try {
+      const response = await fetch(`/api/support-zentrale/cases/${detail.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "send_reply" ? { action, text: reply } : { action }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "case_action_failed");
+      setDetail(body as CaseDetail);
+      await onChanged();
+    } catch (error) {
+      setCaseError(error instanceof Error && !error.message.includes("failed") ? error.message : t("support.caseActionError", locale));
+    } finally { setActionBusy(false); }
+  }
+
+  async function runRepair(send: boolean) {
+    setRepairBusy(true); setCaseError("");
+    try {
+      const response = await fetch("/api/support-zentrale/reissue-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ send }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "repair_failed");
+      setRepair(body);
+      if (send) await onChanged();
+    } catch { setCaseError(t("support.repairError", locale)); }
+    finally { setRepairBusy(false); }
+  }
+
+  return <section className={`overflow-hidden rounded-[14px] border ${surface}`}>
+    <div className={`flex flex-wrap items-end justify-between gap-4 border-b p-6 ${rule}`}>
+      <div><h2 className="text-lg font-bold">{t("support.caseTitle", locale)}</h2><p className={`mt-1 max-w-[72ch] text-base ${muted}`}>{t("support.caseWorkspaceIntro", locale)}</p></div>
+      <div className="flex flex-wrap items-center gap-2"><Filter size={18} className={muted} />{["all", "manual", "auto"].map(filter => <button key={filter} type="button" onClick={() => setCaseFilter(filter)} className={`min-h-11 rounded-lg border px-3 text-sm font-semibold ${caseFilter === filter ? `border-emerald-400/40 text-emerald-400 ${selectedBg}` : rule}`}>{t(`support.caseFilter.${filter}`, locale)}</button>)}</div>
+    </div>
+    <div className={`flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4 ${rule}`}><div><p className="font-semibold">{t("support.repairTitle", locale)}</p><p className={`mt-1 text-sm ${muted}`}>{repair ? t("support.repairSummary", locale, { cases: String(repair.cases), eligible: String(repair.eligible), signedIn: String(repair.alreadySignedIn), review: String(repair.ambiguous + repair.missing + repair.incomplete) }) : t("support.repairIntro", locale)}</p></div><div className="flex flex-wrap gap-2"><button type="button" className="btn btn-secondary min-h-11" disabled={repairBusy} onClick={() => void runRepair(false)}><Search size={17} />{repairBusy ? t("support.repairChecking", locale) : t("support.repairPreview", locale)}</button>{repair && repair.eligible > 0 && <button type="button" className="btn btn-primary min-h-11" disabled={repairBusy} onClick={() => void runRepair(true)}><KeyRound size={17} />{t("support.repairSend", locale, { count: String(repair.eligible) })}</button>}{repair && repair.sent > 0 && <span className="flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-400"><CheckCircle2 size={17} />{t("support.repairSent", locale, { count: String(repair.sent) })}</span>}</div></div>
+    {caseError && <div role="alert" className="border-b border-red-400/30 bg-red-500/10 px-5 py-3 text-sm text-red-300">{caseError}</div>}
+    {filteredCases.length === 0 ? <div className={`py-20 text-center ${muted}`}>{t("support.noCasesForFilter", locale)}</div> : <div className="grid min-h-[720px] lg:grid-cols-[390px_minmax(0,1fr)]">
+      <div className={`border-b lg:border-b-0 lg:border-r ${rule}`}>
+        <div className="max-h-[660px] overflow-y-auto">{rows.map(item => <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} aria-pressed={selectedId === item.id} className={`block w-full border-b px-5 py-4 text-left transition-colors ${rule} ${selectedId === item.id ? selectedBg : "hover:bg-emerald-400/[0.04]"}`}>
+          <div className="flex items-center justify-between gap-3"><span className={`text-xs font-semibold ${item.caseStatus === "resolved" ? "text-emerald-400" : item.manualReview ? "text-amber-400" : muted}`}>{item.caseStatus === "resolved" ? t("support.caseResolved", locale) : item.manualReview ? t("support.caseNeedsReview", locale) : t("support.caseObserved", locale)}</span><time className={`text-xs tabular-nums ${muted}`}>{new Date(item.startedAt).toLocaleString(locale === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</time></div>
+          <span className="mt-2 block truncate font-semibold">{item.subject || t("support.noSubject", locale)}</span>
+          <span className={`mt-1 block truncate text-sm ${muted}`}>{item.sender || "–"} · {t(`support.category.${item.category}`, locale)}</span>
+        </button>)}</div>
+        <div className={`flex items-center justify-between border-t px-4 py-3 ${rule}`}><button type="button" className="btn btn-secondary min-h-11" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>{t("support.previous", locale)}</button><span className={`text-sm tabular-nums ${muted}`}>{page} / {pageCount}</span><button type="button" className="btn btn-secondary min-h-11" disabled={page >= pageCount} onClick={() => setPage(value => value + 1)}>{t("support.next", locale)}</button></div>
+      </div>
+      <div className="min-w-0">{loading || !detail ? <div className="space-y-4 p-6 lg:p-8" aria-busy="true"><div className="h-8 w-1/2 animate-pulse rounded-lg bg-white/10" /><div className="h-28 animate-pulse rounded-lg bg-white/10" /><div className="h-48 animate-pulse rounded-lg bg-white/10" /></div> : <CaseWorkbench detail={detail} reply={reply} setReply={setReply} runAction={runAction} actionBusy={actionBusy} locale={locale} muted={muted} rule={rule} />}</div>
+    </div>}
+  </section>;
+}
+
+function CaseWorkbench({ detail, reply, setReply, runAction, actionBusy, locale, muted, rule }: { detail: CaseDetail; reply: string; setReply: (value: string) => void; runAction: (action: "resend_access_code" | "send_reply" | "resolve") => Promise<void>; actionBusy: boolean; locale: string; muted: string; rule: string }) {
+  const patient = detail.patientMatches[0];
+  const lastDelivery = detail.codeDeliveries[0];
+  return <div className="p-6 lg:p-8">
+    <div className={`flex flex-wrap items-start justify-between gap-4 border-b pb-6 ${rule}`}><div className="max-w-3xl"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-md px-2.5 py-1 text-sm font-semibold ${detail.caseStatus === "resolved" ? "bg-emerald-400/10 text-emerald-400" : "bg-amber-400/10 text-amber-400"}`}>{detail.caseStatus === "resolved" ? t("support.caseResolved", locale) : t("support.caseNeedsReview", locale)}</span><span className={`text-sm ${muted}`}>{t(`support.category.${detail.category}`, locale)}</span></div><h3 className="mt-3 text-[22px] font-bold tracking-[-0.02em]">{detail.subject || t("support.noSubject", locale)}</h3><p className={`mt-2 break-all text-sm ${muted}`}>{detail.senderName ? `${detail.senderName} · ` : ""}{detail.sender}</p></div><button type="button" className="btn btn-secondary min-h-11" disabled={actionBusy || detail.caseStatus === "resolved"} onClick={() => void runAction("resolve")}><CheckCircle2 size={17} />{t("support.caseResolve", locale)}</button></div>
+
+    <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,.75fr)]">
+      <div className="space-y-6">
+        <section><h4 className="flex items-center gap-2 font-semibold"><MailCheck size={18} />{t("support.originalMessage", locale)}</h4><div className={`mt-3 rounded-lg border p-5 text-base leading-7 ${rule}`}>{detail.message ? <p className="whitespace-pre-wrap">{detail.message}</p> : <p className={muted}>{t("support.legacyMessageUnavailable", locale)}</p>}</div></section>
+        {detail.replyText && <section><h4 className="flex items-center gap-2 font-semibold"><Send size={18} />{t("support.sentReply", locale)}</h4><div className={`mt-3 whitespace-pre-wrap rounded-lg border p-5 text-base leading-7 ${rule}`}>{detail.replyText}</div></section>}
+        <section><label htmlFor="support-reply" className="font-semibold">{t("support.manualReply", locale)}</label><p className={`mt-1 text-sm ${muted}`}>{t("support.manualReplyHelp", locale)}</p><textarea id="support-reply" className="input mt-3 min-h-36 resize-y py-3" value={reply} onChange={event => setReply(event.target.value)} maxLength={4000} /><button type="button" className="btn btn-primary mt-3 min-h-11" disabled={actionBusy || reply.trim().length < 2} onClick={() => void runAction("send_reply")}><Send size={17} />{t("support.sendReply", locale)}</button></section>
+      </div>
+      <aside className="space-y-6">
+        <section className={`rounded-lg border p-5 ${rule}`}><h4 className="flex items-center gap-2 font-semibold"><UserRoundCheck size={18} />{t("support.patientMatch", locale)}</h4>{detail.matchState === "unique" && patient ? <div className="mt-4"><p className="font-semibold">{patient.name}</p><p className={`mt-1 text-sm ${muted}`}>{t("support.patientNumber", locale)} {patient.patientNumber || "–"} · {patient.contactType === "guardian" ? t("support.guardianContact", locale) : t("support.patientContact", locale)}</p><div className={`mt-4 border-t pt-4 ${rule}`}><p className="text-sm font-semibold">{patient.portal ? t("support.portalExists", locale) : t("support.portalMissing", locale)}</p><p className={`mt-1 text-sm ${muted}`}>{patient.portal?.lastSignInAt ? t("support.lastLogin", locale, { date: new Date(patient.portal.lastSignInAt).toLocaleString(locale === "de" ? "de-DE" : "en-GB") }) : t("support.noLogin", locale)}</p></div></div> : <div className="mt-4 flex gap-3 text-amber-400"><CircleAlert className="mt-0.5 shrink-0" size={18} /><p className="text-sm leading-6">{detail.matchState === "ambiguous" ? t("support.matchAmbiguous", locale) : t("support.matchMissing", locale)}</p></div>}</section>
+        <section className={`rounded-lg border p-5 ${rule}`}><h4 className="flex items-center gap-2 font-semibold"><KeyRound size={18} />{t("support.codeDelivery", locale)}</h4>{lastDelivery ? <div className="mt-4"><p className="font-semibold">{t(`dispatch.status.${lastDelivery.status}`, locale)}</p><p className={`mt-1 text-sm ${muted}`}>{new Date(lastDelivery.sent_at || lastDelivery.created_at).toLocaleString(locale === "de" ? "de-DE" : "en-GB")}</p></div> : <p className={`mt-3 text-sm leading-6 ${muted}`}>{t("support.noCodeDelivery", locale)}</p>}<button type="button" className="btn btn-primary mt-4 min-h-11 w-full" disabled={actionBusy || !detail.canResendCode} onClick={() => void runAction("resend_access_code")}><KeyRound size={17} />{actionBusy ? t("support.sendingCode", locale) : t("support.resendCode", locale)}</button>{!detail.canResendCode && <p className="mt-2 text-xs leading-5 text-amber-400">{t("support.resendUnavailable", locale)}</p>}</section>
+        <section className={`rounded-lg border p-5 ${rule}`}><h4 className="flex items-center gap-2 font-semibold"><Clock3 size={18} />{t("support.caseHistory", locale)}</h4><ol className={`mt-3 divide-y ${rule}`}>{detail.caseActions.length ? detail.caseActions.slice().reverse().map((action, index) => <li key={`${action.at}-${index}`} className="py-3"><p className="text-sm font-semibold">{t(`support.action.${action.type || "resolved"}`, locale)}</p><p className={`mt-1 text-xs ${muted}`}>{action.at ? new Date(action.at).toLocaleString(locale === "de" ? "de-DE" : "en-GB") : "–"}</p></li>) : <li className={`py-3 text-sm ${muted}`}>{t("support.noCaseActions", locale)}</li>}</ol></section>
+      </aside>
+    </div>
+  </div>;
 }
 
 function LearningPanel({ data, topTopics, maxTopic, locale, surface, soft, muted, rule, form, setForm, busy, saveNote, reviewNote }: { data: Overview; topTopics: [string, number][]; maxTopic: number; locale: string; surface: string; soft: string; muted: string; rule: string; form: { category: string; title: string; content: string }; setForm: (value: { category: string; title: string; content: string }) => void; busy: boolean; saveNote: (event: React.FormEvent) => Promise<void>; reviewNote: (id: string, status: "reviewed" | "rejected") => Promise<void> }) {

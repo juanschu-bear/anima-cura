@@ -124,6 +124,7 @@ export async function GET() {
       reason: String(result.reason || ""),
       subject: String(result.subject || ""),
       sender: String(result.sender || "").replace(/^(.{2}).*(@.*)$/, "$1•••$2"),
+      caseStatus: String(result.caseStatus || (result.manualReview === true ? "open" : "observed")),
       manualReview: result.manualReview === true,
       autoReplied: result.autoReplied === true,
       replyMode: String(result.replyMode || ""),

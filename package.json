@@ -44,7 +44,7 @@
     "resolve:billing-manifest-patients": "tsx scripts/resolve-billing-manifest-patients.ts",
     "test:patient-outreach": "tsx --test src/lib/services/__tests__/patient-outreach-audit.test.ts",
     "test:patient-navigation": "tsx --test src/lib/services/__tests__/patient-navigation.test.ts src/lib/services/__tests__/patient-self-activation.test.ts src/lib/services/__tests__/patient-access-code-delivery.test.ts",
-    "test:support-mail": "tsx --test src/lib/services/__tests__/hostinger-support-mail.test.ts",
+    "test:support-mail": "tsx --test src/lib/services/__tests__/hostinger-support-mail.test.ts src/lib/services/__tests__/support-code-repair.test.ts",
     "export:stabilization-snapshot": "tsx scripts/export-stabilization-snapshot.ts",
     "repair:patient-duplicates": "tsx scripts/repair-patient-duplicates.ts",
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",

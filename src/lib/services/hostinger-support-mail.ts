@@ -452,6 +452,55 @@ async function sendHostingerReply(event: ParsedSupportEvent, classification: Sup
   return generated;
 }
 
+export async function sendHostingerSupportMessage(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  inReplyTo?: { folder: string; uid: number | string } | null;
+}) {
+  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
+  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID;
+  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
+  const body: Record<string, unknown> = {
+    to: [input.to],
+    displayName: "Anima Cura Praxisteam",
+    subject: input.subject,
+    text: input.text,
+    html: input.html ?? buildSupportEmailHtml(input.text, "login_password"),
+  };
+  if (input.inReplyTo) body.inReplyTo = input.inReplyTo;
+  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
+    method: "POST",
+    signal: AbortSignal.timeout(12_000),
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`hostinger_mail_rejected:${response.status}`);
+}
+
+export function buildAccessCodeReissueNotice() {
+  const text = [
+    "Hallo,",
+    "",
+    "danke für deinen Hinweis. Beim ersten Versuch wurde der Sicherheitscode aufgrund eines technischen Fehlers nicht versendet. Der Fehler ist behoben.",
+    "",
+    "Wir haben dir gerade eine separate E-Mail mit einem neuen sechsstelligen Sicherheitscode geschickt. Der Code ist zehn Minuten gültig. Bitte gib ihn direkt in der geöffneten Anima-Cura-Web-App ein.",
+    "",
+    "Falls du die Nachricht nicht sofort siehst, prüfe bitte auch den Spam-Ordner. Fordere keinen weiteren Code an, solange der aktuelle noch gültig ist – es gilt immer nur der zuletzt versendete Code.",
+    "",
+    "Du musst kein Passwort und keinen Sicherheitscode an uns senden. Wenn es weiterhin nicht klappt, antworte einfach auf diese E-Mail; wir prüfen den Fall persönlich.",
+    "",
+    "Liebe Grüße",
+    "Dein Anima-Cura-Praxisteam",
+  ].join("\n");
+  return {
+    subject: "Dein neuer Anima-Cura-Sicherheitscode wurde versendet",
+    text,
+    html: buildSupportEmailHtml(text, "login_password"),
+  };
+}
+
 export function buildManualReviewAlert(event: ParsedSupportEvent, classification: SupportClassification) {
   const patient = event.senderName?.trim() || event.senderEmail;
   const reason = classification.category === "medical"
@@ -501,7 +550,9 @@ export async function processHostingerSupportEvent(payload: unknown) {
   const id = hostingerSupportRunId(event.eventKey);
   const audit = {
     sender: event.senderEmail,
+    senderName: event.senderName,
     subject: event.subject,
+    excerpt: event.excerpt,
     category: classification.category,
     reason: classification.reason,
     receivedAt: event.timestamp,
@@ -560,6 +611,8 @@ export async function processHostingerSupportEvent(payload: unknown) {
       result: {
         ...audit,
         autoReplied: true,
+        replySubject: generated.reply.subject,
+        replyText: generated.reply.text,
         replyMode: generated.mode,
         knowledgeVersion: generated.knowledgeVersion,
         knowledgeSourceIds: generated.sourceIds,
