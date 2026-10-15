@@ -4,6 +4,7 @@ import {
   buildSupportReply,
   buildSupportEmailHtml,
   buildManualReviewAlert,
+  buildManualReviewAcknowledgement,
   classifySupportEvent,
   hostingerSupportRunId,
   parseHostingerSupportEvent,
@@ -106,7 +107,7 @@ test("keeps medical, billing, and reply-loop protections ahead of code escalatio
   assert.equal(classifySupportEvent(automated).reason, "automated_or_loop_risk");
 });
 
-test("notifies only the internal review address for missing codes and missing bodies", async t => {
+test("acknowledges every patient message while also notifying internal review", async t => {
   const environment = {
     NEXT_PUBLIC_SUPABASE_URL: "https://support-fixture.invalid",
     SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key",
@@ -125,7 +126,7 @@ test("notifies only the internal review address for missing codes and missing bo
   });
 
   const sent: Array<{ to: string[]; text: string }> = [];
-  const completed: Array<{ result: { manualReview: boolean; practiceNotified: boolean; reason: string } }> = [];
+  const completed: Array<{ result: { manualReview: boolean; practiceNotified: boolean; autoAcknowledged: boolean; reason: string; replyText: string } }> = [];
   t.mock.method(globalThis, "fetch", async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     const body = JSON.parse(String(init?.body));
@@ -150,16 +151,21 @@ test("notifies only the internal review address for missing codes and missing bo
     });
     assert.equal(result.ok, true);
     assert.ok("autoReplied" in result && result.autoReplied === false);
+    assert.ok("autoAcknowledged" in result && result.autoAcknowledged === true);
     assert.ok("practiceNotified" in result && result.practiceNotified === true);
   }
-  assert.equal(sent.length, 2);
-  for (const alert of sent) assert.deepEqual(alert.to, ["review@example.com"]);
-  assert.match(sent[0].text, /technische Prüfung der Codezustellung/);
-  assert.match(sent[1].text, /Originalnachricht persönlich prüfen/);
+  assert.equal(sent.length, 4);
+  assert.equal(sent.filter(message => message.to[0] === "erika@example.com").length, 2);
+  assert.equal(sent.filter(message => message.to[0] === "review@example.com").length, 2);
+  assert.ok(sent.some(message => /technische Prüfung der Codezustellung/.test(message.text)));
+  assert.ok(sent.some(message => /Originalnachricht persönlich prüfen/.test(message.text)));
+  assert.ok(sent.filter(message => message.to[0] === "erika@example.com").every(message => /deine Nachricht ist angekommen/.test(message.text)));
   assert.deepEqual(completed.map(row => row.result.reason), ["security_code_not_received", "missing_message_body"]);
   for (const row of completed) {
     assert.equal(row.result.manualReview, true);
     assert.equal(row.result.practiceNotified, true);
+    assert.equal(row.result.autoAcknowledged, true);
+    assert.match(row.result.replyText, /deine Nachricht ist angekommen/);
   }
 });
 
@@ -200,6 +206,14 @@ test("manual review alert contains the original context and direct patient reply
   assert.match(alert.subject, /Prüfung erforderlich/);
   assert.match(alert.text, /erika@example\.com/);
   assert.match(alert.html, /Patient direkt antworten/);
+});
+
+test("manual review acknowledgement never leaves the patient without a response", () => {
+  const incoming = event("Kein Code", "Ich habe keinen Sicherheitscode erhalten.");
+  const acknowledgement = buildManualReviewAcknowledgement(incoming, classifySupportEvent(incoming));
+  assert.match(acknowledgement.text, /deine Nachricht ist angekommen/);
+  assert.match(acknowledgement.text, /keinen weiteren Code/);
+  assert.doesNotMatch(acknowledgement.html, /Passwort neu einrichten/);
 });
 
 test("accepts common nested webhook field variants", () => {

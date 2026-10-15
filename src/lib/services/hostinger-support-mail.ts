@@ -323,8 +323,11 @@ function supportEmailPresentation(category: SupportCategory) {
   };
 }
 
-export function buildSupportEmailHtml(message: string, category: SupportCategory) {
+export function buildSupportEmailHtml(message: string, category: SupportCategory, options?: { showAction?: boolean; title?: string; summary?: string }) {
   const presentation = supportEmailPresentation(category);
+  const title = options?.title || presentation.title;
+  const summary = options?.summary || presentation.summary;
+  const showAction = options?.showAction !== false;
   const paragraphs = message.split("\n\n").map(value => value.trim()).filter(Boolean);
   const greeting = paragraphs.shift() || "Guten Tag,";
   const body = paragraphs.filter(paragraph =>
@@ -335,10 +338,10 @@ export function buildSupportEmailHtml(message: string, category: SupportCategory
   const bodyHtml = body.map(paragraph => `<p style="margin:0 0 18px;color:#33443f;font-size:16px;line-height:1.7;">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
 
   return `<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(presentation.title)}</title>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
 <style>@media only screen and (max-width:620px){.ac-shell{padding:18px 10px!important}.ac-card{border-radius:16px!important}.ac-pad{padding-left:22px!important;padding-right:22px!important}.ac-title{font-size:28px!important}.ac-button{display:block!important;text-align:center!important}}</style></head>
 <body style="margin:0;padding:0;background:#eef2ef;color:#17372f;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(presentation.summary)}</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(summary)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#eef2ef;"><tr><td class="ac-shell" align="center" style="padding:38px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="ac-card" style="width:100%;max-width:640px;background:#fffdf9;border:1px solid #dbe3de;border-radius:20px;overflow:hidden;box-shadow:0 18px 50px rgba(24,55,47,.12);">
     <tr><td style="height:5px;background:#1d5f4e;font-size:0;line-height:0;">&nbsp;</td></tr>
@@ -350,14 +353,14 @@ export function buildSupportEmailHtml(message: string, category: SupportCategory
     </td></tr>
     <tr><td class="ac-pad" style="padding:38px 42px 14px;">
       <p style="margin:0 0 18px;color:#1d5f4e;font-size:16px;font-weight:700;">${escapeHtml(greeting)}</p>
-      <h1 class="ac-title" style="margin:0;max-width:520px;color:#142f28;font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:500;line-height:1.16;letter-spacing:-.02em;">${escapeHtml(presentation.title)}</h1>
-      <p style="margin:14px 0 0;max-width:540px;color:#65766f;font-size:16px;line-height:1.65;">${escapeHtml(presentation.summary)}</p>
+      <h1 class="ac-title" style="margin:0;max-width:520px;color:#142f28;font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:500;line-height:1.16;letter-spacing:-.02em;">${escapeHtml(title)}</h1>
+      <p style="margin:14px 0 0;max-width:540px;color:#65766f;font-size:16px;line-height:1.65;">${escapeHtml(summary)}</p>
     </td></tr>
     <tr><td class="ac-pad" style="padding:22px 42px 8px;">${bodyHtml}</td></tr>
-    <tr><td class="ac-pad" style="padding:18px 42px 34px;">
+    ${showAction ? `<tr><td class="ac-pad" style="padding:18px 42px 34px;">
       <a class="ac-button" href="${presentation.url}" target="_blank" style="display:inline-block;background:#1d5f4e;border:1px solid #1d5f4e;border-radius:10px;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:750;line-height:1.2;">${escapeHtml(presentation.action)} &nbsp;→</a>
       <p style="margin:14px 0 0;color:#788780;font-size:12px;line-height:1.6;word-break:break-all;">Falls der Button nicht öffnet: <a href="${presentation.url}" style="color:#1d5f4e;text-decoration:underline;">${presentation.url}</a></p>
-    </td></tr>
+    </td></tr>` : ""}
     <tr><td class="ac-pad" style="padding:0 42px 34px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f6f3;border:1px solid #d8e4de;border-radius:12px;"><tr><td style="padding:17px 18px;">
         <div style="color:#1d5f4e;font-size:13px;font-weight:750;">Sicherer Umgang mit Zugangsdaten</div>
@@ -501,7 +504,30 @@ export function buildAccessCodeReissueNotice(purpose: "activation" | "recovery" 
   return {
     subject: `Dein Sicherheitscode zur ${purposeLabel}`,
     text,
-    html: buildSupportEmailHtml(text, "login_password"),
+    html: buildSupportEmailHtml(text, purpose === "activation" ? "portal_setup" : "login_password"),
+  };
+}
+
+export function buildManualReviewAcknowledgement(event: ParsedSupportEvent, classification: SupportClassification) {
+  const hello = salutation(event.senderName);
+  const core = classification.reason === "security_code_not_received"
+    ? "deine Nachricht ist angekommen. Wir prüfen jetzt, ob es bei dir um die erstmalige Aktivierung oder um eine Passwort-Neuvergabe geht und kontrollieren den letzten Codeversand. Bitte fordere bis zu unserer Rückmeldung keinen weiteren Code an, damit nicht mehrere Codes miteinander kollidieren."
+    : classification.category === "medical"
+      ? "deine Nachricht ist angekommen und wurde zur persönlichen Prüfung an das Praxisteam weitergegeben. Medizinische Fragen werden nicht automatisch beantwortet."
+      : classification.category === "billing_specific"
+        ? "deine Nachricht ist angekommen. Deine individuelle Abrechnungsfrage wird persönlich geprüft; du erhältst dazu eine gesonderte Rückmeldung."
+        : "deine Nachricht ist angekommen und wird persönlich geprüft. Falls für die eindeutige Zuordnung noch eine Angabe fehlt, fragen wir gezielt nach.";
+  const text = `${hello}\n\n${core}\n\nDu musst dein Passwort oder einen Sicherheitscode niemals per E-Mail senden.\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
+  return {
+    subject: event.subject.toLocaleLowerCase("de-DE").startsWith("re:") || event.subject.toLocaleLowerCase("de-DE").startsWith("aw:")
+      ? event.subject
+      : `Re: ${event.subject}`,
+    text,
+    html: buildSupportEmailHtml(text, classification.category, {
+      showAction: false,
+      title: "Deine Nachricht ist angekommen",
+      summary: "Das Praxisteam prüft dein Anliegen und meldet sich mit dem passenden nächsten Schritt.",
+    }),
   };
 }
 
@@ -540,6 +566,29 @@ async function sendManualReviewAlert(event: ParsedSupportEvent, classification: 
     }),
   });
   if (!response.ok) throw new Error(`manual_review_notification_rejected:${response.status}`);
+}
+
+async function sendManualReviewAcknowledgement(event: ParsedSupportEvent, classification: SupportClassification) {
+  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
+  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
+  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
+  const acknowledgement = buildManualReviewAcknowledgement(event, classification);
+  const body: Record<string, unknown> = {
+    to: [event.senderEmail],
+    displayName: "Anima Cura Praxisteam",
+    subject: acknowledgement.subject,
+    text: acknowledgement.text,
+    html: acknowledgement.html,
+  };
+  if (event.uid) body.inReplyTo = { folder: event.folder, uid: event.uid };
+  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
+    method: "POST",
+    signal: AbortSignal.timeout(12_000),
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`manual_review_acknowledgement_rejected:${response.status}`);
+  return acknowledgement;
 }
 
 export async function processHostingerSupportEvent(payload: unknown) {
@@ -587,24 +636,33 @@ export async function processHostingerSupportEvent(payload: unknown) {
   }
 
   if (!classification.autoReply) {
-    try {
-      await sendManualReviewAlert(event, classification);
-      const saved = await db.from("workflow_runs").update({
-        status: "success",
-        finished_at: new Date().toISOString(),
-        result: { ...audit, manualReview: true, practiceNotified: true },
-      }).eq("id", id);
-      if (saved.error) throw new Error("support_audit_finalize_failed");
-      return { ok: true as const, autoReplied: false, practiceNotified: true, category: classification.category };
-    } catch (error) {
-      await db.from("workflow_runs").update({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        error: error instanceof Error ? error.message : "manual_review_notification_failed",
-        result: { ...audit, manualReview: true, practiceNotified: false },
-      }).eq("id", id);
-      throw error;
-    }
+    const [acknowledgement, alert] = await Promise.allSettled([
+      sendManualReviewAcknowledgement(event, classification),
+      sendManualReviewAlert(event, classification),
+    ]);
+    const autoAcknowledged = acknowledgement.status === "fulfilled";
+    const practiceNotified = alert.status === "fulfilled";
+    const error = [acknowledgement, alert]
+      .filter((entry): entry is PromiseRejectedResult => entry.status === "rejected")
+      .map(entry => entry.reason instanceof Error ? entry.reason.message : String(entry.reason))
+      .join("; ");
+    const reply = acknowledgement.status === "fulfilled" ? acknowledgement.value : null;
+    const saved = await db.from("workflow_runs").update({
+      status: autoAcknowledged ? "success" : "failed",
+      finished_at: new Date().toISOString(),
+      error: error || null,
+      result: {
+        ...audit,
+        manualReview: true,
+        practiceNotified,
+        autoAcknowledged,
+        replySubject: reply?.subject ?? null,
+        replyText: reply?.text ?? null,
+        replyMode: reply ? "receipt_acknowledgement" : null,
+      },
+    }).eq("id", id);
+    if (saved.error) throw new Error("support_audit_finalize_failed");
+    return { ok: true as const, autoReplied: false, autoAcknowledged, practiceNotified, category: classification.category };
   }
 
   try {
