@@ -83,7 +83,8 @@ export async function sendPatientPortalClarificationBatch(limit = 10) {
     let message: Awaited<ReturnType<typeof safeCreateCommunicationMessage>> = null;
     try {
       let email = buildPatientPortalClarificationEmail("de");
-      message = await safeCreateCommunicationMessage({ patientId: recipient.patientIds.length === 1 ? recipient.patientIds[0] : null, campaignKey: EVENT, provider: "resend", recipient: recipient.email, subject: email.subject, metadata: { patientIds: recipient.patientIds } });
+      message = await safeCreateCommunicationMessage({ patientId: recipient.patientIds.length === 1 ? recipient.patientIds[0] : null, campaignKey: EVENT, provider: "resend", recipient: recipient.email, subject: email.subject, metadata: { patientIds: recipient.patientIds,
+        emailSnapshot: { html: email.html, text: email.text, from: PATIENT_EMAIL_FROM, replyTo: [PATIENT_EMAIL_REPLY_TO] } } });
       if (message) email = { ...email, ...await prepareTrackedEmail(message, email) };
       const apiKey = process.env.RESEND_API_KEY;
       if (!apiKey) throw new Error("Versanddienst nicht konfiguriert");

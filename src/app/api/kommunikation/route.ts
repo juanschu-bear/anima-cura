@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { loadActivationCohort } from "@/lib/services/portal-activation-workflow";
+import { linkedPatientIds, mailEvidence, inboundContact, type DispatchMessage } from "@/lib/communication-insights";
+import { HOSTINGER_SUPPORT_WORKFLOW_ID } from "@/lib/services/hostinger-support-mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,10 +96,16 @@ async function loadBillingSnapshot(db: ReturnType<typeof createServerClient>): P
   const [documentsResult, manifestResult, campaignResult] = await Promise.all([
     db.from("patient_documents").select("id,patient_id").ilike("name", "%Rechnung 3/2026%").limit(1000),
     db.from("einstellungen").select("value").eq("key", Q3_CAMPAIGN_MANIFEST).maybeSingle(),
-    db.from("communication_messages")
-      .select("campaign_key,status,recipient,metadata")
-      .in("campaign_key", [Q3_INVOICE_CAMPAIGN, Q3_CLARIFICATION_CAMPAIGN])
-      .limit(3000),
+    (async () => {
+      const pages = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await db.from("communication_messages").select("campaign_key,status,recipient,metadata")
+          .in("campaign_key", [Q3_INVOICE_CAMPAIGN, Q3_CLARIFICATION_CAMPAIGN]).order("id").range(offset, offset + 499);
+        pages.push(page);
+        if (page.error || (page.data?.length ?? 0) < 500) break;
+      }
+      return { data: pages.flatMap(page => page.data ?? []), error: pages.find(page => page.error)?.error };
+    })(),
   ]);
 
   if (documentsResult.error || manifestResult.error || campaignResult.error) return null;
@@ -217,14 +225,16 @@ export async function GET(request: NextRequest) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = createServerClient();
 
-  let messageQuery = db.from("communication_messages")
-    .select("id,patient_id,campaign_key,channel,provider,recipient,subject,status,sent_at,delivered_at,first_opened_at,first_clicked_at,last_event_at,created_at,metadata")
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(1500);
-  if (status !== "all" && status !== "problem") messageQuery = messageQuery.eq("status", status);
-  if (status === "problem") messageQuery = messageQuery.in("status", Array.from(PROBLEM_STATUSES));
-  const messagesResult = await messageQuery;
+  // Page explicitly: the database's default row cap must not silently cut a campaign in half.
+  const messagePages = [];
+  for (let offset = 0; offset < 10000; offset += 500) {
+    const page = await db.from("communication_messages")
+      .select("id,patient_id,campaign_key,channel,provider,recipient,subject,status,sent_at,delivered_at,first_opened_at,first_clicked_at,last_event_at,created_at,metadata")
+      .gte("created_at", since).order("created_at", { ascending: false }).order("id").range(offset, offset + 499);
+    messagePages.push(page);
+    if (page.error || (page.data?.length ?? 0) < 500) break;
+  }
+  const messagesResult = { error: messagePages.find(page => page.error)?.error, data: messagePages.flatMap(page => page.data ?? []) };
 
   if (messagesResult.error) {
     const schemaMissing = messagesResult.error.code === "42P01" || messagesResult.error.message.includes("communication_messages");
@@ -239,18 +249,20 @@ export async function GET(request: NextRequest) {
   }
 
   const rawMessages = messagesResult.data ?? [];
-  const patientIds = Array.from(new Set(rawMessages.map(row => row.patient_id).filter(Boolean))) as string[];
+  const patientIds = Array.from(new Set(rawMessages.flatMap(linkedPatientIds)));
   const messageIds = rawMessages.map(row => row.id);
-  const [billingSnapshot, patientBatches, eventBatches, engagementBatches] = await Promise.all([
+  const [billingSnapshot, patientBatches, eventBatches, engagementBatches, inboundResult] = await Promise.all([
     loadBillingSnapshot(db),
     Promise.all(chunk(patientIds).map(ids => db.from("patients").select("id,vorname,nachname,ivoris_nummer").in("id", ids))),
     Promise.all(chunk(messageIds).map(ids => db.from("communication_events")
       .select("id,message_id,event_type,source,occurred_at,metadata")
       .in("message_id", ids).order("occurred_at", { ascending: false }).limit(1000))),
     Promise.all(chunk(patientIds).map(ids => db.from("patient_engagement")
-      .select("patient_id,event_type,created_at,metadata").in("patient_id", ids)
-      .in("event_type", ["app_open", "notification_clicked", "document_view", "payment_view", "qrcode_view"])
+      .select("id,patient_id,event_type,created_at,metadata").in("patient_id", ids)
+      .in("event_type", ["app_open", "notification_clicked", "document_view", "invoice_document_opened", "payment_view", "qrcode_view"])
       .gte("created_at", since).order("created_at", { ascending: false }).limit(1000))),
+    db.from("workflow_runs").select("id,status,started_at,result").eq("workflow_id", HOSTINGER_SUPPORT_WORKFLOW_ID)
+      .gte("started_at", since).order("started_at", { ascending: false }).limit(1000),
   ]);
   const failedLookup = [...patientBatches, ...eventBatches, ...engagementBatches].find(result => result.error);
   if (failedLookup?.error) {
@@ -279,23 +291,31 @@ export async function GET(request: NextRequest) {
     const patientName = patient ? [patient.vorname, patient.nachname].filter(Boolean).join(" ") : null;
     return {
       ...row,
+      metadata: { patientIds: linkedPatientIds(row), documentIds: asStringArray(row.metadata?.documentIds) },
+      patients: linkedPatientIds(row).flatMap(id => {
+        const linked = patients.get(id);
+        return linked ? [{ id, name: [linked.vorname, linked.nachname].filter(Boolean).join(" "), number: linked.ivoris_nummer ?? null }] : [];
+      }),
       patientName,
       patientNumber: patient?.ivoris_nummer ?? null,
       events: eventsByMessage.get(row.id) ?? [],
-      portalEvents: row.patient_id ? (engagementByPatient.get(row.patient_id) ?? []).slice(0, 8) : [],
+      portalEvents: linkedPatientIds(row).flatMap(id => engagementByPatient.get(id) ?? []),
     };
   });
-  const messages = query
-    ? enriched.filter(row => `${row.patientName ?? ""} ${row.patientNumber ?? ""} ${row.recipient} ${row.subject}`.toLocaleLowerCase("de-DE").includes(query))
-    : enriched;
+  const messages = enriched.filter(row => {
+    const matchesQuery = !query || `${row.patients.map(patient => `${patient.name} ${patient.number}`).join(" ")} ${row.recipient} ${row.subject}`.toLocaleLowerCase("de-DE").includes(query);
+    const matchesStatus = status === "all" || (status === "problem" ? PROBLEM_STATUSES.has(row.status)
+      : ["accepted", "delivered", "opened", "clicked"].includes(status) ? Boolean(mailEvidence(row as DispatchMessage, status as "accepted" | "delivered" | "opened" | "clicked")) : row.status === status);
+    return matchesQuery && matchesStatus;
+  });
 
   const allStatuses = rawMessages.map(row => row.status);
   const summary = {
     total: rawMessages.length,
-    accepted: allStatuses.filter(value => ["accepted", "delivered", "opened", "clicked"].includes(value)).length,
-    delivered: allStatuses.filter(value => ["delivered", "opened", "clicked"].includes(value)).length,
-    opened: allStatuses.filter(value => ["opened", "clicked"].includes(value)).length,
-    clicked: allStatuses.filter(value => value === "clicked").length,
+    accepted: enriched.filter(row => mailEvidence(row as DispatchMessage, "accepted")).length,
+    delivered: enriched.filter(row => mailEvidence(row as DispatchMessage, "delivered")).length,
+    opened: enriched.filter(row => mailEvidence(row as DispatchMessage, "opened")).length,
+    clicked: enriched.filter(row => mailEvidence(row as DispatchMessage, "clicked")).length,
     problems: allStatuses.filter(value => PROBLEM_STATUSES.has(value)).length,
   };
 
@@ -309,5 +329,7 @@ export async function GET(request: NextRequest) {
       )
     : [];
 
-  return NextResponse.json({ ready: true, summary, messages, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "no-store" } });
+  const inbound = (inboundResult.data ?? []).map(inboundContact).filter(Boolean);
+  const truncated = rawMessages.length >= 10000 || [...eventBatches, ...engagementBatches].some(result => (result.data?.length ?? 0) >= 1000) || (inboundResult.data?.length ?? 0) >= 1000;
+  return NextResponse.json({ ready: true, summary, messages, inbound, repliesAvailable: !inboundResult.error, truncated, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "private, no-store" } });
 }

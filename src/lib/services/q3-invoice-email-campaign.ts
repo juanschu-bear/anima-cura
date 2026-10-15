@@ -245,7 +245,8 @@ export async function sendQ3InvoiceEmailBatch(limit = 8) {
         provider: "resend",
         recipient: recipient.email,
         subject: email.subject,
-        metadata: { patientIds: recipient.patientIds, documentIds: recipient.invoices.map(invoice => invoice.documentId) },
+        metadata: { patientIds: recipient.patientIds, documentIds: recipient.invoices.map(invoice => invoice.documentId),
+          emailSnapshot: { html: email.html, text: email.text, from: PATIENT_EMAIL_FROM, replyTo: [PATIENT_EMAIL_REPLY_TO] } },
       });
       if (ledgerMessage) email = { ...email, ...await prepareTrackedEmail(ledgerMessage, email) };
       const providerId = await providerSend({ idempotencyKey: id, to: recipient.email, ...email, attachments: content.attachments });

@@ -3,20 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, CheckCircle2, ChevronRight, CircleDot, Clock3, Eye,
-  FileCheck2, Link2, MailCheck, MousePointerClick, RefreshCw, Search, X,
+  FileCheck2, MailCheck, MousePointerClick, RefreshCw, Search,
 } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
 import { t } from "@/lib/i18n";
+import { PatientCommunicationCenter } from "@/components/communication/PatientCommunicationCenter";
+import type { DispatchMessage, InboundContact } from "@/lib/communication-insights";
 
-type EventRow = { id: string; event_type: string; source: string; occurred_at: string };
-type PortalEvent = { patient_id: string; event_type: string; created_at: string };
-type MessageRow = {
-  id: string; patient_id: string | null; patientName: string | null; patientNumber: string | null;
-  campaign_key: string | null; channel: string; provider: string | null; recipient: string;
-  subject: string; status: string; sent_at: string | null; delivered_at: string | null;
-  first_opened_at: string | null; first_clicked_at: string | null; created_at: string;
-  events: EventRow[]; portalEvents: PortalEvent[];
-};
+type MessageRow = DispatchMessage;
 type BillingReconciliation = {
   quarter: string;
   expectedInvoices: number;
@@ -54,6 +48,9 @@ type Overview = {
   ready: boolean; schemaMissing?: boolean;
   summary: { total: number; accepted: number; delivered: number; opened: number; clicked: number; problems: number };
   messages: MessageRow[];
+  inbound?: InboundContact[];
+  repliesAvailable?: boolean;
+  truncated?: boolean;
   billingReconciliation: BillingReconciliation | null;
   billingReviewRows: BillingReviewRow[];
 };
@@ -82,12 +79,6 @@ function messageKind(row: MessageRow): "invoice" | "clarification" | "other" {
   if (key.includes("invoice")) return "invoice";
   if (key.includes("clarification")) return "clarification";
   return "other";
-}
-
-function statusHelpKey(status: string) {
-  if (["failed", "bounced", "complained", "suppressed"].includes(status)) return "failed";
-  if (["accepted", "delivered", "opened", "clicked", "queued", "delayed"].includes(status)) return status;
-  return "default";
 }
 
 function messageKindBadge(kind: "invoice" | "clarification" | "other", dark: boolean) {
@@ -176,6 +167,11 @@ export default function VersandPage() {
     </section>}
     {error && <div className="mt-6 border-l-4 border-red-400 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
+    <PatientCommunicationCenter messages={messages} inbound={data?.inbound ?? []} repliesAvailable={data?.repliesAvailable ?? false}
+      selected={selected} onSelect={setSelected} locale={locale} dark={dark} busy={busy} />
+    {data?.truncated && <p className="mt-3 text-sm text-amber-500">{t("dispatch.crm.truncated", locale)}</p>}
+
+    <div hidden={Boolean(selected)}>
     {billing && <BillingReconciliationPanel billing={billing} reviewRows={billingReviewRows} locale={locale} dark={dark} surface={surface} rule={rule} muted={muted} />}
 
     <section className={`mt-6 overflow-hidden rounded-[14px] border ${surface}`}>
@@ -188,7 +184,7 @@ export default function VersandPage() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5">
         {stages.map(([key, value, Icon], index) => {
-          const previous = index === 0 ? value : stages[index - 1][1];
+          const previous = summary.total;
           const ratio = previous > 0 ? Math.round(value / previous * 100) : 0;
           return <button key={key} type="button" onClick={() => setStatus(key === "total" ? "all" : key)} className={`relative min-h-[126px] border-b p-5 text-left transition-colors hover:bg-emerald-400/[0.04] md:border-b-0 ${index > 0 ? `border-l ${rule}` : ""} ${status === (key === "total" ? "all" : key) ? "bg-emerald-400/[0.06]" : ""}`}>
             <div className="flex items-center justify-between"><Icon size={19} className={key === "delivered" ? "text-emerald-400" : "text-slate-400"} />{index > 0 && <span className={`text-xs tabular-nums ${muted}`}>{ratio}%</span>}</div>
@@ -239,7 +235,7 @@ export default function VersandPage() {
               }}
               className="cursor-pointer transition-colors hover:bg-emerald-400/[0.035] focus-visible:bg-emerald-400/[0.06] focus-visible:outline-none"
             >
-              <td className="px-5 py-4"><div className="font-semibold">{row.patientName || t("dispatch.notAssigned", locale)}</div><div className={`mt-1 text-xs ${muted}`}>{row.patientNumber || "–"}</div></td>
+              <td className="px-5 py-4"><div className="font-semibold">{row.patients?.map(patient => patient.name).join(" · ") || row.patientName || t("dispatch.notAssigned", locale)}</div><div className={`mt-1 text-xs ${muted}`}>{row.patients?.map(patient => patient.number).filter(Boolean).join(" · ") || row.patientNumber || "–"}</div></td>
               <td className="max-w-[360px] px-5 py-4">
                 <div className="truncate font-medium">{row.subject || "–"}</div>
                 <div className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${muted}`}>
@@ -269,7 +265,7 @@ export default function VersandPage() {
       />}
     </section>
 
-    {selected && <TimelineDrawer row={selected} locale={locale} dark={dark} muted={muted} rule={rule} close={() => setSelected(null)} />}
+    </div>
   </div>;
 }
 
@@ -535,42 +531,5 @@ function FlowRow({
   return <div className="flex items-start justify-between gap-4">
     <div className={`text-sm leading-6 ${muted}`}>{label}</div>
     <div className={`shrink-0 text-right tabular-nums ${emphasize ? "text-lg font-bold tracking-[-0.03em]" : "font-semibold"} ${toneClass}`}>{value}</div>
-  </div>;
-}
-
-function TimelineDrawer({ row, locale, dark, muted, rule, close }: { row: MessageRow; locale: string; dark: boolean; muted: string; rule: string; close: () => void }) {
-  const timeline = [
-    ...row.events.map(event => ({ type: event.event_type, at: event.occurred_at, source: event.source, portal: false })),
-    ...row.portalEvents.map(event => ({ type: event.event_type, at: event.created_at, source: "patient_portal", portal: true })),
-  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  const iconFor = (type: string) => type === "clicked" || type === "notification_clicked" ? Link2 : type === "opened" ? Eye : type.includes("document") ? FileCheck2 : type === "failed" || type === "bounced" ? AlertCircle : CheckCircle2;
-  const statusKey = statusHelpKey(row.status);
-  const kind = messageKind(row);
-  const statusIcon = statusKey === "failed" ? AlertCircle : statusKey === "accepted" || statusKey === "queued" || statusKey === "delayed" ? Clock3 : CheckCircle2;
-  const StatusIcon = statusIcon;
-  return <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]" onMouseDown={event => event.target === event.currentTarget && close()}>
-    <aside className={`h-full w-full max-w-[560px] overflow-y-auto border-l p-6 shadow-2xl ${rule} ${dark ? "bg-[#0d121b] text-[#f0f3f8]" : "bg-white text-[#1c3044]"}`}>
-      <div className={`flex items-start justify-between gap-4 border-b pb-5 ${rule}`}><div><div className={`text-sm ${muted}`}>{t("dispatch.timeline", locale)}</div><h2 className="mt-1 text-xl font-bold">{row.patientName || row.recipient}</h2><p className={`mt-1 text-sm ${muted}`}>{row.subject}</p></div><button type="button" onClick={close} className="flex h-11 w-11 items-center justify-center rounded-lg border border-current/15" aria-label={t("dispatch.close", locale)}><X size={19} /></button></div>
-      <dl className={`grid grid-cols-1 gap-x-4 gap-y-3 border-b py-5 text-sm sm:grid-cols-2 ${rule}`}>
-        <div><dt className={muted}>{t("dispatch.table.recipient", locale)}</dt><dd className="mt-1 font-semibold">{row.recipient}</dd></div>
-        <div><dt className={muted}>{t("dispatch.table.status", locale)}</dt><dd className={`mt-1 font-semibold ${statusTone[row.status] || ""}`}>{t(`dispatch.status.${row.status}`, locale)}</dd></div>
-        <div><dt className={muted}>{t("dispatch.messageType", locale)}</dt><dd className="mt-2"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${messageKindBadge(kind, dark)}`}>{t(`dispatch.messageKind.${kind}`, locale)}</span></dd></div>
-        <div><dt className={muted}>{t("dispatch.signalCount", locale)}</dt><dd className="mt-1 font-semibold tabular-nums">{fmtNumber(row.events.length + row.portalEvents.length, locale)}</dd></div>
-        <div><dt className={muted}>{t("dispatch.campaign", locale)}</dt><dd className="mt-1 font-semibold break-all">{row.campaign_key || "–"}</dd></div>
-        <div><dt className={muted}>{t("dispatch.provider", locale)}</dt><dd className="mt-1 font-semibold">{row.provider || t("dispatch.ownSystem", locale)}</dd></div>
-      </dl>
-      <div className={`mt-5 rounded-[12px] border px-4 py-4 text-sm leading-6 ${rule} ${dark ? "bg-white/[0.03]" : "bg-[#f7fafc]"}`}>
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${statusKey === "failed" ? (dark ? "bg-red-400/12 text-red-300" : "bg-[#fde8e6] text-[#ad342f]") : (dark ? "bg-emerald-400/12 text-emerald-300" : "bg-[#eef8f1] text-[#176a40]")}`}>
-            <StatusIcon size={18} />
-          </div>
-          <div>
-            <div className="font-semibold">{t("dispatch.statusMeaningTitle", locale)}</div>
-            <p className={`mt-1 ${muted}`}>{t(`dispatch.statusHint.${statusKey}`, locale)}</p>
-          </div>
-        </div>
-      </div>
-      <div className="py-6"><h3 className="font-bold">{t("dispatch.history", locale)}</h3><p className={`mt-1 text-sm ${muted}`}>{t("dispatch.historyHint", locale)}</p><ol className="mt-6">{timeline.map((event, index) => { const Icon = iconFor(event.type); return <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-4 pb-7"><div className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${event.portal ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-400" : `${rule} ${dark ? "bg-[#151d29]" : "bg-white"}`}`}><Icon size={16} /></div>{index < timeline.length - 1 && <div className={`absolute left-[17px] top-9 h-[calc(100%-1.25rem)] border-l ${rule}`} />}<div className="min-w-0 pt-1"><div className="font-semibold">{t(`dispatch.event.${event.type}`, locale)}</div><div className={`mt-1 text-sm ${muted}`}>{fmt(event.at, locale)} · {event.portal ? t("dispatch.portalEvidence", locale) : t("dispatch.technicalSignal", locale)}</div></div></li>; })}{timeline.length === 0 && <li className={muted}>{t("dispatch.noEvents", locale)}</li>}</ol></div>
-    </aside>
   </div>;
 }

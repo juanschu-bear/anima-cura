@@ -17,6 +17,11 @@ export async function POST(request: NextRequest) {
   if (!VALID_EVENTS.includes(event_type)) return NextResponse.json({ error: "Invalid event_type" }, { status: 400 });
 
   const sc = createServerClient();
-  await sc.from("patient_engagement").insert({ patient_id, event_type, metadata: metadata || {} });
+  const profile = await sc.from("user_profiles").select("role,patient_id").eq("id", user.id).maybeSingle();
+  if (profile.error || profile.data?.role !== "patient" || profile.data.patient_id !== patient_id) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  const inserted = await sc.from("patient_engagement").insert({ patient_id, event_type, metadata: metadata || {} });
+  if (inserted.error) return NextResponse.json({ error: "unavailable" }, { status: 503 });
   return NextResponse.json({ ok: true });
 }

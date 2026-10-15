@@ -14,6 +14,7 @@ function fixture(options: { loggedIn?: boolean; role?: string; owner?: string; p
     from(table: string) {
       calls.push(table);
       const query = {
+        async insert(value: unknown) { filters.push([table, 'insert', value]); return { error: null }; },
         select() { return query; },
         eq(...values: unknown[]) { filters.push([table, ...values]); return query; },
         async maybeSingle() {
@@ -53,6 +54,13 @@ test('own PDF has no-store headers and no public or signed redirect', async () =
   assert.equal(response.headers.get('location'),null);
   assert.match(await response.text(),/^%PDF-/);
   assert.ok(f.calls.includes('download:' + billingDocumentPath(patientId,documentId)));
+  assert.ok(f.filters.some(v => v[0] === 'patient_engagement' && v[1] === 'insert' && (v[2] as { event_type: string }).event_type === 'invoice_document_opened'));
+});
+
+test('staff PDF preview never creates patient engagement', async () => {
+  const f = fixture({ role: 'admin' });
+  assert.equal((await f.handle(request, documentId)).status, 200);
+  assert.ok(!f.calls.includes('patient_engagement'));
 });
 
 test('staff needs both patient and billing module rights; user metadata never grants a role', async () => {

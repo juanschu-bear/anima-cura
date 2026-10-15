@@ -48,6 +48,15 @@ export function billingDocumentHandler(session: () => Client, service: () => Cli
         .download(billingDocumentPath(document.patient_id, documentId));
       if (storageError || !pdf || pdf.size === 0 || pdf.size > 25 * 1024 * 1024) return fail('unavailable', 503);
       if (await pdf.slice(0, 5).text() !== '%PDF-') return fail('unavailable', 503);
+      if (patient) {
+        // A successful patient PDF request is distinct from merely visiting the documents tab.
+        // Staff previews must never count as patient engagement. Logging must not block delivery.
+        try {
+          const tracked = await db.from('patient_engagement').insert({ patient_id: document.patient_id,
+            event_type: 'invoice_document_opened', metadata: { documentId, source: 'authenticated_document_delivery' } });
+          if (tracked.error) console.error('[billing-document] engagement write failed');
+        } catch { console.error('[billing-document] engagement unavailable'); }
+      }
       return new Response(pdf, { headers: {
         ...headers, 'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="Anima-Cura-Dokument.pdf"',
