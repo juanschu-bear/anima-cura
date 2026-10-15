@@ -159,13 +159,13 @@ test("acknowledges every patient message while also notifying internal review", 
   assert.equal(sent.filter(message => message.to[0] === "review@example.com").length, 2);
   assert.ok(sent.some(message => /technische Prüfung der Codezustellung/.test(message.text)));
   assert.ok(sent.some(message => /Originalnachricht persönlich prüfen/.test(message.text)));
-  assert.ok(sent.filter(message => message.to[0] === "erika@example.com").every(message => /deine Nachricht ist angekommen/.test(message.text)));
+  assert.ok(sent.filter(message => message.to[0] === "erika@example.com").every(message => /Praxisteam|Codeversand/.test(message.text)));
   assert.deepEqual(completed.map(row => row.result.reason), ["security_code_not_received", "missing_message_body"]);
   for (const row of completed) {
     assert.equal(row.result.manualReview, true);
     assert.equal(row.result.practiceNotified, true);
     assert.equal(row.result.autoAcknowledged, true);
-    assert.match(row.result.replyText, /deine Nachricht ist angekommen/);
+    assert.match(row.result.replyText, /Praxisteam|Codeversand/);
   }
 });
 
@@ -184,12 +184,12 @@ test("prevents reply loops and never asks for passwords", () => {
   assert.doesNotMatch(reply.text, /sende.*Passwort per E-Mail/i);
 });
 
-test("renders branded responsive support email with a direct reply path", () => {
+test("renders a branded responsive support email without redundant reply instructions", () => {
   const html = buildSupportEmailHtml("Hallo Erika,\n\nÖffne bitte dein Patientenportal.", "invoice_access");
   assert.match(html, /Anima Cura/);
   assert.match(html, /Rechnung sicher öffnen/);
   assert.match(html, /Zu meinen Rechnungen/);
-  assert.match(html, /praxisteam@animacura\.io/);
+  assert.doesNotMatch(html, /Du kannst direkt auf diese E-Mail antworten/);
   assert.match(html, /@media only screen and \(max-width:620px\)/);
   assert.doesNotMatch(html, /font-family:Arial,sans-serif/);
 });
@@ -211,9 +211,13 @@ test("manual review alert contains the original context and direct patient reply
 test("manual review acknowledgement never leaves the patient without a response", () => {
   const incoming = event("Kein Code", "Ich habe keinen Sicherheitscode erhalten.");
   const acknowledgement = buildManualReviewAcknowledgement(incoming, classifySupportEvent(incoming));
-  assert.match(acknowledgement.text, /deine Nachricht ist angekommen/);
+  assert.match(acknowledgement.text, /Wir kontrollieren jetzt deinen letzten Codeversand/);
   assert.match(acknowledgement.text, /keinen weiteren Code/);
   assert.doesNotMatch(acknowledgement.html, /Passwort neu einrichten/);
+  assert.equal((acknowledgement.html.match(/Passwort oder einem Sicherheitscode/g) ?? []).length, 1);
+  assert.equal((acknowledgement.html.match(/persönlich/g) ?? []).length, 0);
+  assert.doesNotMatch(acknowledgement.html, /Du kannst direkt auf diese E-Mail antworten/);
+  assert.doesNotMatch(acknowledgement.html, /Deine Nachricht ist angekommen/);
 });
 
 test("accepts common nested webhook field variants", () => {
