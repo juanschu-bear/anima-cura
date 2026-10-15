@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { sendPatientAccessCode } from "./patient-access-code-delivery";
 import { contactEmailIssue, normalizeEmail } from "@/lib/services/patient-outreach-audit";
 
-const CODE_TTL_MINUTES = 10;
+const CODE_TTL_MINUTES = 30;
 const MAX_REQUESTS_PER_HOUR = 3;
 const MAX_CODE_ATTEMPTS = 5;
 const MAX_IP_REQUESTS_PER_HOUR = 10;

@@ -485,7 +485,7 @@ export function buildAccessCodeReissueNotice() {
     "",
     "danke für deinen Hinweis. Beim ersten Versuch wurde der Sicherheitscode aufgrund eines technischen Fehlers nicht versendet. Der Fehler ist behoben.",
     "",
-    "Wir haben dir gerade eine separate E-Mail mit einem neuen sechsstelligen Sicherheitscode geschickt. Der Code ist zehn Minuten gültig. Bitte gib ihn direkt in der geöffneten Anima-Cura-Web-App ein.",
+    "Wir haben dir gerade eine separate E-Mail mit einem neuen sechsstelligen Sicherheitscode geschickt. Der Code ist 30 Minuten gültig. Bitte gib ihn direkt in der geöffneten Anima-Cura-Web-App ein.",
     "",
     "Falls du die Nachricht nicht sofort siehst, prüfe bitte auch den Spam-Ordner. Fordere keinen weiteren Code an, solange der aktuelle noch gültig ist – es gilt immer nur der zuletzt versendete Code.",
     "",
