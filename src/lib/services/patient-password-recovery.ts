@@ -90,9 +90,15 @@ async function patientIdsForContact(contactEmail: string) {
   if (direct.error || guardian.error || submissionDirect.error || submissionPatient.error || submissionGuardian.error) {
     throw new Error("password_recovery_contact_lookup_failed");
   }
-  return Array.from(new Set([
+  const directPatientIds = Array.from(new Set([
     ...(direct.data ?? []).map(row => row.id),
     ...(guardian.data ?? []).map(row => row.id),
+  ].filter((id): id is string => typeof id === "string" && id.length > 0)));
+  // A current patient/master-data contact is stronger evidence than historic
+  // anamnesis forms, where a parent's address may legitimately occur for
+  // several siblings. Use form contacts only when no direct match exists.
+  if (directPatientIds.length) return directPatientIds;
+  return Array.from(new Set([
     ...(submissionDirect.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
     ...(submissionPatient.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
     ...(submissionGuardian.data ?? []).flatMap(row => [row.patient_id, row.matched_patient_id]),
