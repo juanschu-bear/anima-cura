@@ -479,15 +479,19 @@ export async function sendHostingerSupportMessage(input: {
   if (!response.ok) throw new Error(`hostinger_mail_rejected:${response.status}`);
 }
 
-export function buildAccessCodeReissueNotice() {
+export function buildAccessCodeReissueNotice(purpose: "activation" | "recovery" = "activation") {
+  const purposeLabel = purpose === "activation" ? "Aktivierung deines Patientenkontos" : "Passwort-Neuvergabe";
+  const nextStep = purpose === "activation"
+    ? "Öffne in Anima Cura „Noch keinen Zugang? Patientenkonto aktivieren“ und gib den Code dort ein."
+    : "Öffne in Anima Cura „Passwort vergessen?“ und gib den Code dort ein.";
   const text = [
     "Hallo,",
     "",
-    "danke für deinen Hinweis. Beim ersten Versuch wurde der Sicherheitscode aufgrund eines technischen Fehlers nicht versendet. Der Fehler ist behoben.",
+    "danke für deinen Hinweis. Wir haben deinen Zugangsvorgang geprüft.",
     "",
-    "Wir haben dir gerade eine separate E-Mail mit einem neuen sechsstelligen Sicherheitscode geschickt. Der Code ist 30 Minuten gültig. Bitte gib ihn direkt in der geöffneten Anima-Cura-Web-App ein.",
+    `Ein neuer sechsstelliger Sicherheitscode für die ${purposeLabel} wurde an den E-Mail-Versand übergeben. Der Code ist 30 Minuten gültig. ${nextStep}`,
     "",
-    "Falls du die Nachricht nicht sofort siehst, prüfe bitte auch den Spam-Ordner. Fordere keinen weiteren Code an, solange der aktuelle noch gültig ist – es gilt immer nur der zuletzt versendete Code.",
+    "Falls die separate Code-E-Mail nicht innerhalb weniger Minuten eintrifft, antworte bitte direkt auf diese Nachricht. Starte dann keinen weiteren Vorgang – wir prüfen die Zustellung persönlich, damit nicht mehrere Codes miteinander kollidieren.",
     "",
     "Du musst kein Passwort und keinen Sicherheitscode an uns senden. Wenn es weiterhin nicht klappt, antworte einfach auf diese E-Mail; wir prüfen den Fall persönlich.",
     "",
@@ -495,7 +499,7 @@ export function buildAccessCodeReissueNotice() {
     "Dein Anima-Cura-Praxisteam",
   ].join("\n");
   return {
-    subject: "Dein neuer Anima-Cura-Sicherheitscode wurde versendet",
+    subject: `Dein Sicherheitscode zur ${purposeLabel}`,
     text,
     html: buildSupportEmailHtml(text, "login_password"),
   };

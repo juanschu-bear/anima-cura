@@ -12,8 +12,9 @@ test("detects explicit missing-code complaints", () => {
   assert.equal(isMissingCodeComplaint(run({ reason: "security_code_not_received" })), true);
 });
 
-test("includes unresolved login cases but excludes resolved or unrelated cases", () => {
-  assert.equal(isMissingCodeComplaint(run({ category: "login_password", caseStatus: "open" })), true);
+test("never treats a generic login case as proof that a code is missing", () => {
+  assert.equal(isMissingCodeComplaint(run({ category: "login_password", caseStatus: "open" })), false);
   assert.equal(isMissingCodeComplaint(run({ category: "login_password", caseStatus: "resolved" })), false);
+  assert.equal(isMissingCodeComplaint(run({ reason: "security_code_not_received", caseStatus: "resolved" })), false);
   assert.equal(isMissingCodeComplaint(run({ category: "invoice_access", subject: "Wo ist meine Rechnung?" })), false);
 });

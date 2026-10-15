@@ -175,7 +175,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         },
       });
       if (!sent) return NextResponse.json({ error: "Der Sicherheitscode konnte nicht eindeutig erzeugt werden." }, { status: 409 });
-      const notice = buildAccessCodeReissueNotice();
+      const notice = buildAccessCodeReissueNotice("activation");
       await sendHostingerSupportMessage({
         to: sender,
         ...notice,

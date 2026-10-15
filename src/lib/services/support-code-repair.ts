@@ -19,8 +19,8 @@ function resultOf(run: SupportRun) {
 
 export function isMissingCodeComplaint(run: SupportRun) {
   const result = resultOf(run);
+  if (result.caseStatus === "resolved") return false;
   if (result.reason === "security_code_not_received") return true;
-  if (result.category === "login_password" && result.caseStatus !== "resolved") return true;
   const text = `${typeof result.subject === "string" ? result.subject : ""} ${typeof result.excerpt === "string" ? result.excerpt : ""}`;
   return missingCodeComplaintPattern.test(text);
 }
@@ -118,7 +118,7 @@ export async function repairMissingSupportCodes(options: { send: boolean }) {
         },
       });
       if (!codeSent) { summary.blocked++; items.push({ sender, patientNames, outcome: "blocked" }); continue; }
-      const notice = buildAccessCodeReissueNotice();
+      const notice = buildAccessCodeReissueNotice("activation");
       let noticeSent = true;
       try {
         await sendHostingerSupportMessage({ to: sender, ...notice });

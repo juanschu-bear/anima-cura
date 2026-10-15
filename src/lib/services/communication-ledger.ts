@@ -116,14 +116,21 @@ export async function recordCommunicationEvent(input: RecordEventInput) {
   const current = await db.from("communication_messages").select("status").eq("id", input.messageId).maybeSingle();
   if (current.error || !current.data) throw new Error("Communication message not found");
   const status = nextCommunicationStatus(current.data.status as CommunicationMessageStatus, input.eventType);
-  const event = await db.from("communication_events").upsert({
+  const eventRow = {
     message_id: input.messageId,
     event_type: input.eventType,
     event_key: input.eventKey ?? null,
     source: input.source ?? "anima_cura",
     occurred_at: occurredAt,
     metadata: input.metadata ?? {},
-  }, { onConflict: "event_key", ignoreDuplicates: true });
+  };
+  // event_key is optional. PostgreSQL cannot use the partial unique index for
+  // an ON CONFLICT clause when the key is NULL, so ordinary transport events
+  // must be inserted directly. Otherwise accepted code mails remain shown as
+  // merely queued even though the provider accepted them.
+  const event = input.eventKey
+    ? await db.from("communication_events").upsert(eventRow, { onConflict: "event_key", ignoreDuplicates: true })
+    : await db.from("communication_events").insert(eventRow);
   if (event.error) throw new Error(`Communication event unavailable: ${event.error.message}`);
   const patch: Record<string, unknown> = { status, last_event_at: occurredAt, updated_at: new Date().toISOString() };
   if (input.providerMessageId) patch.provider_message_id = input.providerMessageId;
