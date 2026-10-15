@@ -6,6 +6,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PROBLEM_STATUSES = new Set(["failed", "bounced", "complained", "suppressed"]);
+const chunk = <T,>(rows: T[], size = 100) =>
+  Array.from({ length: Math.ceil(rows.length / size) }, (_, index) => rows.slice(index * size, (index + 1) * size));
 
 export async function GET(request: NextRequest) {
   const authError = await requirePraxisRole(["admin", "verwaltung"]);
@@ -39,29 +41,33 @@ export async function GET(request: NextRequest) {
   const rawMessages = messagesResult.data ?? [];
   const patientIds = Array.from(new Set(rawMessages.map(row => row.patient_id).filter(Boolean))) as string[];
   const messageIds = rawMessages.map(row => row.id);
-  const [patientsResult, eventsResult, engagementResult] = await Promise.all([
-    patientIds.length
-      ? db.from("patients").select("id,vorname,nachname,ivoris_nummer").in("id", patientIds)
-      : Promise.resolve({ data: [], error: null }),
-    messageIds.length
-      ? db.from("communication_events").select("id,message_id,event_type,source,occurred_at,metadata").in("message_id", messageIds).order("occurred_at", { ascending: false }).limit(6000)
-      : Promise.resolve({ data: [], error: null }),
-    patientIds.length
-      ? db.from("patient_engagement").select("patient_id,event_type,created_at,metadata").in("patient_id", patientIds)
-        .in("event_type", ["app_open", "notification_clicked", "document_view", "payment_view", "qrcode_view"])
-        .gte("created_at", since).order("created_at", { ascending: false }).limit(3000)
-      : Promise.resolve({ data: [], error: null }),
+  const [patientBatches, eventBatches, engagementBatches] = await Promise.all([
+    Promise.all(chunk(patientIds).map(ids => db.from("patients").select("id,vorname,nachname,ivoris_nummer").in("id", ids))),
+    Promise.all(chunk(messageIds).map(ids => db.from("communication_events")
+      .select("id,message_id,event_type,source,occurred_at,metadata")
+      .in("message_id", ids).order("occurred_at", { ascending: false }).limit(1000))),
+    Promise.all(chunk(patientIds).map(ids => db.from("patient_engagement")
+      .select("patient_id,event_type,created_at,metadata").in("patient_id", ids)
+      .in("event_type", ["app_open", "notification_clicked", "document_view", "payment_view", "qrcode_view"])
+      .gte("created_at", since).order("created_at", { ascending: false }).limit(1000))),
   ]);
+  const failedLookup = [...patientBatches, ...eventBatches, ...engagementBatches].find(result => result.error);
+  if (failedLookup?.error) {
+    return NextResponse.json({ error: "communication_history_unavailable" }, { status: 503 });
+  }
+  const patientRows = patientBatches.flatMap(result => result.data ?? []);
+  const eventRows = eventBatches.flatMap(result => result.data ?? []);
+  const engagementRows = engagementBatches.flatMap(result => result.data ?? []);
 
-  const patients = new Map((patientsResult.data ?? []).map(row => [row.id, row]));
-  const eventsByMessage = new Map<string, typeof eventsResult.data>();
-  for (const event of eventsResult.data ?? []) {
+  const patients = new Map(patientRows.map(row => [row.id, row]));
+  const eventsByMessage = new Map<string, typeof eventRows>();
+  for (const event of eventRows) {
     const current = eventsByMessage.get(event.message_id) ?? [];
     current.push(event);
     eventsByMessage.set(event.message_id, current);
   }
-  const engagementByPatient = new Map<string, typeof engagementResult.data>();
-  for (const event of engagementResult.data ?? []) {
+  const engagementByPatient = new Map<string, typeof engagementRows>();
+  for (const event of engagementRows) {
     const current = engagementByPatient.get(event.patient_id) ?? [];
     current.push(event);
     engagementByPatient.set(event.patient_id, current);
