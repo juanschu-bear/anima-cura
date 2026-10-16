@@ -5,6 +5,7 @@ import { normalizeEmail } from "@/lib/services/patient-outreach-audit";
 import { requestPatientPasswordRecovery } from "@/lib/services/patient-password-recovery";
 import { requestPatientSelfActivation } from "@/lib/services/patient-self-activation";
 import { safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
+import { sendPatientAccessCode } from "@/lib/services/patient-access-code-delivery";
 import { generateGroundedSupportCore } from "@/lib/services/hostinger-support-ai";
 import { retrieveSupportKnowledge } from "@/lib/support/knowledge-base";
 
@@ -590,6 +591,29 @@ async function sendHostingerRecoveryCode(input: { to: string; code: string; requ
   }
 }
 
+async function sendRecoveryCodeWithFallback(input: { to: string; code: string; requestId: string; patientId: string; portalEmail: string }) {
+  try {
+    await sendPatientAccessCode({
+      purpose: "recovery",
+      patientId: input.patientId,
+      to: input.to,
+      code: input.code,
+      requestId: input.requestId,
+      loginEmail: input.portalEmail,
+    });
+    return "resend" as const;
+  } catch (primaryError) {
+    try {
+      await sendHostingerRecoveryCode(input);
+      return "hostinger" as const;
+    } catch (fallbackError) {
+      const primary = primaryError instanceof Error ? primaryError.message : "primary_failed";
+      const fallback = fallbackError instanceof Error ? fallbackError.message : "fallback_failed";
+      throw new Error(`all_code_transports_failed:${primary}:${fallback}`);
+    }
+  }
+}
+
 async function sendAccessGuidance(event: ParsedSupportEvent, text: string) {
   const hello = salutation(event.senderName);
   const body = `${hello}\n\n${text}\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
@@ -633,7 +657,7 @@ export async function remediateMissingCode(event: ParsedSupportEvent, runId: str
   await requestPatientPasswordRecovery({ portalEmail: sender, patientId: patient.id, ip: `support-recovery:${runId}` }, {
     bypassRateLimit: true,
     sendCode: async (to, code, requestId, patientId, portalEmail) => {
-      await sendHostingerRecoveryCode({ to, code, requestId, patientId, portalEmail });
+      await sendRecoveryCodeWithFallback({ to, code, requestId, patientId, portalEmail });
       delivered = true;
     },
   });
