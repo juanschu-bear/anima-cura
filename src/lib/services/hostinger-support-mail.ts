@@ -574,6 +574,16 @@ async function sendHostingerRecoveryCode(input: { to: string; code: string; requ
       source: "hostinger_transport",
       providerMessageId: delivery.providerMessageId,
     });
+    if (message) {
+      const now = new Date().toISOString();
+      await createServerClient().from("communication_messages").update({
+        status: "accepted",
+        provider_message_id: delivery.providerMessageId,
+        sent_at: now,
+        last_event_at: now,
+        updated_at: now,
+      }).eq("id", message.id);
+    }
   } catch (error) {
     if (message) await safeRecordCommunicationEvent({ messageId: message.id, eventType: "failed", source: "hostinger_transport", metadata: { reason: "code_delivery_failed" } });
     throw error;
