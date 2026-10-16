@@ -114,7 +114,6 @@ export async function GET(request: NextRequest) {
     const guidanceMarker = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
       .eq("campaign_key", "patient_access_guidance")
-      .in("status", ["accepted", "delivered", "opened", "clicked"])
       .limit(1);
     if ((guidanceMarker.data ?? []).length) {
       supportResults.push({ id: run.id, outcome: "guidance_already_sent" });
