@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { HOSTINGER_SUPPORT_WORKFLOW_ID, remediateMissingCode } from "@/lib/services/hostinger-support-mail";
-import { safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
+import { safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,6 +111,15 @@ export async function GET(request: NextRequest) {
   let supportActions = 0;
   for (const [sender, run] of Array.from(pendingBySender.entries())) {
     if (supportActions >= supportCapacity) break;
+    const guidanceMarker = await db.from("communication_messages").select("id")
+      .eq("recipient", sender)
+      .eq("campaign_key", "patient_access_guidance")
+      .in("status", ["accepted", "delivered", "opened", "clicked"])
+      .limit(1);
+    if ((guidanceMarker.data ?? []).length) {
+      supportResults.push({ id: run.id, outcome: "guidance_already_sent" });
+      continue;
+    }
     const recent = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
       .eq("provider", "hostinger")
@@ -148,6 +157,19 @@ export async function GET(request: NextRequest) {
           replyText: remediation.replyText,
         },
       }).eq("id", run.id);
+      if (remediation.outcome !== "recovery_code_sent") {
+        const marker = await safeCreateCommunicationMessage({
+          campaignKey: "patient_access_guidance",
+          provider: "support_fallback",
+          recipient: sender,
+          subject: typeof run.result.subject === "string" ? run.result.subject : "Dein Zugang zu Anima Cura",
+          metadata: { contentRestricted: true, remediationOutcome: remediation.outcome, workflowRunId: run.id },
+        });
+        if (marker) {
+          const now = new Date().toISOString();
+          await db.from("communication_messages").update({ status: "accepted", sent_at: now, last_event_at: now, updated_at: now }).eq("id", marker.id);
+        }
+      }
       supportResults.push({ id: run.id, outcome: remediation.outcome });
     } catch (error) {
       supportResults.push({ id: run.id, outcome: error instanceof Error ? error.message : "repair_failed" });
