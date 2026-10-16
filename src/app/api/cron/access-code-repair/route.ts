@@ -69,5 +69,6 @@ export async function GET(request: NextRequest) {
       results.push({ id: row.id, outcome: "retry_scheduled" });
     }
   }
+  console.info("[access-code-watchdog]", JSON.stringify({ checked: query.data?.length ?? 0, results }));
   return NextResponse.json({ checked: query.data?.length ?? 0, results }, { headers: { "Cache-Control": "no-store" } });
 }
