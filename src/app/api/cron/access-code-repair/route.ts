@@ -104,9 +104,10 @@ export async function GET(request: NextRequest) {
     if (reason !== "security_code_not_received" && !(reason === "missing_message_body" && /rechnungszugang|sicherheitscode/i.test(subject))) continue;
     if (!pendingBySender.has(sender)) pendingBySender.set(sender, { id: run.id, started_at: run.started_at, result });
   }
-  // Hostinger rate-limits bursts. Perform at most one outbound remediation per
-  // watchdog run; unresolved support cases resume after the delivery queue.
-  const supportCapacity = eligibleRows.length === 0 ? 1 : 0;
+  // Process one code repair and one explanatory support case per minute. Both
+  // paths have a transactional fallback, so an exhausted mailbox cannot block
+  // either the credential or the instructions needed to use it.
+  const supportCapacity = 1;
   for (const [sender, run] of Array.from(pendingBySender.entries()).slice(0, supportCapacity)) {
     const recent = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
