@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     .limit(25);
   if (query.error) return NextResponse.json({ error: "queue_unavailable" }, { status: 500 });
 
-  const results: Array<{ id: string; outcome: string }> = [];
+  const results: Array<{ id: string; outcome: string; reason?: string }> = [];
   for (const row of query.data ?? []) {
     const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
     let attempts = typeof metadata.repairAttempts === "number" ? metadata.repairAttempts : 0;
@@ -65,12 +65,13 @@ export async function GET(request: NextRequest) {
       });
       results.push({ id: row.id, outcome: remediation.outcome });
     } catch (error) {
+      const reason = error instanceof Error ? error.message : "repair_failed";
       await db.from("communication_messages").update({
         status: "queued",
-        metadata: { ...metadata, repairAttempts: attempts + 1, repairError: error instanceof Error ? error.message : "repair_failed" },
+        metadata: { ...metadata, repairAttempts: attempts + 1, repairError: reason },
         updated_at: new Date().toISOString(),
       }).eq("id", row.id);
-      results.push({ id: row.id, outcome: "retry_scheduled" });
+      results.push({ id: row.id, outcome: "retry_scheduled", reason });
     }
   }
   const supportQuery = await db.from("workflow_runs")

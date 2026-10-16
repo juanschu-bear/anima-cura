@@ -221,6 +221,7 @@ async function genericResult(startedAt: number) {
 
 type RecoveryDependencies = {
   sendCode?: (to: string, code: string, id: string, patientId: string, portalEmail: string) => Promise<void>;
+  bypassRateLimit?: boolean;
 };
 
 async function sendCode(to: string, code: string, id: string, patientId: string, portalEmail: string) {
@@ -233,7 +234,7 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   if (!portalEmail) return genericResult(startedAt);
   const db = createServerClient();
   const ipHash = keyedHash(input.ip || "unknown");
-  if (!acceptIpRequest(ipHash, startedAt)) return genericResult(startedAt);
+  if (!dependencies?.bypassRateLimit && !acceptIpRequest(ipHash, startedAt)) return genericResult(startedAt);
 
   const identity = await resolveIdentity(portalEmail, input.patientId);
   if (!identity) return genericResult(startedAt);
@@ -242,8 +243,9 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   const authUser = authResult.data.user;
   if (authResult.error || !authUser) return genericResult(startedAt);
   const previousState = recoveryState(authUser.app_metadata?.patient_password_recovery);
-  const requestTimes = recentRequestTimes(previousState, startedAt);
-  if (requestTimes.length >= MAX_REQUESTS_PER_HOUR) return genericResult(startedAt);
+  const recentTimes = recentRequestTimes(previousState, startedAt);
+  if (!dependencies?.bypassRateLimit && recentTimes.length >= MAX_REQUESTS_PER_HOUR) return genericResult(startedAt);
+  const requestTimes = dependencies?.bypassRateLimit ? recentTimes.slice(-(MAX_REQUESTS_PER_HOUR - 1)) : recentTimes;
 
   const id = randomUUID();
   const code = String(randomInt(100000, 1000000));

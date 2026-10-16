@@ -631,6 +631,7 @@ export async function remediateMissingCode(event: ParsedSupportEvent, runId: str
   if (!await ensureSupportPortal(patient, sender, runId)) throw new Error("support_portal_prepare_failed");
   let delivered = false;
   await requestPatientPasswordRecovery({ portalEmail: sender, patientId: patient.id, ip: `support-recovery:${runId}` }, {
+    bypassRateLimit: true,
     sendCode: async (to, code, requestId, patientId, portalEmail) => {
       await sendHostingerRecoveryCode({ to, code, requestId, patientId, portalEmail });
       delivered = true;
