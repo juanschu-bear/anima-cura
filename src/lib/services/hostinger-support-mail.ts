@@ -593,7 +593,7 @@ async function sendAccessGuidance(event: ParsedSupportEvent, text: string) {
   return body;
 }
 
-async function remediateMissingCode(event: ParsedSupportEvent, runId: string) {
+export async function remediateMissingCode(event: ParsedSupportEvent, runId: string) {
   const sender = normalizeEmail(event.senderEmail);
   if (!sender) throw new Error("support_sender_invalid");
   const patients = await supportPatientsByEmail(sender);

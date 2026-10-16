@@ -4,12 +4,10 @@ import { createServerClient } from "@/lib/db/supabase";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { normalizeEmail } from "@/lib/services/patient-outreach-audit";
-import { requestPatientSelfActivation } from "@/lib/services/patient-self-activation";
-import { sendPatientAccessCode } from "@/lib/services/patient-access-code-delivery";
 import { findSupportPatientsByEmail, type SupportPatientMatch } from "@/lib/services/support-code-repair";
 import {
-  buildAccessCodeReissueNotice,
   HOSTINGER_SUPPORT_WORKFLOW_ID,
+  remediateMissingCode,
   sendHostingerSupportMessage,
 } from "@/lib/services/hostinger-support-mail";
 
@@ -156,32 +154,27 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   try {
     if (parsed.data.action === "resend_access_code") {
-    const patients = sender ? await findSupportPatientsByEmail(sender) : [];
-      if (patients.length !== 1) return NextResponse.json({ error: patients.length ? "Kontakt ist mehreren Patienten zugeordnet." : "Kontakt konnte keinem Patienten eindeutig zugeordnet werden." }, { status: 409 });
-      const patient = patients[0];
-      if (!patient.ivoris_nummer || !patient.geburtsdatum) return NextResponse.json({ error: "Patientennummer oder Geburtsdatum fehlt." }, { status: 409 });
-      let sent = false;
-      const db = createServerClient();
-      await requestPatientSelfActivation({
-        patientNumber: patient.ivoris_nummer,
-        birthDate: patient.geburtsdatum,
-        contactEmail: sender,
-        ip: `support-case:${id.data}`,
-      }, {
-        db,
-        sendCode: async (to, code, requestId, patientId) => {
-          await sendPatientAccessCode({ purpose: "activation", patientId, to, code, requestId });
-          sent = true;
-        },
+      if (!sender) return NextResponse.json({ error: "Absenderadresse fehlt." }, { status: 409 });
+      const remediation = await remediateMissingCode({
+        event: "message.received",
+        eventKey: `support-case:${id.data}`,
+        mailboxAddress: "praxisteam@animacura.io",
+        mailboxResourceId: null,
+        senderEmail: sender,
+        senderName: stringValue(result.senderName) || null,
+        subject: stringValue(result.subject) || "Kein Sicherheitscode erhalten",
+        excerpt: stringValue(result.excerpt),
+        timestamp: row.started_at,
+        uid: typeof result.sourceUid === "number" ? result.sourceUid : null,
+        folder: stringValue(result.sourceFolder) || "inbox",
+        messageId: null,
+      }, id.data);
+      await appendAction(id.data, result, {
+        ...baseAction,
+        type: remediation.outcome === "recovery_code_sent" ? "code_reissued" : "access_guidance_sent",
+        recipient: sender,
+        outcome: remediation.outcome,
       });
-      if (!sent) return NextResponse.json({ error: "Der Sicherheitscode konnte nicht eindeutig erzeugt werden." }, { status: 409 });
-      const notice = buildAccessCodeReissueNotice("activation");
-      await sendHostingerSupportMessage({
-        to: sender,
-        ...notice,
-        inReplyTo: result.sourceUid ? { folder: stringValue(result.sourceFolder) || "inbox", uid: result.sourceUid as string | number } : null,
-      });
-      await appendAction(id.data, result, { ...baseAction, type: "code_reissued", patientId: patient.id, recipient: sender });
     } else if (parsed.data.action === "send_reply") {
       await sendHostingerSupportMessage({
         to: sender,
