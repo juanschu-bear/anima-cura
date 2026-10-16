@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
         messageId: row.id,
         eventType: "failed",
         source: "access_code_watchdog",
-        eventKey: `access-code-watchdog:${row.id}`,
         metadata: { reason: "superseded_by_verified_fallback", remediationOutcome: remediation.outcome },
       });
       await db.from("communication_messages").update({
