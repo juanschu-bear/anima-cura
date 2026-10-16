@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
+import { buildPatientPasswordRecoveryEmail } from "@/lib/email/patient-password-recovery";
+import { normalizeEmail } from "@/lib/services/patient-outreach-audit";
+import { requestPatientPasswordRecovery } from "@/lib/services/patient-password-recovery";
+import { requestPatientSelfActivation } from "@/lib/services/patient-self-activation";
+import { safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
 import { generateGroundedSupportCore } from "@/lib/services/hostinger-support-ai";
 import { retrieveSupportKnowledge } from "@/lib/support/knowledge-base";
 
@@ -196,6 +201,9 @@ export function classifySupportEvent(event: ParsedSupportEvent): SupportClassifi
   }
   if (/(\d+[.,]\d{2}\s*(€|eur)|betrag|falsch berechnet|zu hoch|zu viel|mahnung|inkasso|widerspruch|reklamation|bezahlt|zahlung verbucht|ratenplan|rate(n)?\b)/.test(text)) {
     return { category: "billing_specific", autoReply: false, reason: "case_specific_billing" };
+  }
+  if (!event.excerpt.trim() && /sicherheitscode.*(?:versendet|aktivierung)|neuer.*sicherheitscode/.test(text)) {
+    return { category: "login_password", autoReply: false, reason: "security_code_not_received" };
   }
   if (!event.excerpt.trim()) {
     return { category: "other", autoReply: false, reason: "missing_message_body" };
@@ -485,6 +493,133 @@ export async function sendHostingerSupportMessage(input: {
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`hostinger_mail_rejected:${response.status}`);
+  const responseBody = await response.json().catch(() => null) as { id?: unknown; messageId?: unknown; message_id?: unknown } | null;
+  const providerMessageId = [responseBody?.id, responseBody?.messageId, responseBody?.message_id]
+    .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
+  return { providerMessageId };
+}
+
+type AccessPatient = {
+  id: string;
+  ivoris_nummer: string | null;
+  geburtsdatum: string | null;
+  vorname: string | null;
+  nachname: string | null;
+  email: string | null;
+  versicherter_email: string | null;
+};
+
+async function supportPatientsByEmail(sender: string): Promise<AccessPatient[]> {
+  const db = createServerClient();
+  const columns = "id,ivoris_nummer,geburtsdatum,vorname,nachname,email,versicherter_email";
+  const [direct, guardian, submissionDirect, submissionPatient, submissionGuardian] = await Promise.all([
+    db.from("patients").select(columns).ilike("email", sender).limit(10),
+    db.from("patients").select(columns).ilike("versicherter_email", sender).limit(10),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").ilike("email", sender).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>patient_email", sender).limit(20),
+    db.from("anamnese_submissions").select("patient_id,matched_patient_id").eq("answers->>vp_email", sender).limit(20),
+  ]);
+  if (direct.error || guardian.error || submissionDirect.error || submissionPatient.error || submissionGuardian.error) {
+    throw new Error("support_patient_match_failed");
+  }
+  const linkedIds = Array.from(new Set([
+    ...(submissionDirect.data ?? []),
+    ...(submissionPatient.data ?? []),
+    ...(submissionGuardian.data ?? []),
+  ].flatMap(row => [row.matched_patient_id, row.patient_id]).filter((id): id is string => typeof id === "string" && id.length > 0)));
+  const linked = linkedIds.length ? await db.from("patients").select(columns).in("id", linkedIds) : { data: [], error: null };
+  if (linked.error) throw new Error("support_patient_match_failed");
+  const unique = new Map<string, AccessPatient>();
+  for (const patient of [...(direct.data ?? []), ...(guardian.data ?? []), ...(linked.data ?? [])] as AccessPatient[]) unique.set(patient.id, patient);
+  return Array.from(unique.values());
+}
+
+async function ensureSupportPortal(patient: AccessPatient, sender: string, runId: string) {
+  const db = createServerClient();
+  const current = await db.from("user_profiles").select("id,email").eq("patient_id", patient.id).eq("role", "patient").limit(2);
+  if (current.error) throw new Error("support_profile_lookup_failed");
+  if ((current.data ?? []).length === 1) return true;
+  if ((current.data ?? []).length > 1 || !patient.ivoris_nummer || !patient.geburtsdatum) return false;
+  let prepared = false;
+  await requestPatientSelfActivation({
+    patientNumber: patient.ivoris_nummer,
+    birthDate: patient.geburtsdatum,
+    contactEmail: sender,
+    ip: `support-prepare:${runId}`,
+  }, {
+    db,
+    // The activation request creates the secured portal identity. We replace
+    // its code immediately with a password-recovery code delivered through
+    // the alternate Hostinger transport, so patients receive one usable code.
+    sendCode: async () => { prepared = true; },
+  });
+  return prepared;
+}
+
+async function sendHostingerRecoveryCode(input: { to: string; code: string; requestId: string; patientId: string; portalEmail: string }) {
+  const email = buildPatientPasswordRecoveryEmail(input.code, "de", input.portalEmail);
+  const message = await safeCreateCommunicationMessage({
+    patientId: input.patientId,
+    campaignKey: "patient_access_code_recovery",
+    provider: "hostinger",
+    recipient: input.to,
+    subject: email.subject,
+    metadata: { contentRestricted: true, securityPurpose: "recovery", requestId: input.requestId, remediation: true },
+  });
+  try {
+    const delivery = await sendHostingerSupportMessage({ to: input.to, subject: email.subject, text: email.text, html: email.html });
+    if (message) await safeRecordCommunicationEvent({
+      messageId: message.id,
+      eventType: "accepted",
+      source: "hostinger_transport",
+      providerMessageId: delivery.providerMessageId,
+    });
+  } catch (error) {
+    if (message) await safeRecordCommunicationEvent({ messageId: message.id, eventType: "failed", source: "hostinger_transport", metadata: { reason: "code_delivery_failed" } });
+    throw error;
+  }
+}
+
+async function sendAccessGuidance(event: ParsedSupportEvent, text: string) {
+  const hello = salutation(event.senderName);
+  const body = `${hello}\n\n${text}\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
+  await sendHostingerSupportMessage({
+    to: event.senderEmail,
+    subject: event.subject.toLocaleLowerCase("de-DE").startsWith("re:") ? event.subject : `Re: ${event.subject}`,
+    text: body,
+    html: buildSupportEmailHtml(body, "login_password", { title: "Dein Zugang zu Anima Cura", summary: null }),
+    inReplyTo: event.uid ? { folder: event.folder, uid: event.uid } : null,
+  });
+  return body;
+}
+
+async function remediateMissingCode(event: ParsedSupportEvent, runId: string) {
+  const sender = normalizeEmail(event.senderEmail);
+  if (!sender) throw new Error("support_sender_invalid");
+  const patients = await supportPatientsByEmail(sender);
+  if (patients.length === 0) {
+    const replyText = await sendAccessGuidance(event, "Wir konnten deine Absenderadresse noch keiner Patientenakte eindeutig zuordnen. Antworte bitte mit dem Namen der behandelten Person und der Patientennummer von der Rechnung. Ein Passwort oder einen Sicherheitscode benötigen wir niemals von dir.");
+    return { outcome: "missing_patient", replyText };
+  }
+  if (patients.length > 1) {
+    const replyText = await sendAccessGuidance(event, `Deine E-Mail-Adresse ist bei mehreren Patientenakten hinterlegt. Deshalb darf das System nicht raten, für welche Akte der Code bestimmt ist. Öffne ${PORTAL_LOGIN_URL} und wähle „Keine Zugangsdaten? Zugang herstellen“. Gib anschließend die Patientennummer und das Geburtsdatum der behandelten Person sowie diese private E-Mail-Adresse ein. Danach wird der Code eindeutig für genau diese Patientenakte versendet.`);
+    return { outcome: "ambiguous_patient", replyText };
+  }
+  const patient = patients[0];
+  if (!patient.ivoris_nummer || !patient.geburtsdatum) {
+    const replyText = await sendAccessGuidance(event, "In der Patientenakte fehlt noch eine Angabe für die sichere Zuordnung. Antworte bitte mit der Patientennummer von der Rechnung und dem Namen der behandelten Person. Das Praxisteam ergänzt den Zugang anschließend gezielt.");
+    return { outcome: "incomplete_patient", replyText };
+  }
+  if (!await ensureSupportPortal(patient, sender, runId)) throw new Error("support_portal_prepare_failed");
+  let delivered = false;
+  await requestPatientPasswordRecovery({ portalEmail: sender, ip: `support-recovery:${runId}` }, {
+    sendCode: async (to, code, requestId, patientId, portalEmail) => {
+      await sendHostingerRecoveryCode({ to, code, requestId, patientId, portalEmail });
+      delivered = true;
+    },
+  });
+  if (!delivered) throw new Error("support_recovery_code_not_generated");
+  return { outcome: "recovery_code_sent", replyText: "Ein neuer 30 Minuten gültiger Sicherheitscode mit direktem Passwort-Button wurde über den alternativen Mailweg gesendet." };
 }
 
 export function buildAccessCodeReissueNotice(purpose: "activation" | "recovery" = "activation") {
@@ -636,6 +771,49 @@ export async function processHostingerSupportEvent(payload: unknown) {
     }).eq("id", id);
     if (saved.error) throw new Error("support_audit_finalize_failed");
     return { ok: true as const, autoReplied: false, ignored: true, category: classification.category };
+  }
+
+  if (classification.reason === "security_code_not_received") {
+    try {
+      const remediation = await remediateMissingCode(event, id);
+      const saved = await db.from("workflow_runs").update({
+        status: "success",
+        finished_at: new Date().toISOString(),
+        result: {
+          ...audit,
+          autoReplied: true,
+          manualReview: false,
+          caseStatus: remediation.outcome === "recovery_code_sent" ? "resolved" : "awaiting_patient",
+          replyMode: "access_code_remediation",
+          replyText: remediation.replyText,
+          remediationOutcome: remediation.outcome,
+        },
+      }).eq("id", id);
+      if (saved.error) throw new Error("support_audit_finalize_failed");
+      return { ok: true as const, autoReplied: true, remediated: true, category: classification.category };
+    } catch (error) {
+      const fallback = buildManualReviewAcknowledgement(event, classification);
+      const [acknowledgementResult, alertResult] = await Promise.allSettled([
+        sendHostingerSupportMessage({
+          to: event.senderEmail,
+          subject: fallback.subject,
+          text: fallback.text,
+          html: fallback.html,
+          inReplyTo: event.uid ? { folder: event.folder, uid: event.uid } : null,
+        }),
+        sendManualReviewAlert(event, classification),
+      ]);
+      const acknowledgement = acknowledgementResult.status === "fulfilled";
+      const practiceNotified = alertResult.status === "fulfilled";
+      const saved = await db.from("workflow_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "support_access_remediation_failed",
+        result: { ...audit, manualReview: true, autoAcknowledged: acknowledgement, practiceNotified, remediationFailed: true },
+      }).eq("id", id);
+      if (saved.error) throw new Error("support_audit_finalize_failed");
+      return { ok: true as const, autoReplied: false, autoAcknowledged: acknowledgement, practiceNotified, category: classification.category };
+    }
   }
 
   if (!classification.autoReply) {

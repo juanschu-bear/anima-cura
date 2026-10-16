@@ -99,6 +99,12 @@ test("holds missing or whitespace-only message text instead of answering the sub
   assert.equal(classifySupportEvent(event("Rechnung öffnen", "Wo finde ich das Dokument in der App?")).autoReply, true);
 });
 
+test("treats an empty reply to a code-delivery notice as a code-delivery follow-up", () => {
+  assert.deepEqual(classifySupportEvent(event("Re: Dein neuer Anima-Cura-Sicherheitscode wurde versendet", "")), {
+    category: "login_password", autoReply: false, reason: "security_code_not_received",
+  });
+});
+
 test("keeps medical, billing, and reply-loop protections ahead of code escalation", () => {
   const complaint = "Mein Sicherheitscode kommt nicht an.";
   assert.equal(classifySupportEvent(event("Schmerzen", complaint)).category, "medical");
@@ -139,7 +145,7 @@ test("acknowledges every patient message while also notifying internal review", 
     return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
   });
 
-  for (const text of ["Kein Aktivierungscode erhalten.", ""]) {
+  for (const text of [""]) {
     const result = await processHostingerSupportEvent({
       event: "message.received",
       mailbox: "praxisteam@animacura.io",
@@ -154,13 +160,12 @@ test("acknowledges every patient message while also notifying internal review", 
     assert.ok("autoAcknowledged" in result && result.autoAcknowledged === true);
     assert.ok("practiceNotified" in result && result.practiceNotified === true);
   }
-  assert.equal(sent.length, 4);
-  assert.equal(sent.filter(message => message.to[0] === "erika@example.com").length, 2);
-  assert.equal(sent.filter(message => message.to[0] === "review@example.com").length, 2);
-  assert.ok(sent.some(message => /technische Prüfung der Codezustellung/.test(message.text)));
+  assert.equal(sent.length, 2);
+  assert.equal(sent.filter(message => message.to[0] === "erika@example.com").length, 1);
+  assert.equal(sent.filter(message => message.to[0] === "review@example.com").length, 1);
   assert.ok(sent.some(message => /Originalnachricht persönlich prüfen/.test(message.text)));
   assert.ok(sent.filter(message => message.to[0] === "erika@example.com").every(message => /Praxisteam|Codeversand/.test(message.text)));
-  assert.deepEqual(completed.map(row => row.result.reason), ["security_code_not_received", "missing_message_body"]);
+  assert.deepEqual(completed.map(row => row.result.reason), ["missing_message_body"]);
   for (const row of completed) {
     assert.equal(row.result.manualReview, true);
     assert.equal(row.result.practiceNotified, true);

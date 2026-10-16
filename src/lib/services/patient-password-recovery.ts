@@ -211,11 +211,15 @@ async function genericResult(startedAt: number) {
   return GENERIC_REQUEST_RESULT;
 }
 
+type RecoveryDependencies = {
+  sendCode?: (to: string, code: string, id: string, patientId: string, portalEmail: string) => Promise<void>;
+};
+
 async function sendCode(to: string, code: string, id: string, patientId: string, portalEmail: string) {
   await sendPatientAccessCode({ purpose: "recovery", patientId, to, code, requestId: id, loginEmail: portalEmail });
 }
 
-export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string }) {
+export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string }, dependencies?: RecoveryDependencies) {
   const startedAt = Date.now();
   const portalEmail = normalizeEmail(input.portalEmail);
   if (!portalEmail) return genericResult(startedAt);
@@ -248,7 +252,7 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   const stored = await db.auth.admin.updateUserById(identity.authUserId, { app_metadata: appMetadata });
   if (stored.error) throw new Error(`password_recovery_store_failed:${stored.error.message}`);
   try {
-    await sendCode(identity.contactEmail, code, id, identity.patientId, identity.portalEmail);
+    await (dependencies?.sendCode ?? sendCode)(identity.contactEmail, code, id, identity.patientId, identity.portalEmail);
   } catch (error) {
     await db.auth.admin.updateUserById(identity.authUserId, {
       app_metadata: { ...authUser.app_metadata, patient_password_recovery: previousState },
@@ -283,7 +287,7 @@ export async function confirmPatientPasswordRecovery(input: {
     });
     return { ok: false as const, reason: "invalid_or_expired" as const };
   }
-  const cleanAppMetadata = withoutRecoveryState(authUser.app_metadata || {});
+  const cleanAppMetadata = { ...withoutRecoveryState(authUser.app_metadata || {}), role: "patient", activation_pending: false };
   const authUpdate = await db.auth.admin.updateUserById(identity.authUserId, {
     password: input.password,
     app_metadata: cleanAppMetadata,
