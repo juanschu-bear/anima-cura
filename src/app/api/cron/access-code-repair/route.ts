@@ -108,7 +108,9 @@ export async function GET(request: NextRequest) {
   // paths have a transactional fallback, so an exhausted mailbox cannot block
   // either the credential or the instructions needed to use it.
   const supportCapacity = 1;
-  for (const [sender, run] of Array.from(pendingBySender.entries()).slice(0, supportCapacity)) {
+  let supportActions = 0;
+  for (const [sender, run] of Array.from(pendingBySender.entries())) {
+    if (supportActions >= supportCapacity) break;
     const recent = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
       .eq("provider", "hostinger")
@@ -121,6 +123,7 @@ export async function GET(request: NextRequest) {
       supportResults.push({ id: run.id, outcome: "recent_code_already_sent" });
       continue;
     }
+    supportActions += 1;
     try {
       const remediation = await remediateMissingCode({
         event: "message.received",
