@@ -119,15 +119,23 @@ async function canonicalPortalProfile(profiles: PortalProfile[]) {
   return previouslyUsed[0]?.profile ?? null;
 }
 
-async function resolveIdentity(recoveryEmail: string) {
+async function resolveIdentity(recoveryEmail: string, expectedPatientId?: string) {
   const db = createServerClient();
-  const exactProfileResult = await db.from("user_profiles")
-    .select("id,patient_id,email,role")
-    .eq("email", recoveryEmail)
-    .eq("role", "patient")
-    .limit(2);
+  const exactProfileResult = expectedPatientId
+    ? await db.from("user_profiles")
+      .select("id,patient_id,email,role")
+      .eq("patient_id", expectedPatientId)
+      .eq("role", "patient")
+      .limit(10)
+    : await db.from("user_profiles")
+      .select("id,patient_id,email,role")
+      .eq("email", recoveryEmail)
+      .eq("role", "patient")
+      .limit(2);
   if (exactProfileResult.error) throw new Error("password_recovery_profile_lookup_failed");
-  let profile = (exactProfileResult.data?.length === 1 ? exactProfileResult.data[0] : null) as PortalProfile | null;
+  let profile = expectedPatientId
+    ? await canonicalPortalProfile((exactProfileResult.data ?? []) as PortalProfile[])
+    : (exactProfileResult.data?.length === 1 ? exactProfileResult.data[0] : null) as PortalProfile | null;
 
   if (!profile) {
     const patientIds = await patientIdsForContact(recoveryEmail);
@@ -219,7 +227,7 @@ async function sendCode(to: string, code: string, id: string, patientId: string,
   await sendPatientAccessCode({ purpose: "recovery", patientId, to, code, requestId: id, loginEmail: portalEmail });
 }
 
-export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string }, dependencies?: RecoveryDependencies) {
+export async function requestPatientPasswordRecovery(input: { portalEmail: string; ip: string; patientId?: string }, dependencies?: RecoveryDependencies) {
   const startedAt = Date.now();
   const portalEmail = normalizeEmail(input.portalEmail);
   if (!portalEmail) return genericResult(startedAt);
@@ -227,7 +235,7 @@ export async function requestPatientPasswordRecovery(input: { portalEmail: strin
   const ipHash = keyedHash(input.ip || "unknown");
   if (!acceptIpRequest(ipHash, startedAt)) return genericResult(startedAt);
 
-  const identity = await resolveIdentity(portalEmail);
+  const identity = await resolveIdentity(portalEmail, input.patientId);
   if (!identity) return genericResult(startedAt);
 
   const authResult = await db.auth.admin.getUserById(identity.authUserId);

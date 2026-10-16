@@ -603,10 +603,18 @@ async function sendAccessGuidance(event: ParsedSupportEvent, text: string) {
   return body;
 }
 
-export async function remediateMissingCode(event: ParsedSupportEvent, runId: string) {
+export async function remediateMissingCode(event: ParsedSupportEvent, runId: string, expectedPatientId?: string) {
   const sender = normalizeEmail(event.senderEmail);
   if (!sender) throw new Error("support_sender_invalid");
-  const patients = await supportPatientsByEmail(sender);
+  const db = createServerClient();
+  const explicitPatient = expectedPatientId
+    ? await db.from("patients")
+      .select("id,ivoris_nummer,geburtsdatum,vorname,nachname,email,versicherter_email")
+      .eq("id", expectedPatientId)
+      .maybeSingle()
+    : null;
+  if (explicitPatient?.error) throw new Error("support_patient_match_failed");
+  const patients = explicitPatient?.data ? [explicitPatient.data as AccessPatient] : await supportPatientsByEmail(sender);
   if (patients.length === 0) {
     const replyText = await sendAccessGuidance(event, "Wir konnten deine Absenderadresse noch keiner Patientenakte eindeutig zuordnen. Antworte bitte mit dem Namen der behandelten Person und der Patientennummer von der Rechnung. Ein Passwort oder einen Sicherheitscode benötigen wir niemals von dir.");
     return { outcome: "missing_patient", replyText };
@@ -622,7 +630,7 @@ export async function remediateMissingCode(event: ParsedSupportEvent, runId: str
   }
   if (!await ensureSupportPortal(patient, sender, runId)) throw new Error("support_portal_prepare_failed");
   let delivered = false;
-  await requestPatientPasswordRecovery({ portalEmail: sender, ip: `support-recovery:${runId}` }, {
+  await requestPatientPasswordRecovery({ portalEmail: sender, patientId: patient.id, ip: `support-recovery:${runId}` }, {
     sendCode: async (to, code, requestId, patientId, portalEmail) => {
       await sendHostingerRecoveryCode({ to, code, requestId, patientId, portalEmail });
       delivered = true;

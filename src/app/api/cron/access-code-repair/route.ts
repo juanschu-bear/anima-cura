@@ -27,10 +27,14 @@ export async function GET(request: NextRequest) {
   const results: Array<{ id: string; outcome: string }> = [];
   for (const row of query.data ?? []) {
     const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
-    const attempts = typeof metadata.repairAttempts === "number" ? metadata.repairAttempts : 0;
+    let attempts = typeof metadata.repairAttempts === "number" ? metadata.repairAttempts : 0;
     if (attempts >= 3) {
-      results.push({ id: row.id, outcome: "manual_review_required" });
-      continue;
+      const lastAttemptAt = typeof metadata.repairStartedAt === "string" ? Date.parse(metadata.repairStartedAt) : 0;
+      if (lastAttemptAt && lastAttemptAt > Date.now() - 65 * 60 * 1000) {
+        results.push({ id: row.id, outcome: "retry_cooldown" });
+        continue;
+      }
+      attempts = 0;
     }
     await db.from("communication_messages").update({
       status: "delayed",
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
         uid: null,
         folder: "inbox",
         messageId: null,
-      }, `stuck-code:${row.id}`);
+      }, `stuck-code:${row.id}`, typeof row.patient_id === "string" ? row.patient_id : undefined);
       await recordCommunicationEvent({
         messageId: row.id,
         eventType: "failed",
