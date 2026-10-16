@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { HOSTINGER_SUPPORT_WORKFLOW_ID, remediateMissingCode } from "@/lib/services/hostinger-support-mail";
-import { recordCommunicationEvent } from "@/lib/services/communication-ledger";
+import { safeRecordCommunicationEvent } from "@/lib/services/communication-ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
   if (query.error) return NextResponse.json({ error: "queue_unavailable" }, { status: 500 });
 
   const results: Array<{ id: string; outcome: string; reason?: string }> = [];
-  for (const row of query.data ?? []) {
+  const eligibleRows = (query.data ?? []).filter(row => {
+    const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
+    return typeof metadata.nextRepairAt !== "string" || Date.parse(metadata.nextRepairAt) <= Date.now();
+  }).slice(0, 1);
+  for (const row of eligibleRows) {
     const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
     let attempts = typeof metadata.repairAttempts === "number" ? metadata.repairAttempts : 0;
     if (attempts >= 3) {
@@ -56,19 +60,30 @@ export async function GET(request: NextRequest) {
         folder: "inbox",
         messageId: null,
       }, `stuck-code:${row.id}`, typeof row.patient_id === "string" ? row.patient_id : undefined);
-      await recordCommunicationEvent({
+      await safeRecordCommunicationEvent({
         messageId: row.id,
         eventType: "failed",
         source: "access_code_watchdog",
         eventKey: `access-code-watchdog:${row.id}`,
         metadata: { reason: "superseded_by_verified_fallback", remediationOutcome: remediation.outcome },
       });
+      await db.from("communication_messages").update({
+        status: "failed",
+        metadata: { ...metadata, supersededByVerifiedFallback: true, remediationOutcome: remediation.outcome },
+        updated_at: new Date().toISOString(),
+      }).eq("id", row.id);
       results.push({ id: row.id, outcome: remediation.outcome });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "repair_failed";
+      const providerLimited = reason.includes("hostinger_mail_rejected:429");
       await db.from("communication_messages").update({
         status: "queued",
-        metadata: { ...metadata, repairAttempts: attempts + 1, repairError: reason },
+        metadata: {
+          ...metadata,
+          repairAttempts: attempts + 1,
+          repairError: reason,
+          nextRepairAt: new Date(Date.now() + (providerLimited ? 5 : 1) * 60 * 1000).toISOString(),
+        },
         updated_at: new Date().toISOString(),
       }).eq("id", row.id);
       results.push({ id: row.id, outcome: "retry_scheduled", reason });
@@ -90,7 +105,10 @@ export async function GET(request: NextRequest) {
     if (reason !== "security_code_not_received" && !(reason === "missing_message_body" && /rechnungszugang|sicherheitscode/i.test(subject))) continue;
     if (!pendingBySender.has(sender)) pendingBySender.set(sender, { id: run.id, started_at: run.started_at, result });
   }
-  for (const [sender, run] of Array.from(pendingBySender.entries()).slice(0, 10)) {
+  // Hostinger rate-limits bursts. Perform at most one outbound remediation per
+  // watchdog run; unresolved support cases resume after the delivery queue.
+  const supportCapacity = eligibleRows.length === 0 ? 1 : 0;
+  for (const [sender, run] of Array.from(pendingBySender.entries()).slice(0, supportCapacity)) {
     const recent = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
       .eq("provider", "hostinger")

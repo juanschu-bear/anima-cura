@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/access-code-repair",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron",
