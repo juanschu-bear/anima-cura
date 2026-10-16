@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
-import { remediateMissingCode } from "@/lib/services/hostinger-support-mail";
+import { HOSTINGER_SUPPORT_WORKFLOW_ID, remediateMissingCode } from "@/lib/services/hostinger-support-mail";
 import { recordCommunicationEvent } from "@/lib/services/communication-ledger";
 
 export const runtime = "nodejs";
@@ -69,6 +69,64 @@ export async function GET(request: NextRequest) {
       results.push({ id: row.id, outcome: "retry_scheduled" });
     }
   }
-  console.info("[access-code-watchdog]", JSON.stringify({ checked: query.data?.length ?? 0, results }));
-  return NextResponse.json({ checked: query.data?.length ?? 0, results }, { headers: { "Cache-Control": "no-store" } });
+  const supportQuery = await db.from("workflow_runs")
+    .select("id,started_at,result")
+    .eq("workflow_id", HOSTINGER_SUPPORT_WORKFLOW_ID)
+    .order("started_at", { ascending: false })
+    .limit(200);
+  const supportResults: Array<{ id: string; outcome: string }> = [];
+  const pendingBySender = new Map<string, { id: string; started_at: string; result: Record<string, unknown> }>();
+  for (const run of supportQuery.data ?? []) {
+    const result = run.result && typeof run.result === "object" ? run.result as Record<string, unknown> : {};
+    const sender = typeof result.sender === "string" ? result.sender.trim().toLowerCase() : "";
+    const subject = typeof result.subject === "string" ? result.subject : "";
+    const reason = typeof result.reason === "string" ? result.reason : "";
+    if (!sender || result.remediationOutcome || result.caseStatus === "resolved") continue;
+    if (reason !== "security_code_not_received" && !(reason === "missing_message_body" && /rechnungszugang|sicherheitscode/i.test(subject))) continue;
+    if (!pendingBySender.has(sender)) pendingBySender.set(sender, { id: run.id, started_at: run.started_at, result });
+  }
+  for (const [sender, run] of Array.from(pendingBySender.entries()).slice(0, 10)) {
+    const recent = await db.from("communication_messages").select("id")
+      .eq("recipient", sender)
+      .eq("provider", "hostinger")
+      .eq("campaign_key", "patient_access_code_recovery")
+      .in("status", ["accepted", "delivered", "opened", "clicked"])
+      .gte("created_at", new Date(Date.now() - 25 * 60 * 1000).toISOString())
+      .limit(1);
+    if ((recent.data ?? []).length) {
+      await db.from("workflow_runs").update({ result: { ...run.result, caseStatus: "resolved", remediationOutcome: "recent_code_already_sent" } }).eq("id", run.id);
+      supportResults.push({ id: run.id, outcome: "recent_code_already_sent" });
+      continue;
+    }
+    try {
+      const remediation = await remediateMissingCode({
+        event: "message.received",
+        eventKey: `support-watchdog:${run.id}`,
+        mailboxAddress: "praxisteam@animacura.io",
+        mailboxResourceId: null,
+        senderEmail: sender,
+        senderName: typeof run.result.senderName === "string" ? run.result.senderName : null,
+        subject: typeof run.result.subject === "string" ? run.result.subject : "Rechnungszugang",
+        excerpt: typeof run.result.excerpt === "string" ? run.result.excerpt : "",
+        timestamp: run.started_at,
+        uid: typeof run.result.sourceUid === "number" ? run.result.sourceUid : null,
+        folder: typeof run.result.sourceFolder === "string" ? run.result.sourceFolder : "inbox",
+        messageId: typeof run.result.messageId === "string" ? run.result.messageId : null,
+      }, `support-watchdog:${run.id}`);
+      await db.from("workflow_runs").update({
+        result: {
+          ...run.result,
+          caseStatus: remediation.outcome === "recovery_code_sent" ? "resolved" : "awaiting_patient",
+          remediationOutcome: remediation.outcome,
+          replyMode: "access_code_watchdog",
+          replyText: remediation.replyText,
+        },
+      }).eq("id", run.id);
+      supportResults.push({ id: run.id, outcome: remediation.outcome });
+    } catch (error) {
+      supportResults.push({ id: run.id, outcome: error instanceof Error ? error.message : "repair_failed" });
+    }
+  }
+  console.info("[access-code-watchdog]", JSON.stringify({ checked: query.data?.length ?? 0, results, supportResults }));
+  return NextResponse.json({ checked: query.data?.length ?? 0, results, supportResults }, { headers: { "Cache-Control": "no-store" } });
 }
