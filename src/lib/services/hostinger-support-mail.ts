@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { buildPatientPasswordRecoveryEmail } from "@/lib/email/patient-password-recovery";
+import { PATIENT_EMAIL_FROM, PATIENT_EMAIL_REPLY_TO } from "@/lib/email/delivery";
 import { normalizeEmail } from "@/lib/services/patient-outreach-audit";
 import { requestPatientPasswordRecovery } from "@/lib/services/patient-password-recovery";
 import { requestPatientSelfActivation } from "@/lib/services/patient-self-activation";
@@ -446,26 +447,15 @@ export function hostingerSupportRunId(eventKey: string) {
 }
 
 async function sendHostingerReply(event: ParsedSupportEvent, classification: SupportClassification) {
-  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
-  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
-  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
   const generated = await buildGroundedSupportReply(event, classification);
   const reply = generated.reply;
-  const body: Record<string, unknown> = {
-    to: [event.senderEmail],
-    displayName: "Anima Cura Praxisteam",
+  await sendSupportMessageWithFallback({
+    to: event.senderEmail,
     subject: reply.subject,
     text: reply.text,
     html: reply.html,
-  };
-  if (event.uid) body.inReplyTo = { folder: event.folder, uid: event.uid };
-  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
-    method: "POST",
-    signal: AbortSignal.timeout(12_000),
-    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    inReplyTo: event.uid ? { folder: event.folder, uid: event.uid } : null,
   });
-  if (!response.ok) throw new Error(`hostinger_mail_rejected:${response.status}`);
   return generated;
 }
 
@@ -498,6 +488,45 @@ export async function sendHostingerSupportMessage(input: {
   const providerMessageId = [responseBody?.id, responseBody?.messageId, responseBody?.message_id]
     .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
   return { providerMessageId };
+}
+
+async function sendSupportMessageWithFallback(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  inReplyTo?: { folder: string; uid: number | string } | null;
+}) {
+  try {
+    return { ...(await sendHostingerSupportMessage(input)), provider: "hostinger" as const };
+  } catch (hostingerError) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) throw hostingerError;
+    const idempotencyKey = createHash("sha256")
+      .update(`${input.to}:${input.subject}:${input.text}`)
+      .digest("hex")
+      .slice(0, 40);
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `patient-support-${idempotencyKey}`,
+      },
+      body: JSON.stringify({
+        from: PATIENT_EMAIL_FROM,
+        to: input.to,
+        reply_to: PATIENT_EMAIL_REPLY_TO,
+        subject: input.subject,
+        text: input.text,
+        html: input.html ?? buildSupportEmailHtml(input.text, "login_password"),
+      }),
+    });
+    if (!response.ok) throw new Error(`support_mail_transports_failed:${response.status}`);
+    const body = await response.json().catch(() => null) as { id?: unknown } | null;
+    return { provider: "resend" as const, providerMessageId: typeof body?.id === "string" ? body.id : null };
+  }
 }
 
 type AccessPatient = {
@@ -617,7 +646,7 @@ async function sendRecoveryCodeWithFallback(input: { to: string; code: string; r
 async function sendAccessGuidance(event: ParsedSupportEvent, text: string) {
   const hello = salutation(event.senderName);
   const body = `${hello}\n\n${text}\n\nLiebe Grüße\nDein Anima-Cura-Praxisteam`;
-  await sendHostingerSupportMessage({
+  await sendSupportMessageWithFallback({
     to: event.senderEmail,
     subject: event.subject.toLocaleLowerCase("de-DE").startsWith("re:") ? event.subject : `Re: ${event.subject}`,
     text: body,
@@ -730,45 +759,24 @@ export function buildManualReviewAlert(event: ParsedSupportEvent, classification
 }
 
 async function sendManualReviewAlert(event: ParsedSupportEvent, classification: SupportClassification) {
-  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
-  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
-  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
   const alert = buildManualReviewAlert(event, classification);
-  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
-    method: "POST",
-    signal: AbortSignal.timeout(12_000),
-    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      to: [process.env.SUPPORT_MANUAL_REVIEW_TO?.trim() || MANUAL_REVIEW_ADDRESS],
-      displayName: "Anima Cura · Support-Prüfung",
-      subject: alert.subject,
-      text: alert.text,
-      html: alert.html,
-    }),
+  await sendSupportMessageWithFallback({
+    to: process.env.SUPPORT_MANUAL_REVIEW_TO?.trim() || MANUAL_REVIEW_ADDRESS,
+    subject: alert.subject,
+    text: alert.text,
+    html: alert.html,
   });
-  if (!response.ok) throw new Error(`manual_review_notification_rejected:${response.status}`);
 }
 
 async function sendManualReviewAcknowledgement(event: ParsedSupportEvent, classification: SupportClassification) {
-  const apiToken = process.env.HOSTINGER_MAIL_API_TOKEN;
-  const mailboxResourceId = process.env.HOSTINGER_MAILBOX_RESOURCE_ID || event.mailboxResourceId;
-  if (!apiToken || !mailboxResourceId) throw new Error("hostinger_mail_not_configured");
   const acknowledgement = buildManualReviewAcknowledgement(event, classification);
-  const body: Record<string, unknown> = {
-    to: [event.senderEmail],
-    displayName: "Anima Cura Praxisteam",
+  await sendSupportMessageWithFallback({
+    to: event.senderEmail,
     subject: acknowledgement.subject,
     text: acknowledgement.text,
     html: acknowledgement.html,
-  };
-  if (event.uid) body.inReplyTo = { folder: event.folder, uid: event.uid };
-  const response = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${encodeURIComponent(mailboxResourceId)}/send`, {
-    method: "POST",
-    signal: AbortSignal.timeout(12_000),
-    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    inReplyTo: event.uid ? { folder: event.folder, uid: event.uid } : null,
   });
-  if (!response.ok) throw new Error(`manual_review_acknowledgement_rejected:${response.status}`);
   return acknowledgement;
 }
 
@@ -837,7 +845,7 @@ export async function processHostingerSupportEvent(payload: unknown) {
     } catch (error) {
       const fallback = buildManualReviewAcknowledgement(event, classification);
       const [acknowledgementResult, alertResult] = await Promise.allSettled([
-        sendHostingerSupportMessage({
+        sendSupportMessageWithFallback({
           to: event.senderEmail,
           subject: fallback.subject,
           text: fallback.text,
