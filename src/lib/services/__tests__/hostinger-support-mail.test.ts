@@ -174,6 +174,64 @@ test("acknowledges every patient message while also notifying internal review", 
   }
 });
 
+test("never emails the practice when automatic access-code remediation fails", async t => {
+  const environment = {
+    NEXT_PUBLIC_SUPABASE_URL: "https://support-fixture.invalid",
+    SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key",
+    HOSTINGER_MAIL_API_TOKEN: "fixture-mail-token",
+    HOSTINGER_MAILBOX_RESOURCE_ID: "fixture-mailbox",
+    HOSTINGER_MAILBOX_ADDRESS: "praxisteam@animacura.io",
+    SUPPORT_MANUAL_REVIEW_TO: "review@example.com",
+  };
+  const originalEnvironment = new Map(Object.keys(environment).map(key => [key, process.env[key]]));
+  Object.assign(process.env, environment);
+  t.after(() => {
+    originalEnvironment.forEach((value, key) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  });
+
+  const sent: Array<{ to: string[]; text: string }> = [];
+  const completed: Array<{ status: string; result: { manualReview: boolean; technicalRepairQueued: boolean; practiceNotified: boolean; remediationFailed: boolean } }> = [];
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input.toString());
+    if (url.hostname === "support-fixture.invalid") {
+      if (url.pathname === "/rest/v1/workflow_runs") {
+        const body = JSON.parse(String(init?.body));
+        if (init?.method === "PATCH") completed.push(body);
+        return new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ message: "fixture patient lookup failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+    assert.equal(url.href, "https://api.mail.hostinger.com/api/v1/mailboxes/fixture-mailbox/send");
+    sent.push(JSON.parse(String(init?.body)));
+    return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+
+  const result = await processHostingerSupportEvent({
+    event: "message.received",
+    mailbox: "praxisteam@animacura.io",
+    message: {
+      from: { name: "Erika Beispiel", address: "erika@example.com" },
+      subject: "Kein Sicherheitscode erhalten",
+      text: "Der Sicherheitscode ist auch nach mehreren Versuchen nicht angekommen.",
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok("practiceNotified" in result && result.practiceNotified === false);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to[0], "erika@example.com");
+  assert.equal(sent.some(message => message.to[0] === "review@example.com"), false);
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].status, "failed");
+  assert.equal(completed[0].result.manualReview, false);
+  assert.equal(completed[0].result.technicalRepairQueued, true);
+  assert.equal(completed[0].result.practiceNotified, false);
+  assert.equal(completed[0].result.remediationFailed, true);
+});
+
 test("prevents reply loops and never asks for passwords", () => {
   const parsed = parseHostingerSupportEvent({
     event: "message.received",

@@ -844,7 +844,7 @@ export async function processHostingerSupportEvent(payload: unknown) {
       return { ok: true as const, autoReplied: true, remediated: true, category: classification.category };
     } catch (error) {
       const fallback = buildManualReviewAcknowledgement(event, classification);
-      const [acknowledgementResult, alertResult] = await Promise.allSettled([
+      const [acknowledgementResult] = await Promise.allSettled([
         sendSupportMessageWithFallback({
           to: event.senderEmail,
           subject: fallback.subject,
@@ -852,15 +852,24 @@ export async function processHostingerSupportEvent(payload: unknown) {
           html: fallback.html,
           inReplyTo: event.uid ? { folder: event.folder, uid: event.uid } : null,
         }),
-        sendManualReviewAlert(event, classification),
       ]);
       const acknowledgement = acknowledgementResult.status === "fulfilled";
-      const practiceNotified = alertResult.status === "fulfilled";
+      // Access-code delivery is a technical automation concern. Even when its
+      // immediate remediation fails, it stays in the technical repair queue and
+      // must never generate an email to the practice mailbox.
+      const practiceNotified = false;
       const saved = await db.from("workflow_runs").update({
         status: "failed",
         finished_at: new Date().toISOString(),
         error: error instanceof Error ? error.message : "support_access_remediation_failed",
-        result: { ...audit, manualReview: true, autoAcknowledged: acknowledgement, practiceNotified, remediationFailed: true },
+        result: {
+          ...audit,
+          manualReview: false,
+          technicalRepairQueued: true,
+          autoAcknowledged: acknowledgement,
+          practiceNotified,
+          remediationFailed: true,
+        },
       }).eq("id", id);
       if (saved.error) throw new Error("support_audit_finalize_failed");
       return { ok: true as const, autoReplied: false, autoAcknowledged: acknowledgement, practiceNotified, category: classification.category };
