@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findPotentialDuplicateCandidates, isSamePersonCandidate } from "../ivoris-sync";
+import { findPotentialDuplicateCandidates, isSamePersonCandidate, patientIdentityMatchKind } from "../ivoris-sync";
 
 test("treats same name and birthday with different ivoris ids as duplicate candidate", () => {
   const duplicate = isSamePersonCandidate(
@@ -52,6 +52,32 @@ test("normalizes spacing and casing when checking duplicate candidates", () => {
     candidates.map((candidate) => candidate.id),
     ["a"]
   );
+});
+
+test("flags an added middle name as a review candidate without calling it exact", () => {
+  const incoming = {
+    ivoris_id: "new-id",
+    vorname: "Emily Milena",
+    nachname: "Beispiel",
+    geburtsdatum: "2012-04-03",
+  };
+  const existing = {
+    id: "existing",
+    ivoris_id: "old-id",
+    vorname: "Emily",
+    nachname: "Beispiel",
+    geburtsdatum: "2012-04-03",
+  };
+
+  assert.equal(isSamePersonCandidate(incoming, existing), true);
+  assert.equal(patientIdentityMatchKind(incoming, existing), "first_name_variant");
+});
+
+test("does not confuse different first names on the same birthday", () => {
+  assert.equal(patientIdentityMatchKind(
+    { ivoris_id: "new-id", vorname: "Emily", nachname: "Beispiel", geburtsdatum: "2012-04-03" },
+    { id: "existing", ivoris_id: "old-id", vorname: "Emilia", nachname: "Beispiel", geburtsdatum: "2012-04-03" }
+  ), "none");
 });
 
 test("does not flag the same ivoris id as duplicate", () => {

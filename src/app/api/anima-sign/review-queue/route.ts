@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
+import { patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
 
 type SubmissionRow = {
   id: string;
@@ -127,23 +128,57 @@ export async function GET() {
   const patientGroups = new Map<string, PatientRow[]>();
   for (const patient of (patientsResult.data ?? []) as PatientRow[]) {
     if (!patient.geburtsdatum || !normalizeNamePart(patient.vorname) || !normalizeNamePart(patient.nachname)) continue;
-    const key = identityKey(patient);
+    const key = `${normalizeNamePart(patient.nachname)}|${patient.geburtsdatum}`;
     if (!patientGroups.has(key)) patientGroups.set(key, []);
     patientGroups.get(key)!.push(patient);
   }
 
   const patientIdentityConflicts = Array.from(patientGroups.entries())
-    .map(([key, patients]) => ({
-      key,
-      patient_name: `${patients[0]?.vorname ?? ""} ${patients[0]?.nachname ?? ""}`.trim(),
-      geburtsdatum: patients[0]?.geburtsdatum ?? null,
-      ivoris_ids: Array.from(new Set(patients.map((patient) => patient.ivoris_id).filter(Boolean))),
-      patients: patients.map((patient) => ({
-        id: patient.id,
-        ivoris_id: patient.ivoris_id,
-        created_at: patient.created_at,
-      })),
-    }))
+    .map(([key, candidates]) => {
+      const kinds = new Set<string>();
+      const involvedIds = new Set<string>();
+      for (let left = 0; left < candidates.length; left += 1) {
+        for (let right = left + 1; right < candidates.length; right += 1) {
+          const a = candidates[left];
+          const b = candidates[right];
+          const kind = patientIdentityMatchKind(
+            {
+              ivoris_id: a.ivoris_id ?? `local:${a.id}`,
+              vorname: a.vorname ?? "",
+              nachname: a.nachname ?? "",
+              geburtsdatum: a.geburtsdatum ?? "",
+            },
+            {
+              id: b.id,
+              ivoris_id: b.ivoris_id,
+              vorname: b.vorname ?? "",
+              nachname: b.nachname ?? "",
+              geburtsdatum: b.geburtsdatum ?? "",
+            }
+          );
+          if (kind === "none") continue;
+          kinds.add(kind);
+          involvedIds.add(a.id);
+          involvedIds.add(b.id);
+        }
+      }
+      const patients = candidates.filter((patient) => involvedIds.has(patient.id));
+      const firstNames = Array.from(new Set(patients.map((patient) => patient.vorname).filter(Boolean)));
+      return {
+        key,
+        patient_name: `${firstNames.join(" / ")} ${patients[0]?.nachname ?? ""}`.trim(),
+        geburtsdatum: patients[0]?.geburtsdatum ?? null,
+        match_kind: kinds.has("first_name_variant") ? "first_name_variant" : "exact",
+        ivoris_ids: Array.from(new Set(patients.map((patient) => patient.ivoris_id).filter(Boolean))),
+        patients: patients.map((patient) => ({
+          id: patient.id,
+          ivoris_id: patient.ivoris_id,
+          vorname: patient.vorname,
+          nachname: patient.nachname,
+          created_at: patient.created_at,
+        })),
+      };
+    })
     .filter((group) => group.patients.length > 1 && group.ivoris_ids.length > 1)
     .sort((left, right) => right.patients.length - left.patients.length);
 

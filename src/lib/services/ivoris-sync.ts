@@ -94,19 +94,38 @@ function normalizePersonToken(value: string): string {
     .replace(/\s+/g, " ");
 }
 
+export type PatientIdentityMatchKind = "none" | "exact" | "first_name_variant";
+
+function nameTokens(value: string): string[] {
+  return normalizePersonToken(value).split(/[\s-]+/).filter(Boolean);
+}
+
+export function patientIdentityMatchKind(
+  incoming: Pick<NormalizedPatient, "vorname" | "nachname" | "geburtsdatum" | "ivoris_id">,
+  existing: ExistingPatientCandidate
+): PatientIdentityMatchKind {
+  if (existing.ivoris_id === incoming.ivoris_id) return "none";
+  if (incoming.geburtsdatum !== existing.geburtsdatum) return "none";
+  if (normalizePersonToken(incoming.nachname) !== normalizePersonToken(existing.nachname)) return "none";
+
+  const incomingFirst = normalizePersonToken(incoming.vorname);
+  const existingFirst = normalizePersonToken(existing.vorname);
+  if (incomingFirst === existingFirst) return "exact";
+
+  const incomingTokens = nameTokens(incoming.vorname);
+  const existingTokens = nameTokens(existing.vorname);
+  const shorter = incomingTokens.length <= existingTokens.length ? incomingTokens : existingTokens;
+  const longer = incomingTokens.length <= existingTokens.length ? existingTokens : incomingTokens;
+  return shorter.length > 0 && shorter.every((token) => longer.includes(token))
+    ? "first_name_variant"
+    : "none";
+}
+
 export function isSamePersonCandidate(
   incoming: Pick<NormalizedPatient, "vorname" | "nachname" | "geburtsdatum" | "ivoris_id">,
   existing: ExistingPatientCandidate
 ): boolean {
-  if (existing.ivoris_id === incoming.ivoris_id) {
-    return false;
-  }
-
-  return (
-    incoming.geburtsdatum === existing.geburtsdatum &&
-    normalizePersonToken(incoming.vorname) === normalizePersonToken(existing.vorname) &&
-    normalizePersonToken(incoming.nachname) === normalizePersonToken(existing.nachname)
-  );
+  return patientIdentityMatchKind(incoming, existing) !== "none";
 }
 
 export function findPotentialDuplicateCandidates(
@@ -264,7 +283,11 @@ export async function syncIvorisPatients(): Promise<{
     );
 
     if (duplicateCandidates.length) {
-      if (duplicateCandidates.length === 1 && !duplicateCandidates[0].ivoris_id) {
+      if (
+        duplicateCandidates.length === 1 &&
+        !duplicateCandidates[0].ivoris_id &&
+        patientIdentityMatchKind(patient, duplicateCandidates[0]) === "exact"
+      ) {
         const candidate = duplicateCandidates[0];
         const { error: linkError } = await db
           .from("patients")

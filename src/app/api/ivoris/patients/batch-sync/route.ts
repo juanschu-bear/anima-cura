@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
-import { findPotentialDuplicateCandidates } from "@/lib/services/ivoris-sync";
+import { findPotentialDuplicateCandidates, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
@@ -203,7 +203,11 @@ export async function GET(request: Request) {
         : [];
 
       if (duplicateCandidates.length > 0) {
-        if (duplicateCandidates.length === 1 && !duplicateCandidates[0].ivoris_id) {
+        if (
+          duplicateCandidates.length === 1 &&
+          !duplicateCandidates[0].ivoris_id &&
+          patientIdentityMatchKind({ ...row, geburtsdatum: row.geburtsdatum! }, duplicateCandidates[0]) === "exact"
+        ) {
           const candidate = duplicateCandidates[0];
           const { error: linkError } = await db
             .from("patients")
