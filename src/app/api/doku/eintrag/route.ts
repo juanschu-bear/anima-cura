@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
+import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,10 @@ export async function POST(request: NextRequest) {
   if (!body.patient_id) return NextResponse.json({ error: "patient_id fehlt" }, { status: 400 });
 
   const bestaetigen = body.bestaetigen !== false; // Default: bestaetigen (Cockpit-Flow)
+  const mitarbeiterKuerzel = normalizeStaffInitials(profile?.kuerzel);
+  if (bestaetigen && !mitarbeiterKuerzel) {
+    return NextResponse.json({ error: MISSING_STAFF_INITIALS_MESSAGE }, { status: 409 });
+  }
   // Ein Entwurf darf unvollstaendig sein. Erst beim Bestaetigen ist Text Pflicht.
   if (bestaetigen && (!body.text || !body.text.trim())) {
     return NextResponse.json({ error: "text fehlt" }, { status: 400 });
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
       ...daten,
       status: bestaetigen ? "bestaetigt" : "entwurf",
       bestaetigt_von: bestaetigen ? user.id : null,
-      bestaetigt_kuerzel: bestaetigen ? ((profile?.kuerzel as string | null) ?? null) : null,
+      bestaetigt_kuerzel: bestaetigen ? mitarbeiterKuerzel : null,
       bestaetigt_am: bestaetigen ? new Date().toISOString() : null,
     };
     const { data: eintrag, error } = await supabase
@@ -137,7 +142,7 @@ export async function POST(request: NextRequest) {
     status: bestaetigen ? "bestaetigt" : "entwurf",
     version: 1,
     bestaetigt_von: bestaetigen ? user.id : null,
-    bestaetigt_kuerzel: bestaetigen ? ((profile?.kuerzel as string | null) ?? null) : null,
+    bestaetigt_kuerzel: bestaetigen ? mitarbeiterKuerzel : null,
     bestaetigt_am: bestaetigen ? new Date().toISOString() : null,
     ivoris_push_status: "ausstehend",
   };

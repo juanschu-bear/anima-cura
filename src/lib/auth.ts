@@ -9,13 +9,14 @@ export interface AuthenticatedAppUser {
   fullName: string;
   role: AppRole;
   permissions?: ProfilPermissions;
+  kuerzel?: string | null;
 }
 
 export interface UserProfileRecord {
   display_name?: string | null;
-  full_name?: string | null;
   role?: string | null;
   permissions?: ProfilPermissions;
+  kuerzel?: string | null;
 }
 
 export interface DefaultAuthUser {
@@ -109,12 +110,9 @@ export function buildAuthenticatedAppUser(user: User): AuthenticatedAppUser {
 }
 
 export function getProfileDisplayName(profile: UserProfileRecord | null | undefined): string | null {
-  const value =
-    typeof profile?.display_name === "string" && profile.display_name.trim()
-      ? profile.display_name
-      : typeof profile?.full_name === "string" && profile.full_name.trim()
-      ? profile.full_name
-      : null;
+  const value = typeof profile?.display_name === "string" && profile.display_name.trim()
+    ? profile.display_name
+    : null;
 
   return value ? value.trim() : null;
 }

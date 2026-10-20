@@ -50,7 +50,7 @@ export async function getAuthenticatedAppUser(): Promise<AuthenticatedAppUser | 
   const authUser = buildAuthenticatedAppUser(user);
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("display_name, full_name, role, permissions")
+    .select("display_name, role, permissions, kuerzel")
     .eq("id", user.id)
     .maybeSingle<UserProfileRecord>();
 
@@ -62,5 +62,6 @@ export async function getAuthenticatedAppUser(): Promise<AuthenticatedAppUser | 
     fullName: displayName ?? authUser.fullName,
     role: profileRole ?? authUser.role,
     permissions: profile?.permissions ?? null,
+    kuerzel: profile?.kuerzel ?? null,
   };
 }

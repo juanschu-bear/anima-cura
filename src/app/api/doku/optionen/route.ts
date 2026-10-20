@@ -67,6 +67,25 @@ export async function POST(request: NextRequest) {
 
   const db = createServerClient();
 
+  // Textbausteine dürfen nur an eine tatsächlich aktive Vorlage und eine dort
+  // vorhandene Gruppe gehängt werden. Sonst würde der Eintrag gespeichert,
+  // im Cockpit aber nie erscheinen.
+  const { data: vorlage, error: vorlageError } = await db
+    .from("doku_vorlagen")
+    .select("struktur")
+    .eq("behandlungsart", behandlungsart)
+    .eq("termin_typ", termin_typ)
+    .eq("aktiv", true)
+    .maybeSingle();
+  if (vorlageError) return NextResponse.json({ error: vorlageError.message }, { status: 500 });
+  if (!vorlage) {
+    return NextResponse.json({ error: "Die gewählte Terminart ist nicht mehr aktiv" }, { status: 404 });
+  }
+  const groups = (vorlage.struktur as { groups?: Record<string, unknown> } | null)?.groups;
+  if (!groups || !Object.prototype.hasOwnProperty.call(groups, gruppe)) {
+    return NextResponse.json({ error: "Diese Textgruppe gehört nicht zur gewählten Terminart" }, { status: 400 });
+  }
+
   // Append after existing practice options of the same group.
   const { data: vorhanden } = await db
     .from("doku_vorlagen_optionen")
