@@ -406,7 +406,13 @@ function PwFeld({ wert, setzen, platzhalter, label, onEnter }: { wert: string; s
   );
 }
 
-export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
+export default function ScribeCockpit({
+  nutzerName,
+  nutzerKuerzel,
+}: {
+  nutzerName: string;
+  nutzerKuerzel: string | null;
+}) {
   const router = useRouter();
   const { thema, wechseln } = useThema();
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
@@ -1600,8 +1606,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           <button className="thema-toggle" onClick={wechseln}>
             {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
           </button>
-          <span className="nutzer">{nutzerName}</span>
-          <button className="abmelden" onClick={abmelden}>Abmelden</button>
+          <span className="nutzer">Bestätigt als {nutzerName}{nutzerKuerzel ? ` · ${nutzerKuerzel.toUpperCase()}` : " · Kürzel fehlt"}</span>
+          <button className="abmelden" onClick={abmelden}>Mitarbeiter wechseln</button>
         </span>
       </header>
       {demo && <div className="demo-banner">Demo-Modus · es wird nichts gespeichert, kein Datenbank-Eintrag, kein ivoris</div>}
@@ -1930,7 +1936,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
         </div>
 
         {/* ===== Eintrag ===== */}
-        <p className="abschnitt">Eintrag · vorgelegt vom System, bestätigt von {nutzerName}</p>
+        <p className="abschnitt">Eintrag · vorgelegt vom System, bestätigt von {nutzerName}{nutzerKuerzel ? ` (${nutzerKuerzel.toUpperCase()})` : ""}</p>
         {ladefehler && <div className="feld" style={{ color: "var(--rot)" }}>{ladefehler}</div>}
 
         <div className="karteikarte">
@@ -2239,7 +2245,8 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
               sendet ||
               komposition.fehlt.length > 0 ||
               (!!bestaetigt && !dirty) ||
-              (!!bestaetigt && dirty && !aenderungsgrund.trim())
+              (!!bestaetigt && dirty && !aenderungsgrund.trim()) ||
+              !nutzerKuerzel
             }
           >
             {sendet
@@ -2267,6 +2274,9 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
           {komposition.fehlt.length > 0 && (
             <span className="hinweis-fehlt">Gesperrt, fehlt: {komposition.fehlt.join(", ")}</span>
           )}
+          {!nutzerKuerzel && (
+            <span className="hinweis-fehlt">Gesperrt: Deinem persönlichen Mitarbeiterkonto fehlt ein Kürzel. Bitte Mitarbeiter wechseln oder das Kürzel in der Teamverwaltung hinterlegen.</span>
+          )}
           {entwurfId && !bestaetigt && !zwischenInfo && <span className="hinweis-ok">Gespeicherter Entwurf, wird beim Bestätigen final in die Akte eingetragen.</span>}
           {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
@@ -2290,7 +2300,7 @@ export default function ScribeCockpit({ nutzerName }: { nutzerName: string }) {
                 </div>
                 <div className="aktetext">{komposition.text}</div>
                 <div className="akteversion">
-                  Eintrag v{bestaetigt.version} · bestätigt: {nutzerName} · revisionssicher: spätere Änderungen bleiben sichtbar · Aufbewahrung 10 Jahre
+                  Eintrag v{bestaetigt.version} · bestätigt: {nutzerName}{nutzerKuerzel ? ` (${nutzerKuerzel.toUpperCase()})` : ""} · revisionssicher: spätere Änderungen bleiben sichtbar · Aufbewahrung 10 Jahre
                 </div>
               </>
             ) : (

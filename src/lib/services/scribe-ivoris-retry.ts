@@ -1,5 +1,6 @@
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
+import { appendStaffInitials } from "@/lib/scribe-identity";
 import {
   recoverStalePatientIvorisLink,
   repairDokuPatientIvorisLink,
@@ -149,10 +150,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
 
     const zaehne = ((eintrag.zaehne as string[] | null) ?? []).map(String);
     const prefix = (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
-    const kuerzel = typeof eintrag.bestaetigt_kuerzel === "string" && eintrag.bestaetigt_kuerzel.trim()
-      ? ` ${eintrag.bestaetigt_kuerzel.trim()}`
-      : "";
-    const text = `${prefix}${(eintrag.text as string) ?? ""}${kuerzel}`;
+    const text = appendStaffInitials(`${prefix}${(eintrag.text as string) ?? ""}`, eintrag.bestaetigt_kuerzel);
 
     try {
       const entryPayload = {

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { addIvorisKarteiEintrag } from "@/lib/api/ivoris-doku-client";
 import { createServerClient } from "@/lib/db/supabase";
+import { appendStaffInitials } from "@/lib/scribe-identity";
 import { repairDokuPatientIvorisLink, type PatientIdentity } from "@/lib/services/patient-ivoris-link";
 import { buildScribeRetryFailurePatch } from "@/lib/services/scribe-ivoris-error";
 
@@ -84,8 +85,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   // Korrektur-Kennzeichnung: ab Version 2 entsteht in ivoris ein zusaetzlicher Eintrag
   const zaehne = (eintrag.zaehne as string[]) ?? [];
   const prefix = (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
-  const kuerzel = (eintrag.bestaetigt_kuerzel as string | null) ?? null;
-  const text = `${prefix}${eintrag.text}${kuerzel ? ` ${kuerzel}` : ""}`;
+  const text = appendStaffInitials(`${prefix}${eintrag.text}`, eintrag.bestaetigt_kuerzel);
 
   try {
     const result = await addIvorisKarteiEintrag({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
+import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!scribeErlaubt) {
     return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
   }
+  const mitarbeiterKuerzel = normalizeStaffInitials(profile?.kuerzel);
+  if (!mitarbeiterKuerzel) {
+    return NextResponse.json({ error: MISSING_STAFF_INITIALS_MESSAGE }, { status: 409 });
+  }
 
   let body: VersionBody;
   try {
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     version: neueVersion,
     status: "bestaetigt",
     bestaetigt_von: user.id,
-    bestaetigt_kuerzel: (profile?.kuerzel as string | null) ?? null,
+    bestaetigt_kuerzel: mitarbeiterKuerzel,
     bestaetigt_am: new Date().toISOString(),
     // Inhalt hat sich geaendert: erneuter Push noetig (ivoris ist append-only,
     // dort entsteht ein zusaetzlicher Korrektur-Eintrag)

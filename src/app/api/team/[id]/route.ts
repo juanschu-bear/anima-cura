@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { MODULE, STUFEN, type Stufe } from "@/lib/permissions";
+import { normalizeStaffInitials } from "@/lib/scribe-identity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const update: Record<string, unknown> = {};
   const service = createServerClient();
-  const { data: zielProfil } = await service.from("user_profiles").select("role").eq("id", params.id).single();
+  const { data: zielProfil } = await service.from("user_profiles").select("role, kuerzel, permissions").eq("id", params.id).single();
   const zielRole = (zielProfil?.role as string | undefined) ?? null;
   if (actorRole === "verwaltung" && zielRole === "admin") {
     return NextResponse.json({ error: "Admin-Konten können nur von Admins bearbeitet werden." }, { status: 403 });
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     update.role = body.rolle;
   }
   if (body.kuerzel !== undefined) {
-    update.kuerzel = (body.kuerzel ?? "").trim().toLowerCase() || null;
+    update.kuerzel = normalizeStaffInitials(body.kuerzel);
   }
   if (body.scribe_schreiben !== undefined || body.module_stufen !== undefined) {
     const { data: aktuell } = await service.from("user_profiles").select("permissions").eq("id", params.id).single();
@@ -72,6 +73,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       neuePermissions.module = validiert;
     }
     update.permissions = neuePermissions;
+  }
+  const kuenftigeRolle = (update.role as string | undefined) ?? zielRole;
+  const bisherigePermissions = (zielProfil?.permissions as Record<string, unknown> | null) ?? {};
+  const kuenftigePermissions = (update.permissions as Record<string, unknown> | undefined) ?? bisherigePermissions;
+  const darfScribeSchreiben = typeof kuenftigePermissions.scribe_schreiben === "boolean"
+    ? kuenftigePermissions.scribe_schreiben
+    : ["admin", "verwaltung"].includes(kuenftigeRolle ?? "");
+  const kuenftigesKuerzel = update.kuerzel !== undefined
+    ? (update.kuerzel as string | null)
+    : normalizeStaffInitials(zielProfil?.kuerzel);
+  if (darfScribeSchreiben && !kuenftigesKuerzel) {
+    return NextResponse.json({ error: "Für Scribe-berechtigte Konten ist ein persönliches Kürzel Pflicht." }, { status: 400 });
+  }
+  if (kuenftigesKuerzel && update.kuerzel !== undefined) {
+    const { data: doppelt } = await service
+      .from("user_profiles")
+      .select("id")
+      .ilike("kuerzel", kuenftigesKuerzel)
+      .neq("id", params.id)
+      .limit(1);
+    if (doppelt?.length) {
+      return NextResponse.json({ error: `Das Kürzel ${kuenftigesKuerzel} ist bereits vergeben.` }, { status: 409 });
+    }
   }
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nichts zu ändern." }, { status: 400 });
 

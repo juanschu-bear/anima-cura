@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
+import { normalizeStaffInitials } from "@/lib/scribe-identity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
   const lokal = (body.lokal ?? "").trim().toLowerCase();
   const name = (body.name ?? "").trim();
   const rolle = body.rolle ?? "";
-  const kuerzel = (body.kuerzel ?? "").trim().toLowerCase() || null;
+  const kuerzel = normalizeStaffInitials(body.kuerzel);
   const passwort = body.passwort ?? "";
 
   if (!/^[a-z0-9._-]{2,40}$/.test(lokal)) {
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
   }
   if (!name) return NextResponse.json({ error: "Name fehlt." }, { status: 400 });
   if (!ROLLEN.includes(rolle)) return NextResponse.json({ error: "Ungültige Rolle." }, { status: 400 });
+  if (["admin", "verwaltung"].includes(rolle) && !kuerzel) {
+    return NextResponse.json({ error: "Für Scribe-berechtigte Konten ist ein persönliches Kürzel Pflicht." }, { status: 400 });
+  }
   if (actorRole === "verwaltung" && body.rolle === "admin") {
     return NextResponse.json({ error: "Verwaltung darf keine Admin-Konten anlegen." }, { status: 403 });
   }
@@ -65,6 +69,16 @@ export async function POST(request: NextRequest) {
 
   const email = `${lokal}@${MAIL_DOMAIN}`;
   const service = createServerClient();
+  if (kuerzel) {
+    const { data: doppelt } = await service
+      .from("user_profiles")
+      .select("id")
+      .ilike("kuerzel", kuerzel)
+      .limit(1);
+    if (doppelt?.length) {
+      return NextResponse.json({ error: `Das Kürzel ${kuerzel} ist bereits vergeben.` }, { status: 409 });
+    }
+  }
 
   const { data: angelegt, error: anlageFehler } = await service.auth.admin.createUser({
     email,
