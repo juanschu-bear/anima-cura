@@ -174,7 +174,7 @@ BEGIN
       )),
       'Patient wurde bei der Erfassung in der Praxis eindeutig ausgewählt',
       coalesce(NEW.created_at, now()), auth.uid()
-    ) ON CONFLICT (source_key) DO NOTHING;
+    ) ON CONFLICT DO NOTHING;
   END IF;
   RETURN NEW;
 END;
@@ -185,30 +185,9 @@ CREATE TRIGGER ledger_record_practice_payment_trigger
   AFTER INSERT ON kassen_zahlungen
   FOR EACH ROW EXECUTE FUNCTION ledger_record_practice_payment();
 
--- Historic practice receipts are certain patient evidence because the patient was
--- selected by the practice during entry. Re-running the migration is idempotent.
-INSERT INTO payment_patient_allocations (
-  source_key, transaction_id, kassen_zahlung_id, patient_id, amount_cents,
-  state, confidence_score, evidence, decision_reason, confirmed_at
-)
-SELECT
-  'kasse-v1:' || k.id::text, NULL, k.id, k.patient_id,
-  round(k.betrag * 100)::bigint, 'confirmed_manual', 100,
-  jsonb_build_array(jsonb_build_object(
-    'kind', 'practice_receipt',
-    'receiptId', k.id,
-    'paymentDate', k.kassen_datum,
-    'paymentMethod', k.zahlart
-  )),
-  'Historischer Praxisbeleg mit eindeutig ausgewähltem Patienten',
-  k.created_at
-FROM kassen_zahlungen k
-WHERE k.status = 'gebucht'
-  AND k.buchungstyp = 'einnahme'
-  AND k.patient_id IS NOT NULL
-  AND k.zahlart IN ('bar', 'girocard', 'kreditkarte')
-  AND k.betrag > 0
-ON CONFLICT (source_key) DO NOTHING;
+-- Historic practice receipts are backfilled by migration 052 after the schema,
+-- trigger and voiding workflow are live. Keeping the backfill separate makes a
+-- failed data row unable to block the structural migration.
 
 CREATE OR REPLACE FUNCTION void_kassen_zahlung(p_id uuid, p_reason text)
 RETURNS void
@@ -254,7 +233,7 @@ BEGIN
       original.patient_id, original.amount_cents, 'reversed', 100,
       jsonb_build_array(jsonb_build_object('kind', 'practice_receipt_void', 'reason', trim(p_reason))),
       trim(p_reason), now(), auth.uid(), original.id
-    ) ON CONFLICT (source_key) DO NOTHING;
+    ) ON CONFLICT DO NOTHING;
   END IF;
 
   UPDATE kassen_zahlungen
