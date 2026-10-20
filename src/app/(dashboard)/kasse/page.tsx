@@ -150,11 +150,13 @@ export default function KassePage() {
   const [pruefe, setPruefe] = useState(false);
   const [tagesListe, setTagesListe] = useState<any[]>([]);
   const [kassenTag, setKassenTag] = useState(() => new Date().toISOString().slice(0, 10));
+  const [zahlungsDatum, setZahlungsDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [filterArt, setFilterArt] = useState<string>("alle");
   const [seite, setSeite] = useState(1);
   const [detail, setDetail] = useState<any | null>(null);
   const [detailQr, setDetailQr] = useState<string | null>(null);
   const [loeschBestaetigung, setLoeschBestaetigung] = useState(false);
+  const [stornoGrund, setStornoGrund] = useState("");
   const [exportZeitraum, setExportZeitraum] = useState<"tag" | "woche" | "monat">("tag");
   const [exporting, setExporting] = useState<null | "csv" | "pdf">(null);
   const [quartalAktiv, setQuartalAktiv] = useState(false);
@@ -191,7 +193,7 @@ export default function KassePage() {
         key,
         label,
         summe: tagesListe
-          .filter((z) => z.zahlart === key)
+          .filter((z) => z.status !== "storniert" && z.zahlart === key)
           .reduce((sum, z) => sum + Number(z.betrag || 0), 0),
       })),
     [tagesListe]
@@ -236,13 +238,17 @@ export default function KassePage() {
 
   const tagesSummen = useMemo(() => {
     const s: Record<string, number> = {};
-    for (const z of tagesListe) s[z.zahlart] = (s[z.zahlart] || 0) + Number(z.betrag);
+    for (const z of tagesListe) {
+      if (z.status === "storniert") continue;
+      s[z.zahlart] = (s[z.zahlart] || 0) + Number(z.betrag);
+    }
     return s;
   }, [tagesListe]);
   const kassenUebersicht = useMemo(() => {
     let einnahmen = 0;
     let ausgaben = 0;
     for (const z of tagesListe) {
+      if (z.status === "storniert") continue;
       const wert = Number(z.betrag || 0);
       if (z.buchungstyp === "ausgabe") ausgaben += wert;
       else einnahmen += wert;
@@ -269,7 +275,9 @@ export default function KassePage() {
       const rows = await ladeExportListe();
       const header = ["Datum", "Typ", "Patient", "Patientennummer", "Zahlart", "Betrag_EUR", "Quartal", "Zweck", "Notiz", "Status"];
       const lines = rows.map((row: any) => {
-        const status = row.buchungstyp === "ausgabe"
+        const status = row.status === "storniert"
+          ? `Storniert: ${row.storno_grund || "ohne Angabe"}`
+          : row.buchungstyp === "ausgabe"
           ? "Praxis-Ausgabe"
           : row.zahlart === "qr_ueberweisung"
           ? row.transaktion_id ? "Geldeingang da" : "Wartet auf Geldeingang"
@@ -317,11 +325,12 @@ export default function KassePage() {
     setExporting("pdf");
     try {
       const rows = await ladeExportListe();
-      const totals = rows.reduce((acc: Record<string, number>, row: any) => {
+      const activeRows = rows.filter((row: any) => row.status !== "storniert");
+      const totals = activeRows.reduce((acc: Record<string, number>, row: any) => {
         acc[row.zahlart] = (acc[row.zahlart] || 0) + Number(row.betrag || 0);
         return acc;
       }, {});
-      const summary = rows.reduce((acc: { einnahmen: number; ausgaben: number }, row: any) => {
+      const summary = activeRows.reduce((acc: { einnahmen: number; ausgaben: number }, row: any) => {
         const wert = Number(row.betrag || 0);
         if (row.buchungstyp === "ausgabe") acc.ausgaben += wert;
         else acc.einnahmen += wert;
@@ -330,7 +339,7 @@ export default function KassePage() {
       const htmlRows = rows.map((row: any) => `
         <tr>
           <td>${htmlEscape(row.kassen_datum)}</td>
-          <td>${htmlEscape(row.buchungstyp === "ausgabe" ? "Ausgabe" : "Einnahme")}</td>
+          <td>${htmlEscape(row.status === "storniert" ? "Storniert" : row.buchungstyp === "ausgabe" ? "Ausgabe" : "Einnahme")}</td>
           <td>${htmlEscape(`${row.patients?.nachname || ""}, ${row.patients?.vorname || ""}`.replace(/^,\s*/, ""))}</td>
           <td>${htmlEscape(row.patients?.ivoris_nummer || "")}</td>
           <td>${htmlEscape(ZAHLARTEN.find((item) => item.key === row.zahlart)?.label || row.zahlart)}</td>
@@ -444,6 +453,7 @@ export default function KassePage() {
   async function oeffneDetail(z: any) {
     setDetail(z);
     setLoeschBestaetigung(false);
+    setStornoGrund("");
     setDetailQr(null);
     if (z.buchungstyp !== "ausgabe" && z.zahlart === "qr_ueberweisung") {
       const zweck = z.zweck || `Behandlung ${z.zeichen || ""} ${z.patients?.nachname || ""}`.trim();
@@ -452,18 +462,21 @@ export default function KassePage() {
     }
   }
 
-  async function loescheEintrag() {
+  async function storniereEintrag() {
     if (!detail) return;
-    const { data, error } = await supabase
-      .from("kassen_zahlungen")
-      .delete()
-      .eq("id", detail.id)
-      .select("id");
+    if (stornoGrund.trim().length < 3) {
+      setHinweis("Bitte einen kurzen Stornogrund eingeben.");
+      return;
+    }
+    const { error } = await supabase.rpc("void_kassen_zahlung", {
+      p_id: detail.id,
+      p_reason: stornoGrund.trim(),
+    });
     setDetail(null);
-    if (error || !data?.length) {
-      setHinweis("Löschen fehlgeschlagen, der Eintrag ist noch da. Bitte Juan Bescheid geben (Datenbank-Rechte).");
+    if (error) {
+      setHinweis(`Stornierung fehlgeschlagen: ${error.message}`);
     } else {
-      setHinweis("Eintrag gelöscht.");
+      setHinweis("Eintrag storniert. Ursprungsbeleg und Gegenbuchung bleiben nachvollziehbar erhalten.");
     }
     ladeTagesliste();
   }
@@ -544,6 +557,7 @@ export default function KassePage() {
       zeichen,
       zweck: zweckFinal,
       notiz: notiz || null,
+      kassen_datum: zahlungsDatum,
       quartal_jahr: quartalAktiv ? quartalJahr : null,
       quartal_nummer: quartalAktiv ? quartalNummer : null,
     }).select().single();
@@ -602,6 +616,7 @@ export default function KassePage() {
     setPatSearch("");
     setBetrag("");
     setNotiz("");
+    setZahlungsDatum(new Date().toISOString().slice(0, 10));
     setZweckManuell(null);
     setLeistung(buchungstyp === "ausgabe" ? AUSGABEN_ARTEN[0] : LEISTUNGEN[0]);
     setQuartalAktiv(false);
@@ -694,6 +709,20 @@ export default function KassePage() {
               value={betrag}
               onChange={(e) => setBetrag(e.target.value)}
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-praxis-500">Tatsächliches Zahlungsdatum</span>
+            <input
+              type="date"
+              className="input w-full"
+              value={zahlungsDatum}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setZahlungsDatum(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-praxis-400">
+              Wann das Geld wirklich eingegangen ist. Der Erfassungszeitpunkt wird zusätzlich automatisch protokolliert.
+            </span>
           </label>
 
           <div>
@@ -908,10 +937,11 @@ export default function KassePage() {
                 <>
               <div className="space-y-1">
                 {sichtbar.map((z: any) => (
-                  <button key={z.id} onClick={() => oeffneDetail(z)} className="flex w-full items-center justify-between border-b border-surface-100 px-2 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-[rgba(127,148,180,0.12)] rounded">
+                  <button key={z.id} onClick={() => oeffneDetail(z)} className={`flex w-full items-center justify-between border-b border-surface-100 px-2 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-[rgba(127,148,180,0.12)] rounded ${z.status === "storniert" ? "opacity-55" : ""}`}>
                     <span>
                       {z.buchungstyp === "ausgabe" ? "Praxis-Ausgabe" : `${z.patients?.nachname}, ${z.patients?.vorname}`}
                       {z.quartal_jahr && z.quartal_nummer ? <span className="ml-2 text-[11px] text-praxis-400">{`Q${z.quartal_nummer} ${z.quartal_jahr}`}</span> : null}
+                      {z.status === "storniert" ? <span className="ml-2 text-[11px] font-semibold text-red-400">STORNIERT</span> : null}
                     </span>
                     <span className="text-xs text-praxis-400">
                       {z.buchungstyp === "ausgabe" ? "Ausgabe · " : "Einnahme · "}
@@ -991,6 +1021,14 @@ export default function KassePage() {
               <span className={`font-semibold ${detail.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>{signedEuro(Number(detail.betrag || 0), detail.buchungstyp || "einnahme")} €</span>
             </div>
             <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Zahlungsdatum</span>
+              <span>{new Date(`${detail.kassen_datum}T12:00:00`).toLocaleDateString("de-DE")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-praxis-400">Erfasst am</span>
+              <span className="text-right text-xs">{new Date(detail.created_at).toLocaleString("de-DE")}</span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-praxis-400">Zahlart</span>
               <span>{ZAHLARTEN.find(a => a.key === detail.zahlart)?.label}</span>
             </div>
@@ -1051,19 +1089,29 @@ export default function KassePage() {
             >
               Als PDF speichern
             </a>
-            {(!detail.transaktion_id || detail.buchungstyp === "ausgabe") ? (
+            {detail.status === "storniert" ? (
+              <div className="rounded-lg border border-red-400/40 p-3 text-xs text-red-400">
+                Storniert: {detail.storno_grund || "Kein Grund hinterlegt"}
+              </div>
+            ) : (!detail.transaktion_id || detail.buchungstyp === "ausgabe") ? (
               loeschBestaetigung ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-red-400/40 p-3">
-                  <span className="text-xs text-red-400">Wirklich löschen? Das lässt sich nicht rückgängig machen.</span>
-                  <button className="btn-secondary text-xs" onClick={loescheEintrag}>Ja, löschen</button>
+                <div className="space-y-2 rounded-lg border border-red-400/40 p-3">
+                  <p className="text-xs text-red-400">Der Beleg wird nicht gelöscht, sondern nachvollziehbar gegengebucht.</p>
+                  <input
+                    className="input w-full text-xs"
+                    value={stornoGrund}
+                    onChange={(e) => setStornoGrund(e.target.value)}
+                    placeholder="Stornogrund, z. B. doppelt erfasst"
+                  />
+                  <button className="btn-secondary w-full text-xs" onClick={storniereEintrag}>Jetzt stornieren</button>
                 </div>
               ) : (
                 <button className="btn-secondary w-full text-xs" onClick={() => setLoeschBestaetigung(true)}>
-                  Eintrag löschen (z.&nbsp;B. Demo oder Irrtum)
+                  Eintrag stornieren
                 </button>
               )
             ) : (
-              <p className="text-xs text-praxis-400">Dieser Eintrag ist mit einer eingegangenen Zahlung verknüpft und kann nicht gelöscht werden.</p>
+              <p className="text-xs text-praxis-400">Dieser Eintrag ist mit einer Bankzahlung verknüpft. Die Korrektur erfolgt über den zugehörigen Zahlungsvorgang.</p>
             )}
           </div>
         ) : null}
