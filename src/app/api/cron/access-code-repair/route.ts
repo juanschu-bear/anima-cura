@@ -121,7 +121,6 @@ export async function GET(request: NextRequest) {
     }
     const recent = await db.from("communication_messages").select("id")
       .eq("recipient", sender)
-      .eq("provider", "hostinger")
       .eq("campaign_key", "patient_access_code_recovery")
       .in("status", ["accepted", "delivered", "opened", "clicked"])
       .gte("created_at", new Date(Date.now() - 25 * 60 * 1000).toISOString())
@@ -129,6 +128,28 @@ export async function GET(request: NextRequest) {
     if ((recent.data ?? []).length) {
       await db.from("workflow_runs").update({ result: { ...run.result, caseStatus: "resolved", remediationOutcome: "recent_code_already_sent" } }).eq("id", run.id);
       supportResults.push({ id: run.id, outcome: "recent_code_already_sent" });
+      continue;
+    }
+
+    // Claim the support case before sending anything. The unique provider /
+    // provider_message_id pair makes this an atomic, cross-invocation lock and
+    // prevents overlapping or repeated cron runs from issuing multiple codes.
+    const claim = await db.from("communication_messages").insert({
+      campaign_key: "patient_access_watchdog_claim",
+      channel: "email",
+      provider: "access_code_watchdog",
+      provider_message_id: run.id,
+      recipient: sender,
+      subject: "Automatische Zugangsprüfung",
+      status: "queued",
+      metadata: { contentRestricted: true, workflowRunId: run.id },
+    }).select("id").single();
+    if (claim.error) {
+      if (claim.error.code === "23505") {
+        supportResults.push({ id: run.id, outcome: "repair_already_claimed" });
+        continue;
+      }
+      supportResults.push({ id: run.id, outcome: "repair_claim_failed" });
       continue;
     }
     supportActions += 1;
@@ -147,7 +168,7 @@ export async function GET(request: NextRequest) {
         folder: typeof run.result.sourceFolder === "string" ? run.result.sourceFolder : "inbox",
         messageId: typeof run.result.messageId === "string" ? run.result.messageId : null,
       }, `support-watchdog:${run.id}`);
-      await db.from("workflow_runs").update({
+      const finalized = await db.from("workflow_runs").update({
         result: {
           ...run.result,
           caseStatus: remediation.outcome === "recovery_code_sent" ? "resolved" : "awaiting_patient",
@@ -156,6 +177,19 @@ export async function GET(request: NextRequest) {
           replyText: remediation.replyText,
         },
       }).eq("id", run.id);
+      if (finalized.error) throw new Error("support_case_finalize_failed");
+      const claimStatus = remediation.outcome === "recovery_code_sent" ? "accepted" : "delivered";
+      await db.from("communication_messages").update({
+        status: claimStatus,
+        sent_at: new Date().toISOString(),
+        last_event_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          contentRestricted: true,
+          workflowRunId: run.id,
+          remediationOutcome: remediation.outcome,
+        },
+      }).eq("id", claim.data.id);
       if (remediation.outcome !== "recovery_code_sent") {
         const marker = await safeCreateCommunicationMessage({
           campaignKey: "patient_access_guidance",
@@ -171,6 +205,16 @@ export async function GET(request: NextRequest) {
       }
       supportResults.push({ id: run.id, outcome: remediation.outcome });
     } catch (error) {
+      await db.from("communication_messages").update({
+        status: "failed",
+        last_event_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          contentRestricted: true,
+          workflowRunId: run.id,
+          repairError: error instanceof Error ? error.message : "repair_failed",
+        },
+      }).eq("id", claim.data.id);
       supportResults.push({ id: run.id, outcome: error instanceof Error ? error.message : "repair_failed" });
     }
   }
