@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Check, CreditCard, Info, Landmark, QrCode, Search, Wallet, X } from "lucide-react";
+import { Banknote, CalendarDays, Check, CreditCard, Info, Landmark, QrCode, Search, Wallet, X } from "lucide-react";
 import QRCode from "qrcode";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { usePatienten } from "@/hooks/useData";
@@ -132,6 +132,7 @@ function epcPayload(betrag: number, zweck: string): string {
 const supabase = createBrowserClient();
 
 export default function KassePage() {
+  const heute = useMemo(() => isoFromLocalDate(new Date()), []);
   const [buchungstyp, setBuchungstyp] = useState<"einnahme" | "ausgabe">("einnahme");
   const [patSearch, setPatSearch] = useState("");
   const { patienten } = usePatienten(patSearch.length >= 2 ? patSearch : undefined);
@@ -139,7 +140,7 @@ export default function KassePage() {
   const [betrag, setBetrag] = useState("");
   const [zahlart, setZahlart] = useState<(typeof ZAHLARTEN)[number]["key"]>("qr_ueberweisung");
   const [guthaben, setGuthaben] = useState<number | null>(null);
-  const [bestaetigung, setBestaetigung] = useState<{ kzId: string; name: string; betrag: number; zahlart: string; rest: number | null; buchungstyp: "einnahme" | "ausgabe" } | null>(null);
+  const [bestaetigung, setBestaetigung] = useState<{ kzId: string; name: string; betrag: number; zahlart: string; datum: string; rest: number | null; buchungstyp: "einnahme" | "ausgabe" } | null>(null);
   const [notiz, setNotiz] = useState("");
   const [leistung, setLeistung] = useState<string>(LEISTUNGEN[0]);
   const [zweckManuell, setZweckManuell] = useState<string | null>(null);
@@ -149,7 +150,8 @@ export default function KassePage() {
   const [qrInfo, setQrInfo] = useState<{ kzId: string; name: string; betrag: number; zweck: string; eingegangen: boolean } | null>(null);
   const [pruefe, setPruefe] = useState(false);
   const [tagesListe, setTagesListe] = useState<any[]>([]);
-  const [kassenTag, setKassenTag] = useState(() => new Date().toISOString().slice(0, 10));
+  const [kassenTag, setKassenTag] = useState(heute);
+  const [buchungsdatum, setBuchungsdatum] = useState(heute);
   const [filterArt, setFilterArt] = useState<string>("alle");
   const [seite, setSeite] = useState(1);
   const [detail, setDetail] = useState<any | null>(null);
@@ -494,6 +496,8 @@ export default function KassePage() {
     setHinweis("");
     const b = parseBetrag(betrag);
     if (!b) { setHinweis("Bitte einen gültigen Betrag eingeben, z. B. 36,23."); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(buchungsdatum)) { setHinweis("Bitte ein gültiges Zahlungsdatum wählen."); return; }
+    if (buchungsdatum > heute) { setHinweis("Das Zahlungsdatum darf nicht in der Zukunft liegen."); return; }
     if (buchungstyp === "einnahme" && !patient) { setHinweis("Bitte zuerst einen Patienten wählen."); return; }
     if (buchungstyp === "ausgabe" && (zahlart === "qr_ueberweisung" || zahlart === "ueberweisung" || zahlart === "guthaben")) {
       setHinweis("Ausgaben koennen nur als Bar-, Girocard- oder Kreditkartenbuchung erfasst werden.");
@@ -515,6 +519,7 @@ export default function KassePage() {
       betrag: b,
       buchungstyp,
       zahlart,
+      kassen_datum: buchungsdatum,
       zeichen,
       zweck: zweckFinal,
       notiz: notiz || null,
@@ -562,6 +567,7 @@ export default function KassePage() {
         name: buchungstyp === "einnahme" && patient ? `${patient.nachname}, ${patient.vorname}` : "Praxis-Ausgabe",
         betrag: b,
         zahlart: ZAHLARTEN.find(a => a.key === zahlart)?.label || zahlart,
+        datum: buchungsdatum,
         rest: buchungstyp === "einnahme" && zahlart === "guthaben" ? Math.max(0, (guthaben ?? 0) - b) : null,
         buchungstyp,
       });
@@ -569,8 +575,8 @@ export default function KassePage() {
 
     setHinweis(
       buchungstyp === "ausgabe"
-        ? `Ausgabe erfasst: ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} € · ${leistung}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
-        : `Erfasst: ${patient!.nachname}, ${patient!.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
+        ? `Ausgabe erfasst: ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} € · ${leistung} · ${localDateFromIso(buchungsdatum).toLocaleDateString("de-DE")}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
+        : `Erfasst: ${patient!.nachname}, ${patient!.vorname} · ${b.toLocaleString("de-DE", { minimumFractionDigits: 2 })} € · Zahlungsdatum ${localDateFromIso(buchungsdatum).toLocaleDateString("de-DE")}${zahlart === "guthaben" ? ` · vom Guthaben verrechnet, Rest ${Math.max(0, (guthaben ?? 0) - b).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : ""}${quartalAktiv ? ` · Q${quartalNummer} ${quartalJahr}` : ""}`
     );
     setPatient(null);
     setPatSearch("");
@@ -580,7 +586,8 @@ export default function KassePage() {
     setLeistung(buchungstyp === "ausgabe" ? AUSGABEN_ARTEN[0] : LEISTUNGEN[0]);
     setQuartalAktiv(false);
     setSaving(false);
-    ladeTagesliste();
+    if (kassenTag !== buchungsdatum) setKassenTag(buchungsdatum);
+    else ladeTagesliste();
   }
 
   return (
@@ -668,6 +675,22 @@ export default function KassePage() {
               value={betrag}
               onChange={(e) => setBetrag(e.target.value)}
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-praxis-500">
+              <CalendarDays size={14} /> Tatsächliches Zahlungsdatum
+            </span>
+            <input
+              className="input w-full"
+              type="date"
+              max={heute}
+              value={buchungsdatum}
+              onChange={(e) => setBuchungsdatum(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-praxis-400">
+              Bei Nachträgen das Datum vom Zahlungsbeleg wählen – nicht das heutige Erfassungsdatum.
+            </span>
           </label>
 
           <div>
@@ -1053,6 +1076,9 @@ export default function KassePage() {
               </div>
             </div>
             <div className={`text-2xl font-bold ${bestaetigung.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>{signedEuro(bestaetigung.betrag, bestaetigung.buchungstyp)} €</div>
+            <div className="text-sm text-praxis-500">
+              Buchungsdatum: {localDateFromIso(bestaetigung.datum).toLocaleDateString("de-DE")}
+            </div>
             {bestaetigung.rest !== null && (
               <div className="text-sm" style={{ color: "#b88a2e" }}>Verbleibendes Anima-Balance-Guthaben: {bestaetigung.rest.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</div>
             )}
