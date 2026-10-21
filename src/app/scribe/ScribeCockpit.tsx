@@ -1606,7 +1606,7 @@ export default function ScribeCockpit({
           <button className="thema-toggle" onClick={wechseln}>
             {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
           </button>
-          <span className="nutzer">Bestätigt als {nutzerName}{nutzerKuerzel ? ` · ${nutzerKuerzel.toUpperCase()}` : " · Kürzel fehlt"}</span>
+          <span className="nutzer">Bestätigt als {nutzerName}</span>
           <button className="abmelden" onClick={abmelden}>Mitarbeiter wechseln</button>
         </span>
       </header>
@@ -1936,7 +1936,7 @@ export default function ScribeCockpit({
         </div>
 
         {/* ===== Eintrag ===== */}
-        <p className="abschnitt">Eintrag · vorgelegt vom System, bestätigt von {nutzerName}{nutzerKuerzel ? ` (${nutzerKuerzel.toUpperCase()})` : ""}</p>
+        <p className="abschnitt">Eintrag · vorgelegt vom System, bestätigt von {nutzerName}</p>
         {ladefehler && <div className="feld" style={{ color: "var(--rot)" }}>{ladefehler}</div>}
 
         <div className="karteikarte">
@@ -2300,7 +2300,7 @@ export default function ScribeCockpit({
                 </div>
                 <div className="aktetext">{komposition.text}</div>
                 <div className="akteversion">
-                  Eintrag v{bestaetigt.version} · bestätigt: {nutzerName}{nutzerKuerzel ? ` (${nutzerKuerzel.toUpperCase()})` : ""} · revisionssicher: spätere Änderungen bleiben sichtbar · Aufbewahrung 10 Jahre
+                  Eintrag v{bestaetigt.version} · bestätigt: {nutzerName} · revisionssicher: spätere Änderungen bleiben sichtbar · Aufbewahrung 10 Jahre
                 </div>
               </>
             ) : (

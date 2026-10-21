@@ -5,8 +5,10 @@ export function normalizeStaffInitials(value: unknown): string | null {
 }
 
 export function appendStaffInitials(text: string, value: unknown): string {
-  const initials = normalizeStaffInitials(value);
-  return initials ? `${text.trimEnd()} ${initials}` : text.trimEnd();
+  // Das persönliche Kürzel bleibt für die interne, revisionssichere Zuordnung
+  // gespeichert. Im IVORIS-Freitext wird es jedoch nicht angehängt.
+  void value;
+  return text.trimEnd();
 }
 
 export const MISSING_STAFF_INITIALS_MESSAGE =
