@@ -126,7 +126,28 @@ export async function GET(request: NextRequest) {
       .gte("created_at", new Date(Date.now() - 25 * 60 * 1000).toISOString())
       .limit(1);
     if ((recent.data ?? []).length) {
-      await db.from("workflow_runs").update({ result: { ...run.result, caseStatus: "resolved", remediationOutcome: "recent_code_already_sent" } }).eq("id", run.id);
+      const recentClaim = await db.from("communication_messages").insert({
+        campaign_key: "patient_access_watchdog_claim",
+        channel: "email",
+        provider: "access_code_watchdog",
+        provider_message_id: run.id,
+        recipient: sender,
+        subject: "Automatische Zugangsprüfung",
+        status: "accepted",
+        sent_at: new Date().toISOString(),
+        metadata: { contentRestricted: true, workflowRunId: run.id, remediationOutcome: "recent_code_already_sent" },
+      });
+      if (recentClaim.error && recentClaim.error.code !== "23505") {
+        supportResults.push({ id: run.id, outcome: "repair_claim_failed" });
+        continue;
+      }
+      const finalized = await db.from("workflow_runs").update({
+        result: { ...run.result, caseStatus: "resolved", remediationOutcome: "recent_code_already_sent" },
+      }).eq("id", run.id);
+      if (finalized.error) {
+        supportResults.push({ id: run.id, outcome: "support_case_finalize_failed" });
+        continue;
+      }
       supportResults.push({ id: run.id, outcome: "recent_code_already_sent" });
       continue;
     }
