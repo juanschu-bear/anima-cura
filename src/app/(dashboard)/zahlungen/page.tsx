@@ -490,10 +490,10 @@ export default function ZahlungenPage() {
   function kassenStatusInfo(z: any) {
     if (z.zahlart === "qr_ueberweisung") {
       if (z.abgleich_status === "mehrdeutig") {
-        return { label: "Zuordnung prüfen", color: "#d4a72c", weight: 700 };
+        return { label: "Wird automatisch geklärt", color: "var(--ac-text-soft)", weight: 600 };
       }
-      if (z.abgleich_status === "kein_eindeutiger_eingang") {
-        return { label: "Kein eindeutiger Bankeingang", color: "var(--ac-text-soft)", weight: 600 };
+      if (["kein_eindeutiger_eingang", "system_nachverfolgung"].includes(z.abgleich_status)) {
+        return { label: "Finanzsystem verfolgt Zahlung", color: "var(--ac-text-soft)", weight: 600 };
       }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
@@ -501,10 +501,10 @@ export default function ZahlungenPage() {
     }
     if (z.zahlart === "ueberweisung") {
       if (z.abgleich_status === "mehrdeutig") {
-        return { label: "Zuordnung prüfen", color: "#d4a72c", weight: 700 };
+        return { label: "Wird automatisch geklärt", color: "var(--ac-text-soft)", weight: 600 };
       }
-      if (z.abgleich_status === "kein_eindeutiger_eingang") {
-        return { label: "Kein eindeutiger Bankeingang", color: "var(--ac-text-soft)", weight: 600 };
+      if (["kein_eindeutiger_eingang", "system_nachverfolgung"].includes(z.abgleich_status)) {
+        return { label: "Finanzsystem verfolgt Zahlung", color: "var(--ac-text-soft)", weight: 600 };
       }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }

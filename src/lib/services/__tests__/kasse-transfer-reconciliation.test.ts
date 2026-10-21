@@ -9,6 +9,8 @@ const intent = {
   kassen_datum: "2026-09-15",
   betrag: 123.45,
   zeichen: "00007123",
+  patient_vorname: "Max",
+  patient_nachname: "Mustermann",
 };
 
 const transaction = {
@@ -79,6 +81,66 @@ test("does not trust an unconfirmed name or amount-only candidate", () => {
     matched_patient_id: "p1",
   };
   const result = buildTransferReconciliationPlan([intent], [unconfirmed]);
+  assert.equal(result.matches.length, 0);
+  assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
+});
+
+test("links an exact near-term transfer naming the patient", () => {
+  const named = {
+    ...transaction,
+    verwendungszweck: "Anfangsdiagnostik Mustermann",
+    absender_name: "Erika Mustermann",
+    matching_status: "unklar",
+  };
+  const result = buildTransferReconciliationPlan([{ ...intent, zeichen: null }], [named]);
+  assert.deepEqual(result.matches.map((row) => row.transaction.id), ["t1"]);
+});
+
+test("links a near-term transfer with two distinctive patient name tokens", () => {
+  const named = {
+    ...transaction,
+    verwendungszweck: "Daiyecker Abraham Olivar Gmez",
+    absender_name: "Elternkonto",
+    matching_status: "unklar",
+  };
+  const specialIntent = {
+    ...intent,
+    zeichen: null,
+    patient_vorname: "Daiyecker Abraham Olivar",
+    patient_nachname: "Gómez",
+  };
+  const result = buildTransferReconciliationPlan([specialIntent], [named]);
+  assert.deepEqual(result.matches.map((row) => row.transaction.id), ["t1"]);
+});
+
+test("does not infer patient identity from an equal amount alone", () => {
+  const unrelated = {
+    ...transaction,
+    verwendungszweck: "Anfangsdiagnostik Andere Familie",
+    absender_name: "Andere Person",
+    matching_status: "unklar",
+  };
+  const result = buildTransferReconciliationPlan([{ ...intent, zeichen: null }], [unrelated]);
+  assert.equal(result.matches.length, 0);
+  assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
+});
+
+test("does not use delayed or intentionally ignored name-only transactions", () => {
+  const delayed = {
+    ...transaction,
+    datum: "2026-09-20",
+    verwendungszweck: "Mustermann",
+    absender_name: "Erika Mustermann",
+    matching_status: "unklar",
+  };
+  const ignored = { ...delayed, id: "t2", datum: "2026-09-16", matching_status: "ignoriert" };
+  const result = buildTransferReconciliationPlan([{ ...intent, zeichen: null }], [delayed, ignored]);
+  assert.equal(result.matches.length, 0);
+});
+
+test("never revives a bank transaction intentionally marked as ignored", () => {
+  const ignoredReference = { ...transaction, matching_status: "ignoriert" };
+  const result = buildTransferReconciliationPlan([intent], [ignoredReference]);
   assert.equal(result.matches.length, 0);
   assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
 });

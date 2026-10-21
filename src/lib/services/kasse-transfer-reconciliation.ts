@@ -9,6 +9,8 @@ export interface PendingTransferIntent {
   betrag: number;
   zeichen: string | null;
   zweck?: string | null;
+  patient_vorname?: string | null;
+  patient_nachname?: string | null;
 }
 
 export interface ImportedBankTransaction {
@@ -18,9 +20,12 @@ export interface ImportedBankTransaction {
   verwendungszweck: string | null;
   finapi_id: number | string | null;
   matching_status?: string | null;
+  matching_score?: number | null;
   matched_patient_id: string | null;
   matched_rate_id?: string | null;
   matching_details?: MatchingDetails | null;
+  absender_name?: string | null;
+  absender_iban?: string | null;
 }
 
 export interface TransferReconciliationMatch {
@@ -45,6 +50,39 @@ function compactReference(value: string | null | undefined) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+function normalizedWords(value: string | null | undefined) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function daysBetween(left: string, right: string) {
+  return Math.round((new Date(right).getTime() - new Date(left).getTime()) / 86_400_000);
+}
+
+function hasStrongPatientIdentity(intent: PendingTransferIntent, transaction: ImportedBankTransaction) {
+  if (
+    transaction.matched_patient_id === intent.patient_id &&
+    transaction.matching_status === "abweichung" &&
+    Number(transaction.matching_score || 0) >= 60
+  ) return true;
+
+  const bankWords = normalizedWords(`${transaction.absender_name || ""} ${transaction.verwendungszweck || ""}`);
+  const bankText = ` ${bankWords.join(" ")} `;
+  const surname = normalizedWords(intent.patient_nachname).join(" ");
+  if (surname.length >= 4 && bankText.includes(` ${surname} `)) return true;
+
+  const patientWords = normalizedWords(`${intent.patient_vorname || ""} ${intent.patient_nachname || ""}`)
+    .filter((word) => word.length >= 4);
+  const sharedWords = patientWords.filter((word) => bankWords.includes(word));
+  return new Set(sharedWords).size >= 2;
+}
+
 export function buildTransferReconciliationPlan(
   intents: PendingTransferIntent[],
   transactions: ImportedBankTransaction[],
@@ -62,6 +100,7 @@ export function buildTransferReconciliationPlan(
 
     const eligible = transactions.filter((transaction) => {
       if (!transaction.finapi_id || linked.has(transaction.id)) return false;
+      if (transaction.matching_status === "ignoriert") return false;
       if (transaction.datum < intent.kassen_datum) return false;
       if (cents(transaction.betrag) !== cents(intent.betrag)) return false;
       return !transaction.matched_patient_id || transaction.matched_patient_id === intent.patient_id;
@@ -78,7 +117,23 @@ export function buildTransferReconciliationPlan(
       ["auto", "manuell"].includes(transaction.matching_status || "")
     );
 
-    candidates.set(intent.id, referenceMatches.length ? referenceMatches : confirmedPatientMatches);
+    // Dritter Beweisweg fuer Zahlungen direkt nach einem QR-/Kassenvorgang:
+    // exakter Betrag, maximal drei Banktage Abstand und ein eindeutiger
+    // Patientenname im Zahler oder Verwendungszweck. So werden auch Eltern-
+    // konten erkannt, ohne eine bloss gleich hohe Zahlung zu erraten.
+    const identityMatches = eligible.filter((transaction) =>
+      daysBetween(intent.kassen_datum, transaction.datum) <= 3 &&
+      hasStrongPatientIdentity(intent, transaction)
+    );
+
+    candidates.set(
+      intent.id,
+      referenceMatches.length
+        ? referenceMatches
+        : confirmedPatientMatches.length
+          ? confirmedPatientMatches
+          : identityMatches
+    );
   }
 
   const candidateUseCount = new Map<string, number>();
@@ -116,7 +171,7 @@ async function loadAllTransactionsSince(
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await db
       .from("transaktionen")
-      .select("id, datum, betrag, verwendungszweck, finapi_id, matching_status, matched_patient_id, matched_rate_id, matching_details")
+      .select("id, datum, betrag, verwendungszweck, absender_name, absender_iban, finapi_id, matching_status, matching_score, matched_patient_id, matched_rate_id, matching_details")
       .gte("datum", minDate)
       .gt("betrag", 0)
       .not("finapi_id", "is", null)
@@ -154,13 +209,28 @@ export async function reconcileWaitingKasseTransfers(): Promise<{
     .order("kassen_datum", { ascending: true });
   if (pendingError) throw pendingError;
 
-  const intents = (pendingRows || [])
+  const rawIntents = (pendingRows || [])
     .filter((row) => row.status !== "storniert")
     .map((row) => ({ ...row, betrag: Number(row.betrag) || 0 })) as PendingTransferIntent[];
 
-  if (!intents.length) {
+  if (!rawIntents.length) {
     return { checked: 0, linked: 0, ambiguous: 0, unmatched: 0, errors };
   }
+
+  const patientIds = Array.from(new Set(rawIntents.map((row) => row.patient_id).filter(Boolean))) as string[];
+  const { data: patientRows, error: patientError } = patientIds.length
+    ? await db.from("patients").select("id, vorname, nachname").in("id", patientIds)
+    : { data: [], error: null };
+  if (patientError) throw patientError;
+  const patientsById = new Map((patientRows || []).map((row) => [row.id, row]));
+  const intents = rawIntents.map((intent) => {
+    const patient = intent.patient_id ? patientsById.get(intent.patient_id) : null;
+    return {
+      ...intent,
+      patient_vorname: patient?.vorname || null,
+      patient_nachname: patient?.nachname || null,
+    };
+  });
 
   const [{ data: linkedRows, error: linkedError }, transactions] = await Promise.all([
     db.from("kassen_zahlungen").select("transaktion_id").not("transaktion_id", "is", null),
@@ -183,7 +253,7 @@ export async function reconcileWaitingKasseTransfers(): Promise<{
   }
   if (plan.unmatchedIntentIds.length) {
     const { error } = await db.from("kassen_zahlungen")
-      .update({ abgleich_status: "kein_eindeutiger_eingang" })
+      .update({ abgleich_status: "system_nachverfolgung" })
       .in("id", plan.unmatchedIntentIds)
       .is("transaktion_id", null);
     if (error) errors.push(`Offene Fälle: ${error.message}`);
