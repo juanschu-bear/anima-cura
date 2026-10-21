@@ -59,3 +59,26 @@ test("rejects amount, date, reference and patient conflicts", () => {
   assert.equal(result.matches.length, 0);
   assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
 });
+
+test("links an exact payment already confirmed for the same patient without a reference", () => {
+  const confirmed = {
+    ...transaction,
+    verwendungszweck: "Behandlung ohne internes Zeichen",
+    matching_status: "auto",
+    matched_patient_id: "p1",
+  };
+  const result = buildTransferReconciliationPlan([intent], [confirmed]);
+  assert.deepEqual(result.matches.map((row) => row.transaction.id), ["t1"]);
+});
+
+test("does not trust an unconfirmed name or amount-only candidate", () => {
+  const unconfirmed = {
+    ...transaction,
+    verwendungszweck: "Familie des Patienten",
+    matching_status: "unklar",
+    matched_patient_id: "p1",
+  };
+  const result = buildTransferReconciliationPlan([intent], [unconfirmed]);
+  assert.equal(result.matches.length, 0);
+  assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
+});

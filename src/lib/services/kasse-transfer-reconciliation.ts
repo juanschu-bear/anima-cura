@@ -17,6 +17,7 @@ export interface ImportedBankTransaction {
   betrag: number;
   verwendungszweck: string | null;
   finapi_id: number | string | null;
+  matching_status?: string | null;
   matched_patient_id: string | null;
   matched_rate_id?: string | null;
   matching_details?: MatchingDetails | null;
@@ -54,24 +55,30 @@ export function buildTransferReconciliationPlan(
 
   for (const intent of intents) {
     const reference = compactReference(intent.zeichen);
-    if (!intent.patient_id || reference.length < 5 || cents(intent.betrag) <= 0) {
+    if (!intent.patient_id || cents(intent.betrag) <= 0) {
       candidates.set(intent.id, []);
       continue;
     }
 
-    candidates.set(
-      intent.id,
-      transactions.filter((transaction) => {
-        if (!transaction.finapi_id || linked.has(transaction.id)) return false;
-        if (transaction.datum < intent.kassen_datum) return false;
-        if (cents(transaction.betrag) !== cents(intent.betrag)) return false;
-        if (
-          transaction.matched_patient_id &&
-          transaction.matched_patient_id !== intent.patient_id
-        ) return false;
-        return compactReference(transaction.verwendungszweck).includes(reference);
-      })
+    const eligible = transactions.filter((transaction) => {
+      if (!transaction.finapi_id || linked.has(transaction.id)) return false;
+      if (transaction.datum < intent.kassen_datum) return false;
+      if (cents(transaction.betrag) !== cents(intent.betrag)) return false;
+      return !transaction.matched_patient_id || transaction.matched_patient_id === intent.patient_id;
+    });
+    const referenceMatches = reference.length >= 5
+      ? eligible.filter((transaction) => compactReference(transaction.verwendungszweck).includes(reference))
+      : [];
+
+    // Zweiter Beweisweg: Der allgemeine Bankabgleich hat den Umsatz bereits
+    // eindeutig demselben Patienten bestaetigt. Dann fehlen nur noch die
+    // Verknuepfung und der sichtbare Status in der Kasse.
+    const confirmedPatientMatches = eligible.filter((transaction) =>
+      transaction.matched_patient_id === intent.patient_id &&
+      ["auto", "manuell"].includes(transaction.matching_status || "")
     );
+
+    candidates.set(intent.id, referenceMatches.length ? referenceMatches : confirmedPatientMatches);
   }
 
   const candidateUseCount = new Map<string, number>();
@@ -109,7 +116,7 @@ async function loadAllTransactionsSince(
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await db
       .from("transaktionen")
-      .select("id, datum, betrag, verwendungszweck, finapi_id, matched_patient_id, matched_rate_id, matching_details")
+      .select("id, datum, betrag, verwendungszweck, finapi_id, matching_status, matched_patient_id, matched_rate_id, matching_details")
       .gte("datum", minDate)
       .gt("betrag", 0)
       .not("finapi_id", "is", null)
