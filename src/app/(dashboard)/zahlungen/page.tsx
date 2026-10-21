@@ -370,7 +370,11 @@ export default function ZahlungenPage() {
       } else {
         const imported = payload.bankSync?.newTransactions ?? 0;
         const auto = payload.matching?.auto ?? 0;
-        setSyncHint(t("payments.syncImported", locale, { imported, auto }));
+        const linked = payload.reconciliation?.linked ?? 0;
+        const ambiguous = payload.reconciliation?.ambiguous ?? 0;
+        setSyncHint(
+          `${t("payments.syncImported", locale, { imported, auto })} ${linked} Kassen-Geldeingang${linked === 1 ? "" : "e"} bestätigt.${ambiguous ? ` ${ambiguous} Zuordnung${ambiguous === 1 ? "" : "en"} muss/müssen geprüft werden.` : ""}`
+        );
       }
       refetch();
       refetchStats();
@@ -485,11 +489,23 @@ export default function ZahlungenPage() {
 
   function kassenStatusInfo(z: any) {
     if (z.zahlart === "qr_ueberweisung") {
+      if (z.abgleich_status === "mehrdeutig") {
+        return { label: "Zuordnung prüfen", color: "#d4a72c", weight: 700 };
+      }
+      if (z.abgleich_status === "kein_eindeutiger_eingang") {
+        return { label: "Kein eindeutiger Bankeingang", color: "var(--ac-text-soft)", weight: 600 };
+      }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
         : { label: "Wartet auf Geldeingang", color: "var(--ac-text-soft)", weight: 500 };
     }
     if (z.zahlart === "ueberweisung") {
+      if (z.abgleich_status === "mehrdeutig") {
+        return { label: "Zuordnung prüfen", color: "#d4a72c", weight: 700 };
+      }
+      if (z.abgleich_status === "kein_eindeutiger_eingang") {
+        return { label: "Kein eindeutiger Bankeingang", color: "var(--ac-text-soft)", weight: 600 };
+      }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
         : { label: "Überweisung angekündigt", color: "var(--ac-text-soft)", weight: 500 };

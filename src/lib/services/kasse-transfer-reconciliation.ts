@@ -174,6 +174,21 @@ export async function reconcileWaitingKasseTransfers(): Promise<{
     (linkedRows || []).map((row) => row.transaktion_id).filter(Boolean) as string[]
   );
 
+  if (plan.ambiguousIntentIds.length) {
+    const { error } = await db.from("kassen_zahlungen")
+      .update({ abgleich_status: "mehrdeutig" })
+      .in("id", plan.ambiguousIntentIds)
+      .is("transaktion_id", null);
+    if (error) errors.push(`Mehrdeutige Fälle: ${error.message}`);
+  }
+  if (plan.unmatchedIntentIds.length) {
+    const { error } = await db.from("kassen_zahlungen")
+      .update({ abgleich_status: "kein_eindeutiger_eingang" })
+      .in("id", plan.unmatchedIntentIds)
+      .is("transaktion_id", null);
+    if (error) errors.push(`Offene Fälle: ${error.message}`);
+  }
+
   let linked = 0;
   for (const { intent, transaction } of plan.matches) {
     const reconciledAt = new Date().toISOString();

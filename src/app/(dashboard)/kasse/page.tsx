@@ -893,7 +893,7 @@ export default function KassePage() {
                       {z.buchungstyp === "einnahme" && (z.zahlart === "qr_ueberweisung" || z.zahlart === "ueberweisung") ? (
                         z.transaktion_id
                           ? <span className="ml-1 font-semibold text-[#5f9339]">· eingegangen{z.eingang_typ === "echtzeit" ? " (Echtzeit)" : z.eingang_typ === "standard" ? " (Standard)" : ""}</span>
-                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· {z.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>
+                          : <span className="ml-1" title="Standard-Überweisungen brauchen 1 Banktag">· {z.abgleich_status === "mehrdeutig" ? "Zuordnung prüfen" : z.abgleich_status === "kein_eindeutiger_eingang" ? "kein eindeutiger Bankeingang" : z.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>
                       ) : null}
                     </span>
                     <span className={`font-semibold ${z.buchungstyp === "ausgabe" ? "text-accent-coral" : ""}`}>
@@ -991,7 +991,7 @@ export default function KassePage() {
                 <span className="text-praxis-400">Status</span>
                 {detail.transaktion_id
                   ? <span className="font-semibold text-[#5f9339]">eingegangen{detail.eingang_typ === "echtzeit" ? " (Echtzeit)" : detail.eingang_typ === "standard" ? " (Standard)" : ""}</span>
-                  : <span>{detail.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>}
+                  : <span>{detail.abgleich_status === "mehrdeutig" ? "Zuordnung prüfen" : detail.abgleich_status === "kein_eindeutiger_eingang" ? "Kein eindeutiger Bankeingang gefunden" : detail.zahlart === "qr_ueberweisung" ? "wartet auf Geldeingang" : "Überweisung angekündigt"}</span>}
               </div>
             ) : null}
             {detailQr && !detail.transaktion_id ? (
