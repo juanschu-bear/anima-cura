@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncBankTransactions } from "@/lib/services/bank-sync";
 import { runBatchMatching } from "@/lib/services/matching-engine";
+import { reconcileWaitingKasseTransfers } from "@/lib/services/kasse-transfer-reconciliation";
 import { requirePraxisRole } from "@/lib/require-praxis";
 
 export const runtime = "nodejs";
@@ -12,11 +13,13 @@ export async function POST() {
 
   try {
     const bankSync = await syncBankTransactions({ triggerUpdate: true });
+    const reconciliation = await reconcileWaitingKasseTransfers();
     const matching = await runBatchMatching();
 
     return NextResponse.json({
       ok: true,
       bankSync,
+      reconciliation,
       matching,
     });
   } catch (error) {

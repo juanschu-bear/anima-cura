@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
     if (count && count > 0) {
       const { syncBankTransactions } = await import("@/lib/services/bank-sync");
       results.bankSync = await syncBankTransactions({ triggerUpdate: true });
+      const { reconcileWaitingKasseTransfers } = await import("@/lib/services/kasse-transfer-reconciliation");
+      results.kasseTransferReconciliation = await reconcileWaitingKasseTransfers();
       const { count: ratenCount } = await db.from("raten").select("*", { count: "exact", head: true });
       if (ratenCount && ratenCount > 0) {
         const { runBatchMatching } = await import("@/lib/services/matching-engine");
@@ -48,6 +50,7 @@ export async function GET(req: NextRequest) {
       }
     } else {
       results.bankSync = { skipped: "Keine Bankverbindung" };
+      results.kasseTransferReconciliation = { skipped: "Keine Bankverbindung" };
       results.matching = { skipped: "Keine Bankverbindung" };
     }
   } catch (e) {

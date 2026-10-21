@@ -470,50 +470,24 @@ export default function KassePage() {
 
   async function pruefeEingaenge() {
     setPruefe(true);
-    const { data: offene } = await supabase
-      .from("kassen_zahlungen")
-      .select("id, betrag, zeichen, kassen_datum, patient_id")
-      .in("zahlart", ["qr_ueberweisung", "ueberweisung"])
-      .is("transaktion_id", null);
-    for (const kz of offene || []) {
-      if (!kz.zeichen) continue;
-      const { data: tx } = await supabase
-        .from("transaktionen")
-        .select("id, datum, verwendungszweck")
-        .gt("finapi_id", 0)
-        .gte("datum", kz.kassen_datum)
-        .eq("betrag", kz.betrag)
-        .ilike("verwendungszweck", `%${kz.zeichen}%`)
-        .limit(1);
-      if (tx?.length) {
-        // Echtzeit = am selben Banktag eingetroffen oder ausdruecklich
-        // so im Buchungstext; Standard braucht 1-2 Banktage.
-        const echtzeit = tx[0].datum === kz.kassen_datum
-          || /echtzeit|instant/i.test(tx[0].verwendungszweck || "");
-        await supabase.from("kassen_zahlungen")
-          .update({
-            transaktion_id: tx[0].id,
-            abgleich_status: "eingegangen",
-            eingang_am: new Date().toISOString(),
-            eingang_typ: echtzeit ? "echtzeit" : "standard",
-          })
-          .eq("id", kz.id);
-        // Beweisklasse 100: diesen Kassen-Zweck haben wir selbst erzeugt,
-        // die Zahlung ist keine Vermutung, sondern unsere Handschrift.
-        await supabase.from("transaktionen")
-          .update({
-            matched_patient_id: kz.patient_id,
-            matching_status: "auto",
-            matching_score: 100,
-            matching_details: { methode: "animapay_kasse", quelle: "kasse", kassen_zahlart: kz.zahlart },
-            geprueft_am: new Date().toISOString(),
-          })
-          .eq("id", tx[0].id);
-        if (qrInfo && qrInfo.kzId === kz.id) setQrInfo({ ...qrInfo, eingegangen: true });
-      }
+    setHinweis("");
+    try {
+      const response = await fetch("/api/kasse/reconcile-transfers", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Abgleich fehlgeschlagen");
+      const result = payload.reconciliation;
+      setHinweis(
+        result.linked > 0
+          ? `${result.linked} Geldeingang${result.linked === 1 ? "" : "e"} automatisch bestätigt.${result.ambiguous ? ` ${result.ambiguous} Fall/Fälle bleiben wegen Mehrdeutigkeit zur Prüfung offen.` : ""}`
+          : `Keine neuen eindeutigen Geldeingänge gefunden.${result.ambiguous ? ` ${result.ambiguous} Fall/Fälle sind mehrdeutig und bleiben offen.` : ""}`
+      );
+      if (qrInfo && result.linked > 0) setQrInfo({ ...qrInfo, eingegangen: true });
+    } catch (error) {
+      setHinweis(`Abgleich fehlgeschlagen: ${String(error)}`);
+    } finally {
+      setPruefe(false);
+      ladeTagesliste();
     }
-    setPruefe(false);
-    ladeTagesliste();
   }
 
   async function speichern() {
