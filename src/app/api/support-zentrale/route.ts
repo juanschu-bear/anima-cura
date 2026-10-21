@@ -151,8 +151,8 @@ export async function GET() {
     stats: {
       total: safeRuns.length,
       autoReplied: safeRuns.filter((row) => row.autoReplied).length,
-      manualReview: safeRuns.filter((row) => row.manualReview).length,
-      failed: safeRuns.filter((row) => row.status === "failed").length,
+      manualReview: safeRuns.filter((row) => row.manualReview && row.caseStatus !== "resolved").length,
+      failed: safeRuns.filter((row) => row.status === "failed" && row.caseStatus !== "resolved").length,
       categories,
       sourceUsage,
       automatedCoverage: 4,

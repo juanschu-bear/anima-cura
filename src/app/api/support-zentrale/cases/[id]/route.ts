@@ -80,6 +80,12 @@ async function caseDetail(row: NonNullable<Awaited<ReturnType<typeof loadRun>>>)
       .order("created_at", { ascending: false })
       .limit(20)
     : { data: [], error: null };
+  const codeDeliveries = deliveries.error ? [] : deliveries.data ?? [];
+  const latestAcceptedCode = codeDeliveries.find(delivery =>
+    ["accepted", "delivered", "opened", "clicked"].includes(delivery.status)
+    && new Date(delivery.sent_at || delivery.created_at).getTime() > Date.now() - 30 * 60 * 1000
+  );
+  const matchState = patients.length === 1 ? "unique" : patients.length > 1 ? "ambiguous" : "missing";
 
   return {
     id: row.id,
@@ -107,9 +113,15 @@ async function caseDetail(row: NonNullable<Awaited<ReturnType<typeof loadRun>>>)
       contactType: normalizeEmail(patient.email) === sender ? "patient" : "guardian",
       portal: authUsers.find(user => user.patientId === patient.id) ?? null,
     })),
-    codeDeliveries: deliveries.error ? [] : deliveries.data ?? [],
-    canResendCode: patients.length === 1 && Boolean(patients[0].ivoris_nummer && patients[0].geburtsdatum),
-    matchState: patients.length === 1 ? "unique" : patients.length > 1 ? "ambiguous" : "missing",
+    codeDeliveries,
+    activeCodeUntil: latestAcceptedCode
+      ? new Date(new Date(latestAcceptedCode.sent_at || latestAcceptedCode.created_at).getTime() + 30 * 60 * 1000).toISOString()
+      : null,
+    canResendCode: matchState === "unique"
+      && Boolean(patients[0].ivoris_nummer && patients[0].geburtsdatum)
+      && !latestAcceptedCode,
+    resendBlockReason: matchState !== "unique" ? "patient_match" : latestAcceptedCode ? "active_code" : null,
+    matchState,
   };
 }
 
@@ -155,6 +167,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     if (parsed.data.action === "resend_access_code") {
       if (!sender) return NextResponse.json({ error: "Absenderadresse fehlt." }, { status: 409 });
+      const currentDetail = await caseDetail(row);
+      if (currentDetail.resendBlockReason === "active_code") {
+        return NextResponse.json({ error: "Ein bereits versendeter Sicherheitscode ist noch gültig." }, { status: 429 });
+      }
+      if (!currentDetail.canResendCode) {
+        return NextResponse.json({ error: "Codeversand ist erst nach eindeutiger Patientenzuordnung möglich." }, { status: 409 });
+      }
       const remediation = await remediateMissingCode({
         event: "message.received",
         eventKey: `support-case:${id.data}`,
