@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       .gte("created_at", new Date(Date.now() - 25 * 60 * 1000).toISOString())
       .limit(1);
     if ((recent.data ?? []).length) {
-      const recentClaim = await db.from("communication_messages").insert({
+      const recentClaim = await db.from("communication_messages").upsert({
         campaign_key: "patient_access_watchdog_claim",
         channel: "email",
         provider: "access_code_watchdog",
@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
         status: "accepted",
         sent_at: new Date().toISOString(),
         metadata: { contentRestricted: true, workflowRunId: run.id, remediationOutcome: "recent_code_already_sent" },
-      });
-      if (recentClaim.error && recentClaim.error.code !== "23505") {
+      }, { ignoreDuplicates: true });
+      if (recentClaim.error) {
         supportResults.push({ id: run.id, outcome: "repair_claim_failed" });
         continue;
       }
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
     // Claim the support case before sending anything. The unique provider /
     // provider_message_id pair makes this an atomic, cross-invocation lock and
     // prevents overlapping or repeated cron runs from issuing multiple codes.
-    const claim = await db.from("communication_messages").insert({
+    const claim = await db.from("communication_messages").upsert({
       campaign_key: "patient_access_watchdog_claim",
       channel: "email",
       provider: "access_code_watchdog",
@@ -164,13 +164,13 @@ export async function GET(request: NextRequest) {
       subject: "Automatische Zugangsprüfung",
       status: "queued",
       metadata: { contentRestricted: true, workflowRunId: run.id },
-    }).select("id").single();
+    }, { ignoreDuplicates: true }).select("id").maybeSingle();
     if (claim.error) {
-      if (claim.error.code === "23505") {
-        supportResults.push({ id: run.id, outcome: "repair_already_claimed" });
-        continue;
-      }
       supportResults.push({ id: run.id, outcome: "repair_claim_failed" });
+      continue;
+    }
+    if (!claim.data) {
+      supportResults.push({ id: run.id, outcome: "repair_already_claimed" });
       continue;
     }
     supportActions += 1;
