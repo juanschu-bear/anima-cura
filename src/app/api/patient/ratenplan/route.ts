@@ -12,9 +12,10 @@ export async function GET() {
   // Get active rate plan
   const { data: plan } = await supabase
     .from("ratenplaene")
-    .select("id, gesamtbetrag, anzahl_raten, rate_betrag, start_datum, rhythmus, status")
+    .select("id, gesamtbetrag, anzahl_raten, rate_betrag, start_datum, rhythmus, status, sepa_mandat")
     .eq("patient_id", patient.patientId)
     .eq("status", "aktiv")
+    .limit(1)
     .maybeSingle();
 
   const summarizeRates = (
@@ -148,6 +149,7 @@ export async function GET() {
       rate_betrag: Number(plan.rate_betrag),
       start_datum: plan.start_datum,
       rhythmus: plan.rhythmus,
+      sepa_mandat: Boolean(plan.sepa_mandat),
     },
     has_financial_data: true,
     financial_source: "plan",

@@ -13,7 +13,7 @@ import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, ge
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
 interface RpData {
-  plan: { gesamtbetrag: number; anzahl_raten: number; rate_betrag: number } | null;
+  plan: { gesamtbetrag: number; anzahl_raten: number; rate_betrag: number; sepa_mandat?: boolean } | null;
   investiert: number; offen_betrag: number; raten_bezahlt: number; raten_gesamt: number;
   prozent: number; streak: number;
   naechste_rate: { betrag: number; faellig_am: string } | null;
@@ -28,7 +28,7 @@ interface Notif { id: string; typ: string; titel: string; text: string; gelesen:
 interface Doc { id: string; name: string; typ: string; anzeige_typ?: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
-interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null }
+interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
@@ -876,7 +876,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       )}
 
-      {rp && rp.naechste_rate && dl <= 3 && dl >= 0 && (
+      {rp && rp.naechste_rate && dl <= 3 && dl >= 0 && !rp.plan?.sepa_mandat && (
         <div style={{ margin: "0 20px 14px", borderRadius: 16, padding: 18, background: dk ? "rgba(34,197,94,0.04)" : "rgba(34,197,94,0.03)", border: "1px solid " + (dk ? "rgba(34,197,94,0.12)" : "rgba(34,197,94,0.1)") }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div>
@@ -1118,9 +1118,15 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ ...lb, color: red, marginBottom: 4 }}>{t("progress.overdue", lang)}</div>
               <div style={{ ...hd, fontSize: 30, fontWeight: 800, marginBottom: 2, color: fg }}>{rp.ueberfaellig.betrag.toFixed(2).replace(".", ",")} €</div>
               <div style={{ fontSize: 13, color: muted }}>{t("progress.since", lang)} {fmtShortL(rp.ueberfaellig.faellig_am, lang)} ({Math.floor((Date.now() - new Date(rp.ueberfaellig.faellig_am).getTime()) / 864e5)} {lang === "en" ? "days" : lang === "es" ? "días" : "Tage"})</div>
-              <button onClick={() => openPayment({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "2px solid rgba(239,68,68,0.6)", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlowRed 2.5s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
-                Jetzt bezahlen
-              </button>
+              {rp.plan?.sepa_mandat ? (
+                <div style={{ marginTop: 12, padding: "11px 14px", borderRadius: 12, background: dk ? "rgba(74,222,128,0.08)" : "rgba(34,197,94,0.06)", color: grn, fontSize: 13, fontWeight: 700 }}>
+                  Nicht überweisen – der Betrag wird automatisch eingezogen.
+                </div>
+              ) : (
+                <button onClick={() => openPayment({ betrag: rp.ueberfaellig!.betrag, verwendungszweck: "AC-PAT-OVD", rateNummer: 0 })} style={{ marginTop: 12, padding: "12px 24px", borderRadius: 14, border: "2px solid rgba(239,68,68,0.6)", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "animapayGlowRed 2.5s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+                  Jetzt bezahlen
+                </button>
+              )}
             </div>
             <div style={{ width: 80, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px 0", background: dk ? "#1e1e1e" : "#f0ece4" }}>
               <div style={{ ...hd, fontSize: 28, fontWeight: 800, color: fg }}>{rp.raten_bezahlt}</div>
@@ -1202,11 +1208,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           </div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
             {rechnungen.slice(0, 6).map((r, i) => {
-              const statusColor = r.status === "bezahlt" ? grn : r.status === "teilbezahlt" ? warn : fg;
-              const mainAmount = r.status === "bezahlt" ? r.betrag : r.offen;
+              const settledByCredit = r.zahlungsmodus === "credit";
+              const isDirectDebit = r.zahlungsmodus === "direct_debit";
+              const statusColor = r.status === "bezahlt" || settledByCredit ? grn : r.status === "teilbezahlt" || r.guthaben_angerechnet > 0 ? warn : fg;
+              const mainAmount = r.status === "bezahlt" ? r.betrag : r.zahlbetrag;
               const statusLabel =
                 r.status === "bezahlt"
                   ? (lang === "en" ? "Paid" : lang === "es" ? "Pagado" : "Bezahlt")
+                  : settledByCredit
+                    ? (lang === "en" ? "Covered by credit" : lang === "es" ? "Cubierto por saldo" : "Durch Guthaben abgedeckt")
+                  : isDirectDebit
+                    ? (lang === "en" ? "Direct debit scheduled" : lang === "es" ? "Domiciliación prevista" : "Lastschrift vorgesehen")
                   : r.status === "teilbezahlt"
                     ? (lang === "en" ? "Partially paid" : lang === "es" ? "Parcialmente pagado" : "Teilbezahlt")
                     : (lang === "en" ? "Open" : lang === "es" ? "Pendiente" : "Offen");
@@ -1223,13 +1235,27 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                       {statusLabel}
                       {r.gezahlt > 0 && r.status !== "bezahlt" ? ` · ${lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} ${fmtEuro(r.gezahlt)}` : ""}
                     </div>
+                    {r.guthaben_angerechnet > 0 && r.status !== "bezahlt" && (
+                      <div style={{ fontSize: 11, color: grn, marginTop: 4, fontWeight: 700 }}>
+                        {lang === "en" ? "Credit applied" : lang === "es" ? "Saldo aplicado" : "Guthaben angerechnet"}: {fmtEuro(r.guthaben_angerechnet)}
+                      </div>
+                    )}
+                    {isDirectDebit && (
+                      <div style={{ fontSize: 11, color: grn, marginTop: 5, fontWeight: 700, lineHeight: 1.4 }}>
+                        {lang === "en" ? "Do not transfer – the remaining amount will be collected automatically." : lang === "es" ? "No transfieras: el importe restante se cobrará automáticamente." : "Nicht überweisen – der Restbetrag wird automatisch eingezogen."}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ ...hd, fontSize: 18, fontWeight: 800, color: statusColor }}>{fmtEuro(mainAmount)}</div>
                     <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>
                       {r.status === "bezahlt"
                         ? (r.bezahlt_am ? fmtShortL(r.bezahlt_am, lang) : statusLabel)
-                        : (lang === "en" ? "Still open" : lang === "es" ? "Aún pendiente" : "Noch offen")}
+                        : settledByCredit
+                          ? (lang === "en" ? "Nothing to transfer" : lang === "es" ? "Nada que transferir" : "Nichts zu überweisen")
+                          : isDirectDebit
+                            ? (lang === "en" ? "Will be collected" : lang === "es" ? "Se cobrará" : "Wird eingezogen")
+                            : (lang === "en" ? "Still open" : lang === "es" ? "Aún pendiente" : "Noch offen")}
                     </div>
                   </div>
                 </div>
