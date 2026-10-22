@@ -278,7 +278,7 @@ async function main() {
     for (const duplicate of duplicates) {
       const rpc = duplicate.ivoris_id
         ? "merge_duplicate_patient_with_ivoris_alias"
-        : "merge_patient_into_canonical";
+        : "merge_local_patient_duplicate";
       const { error: mergeError } = await db.rpc(rpc, {
         p_source_patient_id: duplicate.id,
         p_target_patient_id: canonical.id,
