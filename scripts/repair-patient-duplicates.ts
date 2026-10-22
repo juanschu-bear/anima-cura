@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/db/supabase";
+import { patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
 
 type PatientRow = {
   id: string;
@@ -59,12 +60,66 @@ function compactPhone(value: string | null | undefined) {
   return (value ?? "").replace(/\D/g, "");
 }
 
-function identityKey(row: PatientRow) {
-  return [
-    normalizeNamePart(row.vorname),
-    normalizeNamePart(row.nachname),
-    row.geburtsdatum ?? "",
-  ].join("|");
+function duplicateGroups(rows: PatientRow[]) {
+  const buckets = new Map<string, PatientRow[]>();
+  for (const row of rows) {
+    if (!row.geburtsdatum || !normalizeNamePart(row.vorname) || !normalizeNamePart(row.nachname)) continue;
+    const key = `${normalizeNamePart(row.nachname)}|${row.geburtsdatum}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), row]);
+  }
+
+  const groups: Array<{ key: string; rows: PatientRow[] }> = [];
+  for (const [bucketKey, bucket] of Array.from(buckets.entries())) {
+    const remaining = new Set(bucket.map((row: PatientRow) => row.id));
+    while (remaining.size > 0) {
+      const seedId = remaining.values().next().value as string;
+      remaining.delete(seedId);
+      const component = [bucket.find((row: PatientRow) => row.id === seedId)!];
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const candidate of bucket) {
+          if (!remaining.has(candidate.id)) continue;
+          const matches = component.some((member) => patientIdentityMatchKind(
+            {
+              ivoris_id: member.ivoris_id ?? `local:${member.id}`,
+              vorname: member.vorname ?? "",
+              nachname: member.nachname ?? "",
+              geburtsdatum: member.geburtsdatum ?? "",
+            },
+            {
+              id: candidate.id,
+              ivoris_id: candidate.ivoris_id,
+              vorname: candidate.vorname ?? "",
+              nachname: candidate.nachname ?? "",
+              geburtsdatum: candidate.geburtsdatum ?? "",
+            }
+          ) !== "none");
+          if (!matches) continue;
+          remaining.delete(candidate.id);
+          component.push(candidate);
+          expanded = true;
+        }
+      }
+      if (component.length > 1) groups.push({ key: `${bucketKey}|${component.map((row) => row.id).sort().join(",")}`, rows: component });
+    }
+  }
+  return groups;
+}
+
+function hasStrongContactAgreement(rows: PatientRow[]) {
+  for (let left = 0; left < rows.length; left += 1) {
+    for (let right = left + 1; right < rows.length; right += 1) {
+      const leftEmail = normalizeNamePart(rows[left].email);
+      const rightEmail = normalizeNamePart(rows[right].email);
+      if (leftEmail && leftEmail === rightEmail) return true;
+
+      const leftPhones = new Set([compactPhone(rows[left].telefon), compactPhone(rows[left].mobiltelefon)].filter((value) => value.length >= 7));
+      const rightPhones = new Set([compactPhone(rows[right].telefon), compactPhone(rows[right].mobiltelefon)].filter((value) => value.length >= 7));
+      if (Array.from(leftPhones).some((phone) => rightPhones.has(phone))) return true;
+    }
+  }
+  return false;
 }
 
 function uniqueValues(values: Array<string | null | undefined>) {
@@ -74,6 +129,8 @@ function uniqueValues(values: Array<string | null | undefined>) {
 function chooseCanonical(rows: PatientRow[], refs: GroupRefSnapshot[]) {
   const ivorisLinked = rows.filter((row) => Boolean(row.ivoris_id));
   if (ivorisLinked.length === 1) return ivorisLinked[0];
+
+  const candidates = ivorisLinked.length > 0 ? ivorisLinked : rows;
 
   const refById = new Map(refs.map((entry) => [entry.patientId, entry]));
   const score = (row: PatientRow) => {
@@ -88,7 +145,7 @@ function chooseCanonical(rows: PatientRow[], refs: GroupRefSnapshot[]) {
     return refTotal * 10_000 + hasPortal * 1_000 + richness * 100 - created / 1_000_000_000_000;
   };
 
-  return [...rows].sort((left, right) => score(right) - score(left))[0];
+  return [...candidates].sort((left, right) => score(right) - score(left))[0];
 }
 
 async function collectReferences(ids: string[]) {
@@ -124,33 +181,11 @@ async function collectReferences(ids: string[]) {
   return Array.from(snapshots.values());
 }
 
-async function repointReferences(fromId: string, toId: string) {
-  const db = createAdminClient();
-  const results: Array<{ target: string; updated: number }> = [];
-
-  for (const target of REF_TARGETS) {
-    const { data, error } = await db
-      .from(target.table)
-      .update({ [target.column]: toId })
-      .eq(target.column, fromId)
-      .select("id");
-
-    if (error) {
-      console.warn(`[DEDUPE] repoint skipped ${target.table}.${target.column}: ${error.message}`);
-      continue;
-    }
-
-    results.push({
-      target: `${target.table}.${target.column}`,
-      updated: (data ?? []).length,
-    });
-  }
-
-  return results;
-}
-
 async function mergePatientPayload(canonical: PatientRow, duplicates: PatientRow[]) {
   const db = createAdminClient();
+  const mergedFirstName = [canonical, ...duplicates]
+    .map((row) => row.vorname?.trim() ?? "")
+    .sort((left, right) => right.length - left.length)[0] || canonical.vorname;
   const mergedEmail = canonical.email ?? duplicates.find((row) => row.email)?.email ?? null;
   const mergedTelefon =
     canonical.telefon ?? duplicates.find((row) => compactPhone(row.telefon).length > 0)?.telefon ?? null;
@@ -170,6 +205,7 @@ async function mergePatientPayload(canonical: PatientRow, duplicates: PatientRow
   const { error } = await db
     .from("patients")
     .update({
+      vorname: mergedFirstName,
       email: mergedEmail,
       telefon: mergedTelefon,
       mobiltelefon: mergedMobil,
@@ -179,14 +215,6 @@ async function mergePatientPayload(canonical: PatientRow, duplicates: PatientRow
 
   if (error) {
     throw new Error(`Canonical merge update failed for ${canonical.id}: ${error.message}`);
-  }
-}
-
-async function deleteDuplicatePatient(patientId: string) {
-  const db = createAdminClient();
-  const { error } = await db.from("patients").delete().eq("id", patientId);
-  if (error) {
-    throw new Error(`Delete failed for duplicate patient ${patientId}: ${error.message}`);
   }
 }
 
@@ -203,26 +231,16 @@ async function main() {
 
   if (error) throw error;
 
-  const groups = new Map<string, PatientRow[]>();
-  for (const row of (data ?? []) as PatientRow[]) {
-    if (!row.geburtsdatum || !normalizeNamePart(row.vorname) || !normalizeNamePart(row.nachname)) {
-      continue;
-    }
-    const key = identityKey(row);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
-  }
+  const groups = duplicateGroups((data ?? []) as PatientRow[]);
 
-  const duplicateGroups = Array.from(groups.entries())
-    .filter(([, rows]) => rows.length > 1)
-    .map(([key, rows]) => ({ key, rows }))
+  const candidateGroups = groups
     .sort((left, right) => right.rows.length - left.rows.length)
     .slice(0, limit);
 
   const preview: unknown[] = [];
   let appliedGroups = 0;
 
-  for (const group of duplicateGroups) {
+  for (const group of candidateGroups) {
     const refs = await collectReferences(group.rows.map((row) => row.id));
     const canonical = chooseCanonical(group.rows, refs);
     const duplicates = group.rows.filter((row) => row.id !== canonical.id);
@@ -232,8 +250,7 @@ async function main() {
       return sum + (snapshot?.total ?? 0);
     }, 0);
 
-    const distinctIvorisIds = uniqueValues(group.rows.map((row) => row.ivoris_id));
-    const safeToApply = distinctIvorisIds.length <= 1;
+    const safeToApply = hasStrongContactAgreement(group.rows);
     const plan = {
       key: group.key,
       canonical: {
@@ -259,8 +276,15 @@ async function main() {
 
     await mergePatientPayload(canonical, duplicates);
     for (const duplicate of duplicates) {
-      await repointReferences(duplicate.id, canonical.id);
-      await deleteDuplicatePatient(duplicate.id);
+      const rpc = duplicate.ivoris_id
+        ? "merge_duplicate_patient_with_ivoris_alias"
+        : "merge_patient_into_canonical";
+      const { error: mergeError } = await db.rpc(rpc, {
+        p_source_patient_id: duplicate.id,
+        p_target_patient_id: canonical.id,
+        p_reason: "Deterministische Dublettenbereinigung: Name, Geburtsdatum und Kontakt stimmen ueberein",
+      });
+      if (mergeError) throw new Error(`Transactional merge failed for ${duplicate.id}: ${mergeError.message}`);
     }
     appliedGroups += 1;
   }
@@ -270,7 +294,7 @@ async function main() {
       {
         ok: true,
         mode: apply ? "apply" : "preview",
-        duplicateGroupCount: duplicateGroups.length,
+        duplicateGroupCount: candidateGroups.length,
         appliedGroups,
         preview,
       },

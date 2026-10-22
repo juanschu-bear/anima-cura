@@ -223,6 +223,25 @@ export async function syncIvorisPatients(): Promise<{
       continue;
     }
 
+    const { data: alias, error: aliasError } = await db
+      .from("patient_ivoris_aliases")
+      .select("patient_id, canonical_ivoris_id")
+      .eq("alias_ivoris_id", patient.ivoris_id)
+      .maybeSingle();
+
+    if (aliasError) {
+      skipped++;
+      errors.push(`Alias-Lookup ${patient.ivoris_id}: ${aliasError.message}`);
+      continue;
+    }
+
+    if (alias) {
+      // A confirmed duplicate must never be recreated by the next IVORIS sync.
+      // The canonical record remains authoritative for name and contact data.
+      updated++;
+      continue;
+    }
+
     const { data: existing, error: existingError } = await db
       .from("patients")
       .select("id")

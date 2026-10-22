@@ -149,6 +149,21 @@ export async function GET(request: Request) {
       continue;
     }
 
+    const { data: aliasRows, error: aliasRowsError } = await db
+      .from("patient_ivoris_aliases")
+      .select("alias_ivoris_id")
+      .in("alias_ivoris_id", ivorisIds);
+
+    if (aliasRowsError) {
+      errors.push(`Alias-Lookup Seite ${page}: ${aliasRowsError.message}`);
+      totalSkipped += normalizedRows.length;
+      continue;
+    }
+
+    const knownAliasIds = new Set(
+      ((aliasRows ?? []) as Array<{ alias_ivoris_id: string }>).map((row) => row.alias_ivoris_id)
+    );
+
     const existingByIvorisId = new Set(
       ((existingRows ?? []) as Array<{ ivoris_id: string | null }>)
         .map((row) => row.ivoris_id)
@@ -175,6 +190,12 @@ export async function GET(request: Request) {
     const queuedIdentityKeys = new Set<string>();
     for (const row of normalizedRows) {
       const identityKey = buildPersonIdentityKey(row);
+
+      if (knownAliasIds.has(row.ivoris_id)) {
+        totalUpserted += 1;
+        queuedIdentityKeys.add(identityKey);
+        continue;
+      }
 
       if (existingByIvorisId.has(row.ivoris_id)) {
         rows.push(row);
