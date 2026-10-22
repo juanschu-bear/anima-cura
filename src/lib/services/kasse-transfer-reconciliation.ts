@@ -37,6 +37,7 @@ export interface TransferReconciliationPlan {
   matches: TransferReconciliationMatch[];
   ambiguousIntentIds: string[];
   unmatchedIntentIds: string[];
+  staleUnmatchedIntentIds: string[];
 }
 
 function cents(value: number) {
@@ -86,7 +87,8 @@ function hasStrongPatientIdentity(intent: PendingTransferIntent, transaction: Im
 export function buildTransferReconciliationPlan(
   intents: PendingTransferIntent[],
   transactions: ImportedBankTransaction[],
-  alreadyLinkedTransactionIds: Iterable<string> = []
+  alreadyLinkedTransactionIds: Iterable<string> = [],
+  today = new Date().toISOString().slice(0, 10)
 ): TransferReconciliationPlan {
   const linked = new Set(alreadyLinkedTransactionIds);
   const candidates = new Map<string, ImportedBankTransaction[]>();
@@ -146,6 +148,7 @@ export function buildTransferReconciliationPlan(
   const matches: TransferReconciliationMatch[] = [];
   const ambiguousIntentIds: string[] = [];
   const unmatchedIntentIds: string[] = [];
+  const staleUnmatchedIntentIds: string[] = [];
 
   for (const intent of intents) {
     const rows = candidates.get(intent.id) || [];
@@ -155,10 +158,11 @@ export function buildTransferReconciliationPlan(
       ambiguousIntentIds.push(intent.id);
     } else {
       unmatchedIntentIds.push(intent.id);
+      if (daysBetween(intent.kassen_datum, today) > 5) staleUnmatchedIntentIds.push(intent.id);
     }
   }
 
-  return { matches, ambiguousIntentIds, unmatchedIntentIds };
+  return { matches, ambiguousIntentIds, unmatchedIntentIds, staleUnmatchedIntentIds };
 }
 
 async function loadAllTransactionsSince(
@@ -252,11 +256,22 @@ export async function reconcileWaitingKasseTransfers(): Promise<{
     if (error) errors.push(`Mehrdeutige Fälle: ${error.message}`);
   }
   if (plan.unmatchedIntentIds.length) {
+    const staleIds = new Set(plan.staleUnmatchedIntentIds);
+    const recentIds = plan.unmatchedIntentIds.filter((id) => !staleIds.has(id));
+    if (recentIds.length) {
+      const { error } = await db.from("kassen_zahlungen")
+        .update({ abgleich_status: "offen" })
+        .in("id", recentIds)
+        .is("transaktion_id", null);
+      if (error) errors.push(`Aktuelle offene Fälle: ${error.message}`);
+    }
+  }
+  if (plan.staleUnmatchedIntentIds.length) {
     const { error } = await db.from("kassen_zahlungen")
-      .update({ abgleich_status: "system_nachverfolgung" })
-      .in("id", plan.unmatchedIntentIds)
+      .update({ abgleich_status: "kein_geldeingang" })
+      .in("id", plan.staleUnmatchedIntentIds)
       .is("transaktion_id", null);
-    if (error) errors.push(`Offene Fälle: ${error.message}`);
+    if (error) errors.push(`Überfällige offene Fälle: ${error.message}`);
   }
 
   let linked = 0;

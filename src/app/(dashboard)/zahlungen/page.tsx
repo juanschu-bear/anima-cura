@@ -495,6 +495,9 @@ export default function ZahlungenPage() {
       if (["kein_eindeutiger_eingang", "system_nachverfolgung"].includes(z.abgleich_status)) {
         return { label: "Finanzsystem verfolgt Zahlung", color: "var(--ac-text-soft)", weight: 600 };
       }
+      if (z.abgleich_status === "kein_geldeingang") {
+        return { label: "Noch kein Geldeingang · automatische Prüfung aktiv", color: "#d39b35", weight: 600 };
+      }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }
         : { label: "Wartet auf Geldeingang", color: "var(--ac-text-soft)", weight: 500 };
@@ -505,6 +508,9 @@ export default function ZahlungenPage() {
       }
       if (["kein_eindeutiger_eingang", "system_nachverfolgung"].includes(z.abgleich_status)) {
         return { label: "Finanzsystem verfolgt Zahlung", color: "var(--ac-text-soft)", weight: 600 };
+      }
+      if (z.abgleich_status === "kein_geldeingang") {
+        return { label: "Noch kein Geldeingang · automatische Prüfung aktiv", color: "#d39b35", weight: 600 };
       }
       return z.transaktion_id
         ? { label: "Geldeingang da", color: "#4ca43f", weight: 700 }

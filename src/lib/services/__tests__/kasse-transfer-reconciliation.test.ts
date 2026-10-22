@@ -29,9 +29,17 @@ test("links one exact amount and practice reference deterministically", () => {
 });
 
 test("does not reuse a bank transaction already linked to another receipt", () => {
-  const result = buildTransferReconciliationPlan([intent], [transaction], ["t1"]);
+  const result = buildTransferReconciliationPlan([intent], [transaction], ["t1"], "2026-09-16");
   assert.equal(result.matches.length, 0);
   assert.deepEqual(result.unmatchedIntentIds, ["k1"]);
+  assert.deepEqual(result.staleUnmatchedIntentIds, []);
+});
+
+test("marks an unmatched transfer as stale only after five days", () => {
+  const recent = buildTransferReconciliationPlan([intent], [], [], "2026-09-20");
+  const stale = buildTransferReconciliationPlan([intent], [], [], "2026-09-21");
+  assert.deepEqual(recent.staleUnmatchedIntentIds, []);
+  assert.deepEqual(stale.staleUnmatchedIntentIds, ["k1"]);
 });
 
 test("keeps duplicate candidate transactions for manual review", () => {
