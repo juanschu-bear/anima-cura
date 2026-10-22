@@ -1,6 +1,8 @@
 const BLOCKED_PATIENT_FULL_NAMES = new Set([
   "RABE DON LELAND",
   "DON LELAND RABE",
+  "HIJOP ZGUIUOK",
+  "ZGUIUOK HIJOP",
 ]);
 
 function normalizeBlockedPatientText(value: string | null | undefined) {
