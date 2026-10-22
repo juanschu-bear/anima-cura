@@ -12,7 +12,10 @@ type EigeneArt = {
   id: string;
   name: string;
   basis: string;
+  key: string;
 };
+
+const artKey = (id: string) => `custom-${id}`;
 
 function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -49,7 +52,79 @@ async function ladeEigeneArten(db: ReturnType<typeof createServerClient>) {
     id: eintrag.id,
     name: normalizeName(eintrag.name),
     basis: eintrag.basis,
+    key: typeof eintrag.key === "string" && eintrag.key.trim() ? eintrag.key.trim() : artKey(eintrag.id),
   }));
+}
+
+async function cloneBasisTemplates(
+  db: ReturnType<typeof createServerClient>,
+  basis: string,
+  key: string,
+) {
+  const { data: existing, error: existingError } = await db
+    .from("doku_vorlagen")
+    .select("id")
+    .eq("behandlungsart", key)
+    .limit(1);
+  if (existingError) throw existingError;
+  if ((existing?.length ?? 0) === 0) {
+    const { data: templates, error: templatesError } = await db
+      .from("doku_vorlagen")
+      .select("termin_typ, name, sort_index, aktiv, struktur, positionen")
+      .eq("behandlungsart", basis)
+      .eq("aktiv", true)
+      .order("sort_index");
+    if (templatesError) throw templatesError;
+    if (!templates?.length) throw new Error("Für die gewählte Basis sind keine Vorlagen vorhanden.");
+
+    const { error: insertError } = await db.from("doku_vorlagen").insert(
+      templates.map((template) => ({
+        behandlungsart: key,
+        termin_typ: template.termin_typ,
+        name: template.name,
+        sort_index: template.sort_index,
+        aktiv: true,
+        struktur: JSON.parse(JSON.stringify(template.struktur ?? {})),
+        positionen: JSON.parse(JSON.stringify(template.positionen ?? [])),
+      })),
+    );
+    if (insertError) throw insertError;
+  }
+
+  const { data: options, error: optionsError } = await db
+    .from("doku_vorlagen_optionen")
+    .select("praxis_id, termin_typ, gruppe, text, quelle, sort_index, aktiv, erstellt_von")
+    .eq("behandlungsart", basis);
+  if (optionsError) throw optionsError;
+  if (options?.length) {
+    const { data: existingOptions, error: existingOptionsError } = await db
+      .from("doku_vorlagen_optionen")
+      .select("praxis_id, termin_typ, gruppe, text")
+      .eq("behandlungsart", key);
+    if (existingOptionsError) throw existingOptionsError;
+
+    const vorhanden = new Set(
+      (existingOptions ?? []).map((option) =>
+        [option.praxis_id, option.termin_typ, option.gruppe, option.text].join("\u0000")
+      ),
+    );
+    const fehlendeOptionen = options.filter((option) =>
+      !vorhanden.has([option.praxis_id, option.termin_typ, option.gruppe, option.text].join("\u0000"))
+    );
+    if (!fehlendeOptionen.length) return;
+
+    const { error: insertOptionsError } = await db.from("doku_vorlagen_optionen").insert(
+      fehlendeOptionen.map((option) => ({ ...option, behandlungsart: key })),
+    );
+    if (insertOptionsError) throw insertOptionsError;
+  }
+}
+
+async function ensureIndependentTemplates(
+  db: ReturnType<typeof createServerClient>,
+  arten: EigeneArt[],
+) {
+  for (const art of arten) await cloneBasisTemplates(db, art.basis, art.key);
 }
 
 async function speichereEigeneArten(db: ReturnType<typeof createServerClient>, arten: EigeneArt[]) {
@@ -72,6 +147,8 @@ export async function GET() {
   try {
     const db = createServerClient();
     const arten = await ladeEigeneArten(db);
+    await ensureIndependentTemplates(db, arten);
+    await speichereEigeneArten(db, arten);
     return NextResponse.json({ arten });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Laden fehlgeschlagen." }, { status: 500 });
@@ -95,7 +172,9 @@ export async function POST(request: NextRequest) {
     const duplicate = arten.some((eintrag) => eintrag.name.toLowerCase() === name.toLowerCase());
     if (duplicate) return NextResponse.json({ error: "Diese Behandlungsart gibt es bereits." }, { status: 409 });
 
-    const neueArt: EigeneArt = { id: crypto.randomUUID(), name, basis };
+    const id = crypto.randomUUID();
+    const neueArt: EigeneArt = { id, name, basis, key: artKey(id) };
+    await cloneBasisTemplates(db, basis, neueArt.key);
     const next = [...arten, neueArt];
     await speichereEigeneArten(db, next);
     return NextResponse.json({ ok: true, art: neueArt });
@@ -115,8 +194,13 @@ export async function PATCH(request: NextRequest) {
   try {
     const db = createServerClient();
     const arten = await ladeEigeneArten(db);
+    const entfernt = arten.find((eintrag) => eintrag.id === id);
     const next = arten.filter((eintrag) => eintrag.id !== id);
     await speichereEigeneArten(db, next);
+    if (entfernt) {
+      await db.from("doku_vorlagen").update({ aktiv: false }).eq("behandlungsart", entfernt.key);
+      await db.from("doku_vorlagen_optionen").update({ aktiv: false }).eq("behandlungsart", entfernt.key);
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Löschen fehlgeschlagen." }, { status: 500 });

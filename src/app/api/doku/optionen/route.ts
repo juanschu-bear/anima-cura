@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 // arrives, derive this from the logged-in user's profile instead of the env.
 const PRAXIS_ID = process.env.SCRIBE_PRAXIS_ID || "praxis-schubert";
 
-const ARTEN = new Set(["aligner", "removable", "multiband"]);
 const MAX_LEN = 400;
 
 type AddBody = {
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
   const gruppe = String(body.gruppe ?? "").trim();
   const text = String(body.text ?? "").trim();
 
-  if (!ARTEN.has(behandlungsart)) {
+  if (!behandlungsart) {
     return NextResponse.json({ error: "behandlungsart ungueltig" }, { status: 400 });
   }
   if (!termin_typ || !gruppe) {

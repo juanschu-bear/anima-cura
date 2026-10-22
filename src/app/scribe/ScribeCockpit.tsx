@@ -69,6 +69,7 @@ type EigeneArt = {
   id: string;
   name: string;
   basis: "aligner" | "multiband" | "removable";
+  key: string;
 };
 
 function formatDatumKurz(iso: string | null | undefined): string {
@@ -105,7 +106,8 @@ const STANDARD_ARTEN = Object.entries(ART_NAMEN).map(([id, name]) => ({
   id,
   name,
   basis: id as keyof typeof ART_NAMEN,
-  fix: true,
+  key: id,
+  fix: true as const,
 }));
 const BOGEN = ["12er NiTi", "14er NiTi", "16er NiTi", "16×22 NiTi", "16×22 Stahl", "18er Stahl"];
 const FDI_OK = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -529,7 +531,7 @@ export default function ScribeCockpit({
       const passJson = await passRes.json().catch(() => ({}));
       const liste: Vorlage[] = mergeEigeneTerminarten(json.vorlagen ?? [], passJson.antworten ?? []);
       setVorlagen(liste);
-      setEigeneArten((artenJson.arten ?? []).filter((eintrag: EigeneArt) => !!eintrag?.id && !!eintrag?.name && !!eintrag?.basis));
+      setEigeneArten((artenJson.arten ?? []).filter((eintrag: EigeneArt) => !!eintrag?.id && !!eintrag?.name && !!eintrag?.basis && !!eintrag?.key));
       await ladeHeute();
     })();
   }, [ladeHeute]);
@@ -636,7 +638,7 @@ export default function ScribeCockpit({
   }
 
   const artAuswahlen = useMemo(
-    () => [...STANDARD_ARTEN, ...eigeneArten.map((eintrag) => ({ ...eintrag, fix: false }))],
+    () => [...STANDARD_ARTEN, ...eigeneArten.map((eintrag) => ({ ...eintrag, fix: false as const }))],
     [eigeneArten]
   );
   const aktiveArtAuswahl = useMemo(
@@ -644,6 +646,10 @@ export default function ScribeCockpit({
     [artAuswahlId, artAuswahlen, art]
   );
   const artAnzeigeName = aktiveArtAuswahl?.name ?? (ART_NAMEN[art as keyof typeof ART_NAMEN] ?? art);
+  const behandlungsartName = useCallback(
+    (value: string | null | undefined) => eigeneArten.find((eintrag) => eintrag.key === value)?.name ?? artName(value),
+    [eigeneArten],
+  );
 
   const artVorlagen = useMemo(
     () => vorlagen.filter((v) => v.behandlungsart === art).sort((a, b) => a.sort_index - b.sort_index),
@@ -1671,7 +1677,7 @@ export default function ScribeCockpit({
               <div className="wache" key={e.id} role="button" tabIndex={0} onClick={() => (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))} onKeyDown={(ev) => ev.key === "Enter" && (e.status === "entwurf" ? entwurfLaden(e) : oeffneDetail(e))}>
                 <div className="zeit">{am}</div>
                 <div className="wer">{e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt"}</div>
-                <div className="was">{artName(e.behandlungsart) || e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
+                <div className="was">{behandlungsartName(e.behandlungsart) || e.behandlungsart} · {leistungsName(e.termin_typ, e.behandlungsart)}</div>
                 <span className={`pille ${p.cls}`}>{p.text}</span>
                 {pushFehlerHinweis && <div className="wache-fehler">{pushFehlerHinweis}</div>}
               </div>
@@ -1759,7 +1765,7 @@ export default function ScribeCockpit({
               <div className="wahlzeile">
                 {artAuswahlen.map((eintrag) => (
                   <span key={eintrag.id} className="art-chip-wrap">
-                    <button className="wahl" aria-pressed={artAuswahlId === eintrag.id} onClick={() => artWechseln(eintrag.basis, eintrag.id)}>{eintrag.name}</button>
+                    <button className="wahl" aria-pressed={artAuswahlId === eintrag.id} onClick={() => artWechseln(eintrag.key, eintrag.id)}>{eintrag.name}</button>
                     {!eintrag.fix && (
                       <button
                         type="button"
@@ -1788,7 +1794,7 @@ export default function ScribeCockpit({
                       onChange={(e) => setNeueArtName(e.target.value)}
                     />
                     <select className="feld-input" value={neueArtBasis} onChange={(e) => setNeueArtBasis(e.target.value as "aligner" | "multiband" | "removable")}>
-                      {STANDARD_ARTEN.map((eintrag) => <option key={eintrag.id} value={eintrag.basis}>Basiert auf {eintrag.name}</option>)}
+                      {STANDARD_ARTEN.map((eintrag) => <option key={eintrag.id} value={eintrag.basis}>Startvorlage: {eintrag.name}</option>)}
                     </select>
                     <button type="button" className="neben klein vorlagen-link" disabled={artenSpeichert} onClick={eigeneArtAnlegen}>
                       {artenSpeichert ? "Speichert…" : "Behandlungsart hinzufügen"}
@@ -2422,7 +2428,7 @@ export default function ScribeCockpit({
               <div className="ohead">
                 <span className="otitel">
                   {detail.patients ? `${detail.patients.vorname} ${detail.patients.nachname}` : "Unbekannt"}
-                  {" · "}{artName(detail.behandlungsart) || detail.behandlungsart}
+                  {" · "}{behandlungsartName(detail.behandlungsart) || detail.behandlungsart}
                 </span>
                 <span className={`pille ${wachePille(detail).cls}`} style={{ position: "static" }}>{wachePille(detail).text}</span>
               </div>
