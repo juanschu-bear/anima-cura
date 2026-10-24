@@ -136,6 +136,21 @@ async function main() {
       "billing_payer_requests",
       "id,actor_id,request,result_id,created_at",
     ),
+    runSelectCheck(
+      "billing invoice counters",
+      "billing_invoice_counters",
+      "invoice_year,last_value",
+    ),
+    runSelectCheck(
+      "billing issued invoices",
+      "billing_invoices",
+      "id,payer_version_id,patient_id,invoice_number,issue_date,due_date,total_cents,status,snapshot,document_id,notification_id,storage_path,pdf_sha256,pdf_bytes,open_item_id,issuance_reason,created_by,created_at,issued_by,issued_at,voided_by,voided_at,void_reason",
+    ),
+    runSelectCheck(
+      "billing invoice idempotency records",
+      "billing_invoice_requests",
+      "id,actor_id,request,result_id,created_at",
+    ),
   ];
 
   const results = await Promise.all(checks);

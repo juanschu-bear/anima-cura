@@ -8,8 +8,10 @@ import { scribeBillingCandidates } from './billing-foundation';
 import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, summarizeBillingQuarter, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
 import { t } from './i18n';
 import { payerAllocationCommand } from './billing-payer-allocation';
+import { buildIssuedInvoicePdf, issueInvoiceCommand } from './billing-invoice';
+import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath } from './billing-document-access';
 
-type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'>;
+type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'|'storage'>;
 function stableUuid(value:string){
   const hex=createHash('sha256').update(value).digest('hex').slice(0,32).split('');
   hex[12]='4';hex[16]=((parseInt(hex[16],16)&3)|8).toString(16);
@@ -60,7 +62,9 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
           if(caseError)return fail('unavailable',503);
           const {data:current,error:currentError}=payerCase?await db.from('billing_payer_versions').select('*').eq('case_id',caseId).eq('revision',payerCase.head_version).maybeSingle():{data:null,error:null};
           if(currentError)return fail('unavailable',503);
-          return respond({caseId,from,to,lines,payerCase,current,writable});
+          const {data:invoice,error:invoiceError}=current?await db.from('billing_invoices').select('id,invoice_number,issue_date,due_date,total_cents,status,document_id,issued_at').eq('payer_version_id',current.id).maybeSingle():{data:null,error:null};
+          if(invoiceError)return fail('unavailable',503);
+          return respond({caseId,from,to,lines,payerCase,current,invoice,writable});
         }
         if(kind==='quarter'){
           const fallback=previousBillingQuarter(new Date()),from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
@@ -175,6 +179,38 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       const body=await request.text();
       if(body.length>30000)return fail('invalid',413);
       let raw:unknown;try{raw=JSON.parse(body);}catch{return fail('invalid',400);}
+      const issuance=issueInvoiceCommand.safeParse(raw);
+      if(issuance.success){
+        const command={action:'reserve',payerVersionId:issuance.data.payerVersionId,dueDate:issuance.data.dueDate,reason:issuance.data.reason};
+        const {data:invoiceId,error:reserveError}=await db.rpc('billing_invoice_reserve',{p_actor:user.id,p_request_id:requestId,p_input:command});
+        if(reserveError){
+          if(reserveError.message.includes('forbidden'))return fail('forbidden',403);
+          if(/unapproved|stale|service_stale/.test(reserveError.message))return fail('invoiceNotReady',409);
+          if(/conflict|request_conflict/.test(reserveError.message))return fail('conflict',409);
+          return fail('unavailable',503);
+        }
+        const {data:invoice,error:invoiceError}=await db.from('billing_invoices').select('*').eq('id',invoiceId).maybeSingle();
+        if(invoiceError||!invoice)return fail('unavailable',503);
+        if(invoice.status==='issued')return respond({id:invoice.id,invoiceNumber:invoice.invoice_number,status:invoice.status,documentId:invoice.document_id});
+        const rendered=await buildIssuedInvoicePdf(invoice.snapshot);
+        const {data:bucket,error:bucketError}=await db.storage.getBucket(BILLING_DOCUMENTS_BUCKET);
+        if(bucketError&&!/not found/i.test(bucketError.message))return fail('unavailable',503);
+        if(!bucket){
+          const created=await db.storage.createBucket(BILLING_DOCUMENTS_BUCKET,{public:false,fileSizeLimit:25*1024*1024,allowedMimeTypes:['application/pdf']});
+          if(created.error)return fail('unavailable',503);
+        }else if(bucket.public)return fail('invoiceStorageUnsafe',409);
+        const storagePath=billingDocumentPath(invoice.patient_id,invoice.document_id);
+        const upload=await db.storage.from(BILLING_DOCUMENTS_BUCKET).upload(storagePath,rendered.pdf,{contentType:'application/pdf',cacheControl:'0',upsert:true});
+        if(upload.error)return fail('unavailable',503);
+        const {data:finalized,error:finalizeError}=await db.rpc('billing_invoice_finalize',{p_actor:user.id,p_invoice_id:invoice.id,p_pdf_sha256:rendered.sha256,p_pdf_bytes:rendered.pdf.length,p_storage_path:storagePath});
+        if(finalizeError){
+          if(finalizeError.message.includes('forbidden'))return fail('forbidden',403);
+          if(/stale|unapproved/.test(finalizeError.message))return fail('invoiceNotReady',409);
+          if(/conflict|immutable/.test(finalizeError.message))return fail('conflict',409);
+          return fail('unavailable',503);
+        }
+        return respond({id:finalized,invoiceNumber:invoice.invoice_number,status:'issued',documentId:invoice.document_id});
+      }
       const payer=payerAllocationCommand.safeParse(raw);
       if(payer.success){
         const command=payer.data.action==='save_payer'
