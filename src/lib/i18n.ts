@@ -465,7 +465,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "billing.work.approve": { de: "Fachlich freigeben", en: "Approve service data" },
   "billing.work.tabDraft": { de: "Rechnungsentwurf", en: "Invoice draft" },
   "billing.work.pageTitle": { de: "Rechnungen", en: "Invoices" },
-  "billing.work.pageIntro": { de: "Leistungsdaten prüfen, Tarife belegen und Rechnungsentwürfe vorbereiten.", en: "Review service data, document tariffs and prepare invoice drafts." },
+  "billing.work.pageIntro": { de: "Behandlungsquellen abgleichen, Tarife belegen und ausschließlich nachvollziehbare Abrechnungsfälle vorbereiten.", en: "Reconcile clinical evidence, document tariffs and prepare traceable billing cases only." },
   "billing.work.queueTitle": { de: "Arbeitsvorrat Abrechnung", en: "Billing work queue" },
   "billing.work.queueIntro": { de: "Bestätigte Behandlungseinträge werden automatisch gebündelt. Öffne nur Fälle, bei denen Daten fehlen oder eine fachliche Freigabe aussteht.", en: "Confirmed clinical records are grouped automatically. Open only cases that need data or professional approval." },
   "billing.work.queuePage": { de: "Seite", en: "Page" },
