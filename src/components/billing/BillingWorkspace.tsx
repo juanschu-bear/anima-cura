@@ -16,6 +16,7 @@ type Tariff=z.infer<typeof tariffInput>;
 type Command=z.infer<typeof workspaceCommand>;
 type Candidate=Omit<Service,'schedule'|'insurerId'|'tariffVersionId'> & {schedule:Service['schedule']|null};
 type Editing={id:string;revision:number;kind:Kind;data?:Service|Tariff};
+type QueueCase={sourceId:string;serviceDate:string;sourceVersion:number;patient:Patient;totalPositions:number;recordedPositions:number;incompletePositions:number;states:{draft:number;approved:number;withdrawn:number};stale:number;status:'stale'|'needs_data'|'in_review'|'approved'|'partial'|'not_started'};
 const schedules=['BEMA','GOZ','LABOR','MATERIAL'] as const;
 
 async function getData(query:URLSearchParams,locale:Locale,signal?:AbortSignal){
@@ -99,6 +100,7 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
       {patient&&<p className={styles.muted}>{patient.ivoris_nummer||patient.id}{patient.geburtsdatum?` · ${patient.geburtsdatum}`:''}</p>}
       <div className={styles.results}>{results.map(p=><button key={p.id} onClick={()=>{setPatient(p);setResults([]);reset();}}>{p.name} · {p.ivoris_nummer||p.id}{p.geburtsdatum?` · ${p.geburtsdatum}`:''}</button>)}</div>
     </div>}
+    {kind==='service'&&!patient&&<WorkQueue locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/>}
     {error&&<p role="alert" className={styles.error}>{error}</p>}
     {notice&&<p role="status" className={styles.notice}>{notice}</p>}
     {editing?<Editor key={editing.id+':'+editing.revision} editing={editing} patient={patient} locale={locale} busy={busy} onCancel={()=>setEditing(null)} onSave={mutate}/>
@@ -122,6 +124,26 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
         {(page>0||hasMore)&&<Pager page={page} more={hasMore} loading={loading} locale={locale} onChange={setPage}/>}
         {kind==='service'&&patient&&writable&&<Sources patient={patient} locale={locale} onSelect={candidate=>setEditing({id:crypto.randomUUID(),revision:0,kind:'service',data:{...candidate,schedule:candidate.schedule??'BEMA',insurerId:null,tariffVersionId:null} as Service})}/>}
       </>}
+  </section>;
+}
+
+function WorkQueue({locale,onOpen}:{locale:Locale;onOpen:(patient:Patient)=>void}){
+  const tr=(key:string)=>t(`billing.work.${key}`,locale);
+  const [page,setPage]=useState(0),[cases,setCases]=useState<QueueCase[]>([]),[more,setMore]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  useEffect(()=>{
+    const controller=new AbortController();setLoading(true);setError('');
+    getData(new URLSearchParams({kind:'queue',page:String(page)}),locale,controller.signal).then(data=>{if(!controller.signal.aborted){setCases(data.cases??[]);setMore(data.hasMore);}}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[page,locale]);
+  return <section className={`${styles.panel} ${styles.queue}`} aria-labelledby="billing-queue-title">
+    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="billing-queue-title">{tr('queueTitle')}</h3><p className={styles.muted}>{tr('queueIntro')}</p></div><span className={styles.badge}>{tr('queuePage')} {page+1}</span></div>
+    {error&&<p role="alert" className={styles.error}>{error}</p>}
+    {loading?<p role="status">{tr('loading')}</p>:cases.length===0?<p>{tr('queueEmpty')}</p>:<ul className={styles.queueList}>{cases.map(item=><li key={item.sourceId}>
+      <div><strong>{item.patient.name}</strong><p className={styles.muted}>{item.serviceDate} · {item.patient.ivoris_nummer||tr('missingPatientNumber')}</p></div>
+      <div><span className={`${styles.status} ${styles[item.status]}`}>{tr(`queue_${item.status}`)}</span><p className={styles.muted}>{item.recordedPositions}/{item.totalPositions} {tr('positionsRecorded')}{item.incompletePositions?` · ${item.incompletePositions} ${tr('positionsIncomplete')}`:''}</p></div>
+      <button className={item.status==='approved'?undefined:styles.primary} onClick={()=>onOpen(item.patient)}>{tr(item.status==='approved'?'viewCase':'openCase')}</button>
+    </li>)}</ul>}
+    {(page>0||more)&&<Pager page={page} more={more} loading={loading} locale={locale} onChange={setPage}/>}
   </section>;
 }
 

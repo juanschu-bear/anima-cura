@@ -50,6 +50,20 @@ test('source proposals are scoped, paginated and retain missing quantities',asyn
   assert.ok(f.calls.some(c=>c.method==='range'&&c.args[0]===0&&c.args[1]===25));
   assert.equal(f.writes.length,0);
 });
+test('billing queue groups confirmed evidence and reports the real review state',async()=>{
+  const sourceId=randomUUID(),recordId=randomUUID(),versionId=randomUUID();
+  const entry={id:sourceId,patient_id:patient,version:2,termin_datum:'2026-10-20',status:'bestaetigt',bestaetigt_am:'2026-10-20T10:00:00Z',positionen:[{code:'BEMA 126a',text:'Synthetic service',anzahl:1},{code:'GOZ 6100',text:'Missing quantity'}]};
+  const record={id:recordId,kind:'service',patient_id:patient,source_system:'scribe',source_record_id:sourceId,source_position_index:0,head_version:1};
+  const version={id:versionId,record_id:recordId,revision:1,state:'draft',data:{...service,patientId:patient,source:{system:'scribe',recordId:sourceId,version:2,positionIndex:0},serviceDate:'2026-10-20'},tariff_version_id:service.tariffVersionId};
+  const f=fixture({data:{doku_eintraege:[entry],patients:[{id:patient,vorname:'Test',nachname:'Patient',ivoris_nummer:'42',geburtsdatum:'2010-01-01'}],billing_records:[record],billing_versions:[version]}});
+  const response=await f.handle(new Request(url+'?kind=queue&page=0'));
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.cases.length,1);assert.equal(data.cases[0].patient.name,'Test Patient');
+  assert.equal(data.cases[0].recordedPositions,1);assert.equal(data.cases[0].totalPositions,2);
+  assert.equal(data.cases[0].incompletePositions,1);assert.equal(data.cases[0].status,'needs_data');
+  assert.ok(f.calls.some(c=>c.table==='doku_eintraege'&&c.method==='range'&&c.args[1]===15));
+});
 test('failed reads and missing head snapshots cannot appear as a successful empty list',async()=>{
   for(const table of ['user_profiles','billing_records','billing_versions']){
     const f=fixture({failTable:table,data:{billing_records:[{id:randomUUID(),head_version:1}]}});

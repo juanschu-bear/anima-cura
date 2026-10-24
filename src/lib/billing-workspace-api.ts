@@ -31,7 +31,49 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       if(request.method==='GET'){
         const kind=url.searchParams.get('kind');
         const page=Number(url.searchParams.get('page')??'0');
-        if(!['tariff','service','source'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(!['tariff','service','source','queue'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(kind==='queue'){
+          const pageSize=15;
+          const {data:entries,error}=await client.from('doku_eintraege')
+            .select('id,patient_id,version,termin_datum,status,bestaetigt_am,positionen')
+            .eq('status','bestaetigt').order('termin_datum',{ascending:false}).order('id',{ascending:false})
+            .range(page*pageSize,page*pageSize+pageSize);
+          if(error)return fail('unavailable',503);
+          const selected=(entries??[]).slice(0,pageSize);
+          const patientIds=Array.from(new Set(selected.map(e=>e.patient_id).filter(Boolean)));
+          const sourceIds=selected.map(e=>e.id);
+          const {data:patients,error:patientError}=patientIds.length
+            ?await db.from('patients').select('id,ivoris_nummer,vorname,nachname,geburtsdatum').in('id',patientIds)
+            :{data:[],error:null};
+          if(patientError)return fail('unavailable',503);
+          const {data:records,error:recordError}=sourceIds.length
+            ?await db.from('billing_records').select('*').eq('kind','service').eq('source_system','scribe').in('source_record_id',sourceIds)
+            :{data:[],error:null};
+          if(recordError)return fail('unavailable',503);
+          const recordIds=(records??[]).map(r=>r.id);
+          const {data:versions,error:versionError}=recordIds.length
+            ?await db.from('billing_versions').select('*').in('record_id',recordIds)
+            :{data:[],error:null};
+          if(versionError)return fail('unavailable',503);
+          const current=(records??[]).map(record=>({record,version:(versions??[]).find(v=>v.record_id===record.id&&v.revision===record.head_version)}));
+          const cases=selected.map(entry=>{
+            const patient=(patients??[]).find(p=>p.id===entry.patient_id);
+            const proposals=scribeBillingCandidates([entry]);
+            const linked=current.filter(item=>item.record.source_record_id===entry.id);
+            const states={draft:0,approved:0,withdrawn:0};
+            let stale=0;
+            for(const item of linked){
+              if(item.version?.state in states)states[item.version.state as keyof typeof states]++;
+              if(!item.version||!sourceIsCurrent(item.version.data,entry))stale++;
+            }
+            const incomplete=proposals.lines.filter((line:any)=>!line.schedule||!line.code||!line.description||!line.quantity).length;
+            const total=proposals.lines.length;
+            const recordedPositions=new Set(linked.map(item=>item.record.source_position_index)).size;
+            const status=stale>0?'stale':incomplete>0?'needs_data':states.draft>0?'in_review':total>0&&states.approved===total?'approved':recordedPositions>0?'partial':'not_started';
+            return {sourceId:entry.id,serviceDate:entry.termin_datum,sourceVersion:entry.version,patient:{id:entry.patient_id,name:patient?`${patient.vorname??''} ${patient.nachname??''}`.trim():t('billing.work.unknownPatient',locale),ivoris_nummer:patient?.ivoris_nummer??null,geburtsdatum:patient?.geburtsdatum??null},totalPositions:total,recordedPositions,incompletePositions:incomplete,states,stale,status};
+          });
+          return respond({cases,hasMore:(entries??[]).length>pageSize,writable});
+        }
         if(kind==='source'){
           const patientId=url.searchParams.get('patientId');
           const fallback=previousBillingQuarter(new Date());
