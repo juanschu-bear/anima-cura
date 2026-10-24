@@ -5,7 +5,7 @@ import { extractAppRole } from './auth';
 import { effektiveStufe } from './permissions';
 import { canReadBilling, previousBillingQuarter, validBillingPeriod } from './billing-readiness';
 import { scribeBillingCandidates } from './billing-foundation';
-import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
+import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, summarizeBillingQuarter, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
 import { t } from './i18n';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'>;
@@ -41,7 +41,25 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       if(request.method==='GET'){
         const kind=url.searchParams.get('kind');
         const page=Number(url.searchParams.get('page')??'0');
-        if(!['tariff','service','source','queue'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(!['tariff','service','source','queue','quarter'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(kind==='quarter'){
+          const fallback=previousBillingQuarter(new Date()),from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
+          if(!validBillingPeriod(from,to))return fail('invalid',400);
+          const sourceResult=await client.from('doku_eintraege').select('id,patient_id,version,termin_datum,status,bestaetigt_am,positionen',{count:'exact'})
+            .eq('status','bestaetigt').gte('termin_datum',from).lte('termin_datum',to).order('id').range(0,999);
+          if(sourceResult.error||sourceResult.count&&sourceResult.count>1000||sourceResult.count===null&&(sourceResult.data??[]).length===1000)return fail('catalogLimit',409);
+          const entries=sourceResult.data??[],sourceIds=entries.map(entry=>entry.id),records:any[]=[];
+          for(let index=0;index<sourceIds.length;index+=100){
+            const result=await db.from('billing_records').select('*').eq('kind','service').eq('source_system','scribe').in('source_record_id',sourceIds.slice(index,index+100));
+            if(result.error)return fail('unavailable',503);records.push(...(result.data??[]));
+          }
+          const versions:any[]=[];
+          for(let index=0;index<records.length;index+=100){
+            const result=await db.from('billing_versions').select('*').in('record_id',records.slice(index,index+100).map(record=>record.id));
+            if(result.error)return fail('unavailable',503);versions.push(...(result.data??[]));
+          }
+          return respond({from,to,...summarizeBillingQuarter(entries,records,versions),writable});
+        }
         if(kind==='queue'){
           const pageSize=15;
           const {data:entries,error}=await client.from('doku_eintraege')

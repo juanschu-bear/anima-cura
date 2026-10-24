@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { assessBillingCase, billingDate, tariffVersionSchema, type ScribeBillingEntry } from "./billing-foundation";
+import { assessBillingCase, billingDate, scribeBillingCandidates, tariffVersionSchema, type ScribeBillingEntry } from "./billing-foundation";
 
 const text = z.string().trim().min(1).max(1000);
 const decimal = z.string().regex(/^\d{1,9}(?:\.\d{1,7})?$/).refine(v => Number(v)>0);
@@ -39,6 +39,37 @@ export const importTariffsCommand=z.object({action:z.literal('import_tariffs'),t
 });
 export type BillingVersion={id:string;record_id:string;revision:number;data:Record<string,unknown>;state:'draft'|'approved'|'withdrawn';tariff_version_id:string|null;gross_cents:number|null;reason:string;created_at:string;created_by:string;decided_at:string|null;decided_by:string|null;decision_reason:string|null};
 export type BillingRecord={id:string;kind:'tariff'|'service';patient_id:string|null;head_version:number};
+
+export function summarizeBillingQuarter(entries:ScribeBillingEntry[],records:Array<BillingRecord&{source_record_id?:string;source_position_index?:number}>,versions:BillingVersion[]){
+  const current=records.map(record=>({record,version:versions.find(version=>version.record_id===record.id&&version.revision===record.head_version)}));
+  const patients=new Map<string,{positions:number;approved:number;blocked:boolean}>();
+  const summary={confirmedEntries:entries.length,entriesWithoutPositions:0,sourcePositions:0,missingPositions:0,incompletePositions:0,draftPositions:0,approvedPositions:0,withdrawnPositions:0,stalePositions:0,approvedGrossCents:0,patients:0,readyPatients:0,blockedPatients:0};
+  for(const entry of entries){
+    const candidates=scribeBillingCandidates([entry]);
+    if(candidates.entriesWithoutPositions.length)summary.entriesWithoutPositions++;
+    const patient=patients.get(entry.patient_id)??{positions:0,approved:0,blocked:false};
+    if(candidates.entriesWithoutPositions.length)patient.blocked=true;
+    for(const candidate of candidates.lines as Array<any>){
+      summary.sourcePositions++;patient.positions++;
+      const incomplete=!candidate.schedule||!candidate.code||!candidate.description||!candidate.quantity;
+      if(incomplete){summary.incompletePositions++;patient.blocked=true;}
+      const linked=current.find(item=>item.record.source_record_id===entry.id&&item.record.source_position_index===candidate.source.positionIndex);
+      if(!linked){summary.missingPositions++;patient.blocked=true;continue;}
+      const versionData=linked.version?serviceInput.safeParse(linked.version.data):null;
+      if(!linked.version||!versionData?.success||!sourceIsCurrent(versionData.data,entry)){summary.stalePositions++;patient.blocked=true;continue;}
+      if(linked.version.state==='draft'){summary.draftPositions++;patient.blocked=true;}
+      else if(linked.version.state==='withdrawn'){summary.withdrawnPositions++;patient.blocked=true;}
+      else{summary.approvedPositions++;patient.approved++;summary.approvedGrossCents+=linked.version.gross_cents??0;}
+    }
+    patients.set(entry.patient_id,patient);
+  }
+  summary.patients=patients.size;
+  patients.forEach(patient=>{
+    if(patient.positions>0&&!patient.blocked&&patient.approved===patient.positions)summary.readyPatients++;
+    else summary.blockedPatients++;
+  });
+  return summary;
+}
 
 export function sourceIsCurrent(data:z.infer<typeof serviceInput>,entry:ScribeBillingEntry|null){
   return data.source.system!=='scribe'||!!(entry&&entry.id===data.source.recordId&&entry.patient_id===data.patientId&&entry.version===data.source.version&&entry.status==='bestaetigt'&&entry.bestaetigt_am&&entry.termin_datum===data.serviceDate&&Array.isArray(entry.positionen)&&data.source.positionIndex<entry.positionen.length);
