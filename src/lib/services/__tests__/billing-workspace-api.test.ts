@@ -64,6 +64,19 @@ test('billing queue groups confirmed evidence and reports the real review state'
   assert.equal(data.cases[0].incompletePositions,1);assert.equal(data.cases[0].status,'needs_data');
   assert.ok(f.calls.some(c=>c.table==='doku_eintraege'&&c.method==='range'&&c.args[1]===15));
 });
+test('bulk preparation creates only evidenced review drafts and never approves them',async()=>{
+  const sourceId=randomUUID();
+  const entry={id:sourceId,patient_id:patient,version:3,termin_datum:'2026-10-21',status:'bestaetigt',bestaetigt_am:'2026-10-21T10:00:00Z',positionen:[{code:'BEMA 126a',text:'Documented service',anzahl:1},{code:'free text',text:'Unmapped service',anzahl:1}]};
+  const f=fixture({data:{doku_eintraege:entry,billing_records:[]}});
+  const response=await f.post({action:'prepare_source',sourceId});
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{prepared:1,skippedExisting:0,blocked:1,total:2});
+  assert.equal(f.writes.length,1);
+  const write=f.writes[0] as any;
+  assert.equal(write.name,'billing_write');assert.equal(write.args.p_input.action,'save');
+  assert.equal(write.args.p_input.data.source.recordId,sourceId);assert.equal(write.args.p_input.data.tariffVersionId,null);
+  assert.equal('grossCents' in write.args.p_input,false);
+});
 test('failed reads and missing head snapshots cannot appear as a successful empty list',async()=>{
   for(const table of ['user_profiles','billing_records','billing_versions']){
     const f=fixture({failTable:table,data:{billing_records:[{id:randomUUID(),head_version:1}]}});

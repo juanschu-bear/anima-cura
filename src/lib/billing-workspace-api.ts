@@ -1,13 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { extractAppRole } from './auth';
 import { effektiveStufe } from './permissions';
 import { canReadBilling, previousBillingQuarter, validBillingPeriod } from './billing-readiness';
 import { scribeBillingCandidates } from './billing-foundation';
-import { reviewService, serviceInput, sourceIsCurrent, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
+import { prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
 import { t } from './i18n';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'>;
+function stableUuid(value:string){
+  const hex=createHash('sha256').update(value).digest('hex').slice(0,32).split('');
+  hex[12]='4';hex[16]=((parseInt(hex[16],16)&3)|8).toString(16);
+  return `${hex.slice(0,8).join('')}-${hex.slice(8,12).join('')}-${hex.slice(12,16).join('')}-${hex.slice(16,20).join('')}-${hex.slice(20).join('')}`;
+}
 export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
   return async(request:Request)=>{
     const url=new URL(request.url),locale=url.searchParams.get('lang')==='en'?'en':'de';
@@ -120,6 +126,33 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       const body=await request.text();
       if(body.length>30000)return fail('invalid',413);
       let raw:unknown;try{raw=JSON.parse(body);}catch{return fail('invalid',400);}
+      const prepare=prepareSourceCommand.safeParse(raw);
+      if(prepare.success){
+        const {data:entry,error:entryError}=await db.from('doku_eintraege').select('id,patient_id,version,termin_datum,status,bestaetigt_am,positionen').eq('id',prepare.data.sourceId).maybeSingle();
+        if(entryError)return fail('unavailable',503);if(!entry)return fail('notFound',404);
+        const candidates=scribeBillingCandidates([entry]).lines as Array<Record<string,any>>;
+        const {data:existing,error:existingError}=await db.from('billing_records').select('source_position_index').eq('kind','service').eq('source_system','scribe').eq('source_record_id',entry.id);
+        if(existingError)return fail('unavailable',503);
+        const existingIndexes=new Set((existing??[]).map(row=>row.source_position_index));
+        let prepared=0,skippedExisting=0,blocked=0;
+        for(const candidate of candidates){
+          const positionIndex=candidate.source?.positionIndex;
+          if(existingIndexes.has(positionIndex)){skippedExisting++;continue;}
+          const data={patientId:candidate.patientId,serviceDate:candidate.serviceDate,schedule:candidate.schedule,code:candidate.code,description:candidate.description,quantity:candidate.quantity,region:candidate.region,factor:candidate.factor,justification:candidate.justification,insurerId:null,tariffVersionId:null,source:candidate.source};
+          const validated=serviceInput.safeParse(data);
+          if(!validated.success||!sourceIsCurrent(validated.data,entry)){blocked++;continue;}
+          const recordId=stableUuid(`billing-record:scribe:${entry.id}:${positionIndex}`);
+          const lineRequestId=stableUuid(`billing-request:prepare-v1:${entry.id}:${positionIndex}`);
+          const input={action:'save',kind:'service',recordId,expectedRevision:0,reason:'Automatisch aus einem bestätigten Scribe-Quellbeleg als prüfpflichtiger Entwurf vorbereitet.',data:validated.data};
+          const {error:writeError}=await db.rpc('billing_write',{p_actor:user.id,p_request_id:lineRequestId,p_input:input});
+          if(writeError){
+            if(/revision_conflict|request_conflict|duplicate|unique/i.test(writeError.message)){skippedExisting++;continue;}
+            return fail('unavailable',503);
+          }
+          prepared++;
+        }
+        return respond({prepared,skippedExisting,blocked,total:candidates.length});
+      }
       const parsed=workspaceCommand.safeParse(raw);
       if(!parsed.success)return respond({error:t('billing.work.invalid',locale),fields:Array.from(new Set(parsed.error.issues.map(i=>i.path.join('.'))))},400);
       let input:Record<string,unknown>=parsed.data;

@@ -28,6 +28,7 @@ export const workspaceCommand=z.union([
   z.object({...saveBase,kind:z.literal('service'),data:serviceInput}).strict(),
   z.object({action:z.enum(['approve','withdraw']),versionId:z.string().uuid(),reason}).strict(),
 ]);
+export const prepareSourceCommand=z.object({action:z.literal('prepare_source'),sourceId:z.string().uuid()}).strict();
 export type BillingVersion={id:string;record_id:string;revision:number;data:Record<string,unknown>;state:'draft'|'approved'|'withdrawn';tariff_version_id:string|null;gross_cents:number|null;reason:string;created_at:string;created_by:string;decided_at:string|null;decided_by:string|null;decision_reason:string|null};
 export type BillingRecord={id:string;kind:'tariff'|'service';patient_id:string|null;head_version:number};
 

@@ -122,7 +122,12 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
           </div>}
         </li>)}</ul>
         {(page>0||hasMore)&&<Pager page={page} more={hasMore} loading={loading} locale={locale} onChange={setPage}/>}
-        {kind==='service'&&patient&&writable&&<Sources patient={patient} locale={locale} onSelect={candidate=>setEditing({id:crypto.randomUUID(),revision:0,kind:'service',data:{...candidate,schedule:candidate.schedule??'BEMA',insurerId:null,tariffVersionId:null} as Service})}/>}
+        {kind==='service'&&patient&&writable&&<Sources
+          patient={patient}
+          locale={locale}
+          onPrepared={()=>{setNotice(tr('prepared'));setRefresh(x=>x+1);}}
+          onSelect={candidate=>setEditing({id:crypto.randomUUID(),revision:0,kind:'service',data:{...candidate,schedule:candidate.schedule??'BEMA',insurerId:null,tariffVersionId:null} as Service})}
+        />}
       </>}
   </section>;
 }
@@ -166,15 +171,29 @@ function History({item,locale}:{item:Item;locale:Locale}){
   return <details onToggle={e=>setOpen(e.currentTarget.open)}><summary>{t('billing.work.history',locale)}</summary>{error&&<p role="alert">{error}</p>}{loading&&<p>{t('billing.work.loading',locale)}</p>}<ul className={styles.list}>{versions.map(v=><li key={v.id}><strong>v{v.revision} · {t(`billing.work.${v.state}`,locale)}</strong><p>{v.reason}</p><p className={styles.muted}>{v.created_at} · {v.created_by}</p>{v.decided_at&&<p>{v.decision_reason} · {v.decided_at} · {v.decided_by}</p>}<details><summary>{t('billing.work.details',locale)}</summary><DataDetails data={v.data} locale={locale}/></details></li>)}</ul><Pager page={page} more={more} loading={loading} locale={locale} onChange={setPage}/></details>;
 }
 
-function Sources({patient,locale,onSelect}:{patient:Patient;locale:Locale;onSelect:(c:Candidate)=>void}){
+function Sources({patient,locale,onSelect,onPrepared}:{patient:Patient;locale:Locale;onSelect:(c:Candidate)=>void;onPrepared:()=>void}){
   const [period,setPeriod]=useState(previousBillingQuarter),[page,setPage]=useState(0),[lines,setLines]=useState<Candidate[]>([]),[missing,setMissing]=useState(0),[more,setMore]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[open,setOpen]=useState(false);
+  const [preparing,setPreparing]=useState(false),[result,setResult]=useState('');
   useEffect(()=>{
     setLines([]);setMore(false);setMissing(0);if(!open)return;
     const controller=new AbortController();setLoading(true);setError('');
     getData(new URLSearchParams({kind:'source',patientId:patient.id,...period,page:String(page)}),locale,controller.signal).then(d=>{if(!controller.signal.aborted){setLines(d.lines);setMissing(d.entriesWithoutPositions);setMore(d.hasMore);}}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
   },[patient.id,period,page,open,locale]);
-  return <details className={styles.panel} onToggle={e=>setOpen(e.currentTarget.open)}><summary>{t('billing.work.sources',locale)}</summary><p className={styles.muted}>{t('billing.sourceScope',locale)}</p><div className={styles.grid}>{(['from','to'] as const).map(k=><label key={k}>{t(`billing.${k}`,locale)}<input type="date" value={period[k]} onChange={e=>{setPeriod({...period,[k]:e.target.value});setPage(0);}}/></label>)}</div>{error&&<p role="alert">{error}</p>}{loading&&<p role="status">{t('billing.work.loading',locale)}</p>}{missing>0&&<p>{t('billing.emptyEntries',locale)}: {missing}</p>}{!loading&&!error&&lines.length===0&&<p>{t('billing.work.emptySources',locale)}</p>}<ul className={styles.list}>{lines.map(c=><li key={c.source.recordId+':'+c.source.positionIndex}><strong>{c.schedule} {c.code} · {c.description}</strong><p>{c.serviceDate} · {t('billing.work.quantity',locale)}: {c.quantity??t('billing.work.missing',locale)}</p><button disabled={!c.schedule} onClick={()=>onSelect(c)}>{t('billing.work.useSource',locale)}</button>{!c.schedule&&<p>{t('billing.issue.invalid_schedule',locale)}</p>}</li>)}</ul><Pager page={page} more={more} loading={loading} locale={locale} onChange={setPage}/></details>;
+  async function prepareAll(){
+    const sourceIds=Array.from(new Set(lines.map(line=>line.source.recordId)));
+    setPreparing(true);setError('');setResult('');
+    try{
+      const totals={prepared:0,blocked:0,skippedExisting:0};
+      for(const sourceId of sourceIds){
+        const response=await fetch(`/api/rechnungen/catalog?lang=${locale}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action:'prepare_source',sourceId})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error||t('billing.work.unavailable',locale));
+        totals.prepared+=data.prepared;totals.blocked+=data.blocked;totals.skippedExisting+=data.skippedExisting;
+      }
+      setResult(t('billing.work.prepareResult',locale).replace('{prepared}',String(totals.prepared)).replace('{blocked}',String(totals.blocked)).replace('{existing}',String(totals.skippedExisting)));onPrepared();
+    }catch(e){setError(e instanceof Error?e.message:t('billing.work.unavailable',locale));}finally{setPreparing(false);}
+  }
+  return <details className={styles.panel} onToggle={e=>setOpen(e.currentTarget.open)}><summary>{t('billing.work.sources',locale)}</summary><p className={styles.muted}>{t('billing.sourceScope',locale)}</p><div className={styles.grid}>{(['from','to'] as const).map(k=><label key={k}>{t(`billing.${k}`,locale)}<input type="date" value={period[k]} onChange={e=>{setPeriod({...period,[k]:e.target.value});setPage(0);}}/></label>)}</div>{error&&<p role="alert" className={styles.error}>{error}</p>}{result&&<p role="status" className={styles.notice}>{result}</p>}{loading&&<p role="status">{t('billing.work.loading',locale)}</p>}{missing>0&&<p>{t('billing.emptyEntries',locale)}: {missing}</p>}{!loading&&!error&&lines.length===0&&<p>{t('billing.work.emptySources',locale)}</p>}{lines.length>0&&<div className={styles.row}><button className={styles.primary} disabled={preparing||loading} onClick={prepareAll}>{t(preparing?'billing.work.preparing':'billing.work.prepareAll',locale)}</button><span className={styles.muted}>{t('billing.work.prepareHint',locale)}</span></div>}<ul className={styles.list}>{lines.map(c=><li key={c.source.recordId+':'+c.source.positionIndex}><strong>{c.schedule} {c.code} · {c.description}</strong><p>{c.serviceDate} · {t('billing.work.quantity',locale)}: {c.quantity??t('billing.work.missing',locale)}</p><button disabled={!c.schedule} onClick={()=>onSelect(c)}>{t('billing.work.useSource',locale)}</button>{!c.schedule&&<p>{t('billing.issue.invalid_schedule',locale)}</p>}</li>)}</ul><Pager page={page} more={more} loading={loading} locale={locale} onChange={setPage}/></details>;
 }
 
 function Editor({editing,patient,locale,busy,onCancel,onSave}:{editing:Editing;patient:Patient|null;locale:Locale;busy:boolean;onCancel:()=>void;onSave:(c:Command)=>Promise<void>}){
