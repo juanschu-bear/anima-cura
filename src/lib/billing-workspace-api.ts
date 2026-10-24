@@ -5,7 +5,7 @@ import { extractAppRole } from './auth';
 import { effektiveStufe } from './permissions';
 import { canReadBilling, previousBillingQuarter, validBillingPeriod } from './billing-readiness';
 import { scribeBillingCandidates } from './billing-foundation';
-import { prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
+import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
 import { t } from './i18n';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'>;
@@ -13,6 +13,10 @@ function stableUuid(value:string){
   const hex=createHash('sha256').update(value).digest('hex').slice(0,32).split('');
   hex[12]='4';hex[16]=((parseInt(hex[16],16)&3)|8).toString(16);
   return `${hex.slice(0,8).join('')}-${hex.slice(8,12).join('')}-${hex.slice(12,16).join('')}-${hex.slice(16,20).join('')}-${hex.slice(20).join('')}`;
+}
+function canonicalJson(value:unknown):string{
+  const normalize=(item:unknown):unknown=>Array.isArray(item)?item.map(normalize):item&&typeof item==='object'?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b)).map(([key,nested])=>[key,normalize(nested)])):item;
+  return JSON.stringify(normalize(value));
 }
 export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
   return async(request:Request)=>{
@@ -152,6 +156,29 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
           prepared++;
         }
         return respond({prepared,skippedExisting,blocked,total:candidates.length});
+      }
+      const imported=importTariffsCommand.safeParse(raw);
+      if(imported.success){
+        const {data:records,error:recordError}=await db.from('billing_records').select('*').eq('kind','tariff').order('id').range(0,500);
+        if(recordError)return fail('unavailable',503);if((records??[]).length>500)return fail('catalogLimit',409);
+        const recordIds=(records??[]).map(record=>record.id);
+        const {data:versions,error:versionError}=recordIds.length?await db.from('billing_versions').select('*').in('record_id',recordIds):{data:[],error:null};
+        if(versionError)return fail('unavailable',503);
+        const current=(records??[]).map(record=>({record,version:(versions??[]).find(version=>version.record_id===record.id&&version.revision===record.head_version)})).filter(item=>item.version);
+        const identity=(data:any)=>[data.schedule,data.code,data.insurerId??'',data.validFrom,data.validTo,data.sourceReference].join('|');
+        let created=0,revised=0,unchanged=0;
+        for(const tariff of imported.data.tariffs){
+          const match=current.find(item=>identity(item.version!.data)===identity(tariff));
+          if(match&&canonicalJson(match.version!.data)===canonicalJson(tariff)){unchanged++;continue;}
+          const recordId=match?.record.id??stableUuid(`billing-tariff:${identity(tariff)}`);
+          const expectedRevision=match?.record.head_version??0;
+          const lineRequestId=stableUuid(`billing-request:tariff-import-v1:${recordId}:${canonicalJson(tariff)}`);
+          const input={action:'save',kind:'tariff',recordId,expectedRevision,reason:'Kontrollierter Tarifimport; fachliche Freigabe dieser Version steht noch aus.',data:tariff};
+          const {error:writeError}=await db.rpc('billing_write',{p_actor:user.id,p_request_id:lineRequestId,p_input:input});
+          if(writeError)return /revision_conflict|request_conflict/i.test(writeError.message)?fail('conflict',409):fail('unavailable',503);
+          if(match)revised++;else created++;
+        }
+        return respond({created,revised,unchanged,total:imported.data.tariffs.length});
       }
       const parsed=workspaceCommand.safeParse(raw);
       if(!parsed.success)return respond({error:t('billing.work.invalid',locale),fields:Array.from(new Set(parsed.error.issues.map(i=>i.path.join('.'))))},400);

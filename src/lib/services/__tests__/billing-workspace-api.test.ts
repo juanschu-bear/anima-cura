@@ -77,6 +77,15 @@ test('bulk preparation creates only evidenced review drafts and never approves t
   assert.equal(write.args.p_input.data.source.recordId,sourceId);assert.equal(write.args.p_input.data.tariffVersionId,null);
   assert.equal('grossCents' in write.args.p_input,false);
 });
+test('tariff import is validated and creates drafts only',async()=>{
+  const f=fixture({data:{billing_records:[]}});
+  const response=await f.post({action:'import_tariffs',tariffs:[tariff]});
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{created:1,revised:0,unchanged:0,total:1});
+  assert.equal(f.writes.length,1);
+  const input=(f.writes[0] as any).args.p_input;
+  assert.equal(input.action,'save');assert.equal(input.kind,'tariff');assert.equal(input.expectedRevision,0);
+  assert.equal('state' in input,false);assert.equal('grossCents' in input,false);
+});
 test('failed reads and missing head snapshots cannot appear as a successful empty list',async()=>{
   for(const table of ['user_profiles','billing_records','billing_versions']){
     const f=fixture({failTable:table,data:{billing_records:[{id:randomUUID(),head_version:1}]}});

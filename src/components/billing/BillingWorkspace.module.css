@@ -43,6 +43,8 @@
 .approved { color:var(--accent); border-color:var(--accent); }
 .needs_data,.stale { color:var(--danger); border-color:var(--danger); }
 .in_review,.partial { color:#f0b44d; border-color:#f0b44d; }
+.fileLabel { display:inline-flex!important; align-items:center; gap:10px; min-height:44px; padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:var(--field); cursor:pointer; }
+.fileLabel input { width:auto; min-height:0; padding:0; border:0; background:transparent; }
 .root ::selection { color:var(--on-accent); background:var(--accent); }
 .root { scrollbar-color:var(--muted) var(--field); }
 @media(max-width:640px) { .root { padding:16px; } .grid { grid-template-columns:1fr; } .root dl { grid-template-columns:1fr; gap:3px; } .root dd { margin-bottom:10px; } }

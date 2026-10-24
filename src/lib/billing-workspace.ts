@@ -29,6 +29,14 @@ export const workspaceCommand=z.union([
   z.object({action:z.enum(['approve','withdraw']),versionId:z.string().uuid(),reason}).strict(),
 ]);
 export const prepareSourceCommand=z.object({action:z.literal('prepare_source'),sourceId:z.string().uuid()}).strict();
+export const importTariffsCommand=z.object({action:z.literal('import_tariffs'),tariffs:z.array(tariffInput).min(1).max(100)}).strict().superRefine((value,ctx)=>{
+  const identities=new Set<string>();
+  value.tariffs.forEach((tariff,index)=>{
+    const identity=[tariff.schedule,tariff.code,tariff.insurerId??'',tariff.validFrom,tariff.validTo,tariff.sourceReference].join('|');
+    if(identities.has(identity))ctx.addIssue({code:z.ZodIssueCode.custom,path:['tariffs',index],message:'duplicate_tariff_identity'});
+    identities.add(identity);
+  });
+});
 export type BillingVersion={id:string;record_id:string;revision:number;data:Record<string,unknown>;state:'draft'|'approved'|'withdrawn';tariff_version_id:string|null;gross_cents:number|null;reason:string;created_at:string;created_by:string;decided_at:string|null;decided_by:string|null;decision_reason:string|null};
 export type BillingRecord={id:string;kind:'tariff'|'service';patient_id:string|null;head_version:number};
 

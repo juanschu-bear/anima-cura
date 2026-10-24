@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { t } from '@/lib/i18n';
 import { previousBillingQuarter } from '@/lib/billing-readiness';
+import { parseTariffImport, tariffImportTemplate } from '@/lib/billing-tariff-import';
 import { reviewService, serviceInput, tariffInput, workspaceCommand, type BillingRecord, type BillingVersion } from '@/lib/billing-workspace';
 import styles from './BillingWorkspace.module.css';
 
@@ -103,6 +104,7 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
     {kind==='service'&&!patient&&<WorkQueue locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/>}
     {error&&<p role="alert" className={styles.error}>{error}</p>}
     {notice&&<p role="status" className={styles.notice}>{notice}</p>}
+    {kind==='tariff'&&writable&&!editing&&!decision&&<TariffImport locale={locale} onImported={()=>{setNotice(tr('tariffsImported'));setRefresh(x=>x+1);}}/>}
     {editing?<Editor key={editing.id+':'+editing.revision} editing={editing} patient={patient} locale={locale} busy={busy} onCancel={()=>setEditing(null)} onSave={mutate}/>
       :decision?<Decision key={decision.item.current.id+decision.action} {...decision} tariffs={tariffs} locale={locale} busy={busy} onCancel={()=>setDecision(null)} onSubmit={mutate}/>
       :<>
@@ -130,6 +132,29 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
         />}
       </>}
   </section>;
+}
+
+function TariffImport({locale,onImported}:{locale:Locale;onImported:()=>void}){
+  const [tariffs,setTariffs]=useState<unknown[]>([]),[errors,setErrors]=useState<string[]>([]),[busy,setBusy]=useState(false),[result,setResult]=useState('');
+  const tr=(key:string)=>t(`billing.work.${key}`,locale);
+  async function read(file:File|undefined){
+    setTariffs([]);setErrors([]);setResult('');if(!file)return;
+    const parsed=parseTariffImport(await file.text());
+    if(!parsed.ok){setErrors(parsed.errors);return;}setTariffs(parsed.tariffs);
+  }
+  function downloadTemplate(){
+    const url=URL.createObjectURL(new Blob([tariffImportTemplate()],{type:'text/csv;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download='anima-cura-tarifimport-vorlage.csv';link.click();URL.revokeObjectURL(url);
+  }
+  async function submit(){
+    setBusy(true);setErrors([]);setResult('');
+    try{
+      const response=await fetch(`/api/rechnungen/catalog?lang=${locale}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action:'import_tariffs',tariffs})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||tr('unavailable'));
+      setResult(tr('tariffImportResult').replace('{created}',String(data.created)).replace('{revised}',String(data.revised)).replace('{unchanged}',String(data.unchanged)));onImported();
+    }catch(error){setErrors([error instanceof Error?error.message:tr('unavailable')]);}finally{setBusy(false);}
+  }
+  return <details className={styles.panel}><summary>{tr('tariffImportTitle')}</summary><p className={styles.muted}>{tr('tariffImportHint')}</p><div className={styles.row}><button type="button" onClick={downloadTemplate}>{tr('downloadTemplate')}</button><label className={styles.fileLabel}>{tr('selectCsv')}<input type="file" accept=".csv,text/csv" onChange={event=>void read(event.target.files?.[0])}/></label></div>{errors.length>0&&<p role="alert" className={styles.error}>{tr('tariffImportInvalid')} {errors.slice(0,5).join(', ')}</p>}{tariffs.length>0&&<div className={`${styles.row} ${styles.panel}`}><strong>{tariffs.length} {tr('tariffRowsReady')}</strong><button className={styles.primary} disabled={busy} onClick={()=>void submit()}>{tr(busy?'importingTariffs':'importTariffs')}</button></div>}{result&&<p role="status" className={styles.notice}>{result}</p>}</details>;
 }
 
 function WorkQueue({locale,onOpen}:{locale:Locale;onOpen:(patient:Patient)=>void}){
