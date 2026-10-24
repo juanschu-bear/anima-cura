@@ -126,6 +126,7 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
           </div>}
         </li>)}</ul>
         {(page>0||hasMore)&&<Pager page={page} more={hasMore} loading={loading} locale={locale} onChange={setPage}/>}
+        {kind==='service'&&patient&&<PayerAllocation patient={patient} locale={locale} writable={writable}/>}
         {kind==='service'&&patient&&writable&&<Sources
           patient={patient}
           locale={locale}
@@ -133,6 +134,52 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
           onSelect={candidate=>setEditing({id:crypto.randomUUID(),revision:0,kind:'service',data:{...candidate,schedule:candidate.schedule??'BEMA',insurerId:null,tariffVersionId:null} as Service})}
         />}
       </>}
+  </section>;
+}
+
+type PayerLine={id:string;schedule:'BEMA'|'GOZ'|'LABOR'|'MATERIAL';code:string;description:string;serviceDate:string;grossCents:number};
+type PayerVersion={id:string;revision:number;state:'draft'|'approved'|'withdrawn';payer_model:'private_full'|'statutory_share';patient_share_basis_points:1000|2000|10000;share_source_reference:string;expected_patient_cents:number;patient_cents:number|null;reason:string};
+function PayerAllocation({patient,locale,writable}:{patient:Patient;locale:Locale;writable:boolean}){
+  const initial=previousBillingQuarter(new Date()),tr=(key:string)=>t(`billing.work.${key}`,locale);
+  const [period,setPeriod]=useState(initial),[caseId,setCaseId]=useState(''),[revision,setRevision]=useState(0),[current,setCurrent]=useState<PayerVersion|null>(null),[lines,setLines]=useState<PayerLine[]>([]);
+  const [model,setModel]=useState<'private_full'|'statutory_share'>('private_full'),[share,setShare]=useState<1000|2000|10000>(10000),[expected,setExpected]=useState(''),[evidence,setEvidence]=useState(''),[reason,setReason]=useState('');
+  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[refresh,setRefresh]=useState(0);
+  useEffect(()=>{
+    const controller=new AbortController();setLoading(true);setError('');setNotice('');
+    getData(new URLSearchParams({kind:'payer',patientId:patient.id,from:period.from,to:period.to,page:'0'}),locale,controller.signal).then(data=>{
+      if(controller.signal.aborted)return;
+      setCaseId(data.caseId);setRevision(data.payerCase?.head_version??0);setLines(data.lines??[]);setCurrent(data.current??null);
+      if(data.current){setModel(data.current.payer_model);setShare(data.current.patient_share_basis_points);setExpected((data.current.expected_patient_cents/100).toFixed(2));setEvidence(data.current.share_source_reference);setReason('');}
+      else{setModel('private_full');setShare(10000);setExpected('');setEvidence('');setReason('');}
+    }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[patient.id,period,locale,refresh]);
+  const gross=lines.reduce((sum,line)=>sum+Number(line.grossCents??0),0);
+  const calculated=Math.round(gross*share/10000);
+  async function send(action:'save_payer'|'approve_payer'|'withdraw_payer'){
+    setBusy(true);setError('');setNotice('');
+    try{
+      const parsedExpected=Math.round(Number(expected.replace(',','.'))*100);
+      const body=action==='save_payer'?{action,caseId,expectedRevision:revision,reason,data:{patientId:patient.id,from:period.from,to:period.to,serviceVersionIds:lines.map(line=>line.id),payerModel:model,patientShareBasisPoints:share,shareSourceReference:evidence,expectedPatientCents:parsedExpected}}:{action,versionId:current!.id,reason};
+      const response=await fetch(`/api/rechnungen/catalog?lang=${locale}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(body)});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||tr('unavailable'));
+      setNotice(tr(action==='save_payer'?'payerSaved':'payerDecided'));setRefresh(value=>value+1);
+    }catch(e){setError(e instanceof Error?e.message:tr('unavailable'));}finally{setBusy(false);}
+  }
+  return <section className={`${styles.panel} ${styles.quarter}`} aria-labelledby="payer-allocation-title">
+    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="payer-allocation-title">{tr('payerTitle')}</h3><p className={styles.muted}>{tr('payerIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" value={period[key]} onChange={event=>setPeriod({...period,[key]:event.target.value})}/></label>)}</div></div>
+    {error&&<p role="alert" className={styles.error}>{error}</p>}{notice&&<p role="status" className={styles.notice}>{notice}</p>}
+    {loading?<p role="status">{tr('loading')}</p>:lines.length===0?<p>{tr('noApprovedServices')}</p>:<>
+      <div className={styles.statGrid}><div className={`${styles.stat} ${styles.neutral}`}><strong>{lines.length}</strong><span>{tr('approvedPositions')}</span></div><div className={`${styles.stat} ${styles.neutral}`}><strong>{money(gross,locale)}</strong><span>{tr('approvedGross')}</span></div><div className={`${styles.stat} ${current?.state==='approved'?styles.good:styles.warn}`}><strong>{current?tr(`payer${current.state[0].toUpperCase()}${current.state.slice(1)}`):tr('payerDraft')}</strong><span>{tr('payerTitle')}</span></div></div>
+      {current?.state==='approved'?<p className={styles.notice}>{tr('payerApproved')}: {money(current.patient_cents??current.expected_patient_cents,locale)}</p>:writable&&<div className={styles.grid}>
+        <label>{tr('patientShare')}<select value={model} onChange={event=>{const value=event.target.value as typeof model;setModel(value);setShare(value==='private_full'?10000:2000);}}><option value="private_full">{tr('payerPrivate')}</option><option value="statutory_share">{tr('payerStatutory')}</option></select></label>
+        {model==='statutory_share'&&<label>{tr('patientShare')}<select value={share} onChange={event=>setShare(Number(event.target.value) as 1000|2000)}><option value={1000}>10 %</option><option value={2000}>20 %</option></select></label>}
+        <label>{tr('expectedPatientAmount')}<input inputMode="decimal" value={expected} onChange={event=>setExpected(event.target.value)} placeholder={(calculated/100).toFixed(2)}/></label>
+        <label>{tr('shareEvidence')}<input value={evidence} onChange={event=>setEvidence(event.target.value)} /></label>
+        <label>{tr('reason')}<textarea value={reason} onChange={event=>setReason(event.target.value)} /></label>
+        <div className={styles.row}>{(!current||current.state!=='draft')&&<button className={styles.primary} disabled={busy||reason.trim().length<3||evidence.trim().length<3||!Number.isFinite(Number(expected.replace(',','.')))} onClick={()=>void send('save_payer')}>{tr('payerSave')}</button>}{current?.state==='draft'&&<><button className={styles.primary} disabled={busy||reason.trim().length<3} onClick={()=>void send('approve_payer')}>{tr('payerApprove')}</button><button className={styles.danger} disabled={busy||reason.trim().length<3} onClick={()=>void send('withdraw_payer')}>{tr('payerWithdraw')}</button></>}</div>
+      </div>}
+    </>}
   </section>;
 }
 

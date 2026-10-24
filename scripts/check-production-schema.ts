@@ -121,6 +121,21 @@ async function main() {
       "billing_requests",
       "id,actor_id,request,result_id,created_at",
     ),
+    runSelectCheck(
+      "billing payer cases",
+      "billing_payer_cases",
+      "id,patient_id,from_date,to_date,head_version",
+    ),
+    runSelectCheck(
+      "billing payer versions",
+      "billing_payer_versions",
+      "id,case_id,revision,service_version_ids,payer_model,patient_share_basis_points,share_source_reference,expected_patient_cents,gross_cents,patient_cents,state,reason,created_by,created_at,decided_by,decided_at,decision_reason",
+    ),
+    runSelectCheck(
+      "billing payer idempotency records",
+      "billing_payer_requests",
+      "id,actor_id,request,result_id,created_at",
+    ),
   ];
 
   const results = await Promise.all(checks);

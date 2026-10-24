@@ -7,6 +7,7 @@ import { canReadBilling, previousBillingQuarter, validBillingPeriod } from './bi
 import { scribeBillingCandidates } from './billing-foundation';
 import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput, sourceIsCurrent, summarizeBillingQuarter, tariffInput, workspaceCommand, type BillingVersion } from './billing-workspace';
 import { t } from './i18n';
+import { payerAllocationCommand } from './billing-payer-allocation';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'>;
 function stableUuid(value:string){
@@ -41,7 +42,26 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       if(request.method==='GET'){
         const kind=url.searchParams.get('kind');
         const page=Number(url.searchParams.get('page')??'0');
-        if(!['tariff','service','source','queue','quarter'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(!['tariff','service','source','queue','quarter','payer'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(kind==='payer'){
+          const patientId=url.searchParams.get('patientId'),fallback=previousBillingQuarter(new Date());
+          const from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
+          if(!z.string().uuid().safeParse(patientId).success||!validBillingPeriod(from,to))return fail('invalid',400);
+          const {data:records,error:recordError}=await db.from('billing_records').select('*').eq('kind','service').eq('patient_id',patientId!);
+          if(recordError)return fail('unavailable',503);
+          const recordIds=(records??[]).map(record=>record.id);
+          const {data:versions,error:versionError}=recordIds.length?await db.from('billing_versions').select('*').in('record_id',recordIds):{data:[],error:null};
+          if(versionError)return fail('unavailable',503);
+          const lines=(records??[]).map(record=>(versions??[]).find(version=>version.record_id===record.id&&version.revision===record.head_version))
+            .filter((version:any)=>version?.state==='approved'&&version.data?.serviceDate>=from&&version.data?.serviceDate<=to)
+            .map((version:any)=>({id:version.id,schedule:version.data.schedule,code:version.data.code,description:version.data.description,serviceDate:version.data.serviceDate,grossCents:version.gross_cents}));
+          const caseId=stableUuid(`billing-payer-case:${patientId}:${from}:${to}`);
+          const {data:payerCase,error:caseError}=await db.from('billing_payer_cases').select('*').eq('id',caseId).maybeSingle();
+          if(caseError)return fail('unavailable',503);
+          const {data:current,error:currentError}=payerCase?await db.from('billing_payer_versions').select('*').eq('case_id',caseId).eq('revision',payerCase.head_version).maybeSingle():{data:null,error:null};
+          if(currentError)return fail('unavailable',503);
+          return respond({caseId,from,to,lines,payerCase,current,writable});
+        }
         if(kind==='quarter'){
           const fallback=previousBillingQuarter(new Date()),from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
           if(!validBillingPeriod(from,to))return fail('invalid',400);
@@ -155,6 +175,20 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       const body=await request.text();
       if(body.length>30000)return fail('invalid',413);
       let raw:unknown;try{raw=JSON.parse(body);}catch{return fail('invalid',400);}
+      const payer=payerAllocationCommand.safeParse(raw);
+      if(payer.success){
+        const command=payer.data.action==='save_payer'
+          ?{action:'save',caseId:payer.data.caseId,expectedRevision:payer.data.expectedRevision,reason:payer.data.reason,data:payer.data.data}
+          :{action:payer.data.action==='approve_payer'?'approve':'withdraw',versionId:payer.data.versionId,reason:payer.data.reason};
+        const {data:id,error}=await db.rpc('billing_payer_write',{p_actor:user.id,p_request_id:requestId,p_input:command});
+        if(error){
+          if(error.message.includes('forbidden'))return fail('forbidden',403);
+          if(/scope_mismatch|model_mismatch|total_mismatch/.test(error.message))return fail('payerMismatch',409);
+          if(/conflict|immutable|revision/.test(error.message))return fail('conflict',409);
+          return fail('unavailable',503);
+        }
+        return respond({id});
+      }
       const prepare=prepareSourceCommand.safeParse(raw);
       if(prepare.success){
         const {data:entry,error:entryError}=await db.from('doku_eintraege').select('id,patient_id,version,termin_datum,status,bestaetigt_am,positionen').eq('id',prepare.data.sourceId).maybeSingle();
