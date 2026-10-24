@@ -20,4 +20,7 @@ test('quarter reconciliation exposes missing work and marks only complete patien
   assert.equal(result.confirmedEntries,3);assert.equal(result.sourcePositions,3);assert.equal(result.entriesWithoutPositions,1);
   assert.equal(result.approvedPositions,2);assert.equal(result.missingPositions,1);assert.equal(result.approvedGrossCents,4600);
   assert.equal(result.patients,3);assert.equal(result.readyPatients,1);assert.equal(result.blockedPatients,2);
+  assert.equal(result.cases.find(item=>item.patientId===patientB)?.ready,true);
+  assert.equal(result.cases.find(item=>item.patientId===patientA)?.missing,1);
+  assert.equal(result.cases.find(item=>item.patientId===patientC)?.emptyEntries,1);
 });

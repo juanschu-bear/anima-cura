@@ -58,7 +58,14 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
             const result=await db.from('billing_versions').select('*').in('record_id',records.slice(index,index+100).map(record=>record.id));
             if(result.error)return fail('unavailable',503);versions.push(...(result.data??[]));
           }
-          return respond({from,to,...summarizeBillingQuarter(entries,records,versions),writable});
+          const aggregate=summarizeBillingQuarter(entries,records,versions);
+          const ordered=[...aggregate.cases].sort((a,b)=>Number(a.ready)-Number(b.ready)||b.missing-a.missing||a.patientId.localeCompare(b.patientId));
+          const pageSize=15,pageCases=ordered.slice(page*pageSize,page*pageSize+pageSize),patientIds=pageCases.map(item=>item.patientId);
+          const {data:patients,error:patientError}=patientIds.length?await db.from('patients').select('id,ivoris_nummer,vorname,nachname,geburtsdatum').in('id',patientIds):{data:[],error:null};
+          if(patientError)return fail('unavailable',503);
+          const cases=pageCases.map(item=>{const patient=(patients??[]).find(row=>row.id===item.patientId);return {...item,patient:{id:item.patientId,name:patient?`${patient.vorname??''} ${patient.nachname??''}`.trim():t('billing.work.unknownPatient',locale),ivoris_nummer:patient?.ivoris_nummer??null,geburtsdatum:patient?.geburtsdatum??null}};});
+          const {cases:ignoredCases,...totals}=aggregate;
+          return respond({from,to,...totals,cases,caseHasMore:ordered.length>(page+1)*pageSize,writable});
         }
         if(kind==='queue'){
           const pageSize=15;

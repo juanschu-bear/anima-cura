@@ -18,7 +18,8 @@ type Command=z.infer<typeof workspaceCommand>;
 type Candidate=Omit<Service,'schedule'|'insurerId'|'tariffVersionId'> & {schedule:Service['schedule']|null};
 type Editing={id:string;revision:number;kind:Kind;data?:Service|Tariff};
 type QueueCase={sourceId:string;serviceDate:string;sourceVersion:number;patient:Patient;totalPositions:number;recordedPositions:number;incompletePositions:number;states:{draft:number;approved:number;withdrawn:number};stale:number;status:'stale'|'needs_data'|'in_review'|'approved'|'partial'|'not_started'};
-type QuarterSummary={from:string;to:string;confirmedEntries:number;entriesWithoutPositions:number;sourcePositions:number;missingPositions:number;incompletePositions:number;draftPositions:number;approvedPositions:number;withdrawnPositions:number;stalePositions:number;approvedGrossCents:number;patients:number;readyPatients:number;blockedPatients:number};
+type QuarterCase={patientId:string;patient:Patient;positions:number;approved:number;missing:number;incomplete:number;draft:number;withdrawn:number;stale:number;emptyEntries:number;ready:boolean};
+type QuarterSummary={from:string;to:string;confirmedEntries:number;entriesWithoutPositions:number;sourcePositions:number;missingPositions:number;incompletePositions:number;draftPositions:number;approvedPositions:number;withdrawnPositions:number;stalePositions:number;approvedGrossCents:number;patients:number;readyPatients:number;blockedPatients:number;cases:QuarterCase[];caseHasMore:boolean};
 const schedules=['BEMA','GOZ','LABOR','MATERIAL'] as const;
 
 async function getData(query:URLSearchParams,locale:Locale,signal?:AbortSignal){
@@ -102,7 +103,7 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
       {patient&&<p className={styles.muted}>{patient.ivoris_nummer||patient.id}{patient.geburtsdatum?` · ${patient.geburtsdatum}`:''}</p>}
       <div className={styles.results}>{results.map(p=><button key={p.id} onClick={()=>{setPatient(p);setResults([]);reset();}}>{p.name} · {p.ivoris_nummer||p.id}{p.geburtsdatum?` · ${p.geburtsdatum}`:''}</button>)}</div>
     </div>}
-    {kind==='service'&&!patient&&<><QuarterOverview locale={locale}/><WorkQueue locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/></>}
+    {kind==='service'&&!patient&&<><QuarterOverview locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/><WorkQueue locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/></>}
     {error&&<p role="alert" className={styles.error}>{error}</p>}
     {notice&&<p role="status" className={styles.notice}>{notice}</p>}
     {kind==='tariff'&&writable&&!editing&&!decision&&<TariffImport locale={locale} onImported={()=>{setNotice(tr('tariffsImported'));setRefresh(x=>x+1);}}/>}
@@ -135,22 +136,22 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
   </section>;
 }
 
-function QuarterOverview({locale}:{locale:Locale}){
+function QuarterOverview({locale,onOpen}:{locale:Locale;onOpen:(patient:Patient)=>void}){
   const initial=previousBillingQuarter(new Date());
-  const [period,setPeriod]=useState(initial),[summary,setSummary]=useState<QuarterSummary|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  const [period,setPeriod]=useState(initial),[page,setPage]=useState(0),[summary,setSummary]=useState<QuarterSummary|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const tr=(key:string)=>t(`billing.work.${key}`,locale);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError('');
-    getData(new URLSearchParams({kind:'quarter',from:period.from,to:period.to}),locale,controller.signal).then(data=>{if(!controller.signal.aborted)setSummary(data);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    getData(new URLSearchParams({kind:'quarter',from:period.from,to:period.to,page:String(page)}),locale,controller.signal).then(data=>{if(!controller.signal.aborted)setSummary(data);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
-  },[period,locale]);
+  },[period,page,locale]);
   const stats=summary?[
     ['readyPatients',summary.readyPatients,'good'],['blockedPatients',summary.blockedPatients,'bad'],['approvedPositions',summary.approvedPositions,'good'],['draftPositions',summary.draftPositions,'warn'],['missingPositions',summary.missingPositions,'bad'],['incompletePositions',summary.incompletePositions,'bad'],['stalePositions',summary.stalePositions,'bad'],['approvedGross',money(summary.approvedGrossCents,locale),'neutral'],
   ] as const:[];
   return <section className={`${styles.panel} ${styles.quarter}`} aria-labelledby="billing-quarter-title">
-    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="billing-quarter-title">{tr('quarterTitle')}</h3><p className={styles.muted}>{tr('quarterIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" value={period[key]} onChange={event=>setPeriod({...period,[key]:event.target.value})}/></label>)}</div></div>
+    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="billing-quarter-title">{tr('quarterTitle')}</h3><p className={styles.muted}>{tr('quarterIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" value={period[key]} onChange={event=>{setPeriod({...period,[key]:event.target.value});setPage(0);}}/></label>)}</div></div>
     {error&&<p role="alert" className={styles.error}>{error}</p>}
-    {loading?<p role="status">{tr('loading')}</p>:summary&&<><div className={styles.statGrid}>{stats.map(([key,value,tone])=><div className={`${styles.stat} ${styles[tone]}`} key={key}><strong>{value}</strong><span>{tr(key)}</span></div>)}</div><p className={styles.muted}>{summary.confirmedEntries} {tr('confirmedEntries')} · {summary.sourcePositions} {tr('sourcePositions')} · {summary.entriesWithoutPositions} {tr('entriesWithoutPositions')}</p></>}
+    {loading?<p role="status">{tr('loading')}</p>:summary&&<><div className={styles.statGrid}>{stats.map(([key,value,tone])=><div className={`${styles.stat} ${styles[tone]}`} key={key}><strong>{value}</strong><span>{tr(key)}</span></div>)}</div><p className={styles.muted}>{summary.confirmedEntries} {tr('confirmedEntries')} · {summary.sourcePositions} {tr('sourcePositions')} · {summary.entriesWithoutPositions} {tr('entriesWithoutPositions')}</p><h3>{tr('quarterCases')}</h3><ul className={styles.queueList}>{summary.cases.map(item=><li key={item.patientId}><div><strong>{item.patient.name}</strong><p className={styles.muted}>{item.patient.ivoris_nummer||tr('missingPatientNumber')}</p></div><div><span className={`${styles.status} ${item.ready?styles.approved:styles.needs_data}`}>{tr(item.ready?'queue_approved':'quarterNeedsWork')}</span><p className={styles.muted}>{item.approved}/{item.positions} {tr('positionsRecorded')} · {[item.missing&&`${item.missing} ${tr('missingShort')}`,item.incomplete&&`${item.incomplete} ${tr('incompleteShort')}`,item.draft&&`${item.draft} ${tr('draftShort')}`,item.withdrawn&&`${item.withdrawn} ${tr('withdrawnShort')}`,item.stale&&`${item.stale} ${tr('staleShort')}`,item.emptyEntries&&`${item.emptyEntries} ${tr('emptyShort')}`].filter(Boolean).join(' · ')||tr('complete')}</p></div><button className={item.ready?undefined:styles.primary} onClick={()=>onOpen(item.patient)}>{tr(item.ready?'viewCase':'openCase')}</button></li>)}</ul>{(page>0||summary.caseHasMore)&&<Pager page={page} more={summary.caseHasMore} loading={loading} locale={locale} onChange={setPage}/>}</>}
   </section>;
 }
 
