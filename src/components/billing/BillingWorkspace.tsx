@@ -149,13 +149,14 @@ export function PayerAllocation({patient,locale,writable}:{patient:Patient;local
   const [invoice,setInvoice]=useState<IssuedInvoice|null>(null),[dueDate,setDueDate]=useState(defaultDue),[invoiceReason,setInvoiceReason]=useState('');
   const [cancellation,setCancellation]=useState<InvoiceCancellation|null>(null),[cancelReason,setCancelReason]=useState(''),[cancelConfirmed,setCancelConfirmed]=useState(false);
   const [originalInvoice,setOriginalInvoice]=useState<{invoice_number:string;document_id:string}|null>(null);
+  const [abandonment,setAbandonment]=useState<{reason:string;created_at:string}|null>(null);
   const cancelAttempt=useRef<{body:string;id:string}|null>(null),cancelInFlight=useRef(false);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[refresh,setRefresh]=useState(0);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError('');setNotice('');
     getData(new URLSearchParams({kind:'payer',patientId:patient.id,from:period.from,to:period.to,page:'0'}),locale,controller.signal).then(data=>{
       if(controller.signal.aborted)return;
-      setCaseId(data.caseId);setRevision(data.payerCase?.head_version??0);setLines(data.lines??[]);setCurrent(data.current??null);setInvoice(data.invoice??null);setCancellation(data.cancellation??null);setOriginalInvoice(data.originalInvoice??null);setCancelReason('');setCancelConfirmed(false);
+      setCaseId(data.caseId);setRevision(data.payerCase?.head_version??0);setLines(data.lines??[]);setCurrent(data.current??null);setInvoice(data.invoice??null);setCancellation(data.cancellation??null);setOriginalInvoice(data.originalInvoice??null);setAbandonment(data.abandonment??null);setCancelReason('');setCancelConfirmed(false);
       if(data.current){setModel(data.current.payer_model);setShare(data.current.patient_share_basis_points);setExpected((data.current.expected_patient_cents/100).toFixed(2));setEvidence(data.current.share_source_reference);setReason('');}
       else{setModel('private_full');setShare(10000);setExpected('');setEvidence('');setReason('');}
     }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
@@ -183,7 +184,7 @@ export function PayerAllocation({patient,locale,writable}:{patient:Patient;local
   }
   async function cancel(){
     if(!invoice||!cancelConfirmed||cancelInFlight.current)return;
-    const body=JSON.stringify({action:'cancel_invoice',invoiceId:invoice.id,reason:cancelReason.trim()});
+    const body=JSON.stringify({action:invoice.status==='preparing'?'abandon_invoice':'cancel_invoice',invoiceId:invoice.id,reason:cancelReason.trim()});
     if(cancelAttempt.current?.body!==body)cancelAttempt.current={body,id:crypto.randomUUID()};
     cancelInFlight.current=true;setBusy(true);setError('');setNotice('');
     try{
@@ -196,17 +197,18 @@ export function PayerAllocation({patient,locale,writable}:{patient:Patient;local
   return <section className={`${styles.panel} ${styles.quarter}`} aria-labelledby="payer-allocation-title">
     <div className={`${styles.row} ${styles.spread}`}><div><h3 id="payer-allocation-title">{tr('payerTitle')}</h3><p className={styles.muted}>{tr('payerIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" disabled={busy} value={period[key]} onChange={event=>setPeriod({...period,[key]:event.target.value})}/></label>)}</div></div>
     {error&&<p role="alert" className={styles.error}>{error}</p>}{notice&&<p role="status" className={styles.notice}>{notice}</p>}
-    {!loading&&invoice&&invoice.status!=='preparing'&&<div>
-      <h4>{tr(invoice.status==='void'?'invoiceCancelled':'invoiceIssued')}</h4>
+    {!loading&&invoice&&<div>
+      <h4>{tr(invoice.status==='preparing'?'invoicePreparing':invoice.status==='void'?(invoice.issued_at?'invoiceCancelled':'invoiceAbandoned'):'invoiceIssued')}</h4>
       <p>{invoice.invoice_number} · {money(invoice.total_cents,locale)}</p>
-      <a href={`/api/patient/dokumente/${invoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('invoiceOpen')}</a>
+      {invoice.issued_at&&<a href={`/api/patient/dokumente/${invoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('invoiceOpen')}</a>}
       {originalInvoice&&<p>{tr('correctionOriginal')}: <a href={`/api/patient/dokumente/${originalInvoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{originalInvoice.invoice_number}</a></p>}
       {cancellation&&<><p>{cancellation.cancellation_number} · {cancellation.cancellation_date}</p><p>{cancellation.reason}</p><a href={`/api/patient/dokumente/${cancellation.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('cancellationOpen')}</a><p className={styles.muted}>{tr('correctionNext')}</p></>}
-      {writable&&invoice.status==='issued'&&<details><summary>{tr('cancellationTitle')}</summary>
-        <p className={styles.muted}>{tr('cancellationImpact')}</p>
-        <label>{tr('cancellationReason')}<textarea maxLength={1000} disabled={busy} value={cancelReason} onChange={event=>{setCancelReason(event.target.value);setCancelConfirmed(false);}}/></label>
-        <label className={styles.row}><input type="checkbox" disabled={busy} checked={cancelConfirmed} onChange={event=>setCancelConfirmed(event.target.checked)}/>{tr('cancellationConfirm')}</label>
-        <button className={styles.danger} disabled={busy||!cancelConfirmed||cancelReason.trim().length<3} onClick={()=>void cancel()}>{tr(busy?'cancellationWorking':'cancellationSubmit')}</button>
+      {abandonment&&<><p>{abandonment.reason}</p><p className={styles.muted}>{tr('abandonmentNext')}</p></>}
+      {writable&&(invoice.status==='issued'||invoice.status==='preparing')&&<details><summary>{tr(invoice.status==='preparing'?'abandonmentTitle':'cancellationTitle')}</summary>
+        <p className={styles.muted}>{tr(invoice.status==='preparing'?'abandonmentImpact':'cancellationImpact')}</p>
+        <label>{tr(invoice.status==='preparing'?'abandonmentReason':'cancellationReason')}<textarea maxLength={1000} disabled={busy} value={cancelReason} onChange={event=>{setCancelReason(event.target.value);setCancelConfirmed(false);}}/></label>
+        <label className={styles.check}><input type="checkbox" disabled={busy} checked={cancelConfirmed} onChange={event=>setCancelConfirmed(event.target.checked)}/>{tr(invoice.status==='preparing'?'abandonmentConfirm':'cancellationConfirm')}</label>
+        <button className={styles.danger} disabled={busy||!cancelConfirmed||cancelReason.trim().length<3} onClick={()=>void cancel()}>{tr(busy?'cancellationWorking':invoice.status==='preparing'?'abandonmentSubmit':'cancellationSubmit')}</button>
       </details>}
     </div>}
     {loading?<p role="status">{tr('loading')}</p>:lines.length===0?<p>{tr('noApprovedServices')}</p>:<>
@@ -222,7 +224,57 @@ export function PayerAllocation({patient,locale,writable}:{patient:Patient;local
         <div className={styles.row}>{(!current||current.state!=='draft')&&<button className={styles.primary} disabled={busy||reason.trim().length<3||evidence.trim().length<3||!Number.isFinite(Number(expected.replace(',','.')))} onClick={()=>void send('save_payer')}>{tr('payerSave')}</button>}{current?.state==='draft'&&<><button className={styles.primary} disabled={busy||reason.trim().length<3} onClick={()=>void send('approve_payer')}>{tr('payerApprove')}</button><button className={styles.danger} disabled={busy||reason.trim().length<3} onClick={()=>void send('withdraw_payer')}>{tr('payerWithdraw')}</button></>}</div>
       </div>}
     </>}
+    <InvoiceHistory key={`${patient.id}:${period.from}:${period.to}`} patientId={patient.id} period={period} locale={locale} refresh={refresh} writable={writable} onChanged={()=>setRefresh(value=>value+1)}/>
   </section>;
+}
+
+function InvoiceHistory({patientId,period,locale,refresh,writable,onChanged}:{patientId:string;period:{from:string;to:string};locale:Locale;refresh:number;writable:boolean;onChanged:()=>void}){
+  type HistoryInvoice=IssuedInvoice&{created_at:string;void_reason:string|null;cancellationDocumentId:string|null};
+  const tr=(key:string)=>t(`billing.work.${key}`,locale);
+  const [page,setPage]=useState(0),[items,setItems]=useState<HistoryInvoice[]>([]),[hasMore,setHasMore]=useState(false),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState<HistoryInvoice|null>(null),[reason,setReason]=useState(''),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false);
+  const attempt=useRef<{body:string;id:string}|null>(null),inFlight=useRef(false);
+  useEffect(()=>{
+    const controller=new AbortController();setLoading(true);setError('');
+    getData(new URLSearchParams({kind:'invoice_history',patientId,from:period.from,to:period.to,page:String(page)}),locale,controller.signal)
+      .then(data=>{if(!controller.signal.aborted){setItems(data.items);setHasMore(data.hasMore);}})
+      .catch(e=>{if(!controller.signal.aborted){setItems([]);setHasMore(false);setError(e.message);}})
+      .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[patientId,period.from,period.to,locale,page,refresh]);
+  async function abandon(){
+    if(!selected||!confirmed||inFlight.current)return;
+    const body=JSON.stringify({action:'abandon_invoice',invoiceId:selected.id,reason:reason.trim()});
+    if(attempt.current?.body!==body)attempt.current={body,id:crypto.randomUUID()};
+    inFlight.current=true;setBusy(true);setError('');
+    try{
+      const response=await fetch(`/api/rechnungen/catalog?lang=${locale}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.current.id},body});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||tr('unavailable'));
+      attempt.current=null;setSelected(null);setReason('');setConfirmed(false);onChanged();
+    }catch(e){setError(e instanceof Error?e.message:tr('unavailable'));}
+    finally{inFlight.current=false;setBusy(false);}
+  }
+  return <details className={styles.panel}><summary>{tr('invoiceHistory')}</summary>
+    {error&&<p role="alert" className={styles.error}>{error}</p>}
+    {loading?<p role="status">{tr('loading')}</p>:(!error||items.length>0)&&<>
+      {items.length===0?<p>{tr('invoiceHistoryEmpty')}</p>:<ul className={styles.list}>{items.map(item=><li key={item.id}>
+        <strong>{item.invoice_number} · {money(item.total_cents,locale)}</strong>
+        <p>{tr(item.status==='preparing'?'invoicePreparing':item.status==='void'?(item.issued_at?'invoiceCancelled':'invoiceAbandoned'):'invoiceIssued')}</p>
+        <p className={styles.muted}>{new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Berlin'}).format(new Date(item.created_at))}</p>
+        {item.void_reason&&<p>{item.void_reason}</p>}
+        <div className={styles.row}>{item.issued_at&&<a href={`/api/patient/dokumente/${item.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('invoiceOpen')}</a>}
+        {item.cancellationDocumentId&&<a href={`/api/patient/dokumente/${item.cancellationDocumentId}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('cancellationOpen')}</a>}</div>
+        {writable&&item.status==='preparing'&&<button disabled={busy} onClick={()=>{setSelected(item);setReason('');setConfirmed(false);}}>{tr('abandonmentTitle')}</button>}
+      </li>)}</ul>}
+      {selected&&<div className={styles.panel}><h4>{tr('abandonmentTitle')}: {selected.invoice_number}</h4><p>{tr('abandonmentImpact')}</p>
+        <label>{tr('abandonmentReason')}<textarea maxLength={1000} disabled={busy} value={reason} onChange={event=>{setReason(event.target.value);setConfirmed(false);}}/></label>
+        <label className={styles.check}><input type="checkbox" disabled={busy} checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>{tr('abandonmentConfirm')}</label>
+        <div className={styles.row}><button className={styles.danger} disabled={busy||!confirmed||reason.trim().length<3} onClick={()=>void abandon()}>{tr('abandonmentSubmit')}</button>
+        <button disabled={busy} onClick={()=>setSelected(null)}>{tr('cancel')}</button></div>
+      </div>}
+      <div className={styles.row}><button disabled={busy||page===0} onClick={()=>{setSelected(null);setPage(value=>value-1);}}>{tr('previous')}</button><span>{page+1}</span><button disabled={busy||!hasMore} onClick={()=>{setSelected(null);setPage(value=>value+1);}}>{tr('next')}</button></div>
+    </>}
+  </details>;
 }
 
 function QuarterOverview({locale,onOpen}:{locale:Locale;onOpen:(patient:Patient)=>void}){

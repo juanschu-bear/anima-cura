@@ -10,6 +10,12 @@ export const cancelInvoiceCommand = z.object({
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
+export const abandonInvoiceCommand = z.object({
+  action: z.literal('abandon_invoice'),
+  invoiceId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(1000),
+}).strict();
+
 export const cancellationSnapshot = z.object({
   original: invoiceSnapshot,
   cancellationDate: billingDate,

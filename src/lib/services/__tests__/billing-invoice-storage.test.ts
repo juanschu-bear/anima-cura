@@ -40,6 +40,7 @@ test("invoice issuance reserves one number and atomically publishes debt, docume
     await db.exec(await readFile("supabase/migrations/052_billing_invoice_issuance.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/054_billing_invoice_service_claims.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/055_billing_invoice_cancellations.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/056_billing_invoice_abandonments.sql", "utf8"));
     const due = new Date(); due.setUTCDate(due.getUTCDate() + 14); const dueDate = due.toISOString().slice(0, 10);
     const requestId = randomUUID();
     const input = { action: "reserve", payerVersionId: payerId, dueDate, reason: "Synthetic invoice approval" };
@@ -120,10 +121,33 @@ test("invoice issuance reserves one number and atomically publishes debt, docume
     assert.match(replacementInvoice.invoice_number,/-000002$/);
     assert.equal(replacementInvoice.replaces_invoice_id,invoiceId);
     assert.equal(replacementInvoice.snapshot.replacesInvoiceNumber,invoice.invoice_number);
-    await db.query("SELECT billing_invoice_finalize($1,$2,$3,$4,$5)",[actor,replacement,'c'.repeat(64),100,`${patient}/${replacementInvoice.document_id}.pdf`]);
-    assert.equal((await db.query("SELECT * FROM billing_invoice_service_claims WHERE invoice_id=$1",[replacement])).rows.length,1);
+    const abandonSql="SELECT billing_invoice_abandon($1,$2,$3,$4)",abandonArgs=[actor,randomUUID(),replacement,'Synthetic interrupted upload'];
+    // Even partial evidence of publication must prevent silent abandonment.
+    await db.exec("BEGIN");
+    await db.query("INSERT INTO patient_documents(id,patient_id) VALUES($1,$2)",[replacementInvoice.document_id,patient]);
+    await assert.rejects(db.query(abandonSql,abandonArgs),/already_published/);
+    await db.exec("ROLLBACK");
+    await db.query(abandonSql,abandonArgs);await db.query(abandonSql,abandonArgs);
+    await assert.rejects(db.query(abandonSql,[actor,randomUUID(),replacement,'Changed abandonment reason']),/conflict/);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_abandonments")).rows.length,1);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_service_claims")).rows.length,0);
+    assert.equal((await db.query("SELECT * FROM patient_documents")).rows.length,2);
+    assert.equal((await db.query("SELECT * FROM patient_notifications")).rows.length,2);
+    assert.equal((await db.query("SELECT * FROM offene_posten")).rows.length,1);
+    await assert.rejects(db.query("DELETE FROM billing_invoice_abandonments"),/immutable/);
+    await assert.rejects(db.query("SELECT billing_invoice_finalize($1,$2,$3,$4,$5)",[actor,replacement,'c'.repeat(64),100,`${patient}/${replacementInvoice.document_id}.pdf`]),/conflict/);
+    // The abandoned correction must not occupy the original's replacement slot.
+    const payerId3=(await db.query<{id:string}>("SELECT billing_payer_write($1,$2,$3::jsonb) AS id",[actor,randomUUID(),JSON.stringify({action:'save',caseId:payerCase,expectedRevision:2,reason:'Replacement after abandoned preparation',data:{patientId:patient,from:'2026-07-01',to:'2026-09-30',serviceVersionIds:[serviceId],payerModel:'statutory_share',patientShareBasisPoints:2000,shareSourceReference:'Verified synthetic evidence',expectedPatientCents:240}})])).rows[0].id;
+    await db.query("SELECT billing_payer_write($1,$2,$3::jsonb)",[actor,randomUUID(),JSON.stringify({action:'approve',versionId:payerId3,reason:'Synthetic evidence approved'})]);
+    const resumed=(await db.query<{id:string}>("SELECT billing_invoice_reserve($1,$2,$3::jsonb) AS id",[actor,randomUUID(),JSON.stringify({...input,payerVersionId:payerId3})])).rows[0].id;
+    const resumedInvoice=(await db.query<{invoice_number:string;document_id:string;replaces_invoice_id:string}>("SELECT invoice_number,document_id,replaces_invoice_id FROM billing_invoices WHERE id=$1",[resumed])).rows[0];
+    assert.match(resumedInvoice.invoice_number,/-000003$/);assert.equal(resumedInvoice.replaces_invoice_id,invoiceId);
+    await db.query("SELECT billing_invoice_finalize($1,$2,$3,$4,$5)",[actor,resumed,'d'.repeat(64),100,`${patient}/${resumedInvoice.document_id}.pdf`]);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_service_claims WHERE invoice_id=$1",[resumed])).rows.length,1);
+    await assert.rejects(db.query(abandonSql,[actor,randomUUID(),resumed,'Cannot abandon published invoice']),/already_published/);
     await db.exec("SET ROLE authenticated");
     await assert.rejects(db.query("SELECT * FROM billing_invoices"), /permission denied/);
     await assert.rejects(db.query(cancelSql,cancelArgs), /permission denied/);
+    await assert.rejects(db.query(abandonSql,abandonArgs), /permission denied/);
   } finally { await db.close(); }
 });

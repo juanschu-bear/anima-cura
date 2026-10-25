@@ -9,7 +9,7 @@ import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput
 import { t } from './i18n';
 import { payerAllocationCommand } from './billing-payer-allocation';
 import { buildIssuedInvoicePdf, issueInvoiceCommand } from './billing-invoice';
-import { berlinBillingDate, buildInvoiceCancellationPdf, cancelInvoiceCommand } from './billing-invoice-cancellation';
+import { abandonInvoiceCommand, berlinBillingDate, buildInvoiceCancellationPdf, cancelInvoiceCommand } from './billing-invoice-cancellation';
 import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath } from './billing-document-access';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'|'storage'>;
@@ -45,7 +45,19 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       if(request.method==='GET'){
         const kind=url.searchParams.get('kind');
         const page=Number(url.searchParams.get('page')??'0');
-        if(!['tariff','service','source','queue','quarter','payer'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(!['tariff','service','source','queue','quarter','payer','invoice_history'].includes(kind??'')||!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid',400);
+        if(kind==='invoice_history'){
+          const patientId=url.searchParams.get('patientId'),from=url.searchParams.get('from'),to=url.searchParams.get('to');
+          if(!z.string().uuid().safeParse(patientId).success||!from||!to||!validBillingPeriod(from,to))return fail('invalid',400);
+          const {data:history,error}=await db.from('billing_invoices').select('id,invoice_number,status,total_cents,created_at,issued_at,voided_at,void_reason,document_id')
+            .eq('patient_id',patientId).eq('snapshot->>periodFrom',from).eq('snapshot->>periodTo',to)
+            .order('created_at',{ascending:false}).order('id',{ascending:false}).range(page*15,page*15+15);
+          if(error)return fail('unavailable',503);
+          const items=(history??[]).slice(0,15),ids=items.map(item=>item.id);
+          const {data:cancellations,error:cancellationError}=ids.length?await db.from('billing_invoice_cancellations').select('invoice_id,document_id').in('invoice_id',ids):{data:[],error:null};
+          if(cancellationError)return fail('unavailable',503);
+          return respond({items:items.map(item=>({...item,cancellationDocumentId:cancellations?.find(c=>c.invoice_id===item.id)?.document_id??null})),hasMore:(history??[]).length>15});
+        }
         if(kind==='payer'){
           const patientId=url.searchParams.get('patientId'),fallback=previousBillingQuarter(new Date());
           const from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
@@ -69,7 +81,9 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
           if(cancellationError)return fail('unavailable',503);
           const {data:originalInvoice,error:originalError}=invoice?.replaces_invoice_id?await db.from('billing_invoices').select('invoice_number,document_id').eq('id',invoice.replaces_invoice_id).eq('patient_id',patientId).maybeSingle():{data:null,error:null};
           if(originalError)return fail('unavailable',503);
-          return respond({caseId,from,to,lines,payerCase,current,invoice,cancellation,originalInvoice,writable});
+          const {data:abandonment,error:abandonmentError}=invoice?await db.from('billing_invoice_abandonments').select('reason,created_at').eq('invoice_id',invoice.id).maybeSingle():{data:null,error:null};
+          if(abandonmentError)return fail('unavailable',503);
+          return respond({caseId,from,to,lines,payerCase,current,invoice,cancellation,abandonment,originalInvoice,writable});
         }
         if(kind==='quarter'){
           const fallback=previousBillingQuarter(new Date()),from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
@@ -184,6 +198,18 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       const body=await request.text();
       if(body.length>30000)return fail('invalid',413);
       let raw:unknown;try{raw=JSON.parse(body);}catch{return fail('invalid',400);}
+      const abandonment=abandonInvoiceCommand.safeParse(raw);
+      if(abandonment.success){
+        const {data:id,error}=await db.rpc('billing_invoice_abandon',{p_actor:user.id,p_request_id:requestId,p_invoice_id:abandonment.data.invoiceId,p_reason:abandonment.data.reason});
+        if(error){
+          if(error.message.includes('forbidden'))return fail('forbidden',403);
+          if(error.message.includes('already_published'))return fail('abandonmentAlreadyPublished',409);
+          if(/conflict|invalid/.test(error.message))return fail('conflict',409);
+          if(error.message.includes('not_found'))return fail('invalid',404);
+          return fail('unavailable',503);
+        }
+        return respond({id,status:'void'});
+      }
       const cancellation=cancelInvoiceCommand.safeParse(raw);
       if(cancellation.success){
         const {invoiceId,reason}=cancellation.data;
@@ -235,6 +261,7 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
         }
         const {data:invoice,error:invoiceError}=await db.from('billing_invoices').select('*').eq('id',invoiceId).maybeSingle();
         if(invoiceError||!invoice)return fail('unavailable',503);
+        if(invoice.status==='void')return fail('invoiceVoided',409);
         if(invoice.status==='issued')return respond({id:invoice.id,invoiceNumber:invoice.invoice_number,status:invoice.status,documentId:invoice.document_id});
         const rendered=await buildIssuedInvoicePdf(invoice.snapshot);
         const {data:bucket,error:bucketError}=await db.storage.getBucket(BILLING_DOCUMENTS_BUCKET);

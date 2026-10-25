@@ -59,6 +59,28 @@ test('cancellation retries return the committed document without rewriting files
   assert.equal((await readOnly.post(command)).status,403);assert.equal(readOnly.adminCalls(),0);
   assert.equal((await f.post({...command,totalCents:0})).status,400);
 });
+test('abandonment uses one atomic operation without storage or document writes and rejects published invoices',async()=>{
+  const command={action:'abandon_invoice',invoiceId:randomUUID(),reason:'Interrupted upload'};
+  const f=fixture();const response=await f.post(command);
+  assert.equal(response.status,200);assert.equal((await response.json()).status,'void');
+  assert.equal(f.writes.length,1);assert.equal((f.writes[0] as any).name,'billing_invoice_abandon');
+  const published=fixture({rpcError:{message:'billing_abandonment_already_published'}});
+  const blocked=await published.post(command);assert.equal(blocked.status,409);
+  assert.match((await blocked.json()).error,/inzwischen ausgestellt/);
+  const readonly=fixture({permissions:{module:{rechnungen:'lesen'}}});
+  assert.equal((await readonly.post(command)).status,403);assert.equal(readonly.writes.length,0);
+});
+test('invoice history is scoped to patient and period, paginated, and does not hide read failures',async()=>{
+  const records=Array.from({length:16},()=>({id:randomUUID(),status:'void',issued_at:null}));
+  const f=fixture({data:{billing_invoices:records,billing_invoice_cancellations:[]}});
+  const historyUrl=url+`?kind=invoice_history&patientId=${patient}&from=2026-07-01&to=2026-09-30&page=1`;
+  const response=await f.handle(new Request(historyUrl));assert.equal(response.status,200);
+  const data=await response.json();assert.equal(data.items.length,15);assert.equal(data.hasMore,true);
+  assert.ok(f.calls.some(c=>c.table==='billing_invoices'&&c.method==='eq'&&c.args[0]==='patient_id'&&c.args[1]===patient));
+  assert.ok(f.calls.some(c=>c.method==='eq'&&c.args[0]==='snapshot->>periodFrom'&&c.args[1]==='2026-07-01'));
+  assert.ok(f.calls.some(c=>c.method==='range'&&c.args[0]===15&&c.args[1]===30));
+  assert.equal((await fixture({failTable:'billing_invoices'}).handle(new Request(historyUrl))).status,503);
+});
 test('source proposals are scoped, paginated and retain missing quantities',async()=>{
   const entry={id:service.source.recordId,patient_id:patient,version:1,termin_datum:'2026-07-05',status:'bestaetigt',bestaetigt_am:'2026-07-05T10:00:00Z',positionen:[{code:'BEMA 126a',text:'Test'}]};
   const f=fixture({data:{doku_eintraege:Array.from({length:26},(_,i)=>({...entry,id:String(i)}))}});
