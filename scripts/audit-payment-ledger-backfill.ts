@@ -48,6 +48,13 @@ async function main() {
   if (process.argv.includes("--apply")) {
     throw new Error("This audit is read-only. Historical imports require a separately verified transactional migration.");
   }
+  const manifestPath = process.argv.includes("--manifest") ? path.resolve("tmp/verified-bank-payment-backfill.json") : null;
+  let catalog: string | null = null;
+  if (manifestPath) {
+    const { data, error } = await db.rpc("payment_backfill_catalog_fingerprint");
+    if (error) throw error;
+    catalog = data;
+  }
   const [patients, invoices, transactions, allocationRows] = await Promise.all([
     fetchAll("patients", "id,ivoris_nummer,vorname,nachname"),
     fetchAll("offene_posten", "id,patient_id,unser_zeichen,rechnung_nr"),
@@ -160,6 +167,7 @@ async function main() {
       // Historical import is deliberately stricter than candidate discovery.
       // Never repeat an existing booking, override a prior decision or import name-only matches.
       if (result.state !== "ready") continue;
+      if (!candidate.evidence.some(e => e.kind === "patient_number")) continue;
       rows.push({
         source_key: `backfill-v1:${transaction.id}:${candidate.patientId}`,
         transaction_id: transaction.id,
@@ -170,8 +178,18 @@ async function main() {
         evidence: candidate.evidence,
         decision_reason: candidate.reason,
         confirmed_at: candidate.state === "confirmed_auto" ? new Date().toISOString() : null,
+        expected_transaction: transaction,
       });
     }
+  }
+
+  if (manifestPath) {
+    const { data: after, error } = await db.rpc("payment_backfill_catalog_fingerprint");
+    if (error) throw error;
+    if (!catalog || after !== catalog) throw new Error("Identity catalogue changed during audit; no manifest created");
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    fs.writeFileSync(manifestPath, JSON.stringify({ version: "verified-bank-v1", catalog, createdAt: new Date().toISOString(), rows }), { mode: 0o600 });
+    fs.chmodSync(manifestPath, 0o600);
   }
 
   console.log(JSON.stringify({
@@ -186,6 +204,7 @@ async function main() {
     allocationRows: rows.length,
     reconciliation,
     sourceAllocationRows: allocationRows.length,
+    manifestCreated: Boolean(manifestPath),
     allocationsWithoutBankTransaction: allocationRows.filter(row => !row.transaction_id).length,
     allocationsOutsideAuditScope: allocationRows.filter(row => row.transaction_id && !transactions.some(tx => tx.id === row.transaction_id)).length,
     warning: "Ready means migration candidate, not a reconciled invoice balance. No account view is switched by this audit.",

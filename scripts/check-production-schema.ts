@@ -168,6 +168,15 @@ async function main() {
     ),
   ];
 
+  checks.push((async (): Promise<CheckResult> => {
+    const { error } = await supabase.rpc("import_verified_bank_payment_batch", { p_catalog: "schema-probe", p_rows: [] });
+    return {
+      name: "verified bank import fail-closed guard",
+      ok: error?.message === "invalid verified payment batch",
+      detail: error?.message === "invalid verified payment batch" ? "Empty batches rejected before any write" : (error?.message ?? "Unexpected guard response"),
+    };
+  })());
+
   const results = await Promise.all(checks);
   const failed = results.filter((result) => !result.ok);
 
