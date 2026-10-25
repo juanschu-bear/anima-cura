@@ -18,6 +18,7 @@ export type LedgerTransaction = {
   senderName?: string | null;
   purpose?: string | null;
   existingPatientId?: string | null;
+  existingMatchingStatus?: string | null;
 };
 
 export type LedgerEvidence = {
@@ -58,9 +59,9 @@ export function buildLedgerPatientCandidates(
   patients: LedgerPatient[],
   invoices: LedgerInvoice[]
 ): LedgerCandidate[] {
-  if (transaction.amountCents <= 0) return [];
+  if (!Number.isSafeInteger(transaction.amountCents) || transaction.amountCents <= 0) return [];
   const text = normalize(`${transaction.senderName || ""} ${transaction.purpose || ""}`);
-  const compactPurpose = compact(transaction.purpose);
+  const normalizedPurpose = normalize(transaction.purpose);
   const byPatient = new Map<string, LedgerEvidence[]>();
   const add = (patientId: string | null, evidence: LedgerEvidence) => {
     if (!patientId) return;
@@ -78,7 +79,8 @@ export function buildLedgerPatientCandidates(
     }
     const forward = normalize(`${patient.vorname} ${patient.nachname}`);
     const reverse = normalize(`${patient.nachname} ${patient.vorname}`);
-    if (includesPhrase(text, forward) || includesPhrase(text, reverse)) {
+    if (normalize(patient.vorname) && normalize(patient.nachname)
+      && (includesPhrase(text, forward) || includesPhrase(text, reverse))) {
       add(patient.id, { kind: "exact_full_name", value: forward, score: 75 });
     }
   }
@@ -86,9 +88,9 @@ export function buildLedgerPatientCandidates(
   for (const invoice of invoices) {
     const reference = compact(invoice.reference);
     const invoiceNumber = compact(invoice.invoiceNumber);
-    if (reference && compactPurpose.includes(reference)) {
+    if (reference && includesPhrase(normalizedPurpose, normalize(invoice.reference))) {
       add(invoice.patientId, { kind: "invoice_reference", value: reference, score: 100 });
-    } else if (invoiceNumber && compactPurpose.includes(invoiceNumber)) {
+    } else if (invoiceNumber && includesPhrase(normalizedPurpose, normalize(invoice.invoiceNumber))) {
       add(invoice.patientId, { kind: "invoice_number", value: invoiceNumber, score: 95 });
     }
   }
@@ -101,7 +103,8 @@ export function buildLedgerPatientCandidates(
     evidence,
     reason: "Mehrere plausible Patienten; Split oder manuelle Entscheidung erforderlich",
   }));
-  if (candidates.length === 1 && candidates[0].confidenceScore >= 75) {
+  if (candidates.length === 1 && candidates[0].confidenceScore >= 75
+    && (!transaction.existingPatientId || transaction.existingPatientId === candidates[0].patientId)) {
     candidates[0].state = "confirmed_auto";
     candidates[0].reason = "Eindeutiger Patient mit nachvollziehbarem Beleg und mindestens 75 %";
   }

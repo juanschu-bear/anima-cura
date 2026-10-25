@@ -3,6 +3,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { buildLedgerPatientCandidates } from "../src/lib/payment-ledger-matching";
+import { reconcileLedgerTransaction, type ReconciliationState } from "../src/lib/payment-ledger-reconciliation";
 
 function normalizedWords(value: unknown) {
   return String(value || "")
@@ -34,7 +35,7 @@ const db = createClient(url, key, { auth: { persistSession: false } });
 async function fetchAll(table: string, select: string, configure?: (query: any) => any) {
   const rows: any[] = [];
   for (let start = 0; ; start += 1000) {
-    let query = db.from(table).select(select).range(start, start + 999);
+    let query = db.from(table).select(select).order("id").range(start, start + 999);
     if (configure) query = configure(query);
     const { data, error } = await query;
     if (error) throw error;
@@ -44,16 +45,32 @@ async function fetchAll(table: string, select: string, configure?: (query: any) 
 }
 
 async function main() {
-  const apply = process.argv.includes("--apply");
-  const [patients, invoices, transactions] = await Promise.all([
+  if (process.argv.includes("--apply")) {
+    throw new Error("This audit is read-only. Historical imports require a separately verified transactional migration.");
+  }
+  const [patients, invoices, transactions, allocationRows] = await Promise.all([
     fetchAll("patients", "id,ivoris_nummer,vorname,nachname"),
     fetchAll("offene_posten", "id,patient_id,unser_zeichen,rechnung_nr"),
     fetchAll(
       "transaktionen",
       "id,betrag,absender_name,verwendungszweck,matching_status,matched_patient_id",
-      (query) => query.gt("betrag", 0).neq("matching_status", "ignoriert")
+      (query) => query.gt("betrag", 0).or("matching_status.is.null,matching_status.neq.ignoriert")
     ),
+    fetchAll("payment_patient_allocations", "id,transaction_id,patient_id,amount_cents,state,confidence_score,reversal_of_allocation_id"),
   ]);
+  const historyByTransaction = new Map<string, any[]>();
+  for (const row of allocationRows) {
+    if (!row.transaction_id) continue;
+    const history = historyByTransaction.get(row.transaction_id) || [];
+    history.push({ id: row.id, transactionId: row.transaction_id, patientId: row.patient_id,
+      amountCents: Number(row.amount_cents), state: row.state, confidenceScore: row.confidence_score,
+      reversalOfAllocationId: row.reversal_of_allocation_id });
+    historyByTransaction.set(row.transaction_id, history);
+  }
+  const reconciliation: Record<ReconciliationState, { count: number; amountCents: number }> = Object.fromEntries(
+    ["covered", "partial", "overallocated", "conflict", "prior_decision", "ready", "needs_evidence"]
+      .map(state => [state, { count: 0, amountCents: 0 }]),
+  ) as Record<ReconciliationState, { count: number; amountCents: number }>;
 
   const ledgerPatients = patients.map((patient) => ({
     id: patient.id,
@@ -109,13 +126,18 @@ async function main() {
       for (const invoice of invoicesByNumber.get(padded) || []) relevantInvoices.set(invoice.id, invoice);
       for (const invoice of invoicesByBase.get(padded) || []) relevantInvoices.set(invoice.id, invoice);
     }
-    const candidates = buildLedgerPatientCandidates({
+    const ledgerTransaction = {
       id: transaction.id,
       amountCents: Math.round(Number(transaction.betrag) * 100),
       senderName: transaction.absender_name,
       purpose: transaction.verwendungszweck,
       existingPatientId: transaction.matched_patient_id,
-    }, Array.from(relevantPatients.values()), Array.from(relevantInvoices.values()));
+      existingMatchingStatus: transaction.matching_status,
+    };
+    const candidates = buildLedgerPatientCandidates(ledgerTransaction, Array.from(relevantPatients.values()), Array.from(relevantInvoices.values()));
+    const result = reconcileLedgerTransaction(ledgerTransaction, candidates, historyByTransaction.get(transaction.id) || []);
+    reconciliation[result.state].count += 1;
+    reconciliation[result.state].amountCents += ledgerTransaction.amountCents;
     const conflictsWithLegacy = Boolean(
       transaction.matched_patient_id &&
       candidates.length === 1 &&
@@ -135,6 +157,9 @@ async function main() {
       confirmedByEvidence[kinds] = (confirmedByEvidence[kinds] || 0) + 1;
     }
     for (const candidate of candidates) {
+      // Historical import is deliberately stricter than candidate discovery.
+      // Never repeat an existing booking, override a prior decision or import name-only matches.
+      if (result.state !== "ready") continue;
       rows.push({
         source_key: `backfill-v1:${transaction.id}:${candidate.patientId}`,
         transaction_id: transaction.id,
@@ -150,7 +175,7 @@ async function main() {
   }
 
   console.log(JSON.stringify({
-    mode: apply ? "apply" : "dry-run",
+    mode: "dry-run",
     transactions: transactions.length,
     autoConfirmed,
     ambiguous,
@@ -159,14 +184,13 @@ async function main() {
     confirmedAmountCents,
     confirmedByEvidence,
     allocationRows: rows.length,
+    reconciliation,
+    sourceAllocationRows: allocationRows.length,
+    allocationsWithoutBankTransaction: allocationRows.filter(row => !row.transaction_id).length,
+    allocationsOutsideAuditScope: allocationRows.filter(row => row.transaction_id && !transactions.some(tx => tx.id === row.transaction_id)).length,
+    warning: "Ready means migration candidate, not a reconciled invoice balance. No account view is switched by this audit.",
   }, null, 2));
 
-  if (!apply) return;
-  for (let start = 0; start < rows.length; start += 250) {
-    const { error } = await db.from("payment_patient_allocations")
-      .upsert(rows.slice(start, start + 250), { onConflict: "source_key", ignoreDuplicates: true });
-    if (error) throw error;
-  }
 }
 
 main().catch((error) => {
