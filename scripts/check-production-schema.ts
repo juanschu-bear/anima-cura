@@ -92,6 +92,11 @@ async function main() {
       "id,patient_id,betrag,offen,gezahlt,status,rechnung_datum,mahnung_datum,unser_zeichen",
     ),
     runSelectCheck(
+      "immutable invoice payment reconciliation proof",
+      "payment_invoice_reconciliations",
+      "id,invoice_id,request,result,created_at",
+    ),
+    runSelectCheck(
       "rates core",
       "raten",
       "id,patient_id,ratenplan_id,rate_nummer,betrag,faellig_am,status,bezahlt_am,bezahlt_betrag,mahnstufe,transaktion_id",
@@ -175,6 +180,12 @@ async function main() {
       ok: error?.message === "invalid verified payment batch",
       detail: error?.message === "invalid verified payment batch" ? "Empty batches rejected before any write" : (error?.message ?? "Unexpected guard response"),
     };
+  })());
+  checks.push((async (): Promise<CheckResult> => {
+    const { error } = await supabase.rpc("reconcile_verified_invoice_payments", { p_request: {} });
+    return { name: "verified invoice reconciliation fail-closed guard",
+      ok: error?.message === "invalid invoice reconciliation request",
+      detail: error?.message === "invalid invoice reconciliation request" ? "Incomplete invoice proof rejected before any write" : (error?.message ?? "Unexpected guard response") };
   })());
 
   const results = await Promise.all(checks);
