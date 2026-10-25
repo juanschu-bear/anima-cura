@@ -185,6 +185,7 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
         const {data:invoiceId,error:reserveError}=await db.rpc('billing_invoice_reserve',{p_actor:user.id,p_request_id:requestId,p_input:command});
         if(reserveError){
           if(reserveError.message.includes('forbidden'))return fail('forbidden',403);
+          if(reserveError.message.includes('already_billed'))return fail('invoiceAlreadyBilled',409);
           if(/unapproved|stale|service_stale/.test(reserveError.message))return fail('invoiceNotReady',409);
           if(/conflict|request_conflict/.test(reserveError.message))return fail('conflict',409);
           return fail('unavailable',503);
@@ -205,6 +206,7 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
         const {data:finalized,error:finalizeError}=await db.rpc('billing_invoice_finalize',{p_actor:user.id,p_invoice_id:invoice.id,p_pdf_sha256:rendered.sha256,p_pdf_bytes:rendered.pdf.length,p_storage_path:storagePath});
         if(finalizeError){
           if(finalizeError.message.includes('forbidden'))return fail('forbidden',403);
+          if(finalizeError.message.includes('already_billed'))return fail('invoiceAlreadyBilled',409);
           if(/stale|unapproved/.test(finalizeError.message))return fail('invoiceNotReady',409);
           if(/conflict|immutable/.test(finalizeError.message))return fail('conflict',409);
           return fail('unavailable',503);

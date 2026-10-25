@@ -1,6 +1,6 @@
 # Abrechnungsupgrade – verbindliche Grenzen und Reihenfolge
 
-Stand: 2026-10-08. Dieser Plan ist keine Freigabe zum Versand von Rechnungen.
+Stand der Planung: 2026-10-08; Umsetzungsstand ergänzt am 25.10.2026. Dieser Plan ist keine Freigabe zum Versand von Rechnungen.
 
 Ergänzung vom 09.10.2026: [Praxisregeln für behandlungsbezogene Abrechnung und sichere Patientenidentität](practice-billing-identity-addendum.md). Sie erweitert diesen Plan um Behandlungskonten, nachvollziehbare Bogen-/Quartalsvorschläge, regelbezogenes Lernen nach fachlicher Freigabe und die Erkennung vertauschter Vor-/Nachnamen. Status: spezifiziert, noch nicht implementiert.
 
@@ -50,3 +50,13 @@ Die Oberfläche trennt Tarif, Leistungsentwurf, Versionsverlauf, fachliche Freig
 Prüfnachweise: isolierte echte PostgreSQL-Tests der Migration einschließlich paralleler Änderungen, Wiederholungen, Rechte, unveränderlicher Historie, Dublettensperre, falscher Summen und veralteter Scribe-Quellen; API-Tests für Anmeldung, Herkunft, Browserursprung, serverseitige Betragsberechnung und sichere Fehler; vollständiger Projekt-Testlauf und Produktionsbuild; synthetische Browserprüfung auf Desktop und Mobilgerät.
 
 Produktiv aktiviert wurden ausschließlich die drei neuen, zunächst leeren Abrechnungstabellen und die zugriffsgeschützte Schreibfunktion. Bestehende Patienten, Rechnungen, Zahlungen, offene Posten und Nachrichten wurden dabei nicht verändert. Reale Tarife und Leistungsfreigaben müssen erst mit Praxisbelegen erfasst werden.
+
+## Ausstellung und Portal – Stand 25.10.2026
+
+Implementiert sind eine getrennte, versionierte Kostenträgerentscheidung und die explizite Rechnungsausstellung mit Jahresnummer, unveränderlichem Snapshot und privatem PDF. Forderung, Patientendokument und Portal-Benachrichtigung werden gemeinsam gebucht. Wiederholungen setzen dieselbe Ausstellung fort. Es erfolgt dabei kein automatischer E-Mail-Versand.
+
+Zusätzlich bindet eine Datenbanksperre jede logische Leistungsposition an genau eine Rechnung. Ein neuer Kostenträgerstand oder ein überlappender Zeitraum erlaubt keine zweite Ausstellung derselben Leistung. Vor der endgültigen Buchung werden Leistungsrevision, Kostenträgerstand und vorhandene Scribe-Quelle erneut unter Transaktionssperren geprüft. Änderungen stoppen die Veröffentlichung vollständig. Reservierte Positionen bleiben bis zur Klärung gebunden; ein bloßer Fehler löst die Bindung nicht automatisch.
+
+Prüfnachweise: 69 erfolgreiche Abrechnungstests einschließlich doppelter Kostenträgerentscheidung, zurückgerollter Veröffentlichung nach Leistungs-/Quelländerung, idempotenter Wiederholung, unveränderlicher Rechnung und gesperrtem direkten Löschzugriff; erfolgreicher Produktionsbuild. Die Schutzmigration übernimmt vorhandene Rechnungsbindungen und bricht bei überlappenden historischen Bindungen vollständig ab.
+
+Noch offen: Storno-/Korrekturbelege mit geordneter Aufhebung bzw. Übernahme von Leistungsbindungen, einheitliche Einbindung in das Patientenzahlungskonto sowie ein authentifizierter Praxisdurchlauf mit freigegebenen realen Abrechnungsbeispielen. Die Rechnungsausstellung allein bedeutet keine vollständige fachliche Abnahme der Gesamtabrechnung.

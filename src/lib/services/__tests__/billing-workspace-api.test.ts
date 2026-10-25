@@ -40,6 +40,13 @@ test('cross-origin and forged approval payloads never invoke the write function'
   assert.equal((await f.post({...save,actor:'someone else'})).status,400);
   assert.equal(f.writes.length,0);
 });
+test('invoice service reuse returns a useful conflict before any PDF or storage access',async()=>{
+  const f=fixture({rpcError:{message:'billing_invoice_service_already_billed'}});
+  const response=await f.post({action:'issue_invoice',payerVersionId:randomUUID(),dueDate:'2026-11-07',reason:'Synthetic invoice approval'});
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/Leistung.*bereits.*Rechnung/);
+  assert.equal(f.writes.length,1);
+});
 test('source proposals are scoped, paginated and retain missing quantities',async()=>{
   const entry={id:service.source.recordId,patient_id:patient,version:1,termin_datum:'2026-07-05',status:'bestaetigt',bestaetigt_am:'2026-07-05T10:00:00Z',positionen:[{code:'BEMA 126a',text:'Test'}]};
   const f=fixture({data:{doku_eintraege:Array.from({length:26},(_,i)=>({...entry,id:String(i)}))}});
