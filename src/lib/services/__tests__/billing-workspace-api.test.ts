@@ -47,6 +47,18 @@ test('invoice service reuse returns a useful conflict before any PDF or storage 
   assert.match((await response.json()).error,/Leistung.*bereits.*Rechnung/);
   assert.equal(f.writes.length,1);
 });
+test('cancellation retries return the committed document without rewriting files or posting twice',async()=>{
+  const invoiceId=randomUUID(),documentId=randomUUID();
+  const command={action:'cancel_invoice',invoiceId,reason:'Synthetic correction reason'};
+  const f=fixture({data:{billing_invoices:{id:invoiceId,status:'void'},billing_invoice_cancellations:{reason:command.reason,document_id:documentId}}});
+  const response=await f.post(command);
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{id:invoiceId,status:'void',documentId});
+  assert.equal(f.writes.length,0);
+  assert.equal((await f.post({...command,reason:'Changed cancellation reason'})).status,409);
+  const readOnly=fixture({permissions:{module:{rechnungen:'lesen'}}});
+  assert.equal((await readOnly.post(command)).status,403);assert.equal(readOnly.adminCalls(),0);
+  assert.equal((await f.post({...command,totalCents:0})).status,400);
+});
 test('source proposals are scoped, paginated and retain missing quantities',async()=>{
   const entry={id:service.source.recordId,patient_id:patient,version:1,termin_datum:'2026-07-05',status:'bestaetigt',bestaetigt_am:'2026-07-05T10:00:00Z',positionen:[{code:'BEMA 126a',text:'Test'}]};
   const f=fixture({data:{doku_eintraege:Array.from({length:26},(_,i)=>({...entry,id:String(i)}))}});

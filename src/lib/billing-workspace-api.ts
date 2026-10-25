@@ -9,6 +9,7 @@ import { importTariffsCommand, prepareSourceCommand, reviewService, serviceInput
 import { t } from './i18n';
 import { payerAllocationCommand } from './billing-payer-allocation';
 import { buildIssuedInvoicePdf, issueInvoiceCommand } from './billing-invoice';
+import { berlinBillingDate, buildInvoiceCancellationPdf, cancelInvoiceCommand } from './billing-invoice-cancellation';
 import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath } from './billing-document-access';
 
 type Client=Pick<SupabaseClient,'auth'|'from'|'rpc'|'storage'>;
@@ -62,9 +63,13 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
           if(caseError)return fail('unavailable',503);
           const {data:current,error:currentError}=payerCase?await db.from('billing_payer_versions').select('*').eq('case_id',caseId).eq('revision',payerCase.head_version).maybeSingle():{data:null,error:null};
           if(currentError)return fail('unavailable',503);
-          const {data:invoice,error:invoiceError}=current?await db.from('billing_invoices').select('id,invoice_number,issue_date,due_date,total_cents,status,document_id,issued_at').eq('payer_version_id',current.id).maybeSingle():{data:null,error:null};
+          const {data:invoice,error:invoiceError}=current?await db.from('billing_invoices').select('id,invoice_number,issue_date,due_date,total_cents,status,document_id,issued_at,replaces_invoice_id').eq('payer_version_id',current.id).maybeSingle():{data:null,error:null};
           if(invoiceError)return fail('unavailable',503);
-          return respond({caseId,from,to,lines,payerCase,current,invoice,writable});
+          const {data:cancellation,error:cancellationError}=invoice?await db.from('billing_invoice_cancellations').select('id,invoice_id,cancellation_number,cancellation_date,reason,document_id').eq('invoice_id',invoice.id).maybeSingle():{data:null,error:null};
+          if(cancellationError)return fail('unavailable',503);
+          const {data:originalInvoice,error:originalError}=invoice?.replaces_invoice_id?await db.from('billing_invoices').select('invoice_number,document_id').eq('id',invoice.replaces_invoice_id).eq('patient_id',patientId).maybeSingle():{data:null,error:null};
+          if(originalError)return fail('unavailable',503);
+          return respond({caseId,from,to,lines,payerCase,current,invoice,cancellation,originalInvoice,writable});
         }
         if(kind==='quarter'){
           const fallback=previousBillingQuarter(new Date()),from=url.searchParams.get('from')??fallback.from,to=url.searchParams.get('to')??fallback.to;
@@ -179,6 +184,44 @@ export function billingWorkspaceHandler(session:()=>Client,admin:()=>Client){
       const body=await request.text();
       if(body.length>30000)return fail('invalid',413);
       let raw:unknown;try{raw=JSON.parse(body);}catch{return fail('invalid',400);}
+      const cancellation=cancelInvoiceCommand.safeParse(raw);
+      if(cancellation.success){
+        const {invoiceId,reason}=cancellation.data;
+        const {data:invoice,error:invoiceError}=await db.from('billing_invoices').select('*').eq('id',invoiceId).maybeSingle();
+        if(invoiceError)return fail('unavailable',503);
+        if(!invoice)return fail('invalid',404);
+        const {data:existing,error:existingError}=await db.from('billing_invoice_cancellations').select('*').eq('invoice_id',invoice.id).maybeSingle();
+        if(existingError)return fail('unavailable',503);
+        if(existing){
+          if(existing.reason!==reason)return fail('conflict',409);
+          return respond({id:invoice.id,status:'void',documentId:existing.document_id});
+        }
+        if(invoice.status!=='issued')return fail('conflict',409);
+        const cancellationDate=berlinBillingDate();
+        // Different reasons/dates use different files, so a losing concurrent
+        // request can never overwrite the successful immutable cancellation PDF.
+        const documentId=stableUuid(`billing-cancellation:${invoice.id}:${cancellationDate}:${reason}`);
+        const rendered=await buildInvoiceCancellationPdf({original:invoice.snapshot,cancellationDate,reason});
+        const {data:bucket,error:bucketError}=await db.storage.getBucket(BILLING_DOCUMENTS_BUCKET);
+        if(bucketError||!bucket)return fail('unavailable',503);
+        if(bucket.public)return fail('invoiceStorageUnsafe',409);
+        const storagePath=billingDocumentPath(invoice.patient_id,documentId);
+        const upload=await db.storage.from(BILLING_DOCUMENTS_BUCKET).upload(storagePath,rendered.pdf,{contentType:'application/pdf',cacheControl:'0',upsert:true});
+        if(upload.error)return fail('unavailable',503);
+        const {data:id,error}=await db.rpc('billing_invoice_cancel',{p_actor:user.id,p_request_id:requestId,p_invoice_id:invoice.id,p_document_id:documentId,
+          p_date:cancellationDate,p_reason:reason,p_pdf_sha256:rendered.sha256,p_pdf_bytes:rendered.pdf.length,p_storage_path:storagePath});
+        if(error){
+          if(error.message.includes('forbidden'))return fail('forbidden',403);
+          if(error.message.includes('payment_review'))return fail('cancellationPaymentReview',409);
+          if(/conflict|invalid|immutable/.test(error.message))return fail('conflict',409);
+          return fail('unavailable',503);
+        }
+        // A parallel same-reason cancellation may have completed with its own
+        // document. Always return the actual committed document, never our guess.
+        const {data:committed,error:committedError}=await db.from('billing_invoice_cancellations').select('document_id').eq('invoice_id',invoice.id).maybeSingle();
+        if(committedError||!committed)return fail('unavailable',503);
+        return respond({id,status:'void',documentId:committed.document_id});
+      }
       const issuance=issueInvoiceCommand.safeParse(raw);
       if(issuance.success){
         const command={action:'reserve',payerVersionId:issuance.data.payerVersionId,dueDate:issuance.data.dueDate,reason:issuance.data.reason};

@@ -140,18 +140,22 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
 type PayerLine={id:string;schedule:'BEMA'|'GOZ'|'LABOR'|'MATERIAL';code:string;description:string;serviceDate:string;grossCents:number};
 type PayerVersion={id:string;revision:number;state:'draft'|'approved'|'withdrawn';payer_model:'private_full'|'statutory_share';patient_share_basis_points:1000|2000|10000;share_source_reference:string;expected_patient_cents:number;patient_cents:number|null;reason:string};
 type IssuedInvoice={id:string;invoice_number:string;issue_date:string;due_date:string;total_cents:number;status:'preparing'|'issued'|'void';document_id:string;issued_at:string|null};
-function PayerAllocation({patient,locale,writable}:{patient:Patient;locale:Locale;writable:boolean}){
+type InvoiceCancellation={id:string;cancellation_number:string;cancellation_date:string;reason:string;document_id:string};
+export function PayerAllocation({patient,locale,writable}:{patient:Patient;locale:Locale;writable:boolean}){
   const initial=previousBillingQuarter(new Date()),tr=(key:string)=>t(`billing.work.${key}`,locale);
   const [period,setPeriod]=useState(initial),[caseId,setCaseId]=useState(''),[revision,setRevision]=useState(0),[current,setCurrent]=useState<PayerVersion|null>(null),[lines,setLines]=useState<PayerLine[]>([]);
   const [model,setModel]=useState<'private_full'|'statutory_share'>('private_full'),[share,setShare]=useState<1000|2000|10000>(10000),[expected,setExpected]=useState(''),[evidence,setEvidence]=useState(''),[reason,setReason]=useState('');
   const defaultDue=()=>{const value=new Date();value.setUTCDate(value.getUTCDate()+14);return value.toISOString().slice(0,10);};
   const [invoice,setInvoice]=useState<IssuedInvoice|null>(null),[dueDate,setDueDate]=useState(defaultDue),[invoiceReason,setInvoiceReason]=useState('');
+  const [cancellation,setCancellation]=useState<InvoiceCancellation|null>(null),[cancelReason,setCancelReason]=useState(''),[cancelConfirmed,setCancelConfirmed]=useState(false);
+  const [originalInvoice,setOriginalInvoice]=useState<{invoice_number:string;document_id:string}|null>(null);
+  const cancelAttempt=useRef<{body:string;id:string}|null>(null),cancelInFlight=useRef(false);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[refresh,setRefresh]=useState(0);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError('');setNotice('');
     getData(new URLSearchParams({kind:'payer',patientId:patient.id,from:period.from,to:period.to,page:'0'}),locale,controller.signal).then(data=>{
       if(controller.signal.aborted)return;
-      setCaseId(data.caseId);setRevision(data.payerCase?.head_version??0);setLines(data.lines??[]);setCurrent(data.current??null);setInvoice(data.invoice??null);
+      setCaseId(data.caseId);setRevision(data.payerCase?.head_version??0);setLines(data.lines??[]);setCurrent(data.current??null);setInvoice(data.invoice??null);setCancellation(data.cancellation??null);setOriginalInvoice(data.originalInvoice??null);setCancelReason('');setCancelConfirmed(false);
       if(data.current){setModel(data.current.payer_model);setShare(data.current.patient_share_basis_points);setExpected((data.current.expected_patient_cents/100).toFixed(2));setEvidence(data.current.share_source_reference);setReason('');}
       else{setModel('private_full');setShare(10000);setExpected('');setEvidence('');setReason('');}
     }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
@@ -177,14 +181,38 @@ function PayerAllocation({patient,locale,writable}:{patient:Patient;locale:Local
       setNotice(tr('invoiceIssued'));setInvoiceReason('');setRefresh(value=>value+1);
     }catch(e){setError(e instanceof Error?e.message:tr('unavailable'));}finally{setBusy(false);}
   }
+  async function cancel(){
+    if(!invoice||!cancelConfirmed||cancelInFlight.current)return;
+    const body=JSON.stringify({action:'cancel_invoice',invoiceId:invoice.id,reason:cancelReason.trim()});
+    if(cancelAttempt.current?.body!==body)cancelAttempt.current={body,id:crypto.randomUUID()};
+    cancelInFlight.current=true;setBusy(true);setError('');setNotice('');
+    try{
+      const response=await fetch(`/api/rechnungen/catalog?lang=${locale}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':cancelAttempt.current.id},body});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||tr('unavailable'));
+      cancelAttempt.current=null;setRefresh(value=>value+1);
+    }catch(e){setError(e instanceof Error?e.message:tr('unavailable'));}
+    finally{cancelInFlight.current=false;setBusy(false);}
+  }
   return <section className={`${styles.panel} ${styles.quarter}`} aria-labelledby="payer-allocation-title">
-    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="payer-allocation-title">{tr('payerTitle')}</h3><p className={styles.muted}>{tr('payerIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" value={period[key]} onChange={event=>setPeriod({...period,[key]:event.target.value})}/></label>)}</div></div>
+    <div className={`${styles.row} ${styles.spread}`}><div><h3 id="payer-allocation-title">{tr('payerTitle')}</h3><p className={styles.muted}>{tr('payerIntro')}</p></div><div className={styles.row}>{(['from','to'] as const).map(key=><label key={key}>{t(`billing.${key}`,locale)}<input type="date" disabled={busy} value={period[key]} onChange={event=>setPeriod({...period,[key]:event.target.value})}/></label>)}</div></div>
     {error&&<p role="alert" className={styles.error}>{error}</p>}{notice&&<p role="status" className={styles.notice}>{notice}</p>}
+    {!loading&&invoice&&invoice.status!=='preparing'&&<div>
+      <h4>{tr(invoice.status==='void'?'invoiceCancelled':'invoiceIssued')}</h4>
+      <p>{invoice.invoice_number} · {money(invoice.total_cents,locale)}</p>
+      <a href={`/api/patient/dokumente/${invoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('invoiceOpen')}</a>
+      {originalInvoice&&<p>{tr('correctionOriginal')}: <a href={`/api/patient/dokumente/${originalInvoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{originalInvoice.invoice_number}</a></p>}
+      {cancellation&&<><p>{cancellation.cancellation_number} · {cancellation.cancellation_date}</p><p>{cancellation.reason}</p><a href={`/api/patient/dokumente/${cancellation.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('cancellationOpen')}</a><p className={styles.muted}>{tr('correctionNext')}</p></>}
+      {writable&&invoice.status==='issued'&&<details><summary>{tr('cancellationTitle')}</summary>
+        <p className={styles.muted}>{tr('cancellationImpact')}</p>
+        <label>{tr('cancellationReason')}<textarea maxLength={1000} disabled={busy} value={cancelReason} onChange={event=>{setCancelReason(event.target.value);setCancelConfirmed(false);}}/></label>
+        <label className={styles.row}><input type="checkbox" disabled={busy} checked={cancelConfirmed} onChange={event=>setCancelConfirmed(event.target.checked)}/>{tr('cancellationConfirm')}</label>
+        <button className={styles.danger} disabled={busy||!cancelConfirmed||cancelReason.trim().length<3} onClick={()=>void cancel()}>{tr(busy?'cancellationWorking':'cancellationSubmit')}</button>
+      </details>}
+    </div>}
     {loading?<p role="status">{tr('loading')}</p>:lines.length===0?<p>{tr('noApprovedServices')}</p>:<>
       <div className={styles.statGrid}><div className={`${styles.stat} ${styles.neutral}`}><strong>{lines.length}</strong><span>{tr('approvedPositions')}</span></div><div className={`${styles.stat} ${styles.neutral}`}><strong>{money(gross,locale)}</strong><span>{tr('approvedGross')}</span></div><div className={`${styles.stat} ${current?.state==='approved'?styles.good:styles.warn}`}><strong>{current?tr(`payer${current.state[0].toUpperCase()}${current.state.slice(1)}`):tr('payerDraft')}</strong><span>{tr('payerTitle')}</span></div></div>
-      {current?.state==='approved'?<><p className={styles.notice}>{tr('payerApproved')}: {money(current.patient_cents??current.expected_patient_cents,locale)}</p>
-        {invoice?.status==='issued'?<div className={styles.panel}><strong>{tr('invoiceIssued')}</strong><p>{invoice.invoice_number} · {money(invoice.total_cents,locale)} · {invoice.due_date}</p><a href={`/api/patient/dokumente/${invoice.document_id}/datei?lang=${locale}`} target="_blank" rel="noreferrer">{tr('invoiceOpen')}</a></div>
-          :writable&&<div className={styles.grid}><label>{tr('invoiceDueDate')}<input type="date" value={dueDate} min={new Date().toISOString().slice(0,10)} onChange={event=>setDueDate(event.target.value)}/></label><label>{tr('invoiceReason')}<textarea value={invoiceReason} onChange={event=>setInvoiceReason(event.target.value)}/></label><button className={styles.primary} disabled={busy||invoiceReason.trim().length<3||!dueDate} onClick={()=>void issue()}>{tr(invoice?.status==='preparing'?'invoiceResume':'invoiceIssue')}</button></div>}</>
+      {current?.state==='approved'&&invoice?.status!=='void'?<><p className={styles.notice}>{tr('payerApproved')}: {money(current.patient_cents??current.expected_patient_cents,locale)}</p>
+        {invoice?.status!=='issued'&&writable&&<div className={styles.grid}><label>{tr('invoiceDueDate')}<input type="date" value={dueDate} min={new Date().toISOString().slice(0,10)} onChange={event=>setDueDate(event.target.value)}/></label><label>{tr('invoiceReason')}<textarea value={invoiceReason} onChange={event=>setInvoiceReason(event.target.value)}/></label><button className={styles.primary} disabled={busy||invoiceReason.trim().length<3||!dueDate} onClick={()=>void issue()}>{tr(invoice?.status==='preparing'?'invoiceResume':'invoiceIssue')}</button></div>}</>
         :writable&&<div className={styles.grid}>
         <label>{tr('patientShare')}<select value={model} onChange={event=>{const value=event.target.value as typeof model;setModel(value);setShare(value==='private_full'?10000:2000);}}><option value="private_full">{tr('payerPrivate')}</option><option value="statutory_share">{tr('payerStatutory')}</option></select></label>
         {model==='statutory_share'&&<label>{tr('patientShare')}<select value={share} onChange={event=>setShare(Number(event.target.value) as 1000|2000)}><option value={1000}>10 %</option><option value={2000}>20 %</option></select></label>}

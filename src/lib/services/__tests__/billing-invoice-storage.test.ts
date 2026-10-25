@@ -18,6 +18,7 @@ test("invoice issuance reserves one number and atomically publishes debt, docume
       CREATE TABLE offene_posten(id uuid PRIMARY KEY,typ text,rechnung_datum date,patient_name text,rechnung_nr text,unser_zeichen text,basis_nr text,betrag numeric,gebuehr numeric,offen numeric,gezahlt numeric,mahnung_datum date,status text,bezahlt_am date,patient_id uuid,source_file text,imported_at timestamptz,mahnstufe integer,nicht_mahnen boolean);
       CREATE TABLE patient_documents(id uuid PRIMARY KEY,patient_id uuid,name text,typ text,file_url text,hochgeladen_am timestamptz,created_at timestamptz DEFAULT now());
       CREATE TABLE patient_notifications(id uuid PRIMARY KEY,patient_id uuid,typ text,titel text,text text,gelesen boolean,created_at timestamptz DEFAULT now());
+      CREATE TABLE payment_invoice_allocations(id uuid PRIMARY KEY,invoice_id uuid,state text,reversal_of_allocation_id uuid);
       INSERT INTO patients VALUES ('${patient}','Erika','Mustermann','00001234');
       INSERT INTO user_profiles VALUES ('${actor}','verwaltung',null);
       INSERT INTO doku_eintraege VALUES ('${entry}','${patient}',1,'2026-07-05','bestaetigt',now(),'[{"code":"BEMA 126a","anzahl":1}]');`);
@@ -38,6 +39,7 @@ test("invoice issuance reserves one number and atomically publishes debt, docume
     await db.query("SELECT billing_payer_write($1,$2,$3::jsonb)", [actor, randomUUID(), JSON.stringify({ action: "approve", versionId: payerId, reason: "Synthetic share approved" })]);
     await db.exec(await readFile("supabase/migrations/052_billing_invoice_issuance.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/054_billing_invoice_service_claims.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/055_billing_invoice_cancellations.sql", "utf8"));
     const due = new Date(); due.setUTCDate(due.getUTCDate() + 14); const dueDate = due.toISOString().slice(0, 10);
     const requestId = randomUUID();
     const input = { action: "reserve", payerVersionId: payerId, dueDate, reason: "Synthetic invoice approval" };
@@ -82,7 +84,46 @@ test("invoice issuance reserves one number and atomically publishes debt, docume
     await db.exec("SET ROLE service_role");
     await assert.rejects(db.query("DELETE FROM billing_invoice_service_claims"), /permission denied/);
     await db.exec("RESET ROLE");
+    const cancelDocument=randomUUID(),cancelRequest=randomUUID();
+    const cancelDate=(await db.query<{date:string}>("SELECT (now() AT TIME ZONE 'Europe/Berlin')::date::text AS date")).rows[0].date;
+    const cancelArgs=[actor,cancelRequest,invoiceId,cancelDocument,cancelDate,'Synthetic correction reason','b'.repeat(64),200,`${patient}/${cancelDocument}.pdf`];
+    const cancelSql="SELECT billing_invoice_cancel($1,$2,$3,$4,$5,$6,$7,$8,$9)";
+    const allocationId=randomUUID();
+    await db.query("INSERT INTO payment_invoice_allocations VALUES($1,$2,'allocated_manual',NULL)",[allocationId,invoiceId]);
+    await assert.rejects(db.query(cancelSql,cancelArgs),/payment_review/);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_cancellations")).rows.length,0);
+    await db.query("INSERT INTO payment_invoice_allocations VALUES($1,$2,'reversed',$3)",[randomUUID(),invoiceId,allocationId]);
+    await db.query("UPDATE offene_posten SET gezahlt=1,offen=betrag-1 WHERE id=$1",[invoiceId]);
+    await assert.rejects(db.query(cancelSql,cancelArgs),/payment_review/);
+    await db.query("UPDATE offene_posten SET gezahlt=0,offen=betrag WHERE id=$1",[invoiceId]);
+    const originalSnapshot=(await db.query<{snapshot:unknown}>("SELECT snapshot FROM billing_invoices WHERE id=$1",[invoiceId])).rows[0].snapshot;
+    await db.query(cancelSql,cancelArgs);
+    await db.query(cancelSql,cancelArgs);
+    await assert.rejects(db.query(cancelSql,[...cancelArgs.slice(0,1),randomUUID(),...cancelArgs.slice(2,5),'Different reason',...cancelArgs.slice(6)]),/conflict/);
+    const cancelled=(await db.query<{status:string;snapshot:unknown}>("SELECT status,snapshot FROM billing_invoices WHERE id=$1",[invoiceId])).rows[0];
+    assert.equal(cancelled.status,'void');assert.deepEqual(cancelled.snapshot,originalSnapshot);
+    const cancelledItem=(await db.query<{status:string;offen:string;betrag:string;nicht_mahnen:boolean}>("SELECT status,offen,betrag,nicht_mahnen FROM offene_posten WHERE id=$1",[invoiceId])).rows[0];
+    assert.equal(cancelledItem.status,'storniert');assert.equal(Number(cancelledItem.offen),0);assert.equal(Number(cancelledItem.betrag),2.4);assert.equal(cancelledItem.nicht_mahnen,true);
+    await assert.rejects(db.query("UPDATE offene_posten SET status='offen',offen=betrag WHERE id=$1",[invoiceId]),/cancelled/);
+    await assert.rejects(db.query("DELETE FROM offene_posten WHERE id=$1",[invoiceId]),/immutable/);
+    assert.equal((await db.query("SELECT * FROM patient_documents")).rows.length,2);
+    assert.equal((await db.query("SELECT * FROM patient_notifications")).rows.length,2);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_service_claims")).rows.length,0);
+    await assert.rejects(db.query("INSERT INTO payment_invoice_allocations VALUES($1,$2,'allocated_manual',NULL)",[randomUUID(),invoiceId]),/cancelled/);
+    await assert.rejects(db.query("DELETE FROM billing_invoice_cancellations"),/immutable/);
+    await assert.rejects(db.query("UPDATE billing_invoices SET status='issued' WHERE id=$1",[invoiceId]),/immutable/);
+    // Correction requires a separately approved payer revision and gets a new
+    // number, while the original and its cancellation remain immutable.
+    const replacement=(await db.query<{id:string}>("SELECT billing_invoice_reserve($1,$2,$3::jsonb) AS id",[actor,randomUUID(),JSON.stringify({...input,payerVersionId:payerId2})])).rows[0].id;
+    assert.notEqual(replacement,invoiceId);
+    const replacementInvoice=(await db.query<{invoice_number:string;document_id:string;replaces_invoice_id:string;snapshot:{replacesInvoiceNumber:string}}>("SELECT invoice_number,document_id,replaces_invoice_id,snapshot FROM billing_invoices WHERE id=$1",[replacement])).rows[0];
+    assert.match(replacementInvoice.invoice_number,/-000002$/);
+    assert.equal(replacementInvoice.replaces_invoice_id,invoiceId);
+    assert.equal(replacementInvoice.snapshot.replacesInvoiceNumber,invoice.invoice_number);
+    await db.query("SELECT billing_invoice_finalize($1,$2,$3,$4,$5)",[actor,replacement,'c'.repeat(64),100,`${patient}/${replacementInvoice.document_id}.pdf`]);
+    assert.equal((await db.query("SELECT * FROM billing_invoice_service_claims WHERE invoice_id=$1",[replacement])).rows.length,1);
     await db.exec("SET ROLE authenticated");
     await assert.rejects(db.query("SELECT * FROM billing_invoices"), /permission denied/);
+    await assert.rejects(db.query(cancelSql,cancelArgs), /permission denied/);
   } finally { await db.close(); }
 });

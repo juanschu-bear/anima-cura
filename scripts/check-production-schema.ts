@@ -147,9 +147,14 @@ async function main() {
       "service_record_id,service_version_id,invoice_id,created_at",
     ),
     runSelectCheck(
+      "billing invoice cancellations",
+      "billing_invoice_cancellations",
+      "id,invoice_id,cancellation_number,cancellation_date,reason,document_id,storage_path,pdf_sha256,pdf_bytes,created_by,created_at",
+    ),
+    runSelectCheck(
       "billing issued invoices",
       "billing_invoices",
-      "id,payer_version_id,patient_id,invoice_number,issue_date,due_date,total_cents,status,snapshot,document_id,notification_id,storage_path,pdf_sha256,pdf_bytes,open_item_id,issuance_reason,created_by,created_at,issued_by,issued_at,voided_by,voided_at,void_reason",
+      "id,payer_version_id,patient_id,invoice_number,issue_date,due_date,total_cents,status,snapshot,document_id,notification_id,storage_path,pdf_sha256,pdf_bytes,open_item_id,issuance_reason,created_by,created_at,issued_by,issued_at,voided_by,voided_at,void_reason,replaces_invoice_id",
     ),
     runSelectCheck(
       "billing invoice idempotency records",

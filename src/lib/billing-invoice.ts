@@ -24,6 +24,7 @@ const invoiceLine = z.object({
 
 export const invoiceSnapshot = z.object({
   invoiceNumber: z.string().regex(/^AC-\d{4}-\d{6}$/),
+  replacesInvoiceNumber: z.string().regex(/^AC-\d{4}-\d{6}$/).optional(),
   issueDate: billingDate,
   dueDate: billingDate,
   patientId: z.string().uuid(),
@@ -106,6 +107,7 @@ export async function buildIssuedInvoicePdf(raw: unknown) {
   draw(`Rechnungsnummer: ${snapshot.invoiceNumber}`, 360, 9); next(14);
   draw(`Rechnungsdatum: ${date(snapshot.issueDate)}`, 360, 9); next(14);
   draw(`Fällig am: ${date(snapshot.dueDate)}`, 360, 9); next(34);
+  if (snapshot.replacesInvoiceNumber) { draw(`Korrektur zu Rechnung ${snapshot.replacesInvoiceNumber}`, 48, 10, bold); next(24); }
   draw(`Leistungszeitraum ${date(snapshot.periodFrom)} bis ${date(snapshot.periodTo)}`, 48, 10, bold); next(24);
 
   for (const line of snapshot.lines) {
