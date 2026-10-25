@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
-import { summarizeOpenItems } from "@/lib/patient-finance";
+import { resolveRateAmounts, summarizeOpenItems, summarizeRates as summarizeRateFinance } from "@/lib/patient-finance";
+
+export const dynamic = "force-dynamic";
+
+function unavailable() {
+  return NextResponse.json({ error: "Finanzdaten konnten nicht geladen werden." }, { status: 503 });
+}
 
 export async function GET() {
   const patient = await requirePatient();
@@ -10,13 +16,14 @@ export async function GET() {
   const supabase = createServerClient();
 
   // Get active rate plan
-  const { data: plan } = await supabase
+  const { data: plan, error: planError } = await supabase
     .from("ratenplaene")
     .select("id, gesamtbetrag, anzahl_raten, rate_betrag, start_datum, rhythmus, status, sepa_mandat")
     .eq("patient_id", patient.patientId)
     .eq("status", "aktiv")
     .limit(1)
     .maybeSingle();
+  if (planError) return unavailable();
 
   const summarizeRates = (
     rates: Array<{
@@ -27,17 +34,15 @@ export async function GET() {
       faellig_am?: string | null;
     }>,
   ) => {
+    rates = rates.filter(r => r.status !== "storniert" && r.status !== "erloesminderung");
+    const finance = summarizeRateFinance(rates);
     const bezahlt = rates.filter(r => r.status === "bezahlt");
     const offen = rates.filter(r => r.status === "offen");
-    const ueberfaellig = rates.filter(r => r.status === "überfällig");
+    const ueberfaellig = rates.filter(r => (r.status === "überfällig" || r.status === "ueberfaellig") && resolveRateAmounts(r).open > 0);
     const teilbezahlt = rates.filter(r => r.status === "teilbezahlt");
 
-    const investiert = bezahlt.reduce((sum, r) => sum + Number(r.bezahlt_betrag ?? r.betrag ?? 0), 0)
-      + teilbezahlt.reduce((sum, r) => sum + Number(r.bezahlt_betrag ?? 0), 0);
-    const offenBetrag = [...offen, ...ueberfaellig].reduce((sum, r) => sum + Number(r.betrag ?? 0), 0)
-      + teilbezahlt.reduce((sum, r) => sum + Math.max(0, Number(r.betrag ?? 0) - Number(r.bezahlt_betrag ?? 0)), 0);
     const naechsteRate = [...offen, ...teilbezahlt]
-      .filter(r => r.faellig_am)
+      .filter(r => r.faellig_am && resolveRateAmounts(r).open > 0)
       .sort((a, b) => new Date(a.faellig_am!).getTime() - new Date(b.faellig_am!).getTime())[0] ?? null;
     const aeltesteUeberfaellig = ueberfaellig
       .filter(r => r.faellig_am)
@@ -57,21 +62,21 @@ export async function GET() {
     }
 
     return {
-      investiert,
-      offen_betrag: offenBetrag,
+      investiert: finance.bezahltBetrag,
+      offen_betrag: finance.restschuld,
       raten_bezahlt: bezahlt.length,
       raten_gesamt: rates.length,
       prozent: rates.length > 0 ? Math.round((bezahlt.length / rates.length) * 100) : 0,
       streak,
       naechste_rate: naechsteRate
         ? {
-            betrag: Number(naechsteRate.betrag ?? 0),
+            betrag: resolveRateAmounts(naechsteRate).open,
             faellig_am: naechsteRate.faellig_am!,
           }
         : null,
       ueberfaellig: aeltesteUeberfaellig
         ? {
-            betrag: Number(aeltesteUeberfaellig.betrag ?? 0),
+            betrag: resolveRateAmounts(aeltesteUeberfaellig).open,
             faellig_am: aeltesteUeberfaellig.faellig_am!,
             anzahl: ueberfaellig.length,
           }
@@ -80,7 +85,7 @@ export async function GET() {
   };
 
   if (!plan) {
-    const [{ data: patientRates }, { data: offenePosten }, { data: transaktionen }] = await Promise.all([
+    const [{ data: patientRates, error: ratesError }, { data: offenePosten, error: itemsError }, { data: transaktionen, error: transactionsError }] = await Promise.all([
       supabase
         .from("raten")
         .select("id, rate_nummer, betrag, faellig_am, status, bezahlt_am, bezahlt_betrag")
@@ -88,7 +93,7 @@ export async function GET() {
         .order("faellig_am", { ascending: true }),
       supabase
         .from("offene_posten")
-        .select("id, offen, status, rechnung_datum")
+        .select("id, betrag, gezahlt, offen, status, rechnung_datum")
         .eq("patient_id", patient.patientId)
         .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
         .in("status", ["offen", "teilbezahlt"]),
@@ -99,6 +104,7 @@ export async function GET() {
         .gt("betrag", 0)
         .in("matching_status", ["auto", "manuell"]),
     ]);
+    if (ratesError || itemsError || transactionsError) return unavailable();
 
     const rates = patientRates ?? [];
     if (rates.length > 0) {
@@ -133,11 +139,12 @@ export async function GET() {
   }
 
   // Get all rates for this plan
-  const { data: raten } = await supabase
+  const { data: raten, error: ratesError } = await supabase
     .from("raten")
     .select("id, rate_nummer, betrag, faellig_am, status, bezahlt_am, bezahlt_betrag")
     .eq("ratenplan_id", plan.id)
     .order("rate_nummer", { ascending: true });
+  if (ratesError) return unavailable();
 
   const summary = summarizeRates(raten ?? []);
 

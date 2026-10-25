@@ -6,6 +6,7 @@ type OpenItemLike = {
 };
 
 export function resolveOpenItemAmount(item: OpenItemLike) {
+  if (item.status?.toLowerCase() === "storniert") return 0;
   if (typeof item.offen === "number" && Number.isFinite(item.offen)) {
     return Math.max(0, Number(item.offen));
   }
@@ -15,6 +16,7 @@ export function resolveOpenItemAmount(item: OpenItemLike) {
 }
 
 export function resolvePaidItemAmount(item: OpenItemLike) {
+  if (item.status?.toLowerCase() === "storniert") return 0;
   if (typeof item.gezahlt === "number" && Number.isFinite(item.gezahlt)) {
     return Math.max(0, Number(item.gezahlt));
   }
@@ -26,6 +28,7 @@ export function resolvePaidItemAmount(item: OpenItemLike) {
 export function resolveOpenItemStatus<T extends OpenItemLike>(item: T) {
   const rawStatus = String(item.status || "").toLowerCase();
   if (rawStatus === "erloesminderung") return "erloesminderung";
+  if (rawStatus === "storniert") return "storniert";
 
   const offen = resolveOpenItemAmount(item);
   const gezahlt = resolvePaidItemAmount(item);

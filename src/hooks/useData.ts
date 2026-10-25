@@ -120,7 +120,7 @@ export function usePatienten(search?: string) {
 
     let query = supabase
       .from("patients")
-      .select("*, raten(id, status, betrag, faellig_am, mahnstufe)", { count: "exact" })
+      .select("*, raten(id, status, betrag, bezahlt_betrag, faellig_am, mahnstufe)", { count: "exact" })
       .order("nachname", { ascending: true })
       .range(0, 9999);
 
@@ -134,17 +134,16 @@ export function usePatienten(search?: string) {
       query = query.or(muster);
     }
 
-    const [{ data, error: queryError }, { data: offenePosten }] = await Promise.all([
+    const [{ data, error: queryError }, { data: offenePosten, error: financeError }] = await Promise.all([
       query,
       supabase
         .from("offene_posten")
-        .select("patient_id, betrag, offen, gezahlt, status")
-        .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
+        .select("patient_id, betrag, offen, gezahlt, status, nicht_mahnen")
         .limit(10000),
     ]);
 
-    if (queryError) {
-      setError(queryError.message);
+    if (queryError || financeError) {
+      setError((queryError || financeError)!.message);
       setPatienten([]);
     } else {
       const offenePotenByPatient = new Map<string, any[]>();

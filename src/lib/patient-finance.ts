@@ -2,9 +2,26 @@ import { resolveOpenItemAmount, resolveOpenItemStatus, resolvePaidItemAmount } f
 
 type RateLike = {
   betrag?: number | string | null;
+  bezahlt_betrag?: number | string | null;
   status?: string | null;
   mahnstufe?: number | null;
 };
+
+function cents(value: number | string | null | undefined): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
+}
+
+export function resolveRateAmounts(rate: RateLike) {
+  if (rate.status === "storniert" || rate.status === "erloesminderung") {
+    return { paid: 0, open: 0 };
+  }
+  const amount = cents(rate.betrag);
+  const paid = rate.bezahlt_betrag == null
+    ? (rate.status === "bezahlt" ? amount : 0)
+    : cents(rate.bezahlt_betrag);
+  return { paid: paid / 100, open: Math.max(0, amount - paid) / 100 };
+}
 
 type OpenItemLike = {
   betrag?: number | null;
@@ -35,16 +52,14 @@ function deriveStatus(hasOverdue: boolean, maxMahn: number): PatientFinanceSumma
 }
 
 export function summarizeRates(rates: RateLike[]): PatientFinanceSummary {
+  rates = rates.filter((rate) => rate.status !== "storniert" && rate.status !== "erloesminderung");
   const paidCount = rates.filter((rate) => rate.status === "bezahlt").length;
   const partialCount = rates.filter((rate) => rate.status === "teilbezahlt").length;
-  const restschuld = rates
-    .filter((rate) => rate.status !== "bezahlt")
-    .reduce((sum, rate) => sum + Number(rate.betrag ?? 0), 0);
-  const bezahltBetrag = rates
-    .filter((rate) => rate.status === "bezahlt" || rate.status === "teilbezahlt")
-    .reduce((sum, rate) => sum + Number(rate.betrag ?? 0), 0);
-  const hasOverdue = rates.some((rate) => rate.status === "überfällig");
-  const maxMahn = rates.reduce((max, rate) => Math.max(max, Number(rate.mahnstufe ?? 0)), 0);
+  const restschuld = rates.reduce((sum, rate) => sum + cents(resolveRateAmounts(rate).open), 0) / 100;
+  const bezahltBetrag = rates.reduce((sum, rate) => sum + cents(resolveRateAmounts(rate).paid), 0) / 100;
+  const outstanding = rates.filter((rate) => resolveRateAmounts(rate).open > 0);
+  const hasOverdue = outstanding.some((rate) => rate.status === "überfällig" || rate.status === "ueberfaellig");
+  const maxMahn = outstanding.reduce((max, rate) => Math.max(max, Number(rate.mahnstufe ?? 0)), 0);
 
   return {
     source: "rates",
@@ -63,12 +78,13 @@ export function summarizeOpenItems(items: OpenItemLike[]): PatientFinanceSummary
   // `nicht_mahnen=true` marks imported/reconciled records that are still under
   // review. They remain available to the matching engine, but must never be
   // presented to staff or patients as an established debt.
-  const confirmedItems = items.filter((item) => item.nicht_mahnen !== true);
+  const confirmedItems = items.filter((item) => item.nicht_mahnen !== true
+    && item.status !== "storniert" && item.status !== "erloesminderung");
   const paidCount = confirmedItems.filter((item) => resolveOpenItemStatus(item) === "bezahlt").length;
   const partialCount = confirmedItems.filter((item) => resolveOpenItemStatus(item) === "teilbezahlt").length;
   const hasOverdue = confirmedItems.some((item) => resolveOpenItemStatus(item) === "überfällig");
-  const restschuld = confirmedItems.reduce((sum, item) => sum + resolveOpenItemAmount(item), 0);
-  const bezahltBetrag = confirmedItems.reduce((sum, item) => sum + resolvePaidItemAmount(item), 0);
+  const restschuld = confirmedItems.reduce((sum, item) => sum + cents(resolveOpenItemAmount(item)), 0) / 100;
+  const bezahltBetrag = confirmedItems.reduce((sum, item) => sum + cents(resolvePaidItemAmount(item)), 0) / 100;
 
   return {
     source: "open_items",
