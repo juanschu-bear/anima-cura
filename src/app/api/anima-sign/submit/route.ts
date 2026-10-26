@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
-import { ensurePatientPortalAccount } from "@/lib/services/patient-portal-account";
+import { resolveIntakeIdentity, INTAKE_PORTAL_UNAVAILABLE } from "@/lib/services/intake-identity";
+import { formatManualReviewError, isManualReviewErrorText } from '@/lib/services/animasign-sync-status';
+import { t } from '@/lib/i18n';
 import {
   createAndDistribute,
   type DocumensoField,
 } from "@/lib/documenso/client";
 
 import signpdf from "@signpdf/signpdf";
-import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
 import { P12Signer } from "@signpdf/signer-p12";
 import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
 import { classifyRecentIdentitySubmission } from "@/lib/services/animasign-submit-resume";
-import {
-  buildSubmissionPatientPatch,
-  ensureLinkedLocalPatientForSubmission,
-} from "@/lib/services/animasign-local-patient-link";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -226,34 +223,7 @@ async function loadReplayableSubmission(
 }
 
 async function ensureReplayableAccount(submission: SubmissionReplayRow) {
-  if (!submission.account_email || submission.account_password) {
-    return submission;
-  }
-
-  const ensured = await ensurePatientPortalAccount({
-    vorname: submission.vorname ?? null,
-    nachname: submission.nachname ?? null,
-    patientEmail: submission.email ?? null,
-    patientId: submission.matched_patient_id ?? submission.patient_id ?? null,
-  });
-
-  if ((ensured.status === "created" || ensured.status === "existing") && ensured.password) {
-    const supabase = createServerClient();
-    await supabase
-      .from("anamnese_submissions")
-      .update({
-        account_email: ensured.login_email,
-        account_password: ensured.password,
-      })
-      .eq("id", submission.id);
-
-    return {
-      ...submission,
-      account_email: ensured.login_email,
-      account_password: ensured.password,
-    };
-  }
-
+  // Replaying a public form is not authentication. Never reset or return portal credentials.
   return submission;
 }
 
@@ -266,19 +236,8 @@ function buildReplayResponse(submission: SubmissionReplayRow) {
     token: submission.documenso_recipient_token ?? null,
     host: documensoHost(),
     signingUrl,
-    abgleich: submission.matched_patient_id || submission.patient_id
-      ? {
-          is_new: !submission.matched_patient_id,
-          patient_id: submission.matched_patient_id ?? submission.patient_id ?? null,
-        }
-      : null,
-    account: submission.account_email
-      ? {
-          status: "existing",
-          login_email: submission.account_email,
-          password: submission.account_password ?? null,
-        }
-      : null,
+    abgleich: null,
+    account: INTAKE_PORTAL_UNAVAILABLE,
   });
 }
 
@@ -473,36 +432,6 @@ async function updateSubmissionWithSchemaFallback(
   };
 }
 
-async function updatePatientWithSchemaFallback(
-  supabase: ReturnType<typeof createServerClient>,
-  patientId: string,
-  payload: Record<string, unknown>
-) {
-  let currentPayload = { ...payload };
-
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const { error } = await supabase
-      .from("patients")
-      .update(currentPayload)
-      .eq("id", patientId);
-
-    if (!error) {
-      return { error: null as null };
-    }
-
-    const missingColumn = extractMissingColumn(error.message);
-    if (!missingColumn || !(missingColumn in currentPayload)) {
-      return { error };
-    }
-
-    delete currentPayload[missingColumn];
-  }
-
-  return {
-    error: { message: "Schema-Fallback fuer patients erschöpft." },
-  };
-}
-
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SubmitBody;
@@ -691,25 +620,13 @@ export async function POST(request: Request) {
       submissionId = sub.id as string;
     }
 
-    // 1b) Bestandspatienten-Abgleich: prüfen ob Patient existiert, Daten updaten
-    const { data: abgleich } = await supabase.rpc(
-      "abgleich_patient_aus_submission",
-      { p_submission_id: submissionId }
-    );
+    // Resolve and (only with complete facts) create under one database lock.
+    // A failed lookup never falls back to legacy matching or an unguarded INSERT.
+    const abgleich = await resolveIntakeIdentity(supabase, submissionId, true);
+    const resolvedPatientId = abgleich.status === 'matched' ? abgleich.patient_id! : null;
 
-    // 1b-store) Abgleich-Ergebnis in Submission speichern
-    if (abgleich) {
-      await supabase
-        .from("anamnese_submissions")
-        .update({
-          is_existing: !abgleich.is_new,
-          matched_patient_id: abgleich.patient_id || null,
-        })
-        .eq("id", submissionId);
-    }
-
-    // 1c) Ivoris-Sync: Patientendaten sofort zu Ivoris pushen
-    try {
+    // 1c) Only a conflict-free local identity may enter the external sync.
+    if (resolvedPatientId) try {
       const syncResult = await syncAnimaSignSubmission(submissionId, {
         db: supabase,
         stages: ["patient"],
@@ -730,8 +647,8 @@ export async function POST(request: Request) {
           .update({
             ivoris_sync_error: errorText,
             ivoris_sync_retry_count: 0,
-            ivoris_sync_next_retry_at: scheduleFastRetryAt(),
-            ivoris_sync_failed_permanently: false,
+            ivoris_sync_next_retry_at: isManualReviewErrorText(errorText) ? null : scheduleFastRetryAt(),
+            ivoris_sync_failed_permanently: isManualReviewErrorText(errorText),
           })
           .eq("id", submissionId);
       }
@@ -750,57 +667,19 @@ export async function POST(request: Request) {
       // Fehler ist nicht-blockierend: Submission geht trotzdem durch
     }
 
-    // 1d) Patienten-Account erstellen (für AnimaCura App-Zugang)
-    const resolvedPatientId = await ensureLinkedLocalPatientForSubmission(supabase, {
-      submissionId,
-      patientId,
-      matchedPatientId: abgleich?.patient_id ?? null,
-      ivorisId: null,
-      vorname,
-      nachname,
-      geburtsdatum,
-      email,
-      createdAt: new Date().toISOString(),
-      answers,
-    });
-
-    // Relevante Stammdaten immer lokal nachziehen, auch wenn der Portal-Account
-    // gerade nicht erstellt werden kann. Sonst fehlt der Praxis genau die
-    // Übernahme, die sie im Patientenstamm erwartet.
-    if (resolvedPatientId) {
-      await updatePatientWithSchemaFallback(supabase, resolvedPatientId, {
-        portal_zugang: true,
-        ...buildSubmissionPatientPatch(answers),
+    // An intake link alone never grants portal access, discloses a stored password
+    // or updates an existing patient's trusted recovery contact. Separate activation stays in force.
+    const account = INTAKE_PORTAL_UNAVAILABLE;
+    if (!resolvedPatientId) {
+      const locale = answers.sprache === 'en' ? 'en' : 'de';
+      const identityError = abgleich.status === 'lookup_failed' ? t('treatment.unavailable', locale)
+        : formatManualReviewError(t('treatment.identity_review', locale));
+      await updateSubmissionWithSchemaFallback(supabase, submissionId, {
+        ivoris_patient_error: identityError,
+        ivoris_sync_error: identityError,
+        ivoris_sync_failed_permanently: abgleich.status !== 'lookup_failed',
+        ivoris_sync_next_retry_at: abgleich.status === 'lookup_failed' ? scheduleFastRetryAt() : null,
       });
-    }
-
-    const account = await ensurePatientPortalAccount({
-      vorname,
-      nachname,
-      patientEmail: email,
-      patientId: resolvedPatientId || null,
-    });
-
-    // 1e) Account-Email in Submission speichern
-    if (account.status === "created" || account.status === "existing") {
-      await supabase
-        .from("anamnese_submissions")
-        .update({
-          account_email: account.login_email,
-          ...(account.password ? { account_password: account.password } : {}),
-        })
-        .eq("id", submissionId);
-
-      // Willkommens-Email senden (nicht-blockierend)
-      if (email && vorname) {
-        const welcomeUrl = `https://animacura.io/welcome/${submissionId}`;
-        void sendWelcomeEmail({
-          to: email,
-          vorname: vorname,
-          welcomeUrl,
-          lang: ((answers?.sprache as string) === "en" || (answers?.sprache as string) === "es" || (answers?.sprache as string) === "ru" || (answers?.sprache as string) === "tr") ? (answers.sprache as "en" | "es" | "ru" | "tr") : "de",
-        }).catch(err => console.error("[AnimaSign] Welcome email failed:", err));
-      }
     }
 
     // 2) PDF beim PDF-Dienst rendern lassen
@@ -943,7 +822,7 @@ export async function POST(request: Request) {
         token: signing.token,
         host: documensoHost(),
         signingUrl: signing.signingUrl,
-        abgleich: abgleich ?? null,
+        abgleich: { status: abgleich.status },
         account: account ?? null,
       });
     } catch (documensoError) {

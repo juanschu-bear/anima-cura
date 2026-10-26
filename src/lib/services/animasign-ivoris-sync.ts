@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { resolveIntakeIdentity } from './intake-identity';
+import { treatmentReadAll } from '../treatment-account-api';
+import { resolveTreatmentIdentity, type Identity } from '../treatment-account';
 import { createServerClient } from "@/lib/db/supabase";
 import {
   createIvorisPatient,
@@ -102,7 +105,7 @@ export function buildIdentityFingerprint(
   }
 
   return createHash("sha256")
-    .update(`${firstname}|${lastname}|${birthday}`)
+    .update(`identity-v2|${[firstname,lastname].sort().join('|')}|${birthday}`)
     .digest("hex");
 }
 
@@ -493,8 +496,8 @@ export function namesMatchSubmission(
   }
 
   return (
-    firstname === normalizeMatchValue(candidateFirstname ?? null) &&
-    lastname === normalizeMatchValue(candidateLastname ?? null)
+    (firstname === normalizeMatchValue(candidateFirstname ?? null) && lastname === normalizeMatchValue(candidateLastname ?? null)) ||
+    (firstname === normalizeMatchValue(candidateLastname ?? null) && lastname === normalizeMatchValue(candidateFirstname ?? null))
   );
 }
 
@@ -524,45 +527,10 @@ export function decideExactLocalPatientCandidate(
   submission: Pick<SubmissionRow, "vorname" | "nachname" | "email" | "geburtsdatum" | "answers">,
   candidates: LocalPatientCandidate[]
 ): LocalPatientMatchDecision {
-  const birthday = toIsoDateOrNull(submission.geburtsdatum);
-  const firstname = normalizeMatchValue(submission.vorname);
-  const lastname = normalizeMatchValue(submission.nachname);
-  const email = normalizeEmailValue(submission.email);
-  const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission as SubmissionRow));
-
-  if (!birthday || !firstname || !lastname) {
-    return { kind: "none" };
-  }
-
-  const exactIdentityMatches = candidates.filter((candidate) => {
-    if (toIsoDateOrNull(candidate.geburtsdatum ?? null) !== birthday) return false;
-    if (normalizeMatchValue(candidate.vorname) !== firstname) return false;
-    if (normalizeMatchValue(candidate.nachname) !== lastname) return false;
-    return true;
-  });
-
-  if (exactIdentityMatches.length > 1) {
-    return {
-      kind: "manual_review",
-      reason: `Lokaler Patient ist nicht eindeutig: ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}) kommt mehrfach im Bestand vor.`,
-    };
-  }
-
-  if (exactIdentityMatches.length !== 1) {
-    return { kind: "none" };
-  }
-
-  const candidate = exactIdentityMatches[0];
-  const patientEmail = normalizeEmailValue(candidate.email);
-  const patientPhone = normalizePhoneValue(candidate.telefon);
-  const sameEmail = Boolean(email && patientEmail && email === patientEmail);
-  const samePhone = Boolean(patientPhone && phoneCandidates.has(patientPhone));
-
-  if (sameEmail || samePhone) {
-    return { kind: "reuse", candidate, reason: "contact" };
-  }
-
-  return { kind: "reuse", candidate, reason: "identity" };
+  const decision = resolveTreatmentIdentity({ first: submission.vorname ?? '', last: submission.nachname ?? '', dob: toIsoDateOrNull(submission.geburtsdatum) },
+    candidates.map(candidate => ({ ...candidate, vorname: candidate.vorname ?? '', nachname: candidate.nachname ?? '', geburtsdatum: toIsoDateOrNull(candidate.geburtsdatum) ?? '', ivoris_id: candidate.ivoris_id ?? null })), true);
+  if (decision.status === 'matched') return { kind: 'reuse', candidate: candidates.find(candidate => candidate.id === decision.patientId)!, reason: 'identity' };
+  return decision.status === 'new_candidate' ? { kind: 'none' } : { kind: 'manual_review', reason: decision.reason };
 }
 
 function sameValue(left: string | undefined, right: string | undefined) {
@@ -1101,30 +1069,11 @@ async function findExactLocalPatientCandidate(
   db: DbClient,
   submission: SubmissionRow
 ): Promise<LocalPatientCandidate | null> {
-  const birthday = toIsoDateOrNull(submission.geburtsdatum);
-  const firstname = normalizeMatchValue(submission.vorname);
-  const lastname = normalizeMatchValue(submission.nachname);
-  const email = normalizeEmailValue(submission.email);
-  const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission));
-
-  if (!birthday || !firstname || !lastname) {
-    return null;
-  }
-
-  const { data, error } = await db
-    .from("patients")
-    .select("id, ivoris_id, vorname, nachname, geburtsdatum, email, telefon")
-    .eq("geburtsdatum", birthday)
-    .limit(50);
-
-  if (error) {
-    throw new Error(`Lokale Patienten konnten nicht geladen werden: ${error.message}`);
-  }
-
-  const decision = decideExactLocalPatientCandidate(
-    submission,
-    (data ?? []) as LocalPatientCandidate[]
-  );
+  const candidates = await treatmentReadAll<Identity>(() => db.rpc('treatment_identity_candidates', {
+    p_first: submission.vorname, p_last: submission.nachname, p_dob: toIsoDateOrNull(submission.geburtsdatum),
+    p_patient_id: submission.patient_id, p_external_id: submission.ivoris_patient_id,
+  }, { count: 'exact' }).order('id'));
+  const decision = decideExactLocalPatientCandidate(submission, candidates.map(candidate => ({ ...candidate, email: null, telefon: null })));
 
   if (decision.kind === "manual_review") {
     throw new ManualReviewRequiredError(decision.reason, "patient");
@@ -1147,17 +1096,9 @@ async function findReusableIvorisPatientIdFromPriorSubmissions(
   const lastname = normalizeMatchValue(submission.nachname);
   const phoneCandidates = new Set(extractSubmissionPhoneCandidates(submission));
 
-  const { data, error } = await db
-    .from("anamnese_submissions")
-    .select("id, vorname, nachname, email, geburtsdatum, answers, ivoris_patient_id")
-    .eq("geburtsdatum", birthday)
-    .neq("id", submission.id)
-    .not("ivoris_patient_id", "is", null)
-    .limit(50);
-
-  if (error) {
-    throw new Error(`Vorherige AnimaSign-Submissions konnten nicht geprueft werden: ${error.message}`);
-  }
+  const data = await treatmentReadAll<any>(() => db.from('anamnese_submissions')
+    .select('id,vorname,nachname,email,geburtsdatum,answers,ivoris_patient_id,patient_id,matched_patient_id', { count: 'exact' })
+    .eq('geburtsdatum', birthday).neq('id', submission.id).not('ivoris_patient_id', 'is', null).order('id'));
 
   const matchingIds = new Set<string>();
 
@@ -1182,7 +1123,11 @@ async function findReusableIvorisPatientIdFromPriorSubmissions(
     );
 
     const sameEmail = Boolean(email && priorEmail && email === priorEmail);
-    const sameName = Boolean(firstname && lastname && firstname === priorFirstname && lastname === priorLastname);
+    const sameName = namesMatchSubmission(submission, row.vorname, row.nachname);
+    if (sameName && (row.matched_patient_id || row.patient_id) && submission.patient_id
+      && (row.matched_patient_id || row.patient_id) !== submission.patient_id) {
+      throw new ManualReviewRequiredError('Widersprüchliche Patientenverknüpfung in früheren Einreichungen.', 'patient');
+    }
     const samePhone = Array.from(phoneCandidates).some((phone) => priorPhones.has(phone));
 
     if (
@@ -1428,6 +1373,8 @@ async function findReusableIvorisPatientIdForNewSubmission(
     strategyResults.push({
       label,
       ids: Array.from(new Set(ids)),
+      // This connector's raw array has no verified total/page contract. It is not proof of a complete directory.
+      complete: false,
     });
   };
 
@@ -1437,6 +1384,7 @@ async function findReusableIvorisPatientIdForNewSubmission(
       lastname: submission.nachname ?? undefined,
       birthday,
     });
+    await collectMatches('swapped-name+birthday', { firstname: submission.nachname ?? undefined, lastname: submission.vorname ?? undefined, birthday });
   }
 
   if (email) {
@@ -1474,7 +1422,7 @@ async function findReusableIvorisPatientIdForNewSubmission(
     );
   }
 
-  if (localPatient?.id && !localPatient.ivoris_id) {
+  if (localPatient?.id && !localPatient.ivoris_id && submission.is_existing !== false) {
     throw new ManualReviewRequiredError(
       `Patient-Sync braucht manuelle Ivoris-Zuordnung fuer ${submission.vorname ?? "Unbekannt"} ${submission.nachname ?? ""} (${birthday}). Lokaler Bestandspatient wurde eindeutig erkannt, aber ohne belastbare ivoris_id darf kein neuer Ivoris-Patient automatisch angelegt werden.`,
       "patient"
@@ -1517,6 +1465,11 @@ async function resolveSubmissionPatientIvorisId(
   submission: SubmissionRow,
   preferredPatientIvorisId?: string | null
 ): Promise<string | null> {
+  const identity = await resolveIntakeIdentity(db, submission.id, false);
+  if (identity.status === 'lookup_failed') throw new Error('identity_lookup_unavailable');
+  if (identity.status !== 'matched') throw new ManualReviewRequiredError(`Patientenzuordnung nicht bestätigt: ${identity.reason}`, 'document');
+  submission.patient_id = identity.patient_id!;
+  submission.matched_patient_id = identity.patient_id!;
   const preferred = normalizeIvorisId(preferredPatientIvorisId);
   if (preferred) return preferred;
 
@@ -1702,6 +1655,12 @@ async function syncPatientStage(
   const retryCountOnFailure = overrides.retryCountOnFailure ?? attemptNo;
 
   try {
+    const identity = await resolveIntakeIdentity(db, submission.id, true);
+    if (identity.status === 'lookup_failed') throw new Error('identity_lookup_unavailable');
+    if (identity.status !== 'matched') throw new ManualReviewRequiredError(`Patientenzuordnung nicht bestätigt: ${identity.reason}`, 'patient');
+    submission.patient_id = identity.patient_id!;
+    submission.matched_patient_id = identity.patient_id!;
+    submission.is_existing = !identity.is_new;
     const result =
       submission.is_existing === true
         ? await syncExistingPatient(db, submission)
@@ -1712,7 +1671,7 @@ async function syncPatientStage(
         "requestPayload" in result
           ? result.requestPayload
           : { mode: submission.is_existing ? "existing" : "create" },
-      metadata: "metadata" in result ? result.metadata : undefined,
+      metadata: { ...('metadata' in result ? result.metadata : {}), identityResolution: { patientId: identity.patient_id, swapped: !!identity.swapped, submissionId: submission.id } },
       responsePayload: result.ivorisId ? { ivorisId: result.ivorisId } : null,
     });
 

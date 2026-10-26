@@ -14,7 +14,7 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
   const supabase = createServerClient();
   const { data: sub } = await supabase
     .from("anamnese_submissions")
-    .select("vorname, nachname, email, patient_id, matched_patient_id, account_email, account_password, answers")
+    .select("vorname, nachname, email, patient_id, matched_patient_id, account_email, answers")
     .eq("id", id)
     .maybeSingle();
 
@@ -30,7 +30,9 @@ export default async function WelcomePage({ params }: { params: Promise<{ id: st
   }
 
   let loginEmail = sub.account_email || "";
-  let password = sub.account_password || "";
+  // An opaque intake URL is not independent portal authentication.
+  // Existing credentials stay unchanged and are never disclosed by this page.
+  let password = "";
 
   // Opening a link (including an email scanner) must never create an account
   // or reset credentials. Only show the already linked account.

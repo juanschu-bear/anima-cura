@@ -59,3 +59,16 @@ Sabine hat diese Konten noch nicht fachlich abgenommen. Es wurden keine Abnahmeb
 6. Regelaktivierung, Bestandsbearbeitung, Lückenberechnung, Übertragsaktionen, Laborpostfach/Upload und 3D-Modell gehören zu Schritten 2–6 und wurden nicht vorgezogen. Die vollständige Labor-Mail-/Anhangssichtung ist dabei noch auszuführen.
 
 Keine fachliche Vollabnahme und keine Behauptung einer lückenlosen Abrechnung. Stopp nach dieser lesenden Stufe; fehlende Quellen blockieren keine erfundenen Ersatzdaten, sondern bleiben sichtbar.
+
+## Fortsetzung: Anlagepfade vorbereitet, noch nicht aktiviert
+
+Migration 061 und die zugehörigen Serveränderungen sind separat vorbereitet. **Nicht auf main veröffentlicht und nicht produktiv aktiviert**, solange die Migration fehlt. Die Browserverbindung zum Datenbankprojekt antwortet nicht; die lokale Datenbankverwaltung hat keinen Zugriffstoken. Daher bleibt der laufende Formularweg unverändert.
+
+- Lokale Zuordnung und Neuanlage liegen in einer Transaktion. Eine Sperre der Patiententabelle serialisiert auch ältere INSERT-Schreiber; die Kandidatensuche wird unter dieser Sperre wiederholt. Keine Namens-/Geburtsdatums-/Geschlechts-/Behandlungsbeginn-Ersatzwerte. Fehlende Anlagefakten bleiben Prüffälle.
+- Direkte und vertauschte Felder verwenden dieselbe Akte; Varianten oder widersprüchliche Verknüpfungen führen zur Klärung. Die bisherigen lokalen ungesicherten INSERT-/Alt-RPC-Pfade wurden im vorbereiteten Code entfernt.
+- AnimaSign-Einreichung und Wiederholung sind keine Portal-Authentifizierung. Sie legen keine Portalrechte an, setzen kein Passwort zurück und geben keine gespeicherten Zugangsdaten aus. Bestehende Konten und Kennwörter werden nicht verändert. Die separate Aktivierung bleibt erforderlich; diese Änderung baut keinen neuen Aktivierungsprozess.
+- Der Patientensync prüft dieselbe lokale Identität, bevor er weiterarbeitet. Suchausfälle behalten den Wiederholungspfad. Die externen Verzeichnissuchstrategien dürfen einander nicht widersprechen; die Vollständigkeit des bisherigen rohen IVORIS-Arrayvertrags ist nicht bewiesen. Diese Unsicherheit sperrt einen neuen externen Datensatz, nicht die lokale Erfassung in Anima Cura.
+- Isolierte Datenbanktests prüfen Wiederholung, vertauschte Namen, unveränderte Bestandsdaten, fehlende Fakten, Browserrechte und das Unterlassen von Portalaktionen. Ein echter paralleler Produktionsdurchlauf oder eine fachliche Abnahme wurde nicht behauptet.
+- Vollständiger Testlauf dieser Fortsetzung: 251 bestanden, 0 fehlgeschlagen; Produktionsbuild erfolgreich. Code nur auf `codex/patient-communication-center` gesichert; main bleibt beim bereits veröffentlichten lesenden Konto.
+
+Vor Aktivierung: produktive Spalten-/Trigger-Voraussetzungen lesend prüfen, ausschließlich Migration 061 ausführen, danach den Servercode veröffentlichen und den Quellenabruf prüfen. Keine historischen Eingänge erneut abarbeiten. Die Abnahme der drei Behandlungskonten und die fehlenden Planbelege bleiben davon getrennt offen.

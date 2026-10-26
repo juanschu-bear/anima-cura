@@ -32,3 +32,9 @@ test("allows create when every strategy returns zero hits", () => {
 
   assert.equal(decision.kind, "create");
 });
+
+test('conflicting unique hits, incomplete searches and no executed search require review', () => {
+  assert.equal(decideIvorisDirectoryAction([{ label: 'direct', ids: ['a'] }, { label: 'swapped', ids: ['b'] }]).kind, 'manual_review');
+  assert.equal(decideIvorisDirectoryAction([{ label: 'directory', ids: [], complete: false }]).kind, 'manual_review');
+  assert.equal(decideIvorisDirectoryAction([]).kind, 'manual_review');
+});
