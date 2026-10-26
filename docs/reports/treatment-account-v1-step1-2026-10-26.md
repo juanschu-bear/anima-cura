@@ -11,7 +11,7 @@ Keine Zahlungsbereinigung und keine Ratenplanänderung.
 ## Code vorhanden
 
 - Additive Migrationen 059/060: die sieben freigegebenen Tabellen, unveränderliche Revisionen, Herkunft/Autor/Zeit, Patientenbindung und geschlossene Browserrechte. Beide produktiv ausgeführt.
-- Gemeinsamer lesender Identitätsresolver: direkte/vertauschte vollständige Namen und gültiges Geburtsdatum; Varianten, mehrere Kandidaten und widersprüchliche stabile IDs bleiben Prüffälle. Lokale Suche ohne Trefferlimit mit Vollständigkeitskontrolle. Keine Anlage, Zusammenführung oder Portalfreigabe durch diesen Resolver. Bestehende schreibende Anlagepfade wurden in dieser lesenden Stufe nicht umgestellt.
+- Gemeinsamer lesender Identitätsresolver: direkte/vertauschte vollständige Namen und gültiges Geburtsdatum; Varianten, mehrere Kandidaten und widersprüchliche stabile IDs bleiben Prüffälle. Lokale Suche ohne Trefferlimit mit Vollständigkeitskontrolle. Keine Anlage, Zusammenführung oder Portalfreigabe durch diesen lesenden Resolver. Der separate transaktionale Schutz der Anamnese-Anlagepfade ist unten dokumentiert.
 - Eigene Kontoseite `/rechnungen/behandlungskonto/[id]`, verlinkt aus dem bestehenden Abrechnungsarbeitsbereich nach Patientenauswahl.
 - Planversionen, Kalender-/Behandlungsquartal, Historienstand, Quelldokumentation, Bestandsnachträge und historische Rechnungs-/Quartalsreferenzen. Suche, aufklappbare Originaltexte und 15 Einträge pro Seite.
 - Alte Scribe-Texte werden ausschließlich als unbestätigte Textvorschläge angezeigt. Bestätigung der Dokumentation und Mengen-Vorbelegungen erzeugen keine Leistungsbestätigung. Strukturierte Vorlage-Auswahlindizes werden ohne Versionsbeleg nicht interpretiert.
@@ -54,21 +54,21 @@ Sabine hat diese Konten noch nicht fachlich abgenommen. Es wurden keine Abnahmeb
 1. Für die drei Fälle gibt es im Bestand keine bestätigten versionierten Pläne; die vorhandenen Tabellen `behandlungsfall`/`behandlungsfall_multiband` sind produktiv leer. Beginn, Genehmigung je Code/Kiefer und Pausen bleiben unbekannt. Nicht aus Abschlagsnummer, erstem Rechnungsdatum oder Patientenanlage ableiten.
 2. Summenlisten belegen keine Einzelpositionen und keine vollständige Historie. Bestätigte Start-/Endgrenzen der historischen Abdeckung fehlen.
 3. Die 382 nicht sicher zugeordneten Quellzeilen bleiben dokumentiert offen; keine ungeprüfte Übernahme in fremde Akten.
-4. Der neue Resolver ist in der Kontolesung verfügbar. Umstellung der vorhandenen schreibenden Anamnese-/Import-Anlagepfade und transaktionaler Anlageschutz bleiben noch offen; diese Stufe legt überhaupt keine Patienten an.
+4. Der neue Resolver ist in der Kontolesung verfügbar; Anamnese-Anlagepfade sind transaktional geschützt (siehe Fortsetzung). Eine vollständige Umstellung aller anderen historischen Importpfade wird damit nicht behauptet. Das Behandlungskonto selbst bleibt rein lesend.
 5. Scribe-Pflichtzustand, explizite Mengen und unveränderliche Vorlagenversionen aus Abschnitt 9 sind noch nicht implementiert. Alte Daten bleiben deshalb nur Vorschläge.
 6. Regelaktivierung, Bestandsbearbeitung, Lückenberechnung, Übertragsaktionen, Laborpostfach/Upload und 3D-Modell gehören zu Schritten 2–6 und wurden nicht vorgezogen. Die vollständige Labor-Mail-/Anhangssichtung ist dabei noch auszuführen.
 
 Keine fachliche Vollabnahme und keine Behauptung einer lückenlosen Abrechnung. Stopp nach dieser lesenden Stufe; fehlende Quellen blockieren keine erfundenen Ersatzdaten, sondern bleiben sichtbar.
 
-## Fortsetzung: Anlagepfade vorbereitet, noch nicht aktiviert
+## Fortsetzung: Anlagepfade aktiviert
 
-Migration 061 und die zugehörigen Serveränderungen sind separat vorbereitet. **Nicht auf main veröffentlicht und nicht produktiv aktiviert**, solange die Migration fehlt. Die Browserverbindung zum Datenbankprojekt antwortet nicht; die lokale Datenbankverwaltung hat keinen Zugriffstoken. Daher bleibt der laufende Formularweg unverändert.
+Migration 061 wurde nach Wiederherstellung des Chrome-Zugangs erfolgreich im Produktionsprojekt ausgeführt. Die produktiven Spalten und Trigger wurden vorher lesend geprüft: benötigte Spalten vorhanden, unbekannte Behandlungsdaten nullable, kein vorgeschalteter Patientenanlage-Trigger. Anschließend wurde der getestete Servercode `b9b9719` auf main veröffentlicht.
 
 - Lokale Zuordnung und Neuanlage liegen in einer Transaktion. Eine Sperre der Patiententabelle serialisiert auch ältere INSERT-Schreiber; die Kandidatensuche wird unter dieser Sperre wiederholt. Keine Namens-/Geburtsdatums-/Geschlechts-/Behandlungsbeginn-Ersatzwerte. Fehlende Anlagefakten bleiben Prüffälle.
 - Direkte und vertauschte Felder verwenden dieselbe Akte; Varianten oder widersprüchliche Verknüpfungen führen zur Klärung. Die bisherigen lokalen ungesicherten INSERT-/Alt-RPC-Pfade wurden im vorbereiteten Code entfernt.
 - AnimaSign-Einreichung und Wiederholung sind keine Portal-Authentifizierung. Sie legen keine Portalrechte an, setzen kein Passwort zurück und geben keine gespeicherten Zugangsdaten aus. Bestehende Konten und Kennwörter werden nicht verändert. Die separate Aktivierung bleibt erforderlich; diese Änderung baut keinen neuen Aktivierungsprozess.
 - Der Patientensync prüft dieselbe lokale Identität, bevor er weiterarbeitet. Suchausfälle behalten den Wiederholungspfad. Die externen Verzeichnissuchstrategien dürfen einander nicht widersprechen; die Vollständigkeit des bisherigen rohen IVORIS-Arrayvertrags ist nicht bewiesen. Diese Unsicherheit sperrt einen neuen externen Datensatz, nicht die lokale Erfassung in Anima Cura.
 - Isolierte Datenbanktests prüfen Wiederholung, vertauschte Namen, unveränderte Bestandsdaten, fehlende Fakten, Browserrechte und das Unterlassen von Portalaktionen. Ein echter paralleler Produktionsdurchlauf oder eine fachliche Abnahme wurde nicht behauptet.
-- Vollständiger Testlauf dieser Fortsetzung: 251 bestanden, 0 fehlgeschlagen; Produktionsbuild erfolgreich. Code nur auf `codex/patient-communication-center` gesichert; main bleibt beim bereits veröffentlichten lesenden Konto.
+- Vollständiger Testlauf dieser Fortsetzung: 251 bestanden, 0 fehlgeschlagen; Produktionsbuild erfolgreich. Produktionsprobe mit NULL-Einreichungs-ID liefert kontrolliert `lookup_failed/submission_missing`, ohne Patientendaten zu bearbeiten. Funktionsrechte geprüft: Dienstzugriff erlaubt, anonyme und angemeldete Browserrollen gesperrt.
 
-Vor Aktivierung: produktive Spalten-/Trigger-Voraussetzungen lesend prüfen, ausschließlich Migration 061 ausführen, danach den Servercode veröffentlichen und den Quellenabruf prüfen. Keine historischen Eingänge erneut abarbeiten. Die Abnahme der drei Behandlungskonten und die fehlenden Planbelege bleiben davon getrennt offen.
+Keine historischen Eingänge erneut abgearbeitet. Die Abnahme der drei Behandlungskonten und die fehlenden Planbelege bleiben davon getrennt offen. Eine echte neue Formulareinreichung wurde nicht stellvertretend für einen Patienten erzeugt.
