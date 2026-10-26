@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { z } from 'zod';
 import { t } from '@/lib/i18n';
 import { previousBillingQuarter } from '@/lib/billing-readiness';
@@ -101,6 +102,7 @@ export default function BillingWorkspace({locale,theme}:{locale:Locale;theme:str
     {kind==='service'&&<div className={styles.search}>
       <label>{tr('patient')}<input value={patient?patient.name:search} disabled={busy||!!editing||!!decision} onChange={e=>{setPatient(null);setSearch(e.target.value);reset();}} placeholder={tr('patientSearch')}/></label>
       {patient&&<p className={styles.muted}>{patient.ivoris_nummer||patient.id}{patient.geburtsdatum?` · ${patient.geburtsdatum}`:''}</p>}
+      {patient&&<Link href={`/rechnungen/behandlungskonto/${patient.id}`}>{t('treatment.open',locale)}</Link>}
       <div className={styles.results}>{results.map(p=><button key={p.id} onClick={()=>{setPatient(p);setResults([]);reset();}}>{p.name} · {p.ivoris_nummer||p.id}{p.geburtsdatum?` · ${p.geburtsdatum}`:''}</button>)}</div>
     </div>}
     {kind==='service'&&!patient&&<><QuarterOverview locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/><WorkQueue locale={locale} onOpen={selected=>{setPatient(selected);setSearch('');reset();}}/></>}

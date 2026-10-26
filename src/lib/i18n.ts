@@ -5,7 +5,9 @@
 //        t("patients.title", locale)
 // ============================================================
 
+import { treatmentTranslations } from './treatment-i18n';
 const translations: Record<string, { de: string; en: string }> = {
+  ...treatmentTranslations,
   "dispatch.crm.title": { de: "Patienten & Kommunikation", en: "Patients & communication" },
   "dispatch.crm.selectEmail": { de: "E-Mail auswählen", en: "Select an email" },
   "dispatch.crm.intro": { de: "Patient suchen und E-Mails ansehen. Rückmeldungen, Anmeldung und Rechnungsabrufe stehen in den Details.", en: "Find a patient and view their emails. Incoming messages, sign-in and invoice access are available in the details." },
