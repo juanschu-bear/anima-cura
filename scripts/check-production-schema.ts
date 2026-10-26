@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import {readFile} from 'node:fs/promises';
+import {verifyRpcContracts,assertRpcAudit,type RpcContracts} from './lib/rpc-contract';
 
 type CheckResult = {
   name: string;
@@ -172,6 +174,18 @@ async function main() {
       "id,actor_id,request,result_id,created_at",
     ),
   ];
+
+  checks.push((async (): Promise<CheckResult> => {
+    try {
+      const contracts=JSON.parse(await readFile('scripts/rpc-contracts.json','utf8')) as RpcContracts;
+      const requirements=await verifyRpcContracts(process.cwd(),contracts);
+      const {data,error}=await supabase.rpc('rpc_permissions_audit',{p_requirements:requirements});
+      if(error)throw Error(error.message);
+      assertRpcAudit(data);
+      if(data.checked!==requirements.length)throw Error('Incomplete RPC audit');
+      return {name:'explicit RPC grants for proven caller roles',ok:true,detail:JSON.stringify(data)};
+    } catch(error) { return {name:'explicit RPC grants for proven caller roles',ok:false,detail:error instanceof Error?error.message:String(error)}; }
+  })());
 
   checks.push((async (): Promise<CheckResult> => {
     const { data, error } = await supabase.rpc("function_acl_audit", {

@@ -1,0 +1,433 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "file": "scripts/apply-verified-invoice-reconciliation.ts",
+      "sha256": "0fe87c4b7bc1bcbaaaaf08c8ed76e6d4f127b392f807d45bae0e2745448bf781",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "reconcile_verified_invoice_payments",
+          "signature": "public.reconcile_verified_invoice_payments(p_request jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/audit-payment-ledger-backfill.ts",
+      "sha256": "4726bacc8712d02c75a9906803068809293c9d15d2cfc0bbef23495e94ff39d2",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "payment_backfill_catalog_fingerprint",
+          "signature": "public.payment_backfill_catalog_fingerprint()",
+          "role": "service_role"
+        },
+        {
+          "name": "payment_backfill_catalog_fingerprint",
+          "signature": "public.payment_backfill_catalog_fingerprint()",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/check-production-schema.ts",
+      "sha256": "aab8cae2bb478d31a5dc3c9d6a006ef35ff056aca6e06146d7f2e68dab263185",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "function_acl_audit",
+          "signature": "public.function_acl_audit(p_module_role text)",
+          "role": "service_role"
+        },
+        {
+          "name": "import_verified_bank_payment_batch",
+          "signature": "public.import_verified_bank_payment_batch(p_catalog text, p_rows jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "reconcile_verified_invoice_payments",
+          "signature": "public.reconcile_verified_invoice_payments(p_request jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "rpc_permissions_audit",
+          "signature": "public.rpc_permissions_audit(p_requirements jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/check-rpc-permissions.ts",
+      "sha256": "cc08e5728380217833d1eb7ee1cbb818876b6fd18591b3baa83958d96a29b5ae",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "rpc_permissions_audit",
+          "signature": "public.rpc_permissions_audit(p_requirements jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/import-verified-bank-payments.ts",
+      "sha256": "e7de1d35d8f388c80de08ffb044327b94a7073f4440bb2b767dcd78616cbc42b",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "import_verified_bank_payment_batch",
+          "signature": "public.import_verified_bank_payment_batch(p_catalog text, p_rows jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/reconcile-verified-invoice-payments.ts",
+      "sha256": "187dcdf3264e116b7249629949c2acf6ae91b6e76649de1a2f4b0732ccfe2cc7",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "payment_backfill_catalog_fingerprint",
+          "signature": "public.payment_backfill_catalog_fingerprint()",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/repair-patient-duplicates.ts",
+      "sha256": "daae1cad082e6ccb9cc2801691e4dc1559deac7bd7bb4cbdb1c49bb39302bea8",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "merge_duplicate_patient_with_ivoris_alias",
+          "signature": "public.merge_duplicate_patient_with_ivoris_alias(p_source_patient_id uuid, p_target_patient_id uuid, p_reason text)",
+          "role": "service_role"
+        },
+        {
+          "name": "merge_local_patient_duplicate",
+          "signature": "public.merge_local_patient_duplicate(p_source_patient_id uuid, p_target_patient_id uuid, p_reason text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "scripts/test-integration-outbox-claim.ts",
+      "sha256": "98ec1e9101bdab21339d38642bb3444216531b3feaeb752747e67c59cdbb81f9",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "claim_integration_outbox_job",
+          "signature": "public.claim_integration_outbox_job(p_artifact_type text, p_worker_id text, p_lease_minutes integer)",
+          "role": "service_role"
+        },
+        {
+          "name": "claim_integration_outbox_job",
+          "signature": "public.claim_integration_outbox_job(p_artifact_type text, p_worker_id text, p_lease_minutes integer)",
+          "role": "service_role"
+        },
+        {
+          "name": "claim_integration_outbox_job_for_artifact",
+          "signature": "public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)",
+          "role": "service_role"
+        },
+        {
+          "name": "claim_integration_outbox_job_for_artifact",
+          "signature": "public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/(dashboard)/finanzen/page.tsx",
+      "sha256": "2a98a316b55274aeefc3939357336b792d4077f862bd315bc0b45c37dac6f8fc",
+      "proof": "Dashboard invokes createBrowserClient from src/lib/db/supabase.ts after signed-in dashboard access; JWT role authenticated.",
+      "calls": [
+        {
+          "name": "ac_finanz_messwerte",
+          "signature": "public.ac_finanz_messwerte()",
+          "role": "authenticated"
+        }
+      ]
+    },
+    {
+      "file": "src/app/(dashboard)/tagesplan/page.tsx",
+      "sha256": "ff9978f071fb4c78870cfd9adedb8900e7716d3ad709b32904bbfa7336db4f04",
+      "proof": "Dashboard invokes createBrowserClient from src/lib/db/supabase.ts after signed-in dashboard access; JWT role authenticated.",
+      "calls": [
+        {
+          "name": "patient_checkin",
+          "signature": "public.patient_checkin(p_termin_id uuid, p_via text)",
+          "role": "authenticated"
+        },
+        {
+          "name": "tagesplan_status_update",
+          "signature": "public.tagesplan_status_update(p_termin_id uuid, p_neuer_status text)",
+          "role": "authenticated"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
+      "sha256": "a25474b506abcd68eda7e53202d9e6ae9ef83eb5a743ec5c6b350f3a65ba3a69",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "claim_integration_outbox_job_for_artifact",
+          "signature": "public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/doku/eintrag/[id]/resolve-patient/route.ts",
+      "sha256": "f6474e41398c3cc251d6bbdaab5d6c9ebf6ec53593d474eef065b7ae05de9ea4",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "resolve_scribe_patient_atomic",
+          "signature": "public.resolve_scribe_patient_atomic(p_entry_id uuid, p_patient_id uuid, p_resolved_by uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patient/checkin/route.ts",
+      "sha256": "d1b59d03c5bfe9cb213a4f7b54b0452acc612945c0f1f21d2e8b537da43e4fdb",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "patient_checkin",
+          "signature": "public.patient_checkin(p_termin_id uuid, p_via text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/billing-workspace-api.ts",
+      "sha256": "226531cc6f8b8f5e891c70699e5e5415aded2b2a5389d9e90b06475ac298aa9b",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "billing_invoice_abandon",
+          "signature": "public.billing_invoice_abandon(p_actor uuid, p_request_id uuid, p_invoice_id uuid, p_reason text)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_invoice_cancel",
+          "signature": "public.billing_invoice_cancel(p_actor uuid, p_request_id uuid, p_invoice_id uuid, p_document_id uuid, p_date date, p_reason text, p_pdf_sha256 text, p_pdf_bytes bigint, p_storage_path text)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_invoice_finalize",
+          "signature": "public.billing_invoice_finalize(p_actor uuid, p_invoice_id uuid, p_pdf_sha256 text, p_pdf_bytes bigint, p_storage_path text)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_invoice_reserve",
+          "signature": "public.billing_invoice_reserve(p_actor uuid, p_request_id uuid, p_input jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_payer_write",
+          "signature": "public.billing_payer_write(p_actor uuid, p_request_id uuid, p_input jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_write",
+          "signature": "public.billing_write(p_actor uuid, p_request_id uuid, p_input jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_write",
+          "signature": "public.billing_write(p_actor uuid, p_request_id uuid, p_input jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "billing_write",
+          "signature": "public.billing_write(p_actor uuid, p_request_id uuid, p_input jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-memory.ts",
+      "sha256": "841a8686c6f462066ef3d03ad432b747dc616dc4dfa1ec014ea13e3052d72d5a",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "animahost_memory_read",
+          "signature": "public.animahost_memory_read(p_patient_id uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_memory_write",
+          "signature": "public.animahost_memory_write(p_patient_id uuid, p_patient_name text, p_zusammenfassung text, p_offene_themen text[], p_stimmung text, p_praeferenz_updates text[], p_kommunikationsstil text, p_familie_kontext text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animasign-ivoris-sync.ts",
+      "sha256": "7f8147bd5ac5bd30724627d52aa1d3e24f1309fb127481db8eec62debb587a27",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "claim_integration_outbox_job",
+          "signature": "public.claim_integration_outbox_job(p_artifact_type text, p_worker_id text, p_lease_minutes integer)",
+          "role": "service_role"
+        },
+        {
+          "name": "claim_integration_outbox_job_for_artifact",
+          "signature": "public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)",
+          "role": "service_role"
+        },
+        {
+          "name": "treatment_identity_candidates",
+          "signature": "public.treatment_identity_candidates(p_first text, p_last text, p_dob date, p_patient_id uuid, p_external_id text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/intake-identity.ts",
+      "sha256": "1ca137fa0c430a79edd53ad9ce7682ac821283a59d9209d77eb34d2dc53197a8",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "resolve_intake_identity",
+          "signature": "public.resolve_intake_identity(p_submission_id uuid, p_allow_create boolean)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/matching-engine.ts",
+      "sha256": "dbba85988da86f3d646c2b920be64af741e8f3c2402ed3694a4ded06e93e3e93",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "ac_match_names",
+          "signature": "public.ac_match_names(von date, bis date)",
+          "role": "service_role"
+        },
+        {
+          "name": "ac_match_names_v2",
+          "signature": "public.ac_match_names_v2()",
+          "role": "service_role"
+        },
+        {
+          "name": "ac_match_referenz",
+          "signature": "public.ac_match_referenz()",
+          "role": "service_role"
+        },
+        {
+          "name": "ac_match_typos",
+          "signature": "public.ac_match_typos()",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/scribe-ivoris-retry.ts",
+      "sha256": "423f2366a9bdbb051ee9dc339fe9b8e7e13e61a3e18ef8077839b2f889b14f71",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "claim_integration_outbox_job",
+          "signature": "public.claim_integration_outbox_job(p_artifact_type text, p_worker_id text, p_lease_minutes integer)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/treatment-account-api.ts",
+      "sha256": "a799499889d5bfd25bb04e1a814819216325c3ff88f4d0d77c6beabc92d858f1",
+      "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
+      "calls": [
+        {
+          "name": "treatment_identity_candidates",
+          "signature": "public.treatment_identity_candidates(p_first text, p_last text, p_dob date, p_patient_id uuid, p_external_id text)",
+          "role": "service_role"
+        }
+      ]
+    }
+  ],
+  "proofs": [
+    {
+      "file": "scripts/animasign-supervisor.ts",
+      "sha256": "f75795d9944577dbcb4dd5ee5220dd62ee4ff1d5ba074478735c80eadf0b30ab"
+    },
+    {
+      "file": "scripts/animasign-sync-worker.ts",
+      "sha256": "1ceb48a6b7e02ddbfc32ea576de341821a2d79022f1cf2cc240f46796034df6a"
+    },
+    {
+      "file": "scripts/audit-treatment-acceptance.ts",
+      "sha256": "b56fc48f7ab6cddeb23ee861ff1595dfbe10b1a14c343a8dbab997ff3df531d8"
+    },
+    {
+      "file": "scripts/repair-animasign-local-links.ts",
+      "sha256": "6daa1154f72cbf49f926871fdb2326a7d81d1ca317abe5d780570a8c1a95eb1a"
+    },
+    {
+      "file": "scripts/test-animasign-duplicate-guard.ts",
+      "sha256": "2e6d28124a2727255eef8fec6bc4a0ed50689b0adad3a2340b62c9e0e710c4df"
+    },
+    {
+      "file": "src/app/api/anima-sign/documenso-webhook/route.ts",
+      "sha256": "ada057e58846b4b65e44e850b0c587b27df6a5fd4fe5da05544badf562fd7f9b"
+    },
+    {
+      "file": "src/app/api/anima-sign/ivoris-nachsync/route.ts",
+      "sha256": "280fc5a75d4a8fc0898ba96f5aa3a5f9083c12be2c2194689cbb026d43eaf964"
+    },
+    {
+      "file": "src/app/api/anima-sign/submission/[id]/resolve/route.ts",
+      "sha256": "33def3d57e1b7b696b8c8b15b85d7d6a5cd30dd11adcbf8f6545c463e20d62f1"
+    },
+    {
+      "file": "src/app/api/anima-sign/submit/route.ts",
+      "sha256": "fe31bcc1b9b723f275796bef2193a0e816b64a2cd37af019b98860a5becffaea"
+    },
+    {
+      "file": "src/app/api/cron/ivoris-sync/route.ts",
+      "sha256": "33dd7a88b1d71f3e63703c22ebe661a7dad19a4ef55346fc5f7675cd22471278"
+    },
+    {
+      "file": "src/app/api/doku/ivoris-nachsync/route.ts",
+      "sha256": "6c614c72453fd8508867792fad6ccf78db57d5005905d4fc118909ede4c988a9"
+    },
+    {
+      "file": "src/app/api/rechnungen/behandlungskonto/[id]/route.ts",
+      "sha256": "a1ef55b82f2cdf0e53a77d99e272231f3e13dc3afab669812dc80d1c2713a2c0"
+    },
+    {
+      "file": "src/app/api/rechnungen/catalog/route.ts",
+      "sha256": "d5b66866521a54769bff5e7fcd099ebd2b6a07cad70047bb26c3ba1053b9445b"
+    },
+    {
+      "file": "src/lib/db/supabase.ts",
+      "sha256": "83ced00465b5907c1bc92403b4ae81dd2b99653af5c169cd5ebf72a0b9a21581"
+    },
+    {
+      "file": "src/lib/services/animasign-local-patient-link.ts",
+      "sha256": "43bdac90fed3e339e0c6ac3e8f3601a53c25f29495c9105912f69137286014a9"
+    },
+    {
+      "file": "src/lib/services/animasign-signature-reconciliation.ts",
+      "sha256": "b9662db118b81dfd04949a3ceaafa2315e757bf53a3a2c9a13416b4bad6f8716"
+    }
+  ],
+  "boundaries": [
+    "resolveIntakeIdentity",
+    "readTreatmentAccount",
+    "billingWorkspaceHandler",
+    "treatmentAccountHandler",
+    "syncAnimaSignSubmission",
+    "runNextPendingAnimaSignStage",
+    "retryPendingAnimaSignSyncs",
+    "retryPendingScribeIvorisPushes",
+    "ensureLinkedLocalPatientForSubmission",
+    "reconcilePendingAnimaSignSignatures"
+  ]
+}

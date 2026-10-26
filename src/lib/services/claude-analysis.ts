@@ -95,7 +95,6 @@ Suche nach: Doppelbuchungen, ungewöhnliche Betragsabweichungen, plötzliche Zah
 export async function generateQuartalSummary(): Promise<string> {
   const db = createServerClient();
 
-  const { data: stats } = await db.rpc("get_quartal_stats"); // Custom function
   const { data: raten } = await db
     .from("raten")
     .select("status, betrag")
@@ -108,7 +107,7 @@ export async function generateQuartalSummary(): Promise<string> {
 Erstelle eine kurze, verständliche Zusammenfassung des Quartals für die Praxisinhaberin.
 Halte den Ton professionell aber freundlich. Nenne konkrete Zahlen.`,
     messages: [
-      { role: "user", content: `Quartalsdaten:\n${JSON.stringify({ stats, ratenUebersicht: raten }, null, 2)}` },
+      { role: "user", content: `Quartalsdaten:\n${JSON.stringify({ ratenUebersicht: raten }, null, 2)}` },
     ],
   });
 
