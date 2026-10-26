@@ -1,0 +1,328 @@
+RECHTE-INVENTUR UND EINMALIGE BEREINIGUNG – 26.10.2026
+Projekt: zymqxzhjbcxzhzvjqvbv / Anima Cura
+Nachher-Snapshot: 2026-10-26T17:29:45.628691+00:00
+
+ERGEBNIS
+31 Funktionen geändert; 88 EXECUTE-Einzelrechte entzogen, davon 23 PUBLIC-Grants.
+Bei diesen 31 Funktionen hat anon jetzt kein EXECUTE-Recht.
+authenticated bleibt ausschließlich bei patient_checkin und tagesplan_status_update erhalten (belegte Dashboard-Aufrufe).
+Alle 67 Anwendungs-Funktionsdefinitionen und alle zugehörigen Triggerdefinitionen/-Aktivierungszustände sind unverändert.
+Keine Änderung von Patienten, Rechnungen, Zahlungen, Ratenplänen, Triggern, Jobs, Anwendungscode oder Default-Rechten durch diesen Auftrag.
+
+1. LESENDE INVENTUR / ABDECKUNG
+67 nicht extensionsverwaltete Funktionen im Anwendungsschema public, davon 40 mit PUBLIC-EXECUTE.
+Schreibende Funktionen wurden einschließlich aufgerufener Hilfsfunktionen und expliziter anon/authenticated-Rechte betrachtet.
+23 PUBLIC-Schreibfunktionen und weitere 8 Schreibfunktionen mit expliziten Alt-Rechten bilden die 31 Änderungsziele.
+Reine Leser und nur abweisende/validierende Guard-Funktionen wurden nicht pauschal geändert.
+18 GitHub-Repositories, 2648 Quelldateien; Standardzweige je festgehaltenem Commit; zusätzlich lokale Arbeitskopien unter Documents.
+Nicht lesbare Remote-Repositories: 0.
+Dies ist ein statischer Aufrufernachweis, keine Messung jedes historischen Funktionsaufrufs.
+Andere Remote-Zweige und nicht versionierte externe Automationen sind durch eine Quellcodesuche nicht automatisch vollständig nachgewiesen.
+Datenbank-Cron: pg_cron und cron.job sind im Zielprojekt nicht vorhanden.
+Edge Functions: Zielprojekt zeigt „Deploy your first Edge Function“; keine deployten Edge Functions vorhanden.
+Vercel-Zeitpläne und GitHub-Actions-Worker sind im Anima-Cura-Quellcode erfasst; sie verwenden den internen Dienstzugang.
+Weitere 96 PUBLIC-ausführbare Plattform-/Extension-Funktionen sind mit Definitionen und Schema-ACL in platform-before.json erfasst.
+Ihre Schemas sind für die nicht privilegierte Modul-Prüfrolle nicht zugänglich. Keine Änderungen an verwalteten Plattformschemas.
+
+2. RÜCKGÄNGIG VORHER FERTIG
+rollback.sql war vor dem produktiven Entzug vorhanden und in isoliertem PostgreSQL getestet.
+Es stellt die ursprüngliche Kombination aus Berechtigtem, Grantor, EXECUTE und Grant-Option exakt wieder her.
+SQL-intern führen abweichende Definitionen oder zwischenzeitlich geänderte Rechte zum vollständigen Abbruch.
+SHA-256 rollback.sql: 1cbe0ccf12448ed61f808381f7f8bc68ecb22d5b0b70ad212db26097ccf3bfe5
+SHA-256 apply.sql: 2e93565fc5b6b83c72e2158626de9e9e7e56d19a748bfb0f640b368f79cd208b
+Das Rückgängig-Skript wurde in Produktion NICHT ausgeführt: es würde die absichtlich entfernten Alt-Rechte wieder öffnen.
+
+3. GETESTET – GRENZEN EXPLIZIT
+Isoliertes PostgreSQL: 31 vollständige Rollenmatrizen; echte Anamnese-/Scribe-Outbox-Triggerdefinitionen; Dienst-Worker-Claim; authentifizierter Check-in/Tagesstatus; verbotene Aufrufe; exakter Rollback; Abbruch bei ACL-Drift.
+Schreibfreie Live-Prüfungen: 12/12 erfolgreich.
+Dienst-Resolver ohne Einreichung; Legacy-RPC ohne Einreichung; gezielter Worker-Claim mit NULL-Artefakt (0 reservierte Jobs); Check-in mit NULL-Termin (0 geänderte Zeilen); Scribe-Eingangsvalidierung.
+Anonyme Live-Aufrufe von Legacy-RPC, Worker-Claim, Scribe-Zuordnung und Check-in werden mit 42501 abgewiesen.
+HTTP-Live-Prüfungen: Anamnese ohne answers → 400; Scribe ohne Anmeldung → 401; Check-in ohne patient_id → 400.
+Modul-Prüfrolle: 31 Funktionen verweigert; keine Rollenmitgliedschaften, kein Plattform-Schema-Zugriff.
+Die Modulrolle wurde ausschließlich innerhalb einer zurückgerollten Transaktion angelegt. Eine endgültige produktive App-Rolle ist hiermit NICHT provisioniert.
+Bei ihrer späteren Einrichtung muss dieselbe Negativprüfung erneut laufen.
+
+OFFEN IN BEDINGUNG 4: Ein vollständiger erfolgreicher Patientenablauf in Produktion wurde NICHT ausgelöst und ist NICHT als bestanden behauptet.
+Das würde Einreichungen, Dokumentation oder Termine verändern. Solche Testdaten/-änderungen sind nicht freigegeben.
+Die erfolgreichen positiven Abläufe stammen aus der isolierten Datenbank mit synthetischen Daten; die Live-Nachweise prüfen Rechte, Nulltreffer und Eingangsvalidierung.
+Auch ein vollständiger Worker-Job wurde nicht manuell gestartet, da er echte Vorgänge bearbeiten könnte.
+Für den abschließenden positiven Live-Nachweis sind reguläre Praxisvorgänge oder eigens freigegebene Testfälle erforderlich.
+
+4. PASSIVE LIVE-BEOBACHTUNG (nur Zeitstempel/Anzahlen)
+anamnese_submissions.created_at: letzter Wert 2026-10-24T19:50:27.514929+00:00; seit Rechteänderung 0; Lesefehler keiner
+doku_eintraege.created_at: letzter Wert 2026-10-26T14:23:10.218433+00:00; seit Rechteänderung 0; Lesefehler keiner
+integration_outbox_events.occurred_at: letzter Wert 2026-10-26T17:25:17.949319+00:00; seit Rechteänderung 0; Lesefehler keiner
+tagesplan_termine.eingecheckt_um: letzter Wert 2026-07-02T09:52:56.621875+00:00; seit Rechteänderung 0; Lesefehler keiner
+
+5. RECHTE VORHER / NACHHER – ALLE ÄNDERUNGSZIELE
+Alle unten genannten Grants sind EXECUTE; Eigentümerrechte bleiben erhalten.
+
+public.abgleich_patient_aus_submission(p_submission_id uuid)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Lokaler Code (kein Deploymentnachweis): /Users/oniokocentral/Documents/Anima CURA/src/app/api/anima-sign/submit/route.ts:660
+  Lokaler Code (kein Deploymentnachweis): /Users/oniokocentral/Documents/Anima CURA/src/lib/services/animasign-local-patient-link.ts:179
+
+public.ac_import_ivoris_plaene()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.ac_match_iban()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  SQL-Aufrufer: ac_match_kette
+
+public.ac_match_kette()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.ac_match_namen_im_zweck()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  SQL-Aufrufer: ac_match_kette
+
+public.ac_match_names(von date, bis date)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/matching-engine.ts:1082
+  SQL-Aufrufer: ac_match_kette
+
+public.ac_match_names_v2()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/matching-engine.ts:1088
+
+public.ac_match_referenz()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/matching-engine.ts:1075
+  SQL-Aufrufer: ac_match_kette
+
+public.ac_match_typos()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/matching-engine.ts:1097
+
+public.ac_rekonstruiere_plaene()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.animahost_memory_write(p_patient_id uuid, p_patient_name text, p_zusammenfassung text, p_offene_themen text[], p_stimmung text, p_praeferenz_updates text[], p_kommunikationsstil text, p_familie_kontext text)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/animahost-memory.ts:78
+
+public.auto_patient_profile()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.claim_integration_outbox_job(p_artifact_type text, p_worker_id text, p_lease_minutes integer)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/test-integration-outbox-claim.ts:27
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/test-integration-outbox-claim.ts:32
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/animasign-ivoris-sync.ts:1955
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/scribe-ivoris-retry.ts:66
+
+public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/test-integration-outbox-claim.ts:51
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/test-integration-outbox-claim.ts:58
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/app/api/doku/eintrag/[id]/ivoris-push/route.ts:59
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/lib/services/animasign-ivoris-sync.ts:1939
+
+public.doku_baustein_nutzung_erhoehen(p_behandlungsart text, p_termin_typ text, p_gruppe text, p_option_text text)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.kassen_beleg_nr()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: kassen_zahlungen.trg_kassen_beleg_nr
+  Trigger: kassen_zahlungen.trg_kassen_beleg_nr; Status O; CREATE TRIGGER trg_kassen_beleg_nr BEFORE INSERT ON public.kassen_zahlungen FOR EACH ROW EXECUTE FUNCTION kassen_beleg_nr()
+
+public.ledger_record_practice_payment()
+  Vorher: anon, authenticated, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: kassen_zahlungen.ledger_record_practice_payment_trigger
+  Trigger: kassen_zahlungen.ledger_record_practice_payment_trigger; Status O; CREATE TRIGGER ledger_record_practice_payment_trigger AFTER INSERT ON public.kassen_zahlungen FOR EACH ROW EXECUTE FUNCTION ledger_record_practice_payment()
+
+public.mark_overdue_rates()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+public.merge_duplicate_patient_with_ivoris_alias(p_source_patient_id uuid, p_target_patient_id uuid, p_reason text)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/repair-patient-duplicates.ts:280
+
+public.merge_local_patient_duplicate(p_source_patient_id uuid, p_target_patient_id uuid, p_reason text)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/scripts/repair-patient-duplicates.ts:281
+
+public.merge_patient_into_canonical(p_source_patient_id uuid, p_target_patient_id uuid, p_reason text)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  SQL-Aufrufer: merge_duplicate_patient_with_ivoris_alias, merge_local_patient_duplicate
+
+public.patient_checkin(p_termin_id uuid, p_via text)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: authenticated, postgres, service_role
+  Entscheidung: anima-cura/src/app/(dashboard)/tagesplan/page.tsx:70, JWT authenticated, dashboard access gate
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/app/(dashboard)/tagesplan/page.tsx:70
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/app/api/patient/checkin/route.ts:33
+
+public.praxis_pass_touch()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: praxis_pass.praxis_pass_touch_trg
+  Trigger: praxis_pass.praxis_pass_touch_trg; Status O; CREATE TRIGGER praxis_pass_touch_trg BEFORE UPDATE ON public.praxis_pass FOR EACH ROW EXECUTE FUNCTION praxis_pass_touch()
+
+public.record_integration_outbox_event()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: integration_outbox_jobs.trg_record_integration_outbox_event
+  Trigger: integration_outbox_jobs.trg_record_integration_outbox_event; Status O; CREATE TRIGGER trg_record_integration_outbox_event AFTER INSERT OR DELETE OR UPDATE OF status, attempt_count, next_attempt_at, last_error, locked_at, locked_by, succeeded_at ON public.integration_outbox_jobs FOR EACH ROW EXECUTE FUNCTION record_integration_outbox_event()
+
+public.resolve_scribe_patient_atomic(p_entry_id uuid, p_patient_id uuid, p_resolved_by uuid)
+  Vorher: anon, postgres, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Server-side caller; see caller-inventory.json
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/app/api/doku/eintrag/[id]/resolve-patient/route.ts:46
+
+public.sync_animasign_outbox_jobs()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: anamnese_submissions.trg_sync_animasign_outbox_jobs
+  Trigger: anamnese_submissions.trg_sync_animasign_outbox_jobs; Status O; CREATE TRIGGER trg_sync_animasign_outbox_jobs AFTER INSERT OR UPDATE OF signed_pdf_path, ivoris_synced, ivoris_doc_synced, ivoris_sync_retry_count, ivoris_doc_retry_count, ivoris_sync_next_retry_at, ivoris_doc_next_retry_at, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_patient_error, ivoris_document_error ON public.anamnese_submissions FOR EACH ROW EXECUTE FUNCTION sync_animasign_outbox_jobs()
+
+public.sync_scribe_outbox_job()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: doku_eintraege.trg_sync_scribe_outbox_job
+  Trigger: doku_eintraege.trg_sync_scribe_outbox_job; Status O; CREATE TRIGGER trg_sync_scribe_outbox_job AFTER INSERT OR UPDATE OF status, bestaetigt_am, version, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, ivoris_error_class, ivoris_gepusht_am ON public.doku_eintraege FOR EACH ROW EXECUTE FUNCTION sync_scribe_outbox_job()
+
+public.tagesplan_status_update(p_termin_id uuid, p_neuer_status text)
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: authenticated, postgres
+  Entscheidung: anima-cura/src/app/(dashboard)/tagesplan/page.tsx:74, JWT authenticated, dashboard access gate
+  Code: github:anima-cura@ea2661c75ea6e59b792eb527e414432cb80ac09f/src/app/(dashboard)/tagesplan/page.tsx:74
+
+public.update_tagesplan_updated_at()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: tagesplan_termine.trg_tagesplan_updated_at
+  Trigger: tagesplan_termine.trg_tagesplan_updated_at; Status O; CREATE TRIGGER trg_tagesplan_updated_at BEFORE UPDATE ON public.tagesplan_termine FOR EACH ROW EXECUTE FUNCTION update_tagesplan_updated_at()
+
+public.update_updated_at()
+  Vorher: anon, authenticated, postgres, PUBLIC, service_role
+  Nachher: postgres, service_role
+  Entscheidung: Existing trigger: patients.patients_updated_at, ratenplaene.ratenplaene_updated_at, raten.raten_updated_at, behandlungsphasen.behandlungsphasen_updated_at, pflegetipps.pflegetipps_updated_at, zahler.zahler_updated_at, behandlungsfall.behandlungsfall_updated_at, behandlungsfall_aligner.behandlungsfall_aligner_updated_at, behandlungsfall_removable.behandlungsfall_removable_updated_at, behandlungsfall_multiband.behandlungsfall_multiband_updated_at, doku_vorlagen.doku_vorlagen_updated_at, doku_eintraege.doku_eintraege_updated_at, doku_vorlagen_optionen.doku_vorlagen_optionen_updated_at
+  Trigger: patients.patients_updated_at; Status O; CREATE TRIGGER patients_updated_at BEFORE UPDATE ON public.patients FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: ratenplaene.ratenplaene_updated_at; Status O; CREATE TRIGGER ratenplaene_updated_at BEFORE UPDATE ON public.ratenplaene FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: raten.raten_updated_at; Status O; CREATE TRIGGER raten_updated_at BEFORE UPDATE ON public.raten FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: behandlungsphasen.behandlungsphasen_updated_at; Status O; CREATE TRIGGER behandlungsphasen_updated_at BEFORE UPDATE ON public.behandlungsphasen FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: pflegetipps.pflegetipps_updated_at; Status O; CREATE TRIGGER pflegetipps_updated_at BEFORE UPDATE ON public.pflegetipps FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: zahler.zahler_updated_at; Status O; CREATE TRIGGER zahler_updated_at BEFORE UPDATE ON public.zahler FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: behandlungsfall.behandlungsfall_updated_at; Status O; CREATE TRIGGER behandlungsfall_updated_at BEFORE UPDATE ON public.behandlungsfall FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: behandlungsfall_aligner.behandlungsfall_aligner_updated_at; Status O; CREATE TRIGGER behandlungsfall_aligner_updated_at BEFORE UPDATE ON public.behandlungsfall_aligner FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: behandlungsfall_removable.behandlungsfall_removable_updated_at; Status O; CREATE TRIGGER behandlungsfall_removable_updated_at BEFORE UPDATE ON public.behandlungsfall_removable FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: behandlungsfall_multiband.behandlungsfall_multiband_updated_at; Status O; CREATE TRIGGER behandlungsfall_multiband_updated_at BEFORE UPDATE ON public.behandlungsfall_multiband FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: doku_vorlagen.doku_vorlagen_updated_at; Status O; CREATE TRIGGER doku_vorlagen_updated_at BEFORE UPDATE ON public.doku_vorlagen FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: doku_eintraege.doku_eintraege_updated_at; Status O; CREATE TRIGGER doku_eintraege_updated_at BEFORE UPDATE ON public.doku_eintraege FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+  Trigger: doku_vorlagen_optionen.doku_vorlagen_optionen_updated_at; Status O; CREATE TRIGGER doku_vorlagen_optionen_updated_at BEFORE UPDATE ON public.doku_vorlagen_optionen FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+public.void_kassen_zahlung(p_id uuid, p_reason text)
+  Vorher: anon, authenticated, postgres, service_role
+  Nachher: postgres
+  Entscheidung: No application caller found; owner only
+  Kein Aufrufer in den geprüften Quellen nachgewiesen; keine Browser-/Dienstrechte behalten.
+
+6. GEPRÜFTE REMOTE-STÄNDE
+animacal: 7657050200171ba335273ea9442c831991d8eeb0 (main; 297 Dateien)
+anima-cura: ea2661c75ea6e59b792eb527e414432cb80ac09f (main; 571 Dateien)
+anima-core: af2bf3475bc51559e269c831cb6c81f1c99877a0 (main; 74 Dateien)
+anima-sheets: 0288481550db62a6919e4fb95f98a31f14ff2ca2 (master; 21 Dateien)
+WhatsAnima: 697da6e296adf80480df4ff8b51d22cdfb574966 (main; 985 Dateien)
+anima-radar: 305a8e4c9dec37cf904a783f2677d1f0e2fa9828 (main; 92 Dateien)
+animapay-platform: a005d157ae69e517b6e19494d7c32637c28f0dec (main; 147 Dateien)
+anima-viva: b76c020db64058b322bb37b8065e661c48a096a4 (main; 77 Dateien)
+anima-time: 99da8b2c1579d9531a5feafbb647a21864ed2e2b (main; 61 Dateien)
+anima-sign: 2aea6aea5b970791eac23c1f49719bac9666c5c4 (main; 8 Dateien)
+anima-scribe: 72f484db65dd06454ae40dd50c7d40b834c2c8c4 (main; 46 Dateien)
+animapay: 8e0c3d1745a93e558f6721cf2308ee1f6e1c6c73 (main; 35 Dateien)
+whatsanima-guide: abbbc1d2e1cb050ecb63da1f1e9e857d1b63c0f9 (main; 1 Dateien)
+whatsanima-readouts: 11eda541f7926baed4006c276fbbf8f19a273e35 (main; 0 Dateien)
+anima-drive-v1: 9fb59c1124f3ba534fb8163ca33306f5be432af8 (main; 77 Dateien)
+whatsanima-onboarding: a6321b1ba333b4d9e95f6f198b65b0da63ae9ffc (main; 1 Dateien)
+anima-connect: 62404b7650595b797a30b4cba17b1954726f69a3 (main; 58 Dateien)
+Anima-Beta: 50a83d3ce6c0a2c58113ae7006392150867a6f0e (main; 97 Dateien)
+
+7. UNVERÄNDERTE FUNKTIONEN – ZUR VOLLSTÄNDIGKEIT
+public.ac_finanz_messwerte(): PUBLIC, postgres, anon, authenticated, service_role
+public.ac_norm(t text): PUBLIC, postgres, anon, authenticated, service_role
+public.animahost_memory_read(p_patient_id uuid): PUBLIC, postgres, anon, authenticated, service_role
+public.animasign_sync_status(): PUBLIC, postgres, anon, authenticated, service_role
+public.billing_guard_invoice_services(): postgres
+public.billing_invoice_abandon(p_actor uuid, p_request_id uuid, p_invoice_id uuid, p_reason text): postgres, service_role
+public.billing_invoice_cancel(p_actor uuid, p_request_id uuid, p_invoice_id uuid, p_document_id uuid, p_date date, p_reason text, p_pdf_sha256 text, p_pdf_bytes bigint, p_storage_path text): postgres, service_role
+public.billing_invoice_finalize(p_actor uuid, p_invoice_id uuid, p_pdf_sha256 text, p_pdf_bytes bigint, p_storage_path text): postgres, service_role
+public.billing_invoice_reserve(p_actor uuid, p_request_id uuid, p_input jsonb): postgres, service_role
+public.billing_link_invoice_correction(): postgres
+public.billing_payer_write(p_actor uuid, p_request_id uuid, p_input jsonb): postgres, service_role
+public.billing_protect_cancellation(): postgres, service_role
+public.billing_protect_cancelled_open_item(): postgres
+public.billing_protect_invoice(): PUBLIC, postgres, anon, authenticated, service_role
+public.billing_protect_payer_version(): PUBLIC, postgres, anon, authenticated, service_role
+public.billing_protect_version(): PUBLIC, postgres, anon, authenticated, service_role
+public.billing_reject_void_invoice_allocation(): postgres, service_role
+public.billing_write(p_actor uuid, p_request_id uuid, p_input jsonb): postgres, service_role
+public.doku_eintraege_guard(): PUBLIC, postgres, anon, authenticated, service_role
+public.doku_eintraege_no_delete(): PUBLIC, postgres, anon, authenticated, service_role
+public.doku_versionen_immutable(): PUBLIC, postgres, anon, authenticated, service_role
+public.import_verified_bank_payment_batch(p_catalog text, p_rows jsonb): postgres, service_role
+public.match_szenarien(query_embedding vector, match_threshold double precision, match_count integer, filter_behandlungsart text, filter_terminart text, filter_altersgruppe text): PUBLIC, postgres, anon, authenticated, service_role
+public.payment_backfill_catalog_fingerprint(): postgres, service_role
+public.protect_invoice_payment_allocation_history(): PUBLIC, postgres, anon, authenticated, service_role
+public.protect_patient_payment_allocation_history(): PUBLIC, postgres, anon, authenticated, service_role
+public.reconcile_verified_invoice_payments(p_request jsonb): postgres, service_role
+public.reject_patient_merge_audit_mutation(): PUBLIC, postgres, anon, authenticated, service_role
+public.resolve_intake_identity(p_submission_id uuid, p_allow_create boolean): postgres, service_role
+public.treatment_allocation_scope_guard(): postgres
+public.treatment_identity_candidates(p_first text, p_last text, p_dob date, p_patient_id uuid, p_external_id text): postgres, service_role
+public.treatment_immutable(): PUBLIC, postgres, anon, authenticated, service_role
+public.treatment_name_keys(p_name text): postgres, service_role
+public.validate_invoice_payment_allocation(): PUBLIC, postgres, anon, authenticated, service_role
+public.validate_patient_payment_allocation(): PUBLIC, postgres, anon, authenticated, service_role
+public.verified_invoice_reference_tokens(value text): postgres, service_role
+
+REFERENZ
+PostgreSQL CREATE TRIGGER: https://www.postgresql.org/docs/current/sql-createtrigger.html
+Vorhandene Trigger wurden nicht neu angelegt. Das Weiterlaufen nach EXECUTE-Entzug ist mit den echten Definitionen isoliert geprüft.

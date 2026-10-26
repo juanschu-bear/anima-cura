@@ -174,6 +174,20 @@ async function main() {
   ];
 
   checks.push((async (): Promise<CheckResult> => {
+    const { data, error } = await supabase.rpc("function_acl_audit", {
+      p_module_role: process.env.BILLING_DATABASE_ROLE || "abrechnung_runtime",
+    });
+    const valid = data && typeof data.ok === "boolean" && Array.isArray(data.violations)
+      && Array.isArray(data.default_violations) && Array.isArray(data.platform_default_warnings)
+      && typeof data.public_function_count === "number" && data.public_function_count > 0;
+    return {
+      name: "function execution boundary and explicit migration defaults",
+      ok: !error && !!valid && data.ok === true && data.violations.length === 0 && data.default_violations.length === 0,
+      detail: error ? error.message : !valid ? "Missing or malformed function ACL audit" : JSON.stringify(data),
+    };
+  })());
+
+  checks.push((async (): Promise<CheckResult> => {
     const { error } = await supabase.rpc("import_verified_bank_payment_batch", { p_catalog: "schema-probe", p_rows: [] });
     return {
       name: "verified bank import fail-closed guard",
