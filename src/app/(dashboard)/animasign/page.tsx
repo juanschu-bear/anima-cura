@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import { useAppStore } from "@/hooks/useAppStore";
+import { ImportReviewList } from '@/components/animasign/ImportReviewList';
+import { t } from '@/lib/i18n';
 
 interface Submission {
   id: string;
@@ -160,6 +162,10 @@ export default function AnimaSignPage() {
   const [manualReviewItems, setManualReviewItems] = useState<ManualReviewItem[]>([]);
   const [patientIdentityConflicts, setPatientIdentityConflicts] = useState<PatientIdentityConflict[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
+  const [reviewError, setReviewError] = useState(false);
+  const [reviewPage, setReviewPage] = useState(0);
+  const manualPages = Math.max(1, Math.ceil(manualReviewItems.length / 15));
+  const manualPage = Math.min(reviewPage, manualPages - 1);
   const [closingGroupKey, setClosingGroupKey] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -203,13 +209,16 @@ export default function AnimaSignPage() {
 
   const fetchReviewQueue = useCallback(async () => {
     setQueueLoading(true);
+    setReviewError(false);
     try {
       const res = await fetch("/api/anima-sign/review-queue");
+      if (!res.ok) throw new Error('review_queue_unavailable');
       const data = await res.json();
       setDuplicateGroups(data.duplicateGroups || []);
       setManualReviewItems(data.manualReview || []);
       setPatientIdentityConflicts(data.patientIdentityConflicts || []);
     } catch (error) {
+      setReviewError(true);
       console.error("[AnimaSign][review-queue]", error);
       setDuplicateGroups([]);
       setManualReviewItems([]);
@@ -598,6 +607,7 @@ export default function AnimaSignPage() {
           <div style={{ fontSize: 13, color: muted, marginBottom: 12 }}>
             Diese Fälle bleiben absichtlich unter menschlicher Kontrolle, wenn Ivoris mehrere plausible Treffer liefert.
           </div>
+          <ImportReviewList />
           {patientIdentityConflicts.length > 0 && (
             <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
               {patientIdentityConflicts.map((conflict) => (
@@ -627,13 +637,15 @@ export default function AnimaSignPage() {
               ))}
             </div>
           )}
-          {queueLoading ? (
+          {reviewError ? (
+            <div role="alert"><p>{t('intake.reviewLoadError',locale)}</p><button type="button" onClick={()=>void fetchReviewQueue()} style={{minHeight:44}}>{t('intake.reviewRetry',locale)}</button></div>
+          ) : queueLoading ? (
             <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Prüffälle werden geladen…</div>
           ) : manualReviewItems.length === 0 ? (
             <div style={{ fontSize: 13, color: muted, padding: "18px 0" }}>Keine offenen Prüffälle.</div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
-              {manualReviewItems.map((item) => (
+              {manualReviewItems.slice(manualPage * 15, (manualPage + 1) * 15).map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -673,6 +685,11 @@ export default function AnimaSignPage() {
                   <div style={{ fontSize: 12, color: ink, marginTop: 8, lineHeight: 1.5 }}>{item.reason || "Manuelle Auflösung erforderlich."}</div>
                 </button>
               ))}
+              <nav aria-label={t('intake.reviewPage',locale,{page:manualPage+1,pages:manualPages,total:manualReviewItems.length})} style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center'}}>
+                <button type="button" disabled={manualPage===0} onClick={()=>setReviewPage(manualPage-1)} style={{minHeight:44}}>{t('intake.previous',locale)}</button>
+                <span>{t('intake.reviewPage',locale,{page:manualPage+1,pages:manualPages,total:manualReviewItems.length})}</span>
+                <button type="button" disabled={manualPage+1>=manualPages} onClick={()=>setReviewPage(manualPage+1)} style={{minHeight:44}}>{t('intake.next',locale)}</button>
+              </nav>
             </div>
           )}
         </div>

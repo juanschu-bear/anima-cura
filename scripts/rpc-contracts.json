@@ -387,7 +387,7 @@
     },
     {
       "file": "src/app/api/anima-sign/submit/route.ts",
-      "sha256": "fe31bcc1b9b723f275796bef2193a0e816b64a2cd37af019b98860a5becffaea"
+      "sha256": "d6cc6c65880c14c541825a4f741ffb9c7b1d70f31b9409240418a96e202c0f41"
     },
     {
       "file": "src/app/api/cron/ivoris-sync/route.ts",

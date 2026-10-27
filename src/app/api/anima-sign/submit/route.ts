@@ -4,6 +4,7 @@ import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 import { resolveIntakeIdentity, INTAKE_PORTAL_UNAVAILABLE } from "@/lib/services/intake-identity";
 import { formatManualReviewError, isManualReviewErrorText } from '@/lib/services/animasign-sync-status';
 import { t } from '@/lib/i18n';
+import { validateIntakeAnswers } from '@/lib/services/intake-required-fields';
 import {
   createAndDistribute,
   type DocumensoField,
@@ -436,6 +437,12 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SubmitBody;
     const answers = body.answers;
+
+    const invalidFields = validateIntakeAnswers(answers);
+    if (invalidFields.length) {
+      const locale = answers && typeof answers === 'object' && answers.sprache === 'en' ? 'en' : 'de';
+      return NextResponse.json({ ok: false, error: t('intake.requiredFields', locale), fields: invalidFields }, { status: 422 });
+    }
 
     if (!answers || typeof answers !== "object") {
       return NextResponse.json(

@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
 import { patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
+import { loadOpenIntakeReviews } from '@/lib/services/intake-open-review';
 
 type SubmissionRow = {
   id: string;
@@ -111,19 +112,20 @@ export async function GET() {
     .sort((a, b) => Number(b.can_auto_close) - Number(a.can_auto_close) || b.total - a.total)
     .slice(0, 20);
 
-  const manualReview = rows
-    .filter((row) => typeof row.ivoris_sync_error === "string" && row.ivoris_sync_error.startsWith("MANUAL_REVIEW:"))
+  let openReviews;
+  try { openReviews = await loadOpenIntakeReviews(db); }
+  catch { return NextResponse.json({ error: 'intake_review_read_failed' }, { status: 503 }); }
+  const manualReview = openReviews
     .map((row) => ({
       id: row.id,
       patient_name: `${row.vorname ?? ""} ${row.nachname ?? ""}`.trim(),
       geburtsdatum: row.geburtsdatum,
       created_at: row.created_at,
       status: row.status,
-      reason: stripManualReviewPrefix(row.ivoris_sync_error),
+      reason: stripManualReviewPrefix(row.ivoris_sync_error || row.ivoris_document_error),
       matched_patient_id: row.matched_patient_id,
       ivoris_patient_id: row.ivoris_patient_id,
-    }))
-    .slice(0, 20);
+    }));
 
   const patientGroups = new Map<string, PatientRow[]>();
   for (const patient of (patientsResult.data ?? []) as PatientRow[]) {

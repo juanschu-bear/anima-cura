@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   let fetched = 0;
   let upserted = 0;
   let skipped = 0;
+  let deferred = 0;
   let done = false;
   const errors: string[] = [];
 
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
       fetched += json.results?.fetched ?? 0;
       upserted += json.results?.upserted ?? 0;
       skipped += json.results?.skipped ?? 0;
+      deferred += json.results?.deferred ?? 0;
       if (Array.isArray(json.errors)) errors.push(...json.errors);
       if (json.done || json.nextPage === null || json.nextPage === undefined) {
         done = true;
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    results: { fetched, upserted, skipped, done },
+    results: { fetched, upserted, skipped, deferred, done },
     errors: errors.slice(0, 20),
     duration_ms: Date.now() - startTime,
   });

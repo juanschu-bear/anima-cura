@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { findPotentialDuplicateCandidates, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
+import { splitPatientImport, resolveValidPatientImports } from '@/lib/services/patient-import-review';
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
@@ -105,6 +106,7 @@ export async function GET(request: Request) {
   let totalFetched = 0;
   let totalUpserted = 0;
   let totalSkipped = 0;
+  let totalDeferred = 0;
   let reachedEnd = false;
   const errors: string[] = [];
 
@@ -124,8 +126,10 @@ export async function GET(request: Request) {
 
     totalFetched += patients.length;
 
+    const split = await splitPatientImport(db, patients);
+    totalDeferred += split.deferred;
     const normalizedRows: BatchPatientRow[] = [];
-    for (const raw of patients) {
+    for (const raw of split.valid) {
       const normalized = normalizePatient(raw);
       if (!normalized) { totalSkipped++; continue; }
       normalizedRows.push(normalized);
@@ -193,6 +197,7 @@ export async function GET(request: Request) {
 
       if (knownAliasIds.has(row.ivoris_id)) {
         totalUpserted += 1;
+        await resolveValidPatientImports(db, [String(row.ivoris_id)]);
         queuedIdentityKeys.add(identityKey);
         continue;
       }
@@ -256,6 +261,7 @@ export async function GET(request: Request) {
             errors.push(`Seite ${page}: Dublette konnte nicht verknuepft werden fuer ${row.vorname} ${row.nachname}: ${linkError.message}`);
           } else {
             totalUpserted += 1;
+            await resolveValidPatientImports(db, [row.ivoris_id]);
           }
           continue;
         }
@@ -283,6 +289,7 @@ export async function GET(request: Request) {
       totalSkipped += rows.length;
     } else {
       totalUpserted += rows.length;
+      await resolveValidPatientImports(db, rows.map(row => String(row.ivoris_id)));
     }
 
     await new Promise((r) => setTimeout(r, 150));
@@ -293,7 +300,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     batch: { startPage },
-    results: { fetched: totalFetched, upserted: totalUpserted, skipped: totalSkipped },
+    results: { fetched: totalFetched, upserted: totalUpserted, skipped: totalSkipped, deferred: totalDeferred },
     errors: errors.slice(0, 20),
     done: reachedEnd,
     nextPage,

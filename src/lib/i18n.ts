@@ -7,6 +7,19 @@
 
 import { treatmentTranslations } from './treatment-i18n';
 const translations: Record<string, { de: string; en: string }> = {
+  'intake.requiredFields': { de: 'Bitte prüfe die markierten Pflichtangaben, insbesondere das vollständige Geburtsdatum. Deine Eingaben bleiben erhalten.', en: 'Please check the marked required fields, including the complete date of birth. Your entries have been preserved.' },
+  'intake.importTitle': { de: 'Zurückgestellte Patientenimporte', en: 'Patient imports awaiting review' },
+  'intake.importHelp': { de: 'Geburtsdatum im Praxissystem ergänzen oder korrigieren. Nach einem erfolgreichen erneuten Import wird der Fall automatisch geschlossen. Gültige Zeilen werden unabhängig verarbeitet.', en: 'Complete or correct the date of birth in the practice system. The case closes automatically after a successful subsequent import. Valid rows are processed independently.' },
+  'intake.birthdate_missing': { de: 'Geburtsdatum fehlt – nicht übernommen', en: 'Date of birth missing — not imported' },
+  'intake.birthdate_invalid': { de: 'Geburtsdatum ungültig – nicht übernommen', en: 'Invalid date of birth — not imported' },
+  'intake.reviewLoadError': { de: 'Die Prüffälle konnten nicht geladen werden. Bitte erneut versuchen.', en: 'Review cases could not be loaded. Please try again.' },
+  'intake.reviewLoading': { de: 'Prüffälle werden geladen …', en: 'Loading review cases …' },
+  'intake.reviewEmpty': { de: 'Keine zurückgestellten Importe.', en: 'No imports awaiting review.' },
+  'intake.reviewRetry': { de: 'Erneut laden', en: 'Retry' },
+  'intake.previous': { de: 'Zurück', en: 'Previous' },
+  'intake.next': { de: 'Weiter', en: 'Next' },
+  'intake.reviewPage': { de: 'Seite {page} von {pages} · {total} offene Fälle', en: 'Page {page} of {pages} · {total} open cases' },
+  'intake.externalId': { de: 'Praxis-ID', en: 'Practice ID' },
   ...treatmentTranslations,
   "dispatch.crm.title": { de: "Patienten & Kommunikation", en: "Patients & communication" },
   "dispatch.crm.selectEmail": { de: "E-Mail auswählen", en: "Select an email" },

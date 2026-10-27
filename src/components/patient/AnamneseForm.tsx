@@ -703,6 +703,14 @@ export function AnamneseForm({ patientId }: Props) {
       const res = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        if (Array.isArray(res?.fields)) {
+          const fields = res.fields.filter((key: unknown): key is string => typeof key === 'string');
+          setFehlen(fields);
+          const first = fields[0];
+          const target = (Object.entries(PFLICHT) as [StepName,string[]][]).find(([,keys])=>keys.includes(first))?.[0]
+            ?? (first?.startsWith('vp_') ? 'versicherter' : first?.startsWith('zahler_') || first?.startsWith('vn_') ? 'zahler' : 'patient');
+          setStepName(target); scrollTop();
+        }
         throw new Error(res?.error || "Anamnese-Übermittlung fehlgeschlagen.");
       }
 
