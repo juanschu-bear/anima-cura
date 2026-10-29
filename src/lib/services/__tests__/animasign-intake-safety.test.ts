@@ -39,6 +39,25 @@ test('server validates required fields and exact calendar birthdate before any p
   assert.ok(route.indexOf('validateIntakeAnswers(answers)') < route.indexOf('const supabase = createServerClient();',route.indexOf('export async function POST')));
   assert.match(route,/status: 422/);
 });
+test('review follow-up removes inherited table defaults without changing existing rows or global defaults',async()=>{
+  const db=new PGlite();
+  try{
+    await db.exec('CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE ROLE abrechnung_runtime;ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO service_role;');
+    await db.exec(await readFile('supabase/migrations/065_patient_import_reviews.sql','utf8'));
+    await db.exec("INSERT INTO public.patient_import_reviews(source,external_id,first_name,last_name,reason) VALUES('ivoris','synthetic','Synthetic','Patient','birthdate_missing');");
+    const before=(await db.query('SELECT * FROM public.patient_import_reviews')).rows;
+    const defaults=(await db.query('SELECT defaclrole,defaclnamespace,defaclobjtype,defaclacl::text FROM pg_default_acl ORDER BY oid')).rows;
+    assert.equal((await db.query<{allowed:boolean}>("SELECT has_table_privilege('service_role','public.patient_import_reviews','DELETE') AS allowed")).rows[0].allowed,true);
+    const fix=await readFile('supabase/migrations/067_patient_import_review_privileges.sql','utf8');
+    await db.exec(fix);await db.exec(fix);
+    assert.deepEqual((await db.query('SELECT * FROM public.patient_import_reviews')).rows,before);
+    assert.deepEqual((await db.query('SELECT defaclrole,defaclnamespace,defaclobjtype,defaclacl::text FROM pg_default_acl ORDER BY oid')).rows,defaults);
+    for(const permission of ['SELECT','INSERT','UPDATE'])assert.equal((await db.query<{allowed:boolean}>(`SELECT has_table_privilege('service_role','public.patient_import_reviews','${permission}') AS allowed`)).rows[0].allowed,true);
+    for(const permission of ['DELETE','TRUNCATE','REFERENCES','TRIGGER'])assert.equal((await db.query<{allowed:boolean}>(`SELECT has_table_privilege('service_role','public.patient_import_reviews','${permission}') AS allowed`)).rows[0].allowed,false);
+    for(const role of ['anon','authenticated','abrechnung_runtime'])assert.equal((await db.query<{allowed:boolean}>(`SELECT has_table_privilege('${role}','public.patient_import_reviews','SELECT') AS allowed`)).rows[0].allowed,false);
+    await db.exec('SET ROLE service_role');await assert.rejects(db.query('DELETE FROM public.patient_import_reviews'),/permission denied/);await assert.rejects(db.exec('TRUNCATE public.patient_import_reviews'),/permission denied/);
+  }finally{await db.close();}
+});
 test('mixed import quarantines invalid rows before valid upsert, never fabricates dates, and closes only explicitly successful IDs', async () => {
   const saved:any[]=[];let resolved:any;
   const db:any={from:(table:string)=>{assert.equal(table,'patient_import_reviews');return {upsert:async(value:any,options:any)=>{saved.push({value,options});return {error:null};},update:(value:any)=>({eq:()=>({eq:()=>({in:async(_:string,ids:string[])=>{resolved={value,ids};return {error:null};}})})})};}};
