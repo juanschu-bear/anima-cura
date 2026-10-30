@@ -1756,7 +1756,7 @@ export default function ScribeCockpit({
                     <ul className="suchliste">
                       {treffer.map((t) => (
                         <li key={t.id}>
-                          <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
+                          <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(true); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
                         </li>
                       ))}
                     </ul>
@@ -1822,7 +1822,7 @@ export default function ScribeCockpit({
             </section>
 
             <section className="termin-panel termin-panel-breit">
-              <ScribeRoomPicker value={zimmerVersionId} onChange={id=>{setZimmerVersionId(id);bearbeitet();}} legacy={!!entwurfId || !!bestaetigt} disabled={sendet || speichert || !patient} />
+              <ScribeRoomPicker value={zimmerVersionId} onChange={id=>{setZimmerVersionId(id);bearbeitet();}} legacy={!!entwurfId || !!bestaetigt} disabled={sendet || speichert} />
             </section>
             <section className="termin-panel termin-panel-breit">
               <span className="stufe">Leistungen in dieser Sitzung · stapelbar</span>

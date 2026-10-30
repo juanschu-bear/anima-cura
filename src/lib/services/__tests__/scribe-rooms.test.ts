@@ -4,6 +4,14 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { currentRooms, roomInputError } from '../../scribe-rooms';
 
+test('room can be selected before the patient; explicit patient switch still clears it',async()=>{
+  const ui=await readFile('src/app/scribe/ScribeCockpit.tsx','utf8');
+  assert.match(ui,/disabled=\{sendet \|\| speichert\} \/>/);
+  assert.doesNotMatch(ui,/disabled=\{sendet \|\| speichert \|\| !patient\}/);
+  assert.match(ui,/setPatient\(t\); setTreffer\(\[\]\); resetSitzung\(true\)/);
+  assert.match(ui,/setPatient\(null\); setSuche\(""\); resetSitzung\(\)/);
+});
+
 test('room input rejects malformed and missing values; legacy absence remains valid',()=>{
   for(const value of [undefined,null,'',{},42,'Zimmer 1']) assert.ok(roomInputError(value,true));
   assert.equal(roomInputError(null,false),null);
