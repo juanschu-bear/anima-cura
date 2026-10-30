@@ -7,6 +7,21 @@
 
 import { treatmentTranslations } from './treatment-i18n';
 const translations: Record<string, { de: string; en: string }> = {
+  'scribe.room.label': { de: 'Zimmer', en: 'Room' },
+  'scribe.room.required': { de: 'Bitte vor dem Speichern ein Zimmer auswählen.', en: 'Please choose a room before saving.' },
+  'scribe.room.choose': { de: 'Zimmer auswählen …', en: 'Choose a room …' },
+  'scribe.room.unknown': { de: 'Zimmer unbekannt (bestehender Eintrag)', en: 'Room unknown (existing entry)' },
+  'scribe.room.invalid': { de: 'Bitte eine gültige Zimmerangabe wählen.', en: 'Please choose a valid room.' },
+  'scribe.room.loadError': { de: 'Zimmerliste nicht verfügbar. Bitte erneut laden.', en: 'Room list unavailable. Please reload.' },
+  'scribe.room.saveError': { de: 'Zimmer nicht gespeichert. Bitte Liste neu laden und erneut versuchen.', en: 'Room not saved. Reload the list and try again.' },
+  'scribe.room.manage': { de: 'Zimmerliste pflegen', en: 'Manage rooms' },
+  'scribe.room.name': { de: 'Zimmername', en: 'Room name' },
+  'scribe.room.active': { de: 'Für neue Einträge verfügbar', en: 'Available for new entries' },
+  'scribe.room.save': { de: 'Zimmer speichern', en: 'Save room' },
+  'scribe.room.new': { de: 'Neues Zimmer', en: 'New room' },
+  'scribe.room.retry': { de: 'Neu laden', en: 'Reload' },
+  'scribe.room.created': { de: 'Erstellt', en: 'Created' },
+  'scribe.room.historyWarning': { de: 'Eintrag gespeichert, aber die Versionshistorie ist unvollständig. Bitte nicht erneut anlegen; den Eintrag durch die Praxisleitung prüfen lassen.', en: 'Entry saved, but version history is incomplete. Do not create it again; ask practice management to review this entry.' },
   'intake.requiredFields': { de: 'Bitte prüfe die markierten Pflichtangaben, insbesondere das vollständige Geburtsdatum. Deine Eingaben bleiben erhalten.', en: 'Please check the marked required fields, including the complete date of birth. Your entries have been preserved.' },
   'intake.importTitle': { de: 'Zurückgestellte Patientenimporte', en: 'Patient imports awaiting review' },
   'intake.importHelp': { de: 'Geburtsdatum im Praxissystem ergänzen oder korrigieren. Nach einem erfolgreichen erneuten Import wird der Fall automatisch geschlossen. Gültige Zeilen werden unabhängig verarbeitet.', en: 'Complete or correct the date of birth in the practice system. The case closes automatically after a successful subsequent import. Valid rows are processed independently.' },

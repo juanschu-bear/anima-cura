@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
+import { roomInputError } from '@/lib/scribe-rooms';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type VersionBody = {
+  zimmer_version_id?: string | null;
   text: string;
   zaehne?: string[];
   variablen?: Record<string, unknown>;
@@ -66,8 +68,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (loadError || !alt) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
 
   const neueVersion = (alt.version as number) + 1;
+  const roomError = roomInputError(body.zimmer_version_id, false);
+  if (roomError) return NextResponse.json({ error: roomError }, { status: 422 });
 
   const update = {
+    ...(body.zimmer_version_id !== undefined ? { zimmer_version_id: body.zimmer_version_id || null } : {}),
     text: body.text.trim(),
     zaehne: body.zaehne ?? alt.zaehne,
     variablen: body.variablen ?? alt.variablen,
@@ -88,10 +93,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .from("doku_eintraege")
     .update(update)
     .eq("id", params.id)
+    .eq("version", alt.version)
     .select("*")
     .single();
 
-  if (updError) return NextResponse.json({ error: updError.message }, { status: 500 });
+  if (updError) return NextResponse.json({ error: updError.message }, { status: updError.code === 'PGRST116' ? 409 : 500 });
 
   const { error: vError } = await supabase.from("doku_eintrag_versionen").insert({
     eintrag_id: eintrag.id,

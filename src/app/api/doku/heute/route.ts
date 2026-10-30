@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("doku_eintraege")
     .select(
-      "id, termin_datum, behandlungsart, termin_typ, status, version, text, zaehne, positionen, ivoris_push_status, ivoris_fehler, ivoris_entry_id, ivoris_error_class, ivoris_retry_count, ivoris_next_retry_at, bestaetigt_am, patient_id, vorlage_id, auswahl, variablen, ausnahme_freitext, patients ( id, vorname, nachname, geburtsdatum )"
+      "id, created_at, zimmer_version_id, termin_datum, behandlungsart, termin_typ, status, version, text, zaehne, positionen, ivoris_push_status, ivoris_fehler, ivoris_entry_id, ivoris_error_class, ivoris_retry_count, ivoris_next_retry_at, bestaetigt_am, patient_id, vorlage_id, auswahl, variablen, ausnahme_freitext, patients ( id, vorname, nachname, geburtsdatum )"
     )
     .eq("termin_datum", datum)
     .neq("status", "verworfen")
@@ -32,7 +32,13 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const eintraege = data ?? [];
+  const roomIds = Array.from(new Set((data ?? []).map(e=>e.zimmer_version_id).filter(Boolean)));
+  const { data: rooms, error: roomError } = roomIds.length
+    ? await supabase.from('scribe_room_versions').select('id,name').in('id',roomIds)
+    : { data: [], error: null };
+  if (roomError) return NextResponse.json({error: 'Zimmerliste konnte nicht geladen werden.'}, {status:503});
+  const names = new Map((rooms ?? []).map(r=>[r.id,r.name]));
+  const eintraege = (data ?? []).map(e=>({...e,zimmer_name:names.get(e.zimmer_version_id) ?? null}));
   const offen = eintraege.filter((e) => e.status === "entwurf").length;
   const pushFehler = eintraege.filter((e) => e.ivoris_push_status === "fehler").length;
 
