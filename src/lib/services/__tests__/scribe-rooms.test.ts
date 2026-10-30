@@ -58,6 +58,21 @@ test('room migration: required new entries, unchanged legacy, append-only histor
       for(const fn of ['scribe_entry_room_guard','scribe_history_room_guard','scribe_room_catalog_guard']) assert.equal((await db.query<{ok:boolean}>(`SELECT has_function_privilege($1,$2,'EXECUTE') ok`,[role,fn+'()'])).rows[0].ok,false);
       assert.equal((await db.query<{ok:boolean}>(`SELECT has_table_privilege($1,'scribe_room_versions','DELETE') ok`,[role])).rows[0].ok,false);
     }
+    const legacyBefore = await db.query('SELECT id,zimmer_version_id FROM doku_eintraege ORDER BY id');
+    const locations = await readFile('supabase/migrations/069_scribe_activity_locations.sql','utf8');
+    await db.exec(locations);
+    await db.exec(locations); // safe repeat, no duplicate places
+    assert.deepEqual((await db.query('SELECT id,zimmer_version_id FROM doku_eintraege ORDER BY id')).rows,legacyBefore.rows);
+    const places=(await db.query<{id:string;name:string}>("SELECT id,name FROM scribe_room_versions WHERE room_id::text LIKE '06900000-%' ORDER BY name")).rows;
+    assert.equal(places.length,3);
+    assert.deepEqual(places.map(p=>p.name),['Anmeldung / Empfang','Ohne festen Ort / nachträgliche Dokumentation','Röntgen']);
+    for(const place of places) await db.query('INSERT INTO doku_eintraege(zimmer_version_id) VALUES($1)',[place.id]);
+    await db.exec(await readFile('docs/reports/scribe-activity-locations-069-rollback.sql','utf8'));
+    await db.exec(await readFile('docs/reports/scribe-activity-locations-069-rollback.sql','utf8'));
+    for(const place of places){
+      await assert.rejects(db.query('INSERT INTO doku_eintraege(zimmer_version_id) VALUES($1)',[place.id]),/Zimmerliste geändert/);
+      await db.query("UPDATE doku_eintraege SET status='bestaetigt' WHERE zimmer_version_id=$1",[place.id]);
+    }
     await db.exec(await readFile('docs/reports/scribe-rooms-068-rollback.sql','utf8'));
     await db.exec('INSERT INTO doku_eintraege DEFAULT VALUES');
     assert.equal((await db.query('SELECT zimmer_version_id FROM doku_eintrag_versionen')).rows[0].zimmer_version_id,room.id);

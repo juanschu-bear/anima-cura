@@ -40,14 +40,15 @@ export default function ScribeRoomPicker({ value, onChange, legacy = false, disa
   return <section aria-label={t('scribe.room.label')} style={{padding:'12px 16px',border:'1px solid var(--kante, #93a69c)',borderRadius:12,background:'var(--flaeche-flach, #152c32)',color:'var(--schrift, #f1f5f4)',maxWidth:540,width:'100%',minWidth:0}}>
     <label htmlFor={id} style={{display:'block',fontWeight:600,marginBottom:6}}>{t('scribe.room.label')}{!legacy && ' *'}</label>
     <div style={{position:'relative',minWidth:0}}>
-    <select id={id} value={value} required={!legacy} disabled={loading || disabled || busy} onChange={e=>onChange(e.target.value)} style={{appearance:'none',width:'100%',minWidth:0,minHeight:44,padding:'10px 42px 10px 12px',color:'inherit',background:'var(--grund, #152c32)',border:'1px solid var(--kante-hover, #93a69c)',borderRadius:8,textOverflow:'ellipsis'}}>
+    <select id={id} aria-describedby={`${id}-help${error ? ` ${id}-error` : ''}`} value={value} required={!legacy} disabled={loading || disabled || busy} onChange={e=>onChange(e.target.value)} style={{appearance:'none',width:'100%',minWidth:0,minHeight:44,padding:'10px 42px 10px 12px',color:'inherit',background:'var(--grund, #152c32)',border:'1px solid var(--kante-hover, #93a69c)',borderRadius:8,textOverflow:'ellipsis'}}>
       <option value="" disabled={!legacy || !!value}>{t(legacy ? 'scribe.room.unknown':'scribe.room.choose')}</option>
       {selected && !rooms.some(r=>r.id===value && r.active) && <option value={value}>{selected.name}</option>}
       {rooms.filter(r=>r.active).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
     </select>
     <ChevronDown aria-hidden="true" size={18} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} />
     </div>
-    {error && <p role="alert">{error}</p>}
+    <p id={`${id}-help`} style={{fontSize:13,marginTop:8}}>{t('scribe.room.help')}</p>
+    {error && <p id={`${id}-error`} role="alert">{error}</p>}
     <button type="button" disabled={loading || busy} onClick={()=>void load()} style={{minHeight:36,padding:'4px 0',fontSize:13,color:'var(--gedeckt, #c2d3cf)'}}>{t('scribe.room.retry')}</button>
     {canManage && <details style={{marginTop:8}}><summary>{t('scribe.room.manage')}</summary>
       <select aria-label={t('scribe.room.manage')} disabled={busy} value={editing?.id ?? ''} onChange={e=>{const r=rooms.find(r=>r.id===e.target.value) ?? null;setEditing(r);setName(r?.name ?? '');setActive(r?.active ?? true);}} style={{color:'#122c30',background:'#fff',width:'100%',padding:8}}>
