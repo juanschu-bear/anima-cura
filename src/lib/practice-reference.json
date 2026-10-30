@@ -1,0 +1,2113 @@
+{
+  "source": "anima-cura-abrechnung-prototyp-verbindlich-2026-10-15.html",
+  "sourceDate": "2026-10-15",
+  "sourceSha256": "5020e1a7ab3d56ecc839aa0488585f98ab04cba7fb2ac70c95dcda6e4427b368",
+  "catalog": {
+    "bema3": {
+      "title": "BEMA Teil 3, Kieferorthopädie",
+      "sub": "Kassenpatienten. Alle 34 Abrechnungsnummern, Punkte laut BEMA 01.01.2026.",
+      "sch": "BEMA",
+      "cols": [
+        "Nr.",
+        "Klartext",
+        "Punkte",
+        "Regeln",
+        "Muss dokumentiert sein"
+      ],
+      "rows": [
+        [
+          "5",
+          "KFO-Behandlungsplanung: Therapiekonzept, Aufklärung, Plan",
+          "95",
+          "1x je Plan; entsteht mit Planerstellung; nicht bei Verlängerung, Therapieänderung, Ergänzung, Retentionsplanung; laut BEMA nicht neben 121 und 123a, laut KZV Berlin auch nicht neben 122a bis c, 123b, 124",
+          "Befundorientiertes Konzept, Aufklärung, Plan; Dokumentation dem Patienten anbieten, auf Wunsch aushändigen"
+        ],
+        [
+          "116",
+          "Profil- oder En-face-Foto mit Auswertung, je Aufnahme",
+          "15",
+          "bis 4x je Behandlung; darüber Zusatzleistung",
+          "Diagnostische Auswertung; Indikation nach KFO-RL B.5 e"
+        ],
+        [
+          "117",
+          "Modellanalyse, je 7a",
+          "35",
+          "bis 3x, kombiniert KFO/Kieferchirurgie 4x; Grenze entfällt bei früher Behandlung von LKG, skelettal offenem Biss, Progenie, Trauma; auch digitale Modelle",
+          "Metrische oder graphische Analyse, Diagramme"
+        ],
+        [
+          "118",
+          "Kephalometrische Auswertung, je FRS",
+          "29",
+          "höchstens 2x, begründet 3x; Frühbehandlung mit verkürzter Dauer nur bei skelettaler Dysgnathie 1x",
+          "Durchzeichnung, schriftliche Auswertung"
+        ],
+        [
+          "119a, b, c, d",
+          "Umformung eines Kiefers inkl. Retention",
+          "132, 204, 276, 336",
+          "je Kiefer; Stufe aus Punkteschema (Abschnitt 2.2); Abschläge 11, 17, 23, 28 je Quartal; höchstens 12; deckt bis 16 Behandlungsquartale",
+          "Plan mit Kriterien I bis V; Genehmigung; mindestens 1 KFO-Leistung im Kalenderquartal"
+        ],
+        [
+          "120a, b, c, d",
+          "Einstellung des Unterkiefers in den Regelbiss (Bisslage) inkl. Retention",
+          "204, 228, 276, 336",
+          "1x je Fall; Abschläge 17, 19, 23, 28",
+          "wie 119, Kriterien I bis IV"
+        ],
+        [
+          "121",
+          "Habits abgewöhnen, je Sitzung",
+          "17",
+          "bis 6x in 6 Monaten, danach ausgeschlossen; nur bei D5 oder O4; kein Plan, kein Röntgen; nicht neben 119/120",
+          "Habit, KIG-Befund"
+        ],
+        [
+          "122a",
+          "Kontrolle als alleinige Leistung, je Sitzung",
+          "21",
+          "nur ohne laufende 119/120 (Vertretung, Notdienst, individuelle Mundvorhofplatte)",
+          "Anlass"
+        ],
+        [
+          "122b",
+          "Vorbereitung eines Behandlungsmittels, je Kiefer, alleinige Leistung",
+          "43",
+          "nicht neben 119/120",
+          "Kiefer, Gerät"
+        ],
+        [
+          "122c",
+          "Einfügen eines Behandlungsmittels, je Kiefer, alleinige Leistung",
+          "27",
+          "nicht neben 119/120",
+          "Kiefer, Gerät"
+        ],
+        [
+          "123a",
+          "Herausnehmbarer Lückenhalter, je Kiefer",
+          "40",
+          "kein Plan, keine Nr. 5; nicht neben 119/120; Material und Labor extra; daneben nur OPG, wenn nicht schon erbracht; Frontzahnlücken über Kinderprothese",
+          "Kiefer, Milchzahnverlust"
+        ],
+        [
+          "123b",
+          "Kontrolle des Lückenhalters, je Quartal",
+          "14",
+          "1x je Behandlungsquartal",
+          "Kontrolle"
+        ],
+        [
+          "124",
+          "Einschleifen von Milchzähnen bei Kreuz- oder Zwangsbiss, je Sitzung",
+          "16",
+          "bis 2x; nicht neben 119/120",
+          "Zähne"
+        ],
+        [
+          "125",
+          "Wiederherstellung eines Behandlungsmittels inkl. Wiedereinfügen, je Kiefer",
+          "30",
+          "auch neben 119/120; nur Draht- oder Basisteile; Änderung und Aktivierung (Schraube, Feder) sind abgegolten; keine Unterfütterung; Bänder über 126c, Bögen über 129",
+          "Welches Draht- oder Basisteil, Kiefer"
+        ],
+        [
+          "126a",
+          "Bracket oder Attachment aus Edelstahl oder nickelfreiem Metall inkl. Material und Labor",
+          "18",
+          "je Stück; Neukleben ist erneut 126a, als Ersatz \"außerplanmäßig\" kennzeichnen; UK-Retainer 1x bis 6x 126a plus 1x 127a nur bei E3/E4 in der UK-Front; andere Bracketarten sind Mehrleistung",
+          "Zahn (FDI), Bracketart und Material"
+        ],
+        [
+          "126b",
+          "Band inkl. Material und Labor",
+          "42",
+          "je Stück; in der Regel 1x Band oder Bracket je Zahn; angeschweißte Röhrchen inklusive; neben 130 2x, neben 131a und 131b je bis 4x",
+          "Zahn; Grund bei Wiederholung"
+        ],
+        [
+          "126c",
+          "Wiedereingliederung eines Bandes (Reparatur)",
+          "30",
+          "nur Bänder; nicht bei unveränderter Wiedereingliederung; keine BEMA-Höchstzahl, kein Planfeld; neben 126d regional unterschiedlich",
+          "Grund (gelockert), Zahn"
+        ],
+        [
+          "126d",
+          "Entfernung von Band, Bracket oder Attachment",
+          "6",
+          "je Teil; Keramik und Lingual als Mehrleistung; bei Retainer nur innerhalb der vertraglichen Retentionszeit",
+          "Zahn, Teil"
+        ],
+        [
+          "127a",
+          "Teilbogen aus Edelstahl inkl. Material und Labor",
+          "25",
+          "je Teilbogen; anderes Material ist Mehrleistung",
+          "Kiefer, Region, Material"
+        ],
+        [
+          "127b",
+          "Ausgliederung eines Teilbogens",
+          "7",
+          "bei definitiver Entfernung oder Wechsel; nicht beim UK-Retainer",
+          "Kiefer"
+        ],
+        [
+          "128a",
+          "Konfektionierter Vollbogen aus Edelstahl inkl. Material und Labor",
+          "32",
+          "je Bogen; anderes Material ist Mehrleistung; keine BEMA-Höchstzahl",
+          "Kiefer, Material, Stärke"
+        ],
+        [
+          "128b",
+          "Individualisierter Vollbogen aus Edelstahl inkl. Material und Labor",
+          "40",
+          "mindestens 3 Biegungen 2. Ordnung oder 1 Biegung 3. Ordnung",
+          "Art und Ort der Biegungen"
+        ],
+        [
+          "128c",
+          "Ausgliederung von Vollbögen, je Bogen",
+          "9",
+          "auch 2x für die Ausgliederung einer 130-Apparatur; nicht neben 129 am selben Bogen",
+          "Kiefer"
+        ],
+        [
+          "129",
+          "Wiedereingliederung eines Voll- oder Teilbogens (Reparatur)",
+          "24",
+          "ausgeschlossen bei unveränderter Wiedereingliederung und beim Aktivieren; nicht neben 128c; kein Planfeld",
+          "Grund (deformiert, gebrochen)"
+        ],
+        [
+          "130",
+          "Ergänzende festsitzende Apparatur: Palatinal- oder Transversalbogen, Quadhelix, Lingualbogen, Lipbumper, Headgear über 2 Ankerbänder",
+          "72",
+          "Aufzählung abschließend; daneben 2x 126b; Material und Labor der extraoralen Fixierung extra; Ausgliederung 2x 128c; andere Apparaturen sind Zusatzleistung",
+          "Apparaturtyp, Ankerbänder"
+        ],
+        [
+          "131a",
+          "Gaumennahterweiterung (GNE), Ein- und Ausgliederung",
+          "50",
+          "daneben bis 4x 126b; Material und Labor extra; gegossen oder implantatgestützt ist Zusatzleistung",
+          "Apparatur"
+        ],
+        [
+          "131b",
+          "Herbstscharnier, je Seite",
+          "50",
+          "nur bei spätem Beginn, überschrittenem Wachstumshöhepunkt, konventionell nicht erreichbar; je Seite bis 4x 126b; nicht im Verlängerungsfall beantragen",
+          "Indikation ausdrücklich belegen"
+        ],
+        [
+          "131c",
+          "Gesichtsmaske",
+          "50",
+          "Material und Labor extra",
+          "Apparatur"
+        ]
+      ]
+    },
+    "bema12": {
+      "title": "BEMA Teil 1 und 2 in der KFO-Praxis",
+      "sub": "Untersuchung, Abformung, Separieren, Röntgen, Prophylaxe. Röntgen ohne Eigenanteil.",
+      "sch": "BEMA",
+      "cols": [
+        "Nr.",
+        "Klartext",
+        "Punkte",
+        "Regeln",
+        "Muss dokumentiert sein"
+      ],
+      "rows": [
+        [
+          "01k",
+          "KFO-Untersuchung zu Indikation und Zeitpunkt, ggf. KIG",
+          "28",
+          "frühestens nach 6 Monaten erneut; nur durch die planende Praxis; nicht neben 01; ohne GKV-Anspruch Kennzeichen \"KIG(Gruppe/Grad)\"",
+          "Anamnese, extra- und intraorale Untersuchung, Kieferrelation, Dentitionsstadium, Aufklärung, Befund, ggf. KIG"
+        ],
+        [
+          "01 (U)",
+          "Eingehende Untersuchung",
+          "18",
+          "in KFO nur für andere Zwecke; 1x je Kalenderhalbjahr, frühestens nach 4 Monaten",
+          "Befund (c, f, z usw.), Zweck"
+        ],
+        [
+          "Ä1 (Ber)",
+          "Beratung",
+          "9",
+          "in KFO nur für andere Zwecke; nicht neben 01",
+          "Zweck"
+        ],
+        [
+          "7a",
+          "Abformung, Bissnahme für 3D-orientierte Planungsmodelle",
+          "19",
+          "nur KFO; bis 3x, kombiniert 4x; Abformpauschale 2,80 EUR je Abformung; Arbeitsmodelle nur Material und Labor",
+          "schriftliche Niederlegung"
+        ],
+        [
+          "7aD",
+          "7a digital (Intraoralscan)",
+          "19 als Sachleistung",
+          "Mehrleistung, Kennzeichen \"D\"; keine Abformpauschale, kein Material und Labor an die KZV; im Plan als 7a; Modelle für Gutachter nicht zulasten des Patienten",
+          "Vordruck 4d"
+        ],
+        [
+          "12 (bmf)",
+          "Separieren, je Sitzung, je Kieferhälfte oder Frontzahnbereich",
+          "10",
+          "laut KZV Berlin in KFO nur zum Separieren vor 126b",
+          "Region"
+        ],
+        [
+          "40 (I), 41a (L1), 41b (L2)",
+          "Infiltrations- und Leitungsanästhesie",
+          "8, 12, 16",
+          "41 nur, wenn 40 nicht reicht",
+          "Zahn"
+        ],
+        [
+          "63 (Fl)",
+          "Freilegung eines retinierten Zahnes zur KFO-Einstellung",
+          "80",
+          "meist durch Chirurgie",
+          "Zahn"
+        ],
+        [
+          "8 (ViPr), 105 (Mu), 106 (sK), 107 (Zst)",
+          "Sensibilitätsprüfung, Schleimhautbehandlung, scharfe Kanten, Zahnstein",
+          "6, 8, 10, 16",
+          "107 1x je Kalenderjahr; kein Eigenanteil (KCH)",
+          "Befund"
+        ],
+        [
+          "02 (Ohn), 03 (Zu), 04 (PSI)",
+          "Ohnmacht, Zuschlag außerhalb der Sprechstunde, PSI",
+          "20, 15, 12",
+          "03 mit Uhrzeit; 04 alle 2 Jahre",
+          "Uhrzeit, Index"
+        ],
+        [
+          "181a (Ksla), 181b (Kslb)",
+          "Konsil persönlich oder telefonisch, Telekonsil",
+          "14, 16",
+          "ausgeschlossen für Routinebesprechungen und innerhalb einer BAG oder eines MVZ",
+          "Partner, Inhalt"
+        ],
+        [
+          "ePA1, ePA2, eMP, NFD",
+          "Telematikleistungen",
+          "4, 2, 3, 6",
+          "ePA1 1x je Versichertem und ePA sektorübergreifend; ePA2 höchstens 1x je Sitzung",
+          "Vorgang"
+        ],
+        [
+          "IP1",
+          "Mundhygienestatus",
+          "20",
+          "Alter 6 bis 17; 1x je Kalenderhalbjahr; Index beibehalten; mit Hauszahnarzt abstimmen",
+          "Index und Werte im Krankenblatt"
+        ],
+        [
+          "IP2",
+          "Mundgesundheitsaufklärung",
+          "17",
+          "1x je Kalenderhalbjahr; Einzelunterweisung; alle Inhalte binnen 3 Jahren",
+          "Inhalte"
+        ],
+        [
+          "IP4",
+          "Lokale Fluoridierung",
+          "12",
+          "1x je Kalenderhalbjahr, bei hohem Kariesrisiko 2x",
+          ""
+        ],
+        [
+          "IP5",
+          "Fissurenversiegelung 6er und 7er, je Zahn",
+          "16",
+          "Material inklusive",
+          "Zahn"
+        ],
+        [
+          "FU1, FU Pr, FU2, FLA",
+          "Früherkennung bis zum 72. Lebensmonat",
+          "28, 10, 26, 14",
+          "in KFO selten",
+          "Untersuchungsheft"
+        ],
+        [
+          "174a, 174b",
+          "Prävention bei Pflegegrad oder Eingliederungshilfe",
+          "20, 26",
+          "1x je Kalenderhalbjahr; nicht am selben Tag wie IP1, IP2, FU",
+          ""
+        ],
+        [
+          "Ä925a bis d (Rö2, Rö5, Rö8, Stat)",
+          "Zahnfilme bis 2, bis 5, bis 8, Status",
+          "12, 19, 27, 34",
+          "Bissflügel kennzeichnen; kein Eigenanteil",
+          "rechtfertigende Indikation, Befund"
+        ],
+        [
+          "Ä928",
+          "Röntgen der Hand",
+          "30",
+          "nur unter den Bedingungen KFO-RL B.5 d (Wachstumsmaximum, Skelettalter)",
+          "Indikation"
+        ],
+        [
+          "Ä934a, b, c",
+          "Schädel, a auch FRS",
+          "19, 30, 36",
+          "a höchstens 2x, begründet 3x; Frühbehandlung nur skelettal 1x; darüber Zusatzleistung",
+          "Indikation, Befund"
+        ],
+        [
+          "Ä935a, b, c, d",
+          "Teilaufnahmen, d = OPG",
+          "21, 25, 31, 36",
+          "OPG schließt gleichzeitigen Status Ä925d aus; Gelenkaufnahme kennzeichnen; neben 123a nur OPG",
+          "Indikation, Befund"
+        ],
+        [
+          "Ä161 (Inz1)",
+          "Abszesseröffnung",
+          "15",
+          "praktisch selten",
+          ""
+        ]
+      ]
+    },
+    "gozg": {
+      "title": "GOZ Abschnitt G, Kieferorthopädie",
+      "sub": "Privatpatienten und Mehrkosten. Punktwert 5,62421 Cent, Euro beim 2,3-fachen Satz.",
+      "sch": "GOZ",
+      "cols": [
+        "Nr.",
+        "Klartext",
+        "Punkte",
+        "2,3-fach EUR",
+        "Regeln"
+      ],
+      "rows": [
+        [
+          "6000",
+          "Profil- oder En-face-Foto inkl. KFO-Auswertung",
+          "80",
+          "10,35",
+          "mehr als 4x je Behandlung in der Rechnung begründen; intraorale Fotos nur analog"
+        ],
+        [
+          "6010",
+          "Modellanalyse, je 0060",
+          "180",
+          "23,28",
+          "mehrere Methoden: BZÄK einzeln, PKV 1x"
+        ],
+        [
+          "6020",
+          "Untersuchung des Gesichtsschädels (FRS-Auswertung, Wachstumsanalyse)",
+          "360",
+          "46,57",
+          "setzt FRS (GOÄ 5090) voraus"
+        ],
+        [
+          "6030",
+          "Umformung eines Kiefers inkl. Retention, geringer Umfang",
+          "1350",
+          "174,63",
+          "je Kiefer; 4-Jahres-Komplex inkl. Kontrollen, herausnehmbarer Geräte, Aligner, Retention; weniger als 3 Kriterien a bis e"
+        ],
+        [
+          "6040",
+          "dto., mittlerer Umfang",
+          "2100",
+          "271,65",
+          "genau 3 Kriterien"
+        ],
+        [
+          "6050",
+          "dto., hoher Umfang",
+          "3600",
+          "465,68",
+          "4 oder 5 Kriterien"
+        ],
+        [
+          "6060",
+          "Einstellung in den Regelbiss in der Wachstumsphase, gering",
+          "1800",
+          "232,84",
+          "0 Kriterien a bis c"
+        ],
+        [
+          "6070",
+          "dto., mittel",
+          "2600",
+          "336,33",
+          "1 Kriterium"
+        ],
+        [
+          "6080",
+          "dto., hoch",
+          "3600",
+          "465,68",
+          "2 oder 3 Kriterien; neben 6030 bis 6080 keine 6190 bis 6260"
+        ],
+        [
+          "6090",
+          "Alveolärer Ausgleich nach Wachstumsende, je Kiefer",
+          "700",
+          "90,55",
+          "Erwachsene; laut PKV 1x je Kiefer und Fall"
+        ],
+        [
+          "6100",
+          "Klebebracket",
+          "165",
+          "21,34",
+          "je Bracket, auch mehrfach je Zahn; Neukleben erneut; Standardmaterial inklusive; 2197 daneben laut BVerwG nicht"
+        ],
+        [
+          "6110",
+          "Entfernung Klebebracket inkl. Politur",
+          "70",
+          "9,05",
+          "je Bracket; auch Aligner-Attachments"
+        ],
+        [
+          "6120",
+          "Band",
+          "230",
+          "29,75",
+          "je Zahn, auch Rezementieren"
+        ],
+        [
+          "6130",
+          "Entfernung Band inkl. Politur",
+          "20",
+          "2,59",
+          "je Band"
+        ],
+        [
+          "6140",
+          "Teilbogen",
+          "210",
+          "27,16",
+          "je Teilbogen; auch Wiedereingliederung"
+        ],
+        [
+          "6150",
+          "Ungeteilter Bogen, alle Zahngruppen, je Kiefer",
+          "500",
+          "64,68",
+          "je Einsetzen; laut BZÄK auch Wiedereingliederung; Entfernung strittig; NiTi nur als Mehrkosten mit Vereinbarung"
+        ],
+        [
+          "6160",
+          "Intra- oder extraorale Verankerung (z. B. Headgear)",
+          "370",
+          "47,86",
+          "1x je Apparatur; Hilfsmittel extra"
+        ],
+        [
+          "6170",
+          "Kopf-Kinn-Kappe",
+          "500",
+          "64,68",
+          "Hilfsmittel extra"
+        ],
+        [
+          "6180",
+          "Reparatur oder Erweiterung herausnehmbarer Geräte, je Kiefer und Sitzung",
+          "270",
+          "34,93",
+          "festsitzende Reparatur: BZÄK analog, PKV 6100 bis 6150"
+        ],
+        [
+          "6190",
+          "Beratung zur Beseitigung schädlicher Gewohnheiten",
+          "140",
+          "18,11",
+          "nicht neben 0010 in derselben Sitzung"
+        ],
+        [
+          "6200",
+          "Hilfsmittel gegen Funktionsstörungen (z. B. Mundvorhofplatte)",
+          "450",
+          "58,21",
+          "nicht neben 6030 bis 6080"
+        ],
+        [
+          "6210",
+          "Kontrolle oder Weiterführung der Retention, je Sitzung",
+          "90",
+          "11,64",
+          "nicht neben 6030 bis 6080; laut BZÄK erst nach 4 Jahren"
+        ],
+        [
+          "6220",
+          "Vorbereitende Maßnahmen (Abformung, Bissnahme), je Kiefer",
+          "180",
+          "23,28",
+          "außerhalb der Kernpositionen"
+        ],
+        [
+          "6230",
+          "Eingliederung von Behandlungsmitteln, je Kiefer",
+          "180",
+          "23,28",
+          "außerhalb der Kernpositionen; Retainer nach 4 Jahren"
+        ],
+        [
+          "6240",
+          "Offenhalten einer Lücke",
+          "270",
+          "34,93",
+          "je Lücke"
+        ],
+        [
+          "6250",
+          "Beseitigung des Diastemas, selbstständig",
+          "450",
+          "58,21",
+          ""
+        ],
+        [
+          "6260",
+          "Einordnung eines verlagerten Zahnes, selbstständig",
+          "1100",
+          "142,29",
+          "je Zahn"
+        ]
+      ]
+    },
+    "gozx": {
+      "title": "GOZ und GOÄ außerhalb von Abschnitt G",
+      "sub": "Was KFO-Praxen privat zusätzlich abrechnen, etwa Röntgen, Prophylaxe, Versiegelung.",
+      "sch": "GOZ",
+      "cols": [
+        "Nr.",
+        "Klartext",
+        "Punkte",
+        "Schwelle EUR",
+        "Regeln"
+      ],
+      "rows": [
+        [
+          "GOZ 0010",
+          "Eingehende Untersuchung inkl. Parodontalbefund",
+          "100",
+          "12,94 (2,3x)",
+          "nicht neben 6190 in derselben Sitzung; in laufender 6030 bis 6080 strittig"
+        ],
+        [
+          "GOZ 0040",
+          "Heil- und Kostenplan bei KFO",
+          "250",
+          "32,34",
+          "nicht neben 0030"
+        ],
+        [
+          "GOZ 0050, 0060",
+          "Abformung 1 Kiefer, beide Kiefer für Situationsmodelle",
+          "120, 260",
+          "15,52, 33,63",
+          "Nebeneinander begründen"
+        ],
+        [
+          "GOZ 0065",
+          "Optisch-elektronische Abformung, je Kieferhälfte oder Frontzahnbereich",
+          "80",
+          "10,35",
+          "nicht neben konventioneller Abformung derselben Region"
+        ],
+        [
+          "GOZ 0080, 0090",
+          "Oberflächen- und Infiltrationsanästhesie",
+          "30, 60",
+          "3,88, 7,76",
+          ""
+        ],
+        [
+          "GOZ 1000, 1010",
+          "Mundhygienestatus mit Unterweisung (25 Min.), Kontrolle (15 Min.)",
+          "200, 100",
+          "25,87, 12,94",
+          "1000 1x je Jahr, 1010 3x je Jahr"
+        ],
+        [
+          "GOZ 1020",
+          "Lokale Fluoridierung, je Sitzung",
+          "50",
+          "6,47",
+          "bis 4x je Jahr"
+        ],
+        [
+          "GOZ 1030",
+          "Medikamententräger-Schiene, je Kiefer",
+          "90",
+          "11,64",
+          ""
+        ],
+        [
+          "GOZ 1040",
+          "Professionelle Zahnreinigung, je Zahn",
+          "28",
+          "3,62",
+          "nicht neben 1020, 4050, 4055 usw."
+        ],
+        [
+          "GOZ 2000",
+          "Versiegelung, auch Glattflächenversiegelung, je Zahn",
+          "90",
+          "11,64",
+          "Bracketumfeldversiegelung originär (BZÄK, BLZK); Beihilfe NRW bestreitet"
+        ],
+        [
+          "GOZ 2030, 2040",
+          "Besondere Maßnahmen (Separieren), Spanngummi",
+          "65, 65",
+          "8,41, 8,41",
+          "2030 neben Brackets laut PKV nicht"
+        ],
+        [
+          "GOZ 2197",
+          "Adhäsive Befestigung",
+          "130",
+          "16,82",
+          "neben 6100 laut BVerwG nicht"
+        ],
+        [
+          "GOZ 3260, 3280",
+          "Freilegung verlagerter Zahn, Lippenbändchen bei Diastema",
+          "550, 270",
+          "71,15, 34,93",
+          ""
+        ],
+        [
+          "GOZ 4050, 4055, 4060",
+          "Belagentfernung ein- und mehrwurzelig, Kontrolle",
+          "10, 13, 7",
+          "1,29, 1,68, 0,91",
+          "4050/4055 je Zahn 1x in 30 Tagen"
+        ],
+        [
+          "GOZ 5170",
+          "Anatomische Abformung mit individuellem Löffel, je Kiefer",
+          "250",
+          "32,34",
+          ""
+        ],
+        [
+          "GOZ 8000",
+          "Klinische Funktionsanalyse",
+          "500",
+          "64,68",
+          "als \"andere Leistung\" im Vordruck 4d"
+        ],
+        [
+          "GOZ 9020, 0510",
+          "Orthodontisches Implantat (TAD), Zuschlag",
+          "515, 750",
+          "66,62; Zuschlag 42,18 nur 1,0x",
+          ""
+        ],
+        [
+          "GOÄ 1, 3, 5, 6",
+          "Beratung, eingehende Beratung, Untersuchungen",
+          "80, 150, 80, 100",
+          "10,72, 20,11, 10,72, 13,41",
+          "im Behandlungsfall Regeln Abschnitt A"
+        ],
+        [
+          "GOÄ 2697, 2698, 2702",
+          "Drahtligaturen, Schiene, Wiederanbringen oder Entfernen von Schienen je Kiefer",
+          "350, 1500, 300",
+          "46,92, 201,09, 40,22",
+          "Bogenentfernung über 2702: BZÄK ja, PKV und Gerichte nein"
+        ],
+        [
+          "GOÄ 2009, 2010",
+          "Fremdkörperentfernung (z. B. TAD-Entfernung)",
+          "100, 379",
+          "13,41, 50,81",
+          "kein gesicherter Konsens"
+        ],
+        [
+          "GOÄ 5000, 5002, 5004",
+          "Zahnfilm je Projektion, Panorama 1 Kiefer, OPG",
+          "50, 250, 400",
+          "5,25, 26,23, 41,97 (1,8x)",
+          "Abschnitt O: 1,0 bis 2,5, Schwelle 1,8"
+        ],
+        [
+          "GOÄ 5030, 5035, 5037",
+          "Hand in 2 Ebenen, Skelettteil, Skelettalter",
+          "360, 160, 300",
+          "37,77, 16,79, 31,48",
+          ""
+        ],
+        [
+          "GOÄ 5090, 5095",
+          "Schädel in 2 Ebenen (FRS), Spezialprojektion",
+          "400, 200",
+          "41,97, 20,98",
+          ""
+        ],
+        [
+          "GOÄ 5370, 5377",
+          "CT/DVT Kopf, Zuschlag 3D-Analyse",
+          "2000, 800",
+          "209,83; Zuschlag 46,63 nur 1,0x",
+          ""
+        ]
+      ]
+    },
+    "mkv": {
+      "title": "Mehr-, Zusatz- und andere Leistungen (Vordruck 4d)",
+      "sub": "Für Kassenpatienten. M = Mehrleistung (Aufpreis), Z = Zusatzleistung, A = andere Leistung (voll privat).",
+      "sch": "MKV",
+      "cols": [
+        "Art",
+        "Leistung",
+        "BEMA-Bezug",
+        "Abrechnung gegenüber Patient"
+      ],
+      "rows": [
+        [
+          "M",
+          "Keramik-, Mini-, Lingual-, selbstligierende, Kunststoffbrackets; jedes andere als ein vestibuläres programmiertes Edelstahlbracket",
+          "126a",
+          "GOZ 6100 minus 126a; Zusatzmaterial mit Vereinbarung"
+        ],
+        [
+          "M",
+          "Entfernung von Keramik- und Lingualbrackets",
+          "126d",
+          "GOZ 6110 minus 126d"
+        ],
+        [
+          "M",
+          "Gegossenes Band in Ausnahmefällen (z. B. Lingualtechnik)",
+          "126b",
+          "GOZ 6120 minus 126b (Paarung abgeleitet)"
+        ],
+        [
+          "M",
+          "Teilbogen aus anderem Material als Edelstahl",
+          "127a",
+          "GOZ 6140 minus 127a"
+        ],
+        [
+          "M",
+          "Vollbogen aus anderem Material (NiTi, TMA, superelastisch, thermoaktiv)",
+          "128a, 128b",
+          "GOZ 6150 minus 128a oder 128b (Paarung abgeleitet)"
+        ],
+        [
+          "M",
+          "Digitale Abformung, bis 3x (kombiniert 4x)",
+          "7a",
+          "Differenz; Kennzeichen 7aD"
+        ],
+        [
+          "Z",
+          "Diagnostik über den Höchstmengen bei Ä934, 7a, 116, 117, 118",
+          "",
+          "volle GOZ oder GOÄ"
+        ],
+        [
+          "Z",
+          "OK-Frontzahnretainer ein- und ausgliedern",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "Z",
+          "Wiedereingliedern oder Ersatz eines Frontzahnretainers",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "Z",
+          "UK-Frontzahnretainer ohne E3/E4",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "Z",
+          "Ausgliedern des UK-Retainers außerhalb der Retentionszeit",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "Z",
+          "Apparaturen außerhalb 130: intraorale oder implantologische Verankerung (Minischrauben, Minipins), Pendulum, Nance, Frosch, Beneslider, Wilson",
+          "",
+          "volle GOZ (z. B. 9020 für TAD)"
+        ],
+        [
+          "Z",
+          "Gegossene GNE, GNE mit implantologischer Verankerung",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "Z",
+          "Bisslagekorrektur außerhalb 131b: Herbst ohne Indikation, Jasper-Jumper, BioBiteCorrector, gegossenes Herbstscharnier",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "A",
+          "Funktionsanalyse und Funktionsdiagnostik",
+          "",
+          "volle GOZ"
+        ],
+        [
+          "A",
+          "Bracketumfeldversiegelung",
+          "",
+          "GOZ 2000 je Zahn"
+        ],
+        [
+          "A (abgeleitet)",
+          "PZR und Prophylaxe während Multibracket",
+          "",
+          "GOZ 1040 oder 4050/4055 bzw. analog; AOK PLUS bezuschusst bis 50 EUR je Halbjahr"
+        ],
+        [
+          "offen",
+          "Herausnehmbare Retentionsschienen, Aligner, digitales Setup",
+          "",
+          "nicht in Anlage B; Einordnung unbelegt"
+        ]
+      ]
+    },
+    "bel": {
+      "title": "Labor nach BEL II, Sachsen 2026",
+      "sub": "Kassenpatienten. Höchstpreise gewerbliches Labor und Praxislabor.",
+      "sch": "BEL",
+      "cols": [
+        "L-Nr.",
+        "Bezeichnung",
+        "gewerblich EUR",
+        "Praxislabor EUR",
+        "Regel"
+      ],
+      "rows": [
+        [
+          "001 0",
+          "Modell",
+          "8,45",
+          "8,02",
+          "nach Menge; bimaxilläres Gerät bis 4, monomaxilläres 2 Modelle"
+        ],
+        [
+          "002 1",
+          "Doublieren eines Modells",
+          "15,44",
+          "14,67",
+          ""
+        ],
+        [
+          "003 0",
+          "Set-up je Segment",
+          "10,30",
+          "9,79",
+          ""
+        ],
+        [
+          "005 4",
+          "Set-up-Modell KFO",
+          "11,13",
+          "10,57",
+          ""
+        ],
+        [
+          "011 1",
+          "Modellpaar trimmen",
+          "12,14",
+          "11,53",
+          "nur mit KFO; neben 001 0"
+        ],
+        [
+          "011 2",
+          "Fixator",
+          "11,00",
+          "10,45",
+          ""
+        ],
+        [
+          "012 0",
+          "Mittelwertartikulator",
+          "12,42",
+          "11,80",
+          ""
+        ],
+        [
+          "013 0",
+          "Modellpaar sockeln",
+          "27,15",
+          "25,79",
+          "für Dokumentationsmodelle; nicht neben 011 1"
+        ],
+        [
+          "020 2",
+          "Basis für Konstruktionsbiss",
+          "9,29",
+          "8,83",
+          ""
+        ],
+        [
+          "401 0, 402 0, 403 0",
+          "Aufbissbehelf mit, ohne adjustierte Oberfläche, Umarbeiten",
+          "103,18, 73,64, 49,58",
+          "98,02, 69,96, 47,10",
+          ""
+        ],
+        [
+          "404 0",
+          "Semipermanente Metallschiene (Retainer), je Zahn",
+          "36,86",
+          "35,02",
+          "gegossen oder gebogen; reiner Draht erfüllt es nicht"
+        ],
+        [
+          "701 0",
+          "Basis Einzelkiefergerät",
+          "58,76",
+          "55,82",
+          ""
+        ],
+        [
+          "702 0",
+          "Basis bimaxilläres Gerät",
+          "102,54",
+          "97,41",
+          "horizontal geteilt: 2x 701 0; auch Positioner"
+        ],
+        [
+          "703 0",
+          "Schiefe Ebene",
+          "24,12",
+          "22,91",
+          "auf 701-Basis als 710 0"
+        ],
+        [
+          "704 0",
+          "Vorhofplatte",
+          "58,96",
+          "56,01",
+          ""
+        ],
+        [
+          "705 0",
+          "Kinnkappe",
+          "56,97",
+          "54,12",
+          ""
+        ],
+        [
+          "710 0",
+          "Aufbiss",
+          "11,19",
+          "10,63",
+          "je Kieferhälfte oder Frontzahngebiet"
+        ],
+        [
+          "711 0",
+          "Abschirmelement",
+          "21,83",
+          "20,74",
+          "je Kieferhälfte oder Frontzahngebiet"
+        ],
+        [
+          "712 1, 712 2",
+          "Weich-, Sonderkunststoff KFO",
+          "23,61",
+          "22,43",
+          "je Kiefer; 712 2 nur mit Indikation"
+        ],
+        [
+          "720 0",
+          "Schraube einarbeiten",
+          "17,75",
+          "16,86",
+          ""
+        ],
+        [
+          "721 0",
+          "Spezialschraube",
+          "29,65",
+          "28,17",
+          ""
+        ],
+        [
+          "722 0",
+          "Trennen einer Basis",
+          "7,76",
+          "7,37",
+          "auch ohne Schraube"
+        ],
+        [
+          "730 0, 731 0, 732 0",
+          "Labialbogen, modifiziert, intermaxillär",
+          "21,34, 29,76, 29,76",
+          "20,27, 28,27, 28,27",
+          ""
+        ],
+        [
+          "733 0, 734 0",
+          "Feder offen, geschlossen",
+          "9,55, 14,22",
+          "9,07, 13,51",
+          ""
+        ],
+        [
+          "740 0, 741 0",
+          "Verbindungselement intra-, intermaxillär",
+          "24,02, 29,65",
+          "22,82, 28,17",
+          "741 0 je Paar; Sander-Schraube = 741 0"
+        ],
+        [
+          "742 0",
+          "Verankerungselement (Ankerband, individuell)",
+          "24,33",
+          "23,11",
+          "GNE und Herbst"
+        ],
+        [
+          "743 0",
+          "Einzelelement einarbeiten (Schloss, Röhrchen)",
+          "13,84",
+          "13,15",
+          ""
+        ],
+        [
+          "744 0",
+          "Metallverbindung KFO",
+          "10,15",
+          "9,64",
+          "je Verbindungsstelle; auch Bandverschluss"
+        ],
+        [
+          "750 0, 751 0",
+          "Halte- und Abstützelement einarmig, mehrarmig, je Zahn",
+          "9,55, 12,05",
+          "9,07, 11,45",
+          ""
+        ],
+        [
+          "802 1 bis 802 5, 807 0, 808 0, 809 0",
+          "Reparaturpositionen laut Eigenlaborformular",
+          "keine Angabe",
+          "10,04, 21,89, 42,86, 68,56",
+          "Bezeichnungen in den Notizen nicht erfasst"
+        ],
+        [
+          "861 0",
+          "Grundeinheit Instandsetzung KFO-Gerät",
+          "19,81",
+          "18,82",
+          "1x je Gerät"
+        ],
+        [
+          "862 0",
+          "Einfügen Regulierungs- oder Halteelement",
+          "7,67",
+          "7,29",
+          "je Element"
+        ],
+        [
+          "863 0",
+          "Erneuerung intermaxilläres Element",
+          "14,83",
+          "14,09",
+          ""
+        ],
+        [
+          "864 0",
+          "KFO-Basis erneuern",
+          "72,62",
+          "68,99",
+          ""
+        ],
+        [
+          "870 0",
+          "Remontieren KFO-Gerät",
+          "34,55",
+          "32,82",
+          "1x je Gerät"
+        ],
+        [
+          "933 0",
+          "Versandkosten",
+          "7,17",
+          "keine",
+          "entfällt im selben Gebäude"
+        ]
+      ]
+    },
+    "pw": {
+      "title": "KFO-Punktwerte Sachsen",
+      "sub": "Es gilt der Punktwert am Sitz der Praxis. Ersatzkassen 2026 noch nicht vereinbart.",
+      "sch": "PW",
+      "cols": [
+        "Kasse",
+        "KFO-Punktwert IV/2026 (EUR)",
+        "gültig ab",
+        "2025"
+      ],
+      "rows": [
+        [
+          "AOK (AOK PLUS)",
+          "1,2481",
+          "01.01.2026",
+          "1,1887"
+        ],
+        [
+          "BKK",
+          "1,2250",
+          "01.01.2026",
+          "1,1754"
+        ],
+        [
+          "IKK",
+          "1,2131",
+          "01.04.2026 (I/2026: 1,2054)",
+          "1,1535"
+        ],
+        [
+          "Knappschaft",
+          "1,2033",
+          "01.04.2026 (I/2026: 1,1855)",
+          "1,1441"
+        ],
+        [
+          "SVLFG",
+          "1,1997",
+          "01.01.2026",
+          "1,1407"
+        ],
+        [
+          "vdek (DAK, KKH, hkk, HEK)",
+          "1,1435",
+          "01.01.2025",
+          "1,1435"
+        ],
+        [
+          "TK",
+          "1,1649",
+          "01.01.2025",
+          "1,1649"
+        ],
+        [
+          "BARMER",
+          "1,1456",
+          "01.01.2025",
+          "1,1456"
+        ],
+        [
+          "Sozialamt",
+          "1,2481",
+          "01.01.2026",
+          "1,1887"
+        ],
+        [
+          "Heilfürsorge, PVA, Feuerwehr",
+          "1,1576",
+          "01.01.2025",
+          "1,1576"
+        ],
+        [
+          "Bundespolizei, Bundeswehr",
+          "1,2826",
+          "01.01.2026",
+          "1,2241"
+        ],
+        [
+          "Berufsgenossenschaft, Unfallkasse",
+          "1,6000",
+          "01.01.2026",
+          "1,5300"
+        ]
+      ]
+    },
+    "kuerzel": {
+      "title": "Kürzel aus der Kartei",
+      "sub": "Oben die Kürzel der Praxis laut Sabine (14.10.2026), darunter weitere aus der Recherche.",
+      "sch": "KZ",
+      "cols": [
+        "Kürzel",
+        "Bedeutung",
+        "Abrechnungsbezug"
+      ],
+      "rows": [
+        [
+          "Br.",
+          "Brackets",
+          "126a; GOZ 6100"
+        ],
+        [
+          "Bd",
+          "Bänder (zum erhöhten Preis: Komfortbänder)",
+          "126b; GOZ 6120"
+        ],
+        [
+          "Bg",
+          "Bogen",
+          "127a, 128a/b; GOZ 6140, 6150"
+        ],
+        [
+          "GZ",
+          "Gummizüge",
+          "in 119/120 enthalten"
+        ],
+        [
+          "nT",
+          "nächster Termin",
+          "geplant, nichts abrechnen"
+        ],
+        [
+          "AA",
+          "Angelaligner-Schienen",
+          "privat oder Zusatzleistung; Separieren als GOZ 2030"
+        ],
+        [
+          "ASR",
+          "Approximale Schmelzreduktion",
+          "privat, Position mit der Praxis klären"
+        ],
+        [
+          "Abdr",
+          "Abdruck",
+          "7a für Planungsmodelle; Arbeitsmodelle nur Material und Labor"
+        ],
+        [
+          "AD, ZD, SD",
+          "Anfangs-, Zwischen-, Schlussdiagnose",
+          "Diagnostik: 116, 117, 118, Ä934a, Ä935d"
+        ],
+        [
+          "SD-Brief",
+          "Schlussbrief",
+          "keine Position"
+        ],
+        [
+          "GKV, PKV",
+          "gesetzliche, private Krankenversicherung",
+          "BEMA oder GOZ"
+        ],
+        [
+          "GA",
+          "Gutachter",
+          "Gutachterverfahren zum Plan"
+        ],
+        [
+          "GNE",
+          "Gaumennahterweiterungsapparatur",
+          "131a plus bis 4x 126b"
+        ],
+        [
+          "VDP",
+          "Vorschubdoppelplatte",
+          "herausnehmbar: in 119/120, Labor nach BEL II"
+        ],
+        [
+          "MB",
+          "Multiband, Brackets im Mund",
+          "Separieren (12) nur, solange MB im Mund ist"
+        ],
+        [
+          "Metall-Br.",
+          "Metallbrackets, in der Praxis Minibrackets",
+          "Mehrleistung nur als Minibrackets; Standard-Stahlbracket ist Kassenleistung"
+        ],
+        [
+          "OK, UK",
+          "Ober-, Unterkiefer",
+          "je-Kiefer-Positionen"
+        ],
+        [
+          "FKO, AK",
+          "funktionskieferorthopädisches Gerät, Aktivator",
+          "in 119/120; Labor BEL II"
+        ],
+        [
+          "HG, LB, QH, TPA",
+          "Headgear, Lipbumper, Quadhelix, Transpalatinalbogen",
+          "130 plus 2x 126b"
+        ],
+        [
+          "TAD",
+          "Miniimplantat",
+          "Zusatzleistung; GOZ 9020"
+        ],
+        [
+          "FRS, OPG",
+          "Fernröntgenseitenbild, Orthopantomogramm",
+          "Ä934a plus 118, Ä935d; privat GOÄ 5090 plus 6020, GOÄ 5004"
+        ],
+        [
+          "KIG D4, E3/E4 UK",
+          "Indikationsgruppe und Grad; Engstand in der UK-Front",
+          "Plan, 01k-Kennzeichen, UK-Retainer"
+        ],
+        [
+          "Ret, RET",
+          "Retention oder Retainer",
+          "mehrdeutig, Abrechnung verschieden"
+        ],
+        [
+          "Bdex",
+          "Entbänderung, Debonding",
+          "126d je Teil, 128c je Bogen; GOZ 6110, 6130"
+        ],
+        [
+          "SS, Stahl; NiTi; TMA",
+          "Edelstahl; Nickel-Titan; Beta-Titan",
+          "Stahl = BEMA; NiTi, TMA = Mehrleistung"
+        ],
+        [
+          "016, 16x22",
+          "Drahtstärke in 1/1000 Zoll, rund oder rechteckig",
+          "Beleg für Bogenwechsel"
+        ],
+        [
+          "7aD",
+          "digitale Abformung",
+          "Kennzeichen D"
+        ],
+        [
+          "MKV; M, Z, A",
+          "Mehrkostenvereinbarung (amtlich Vordruck 4d); Kategorien",
+          "Vordruck 4d"
+        ],
+        [
+          "U, Ber, bmf, Zst, Rö2, Stat, Ksla",
+          "BEMA-Kürzel für 01, Ä1, 12, 107, Ä925a, Ä925d, 181a",
+          ""
+        ],
+        [
+          "Kl. II, Kette, Lig., Sep.",
+          "Angle-Klasse, Powerchain, Ligaturen, Separiergummis",
+          "meist in 119/120 abgegolten"
+        ],
+        [
+          "o.B., Wv",
+          "ohne Befund; Wiedervorstellung",
+          "verneint; geplant"
+        ]
+      ]
+    }
+  },
+  "rules": [
+    {
+      "id": "R-ABSCHLAG",
+      "name": "Abschlag je Quartal mit Termin",
+      "kind": "vorschlag",
+      "source": "Antworten von Sabine vom 12.10. und 14.10.2026, BEMA 119 und 120",
+      "trigger": "1. Termin in einem Kalenderquartal nach dem Behandlungsbeginn, nur Kassenpatienten",
+      "facts": [
+        "Behandlungsbeginn",
+        "Termin oder KFO-Leistung im Kalenderquartal",
+        "Abschlagspositionen aus dem genehmigten Plan (119 je Kiefer, 120 Bisslage)"
+      ],
+      "exclusions": [
+        "Quartale ohne Termin (Leerquartal)",
+        "mehr als 12 Abschläge, bei Frühbehandlung 6",
+        "Quartale ohne verfügbare Historie"
+      ],
+      "reason": "Laut Praxis wird der Abschlag beim 1. Termin im Quartal angeklickt und gilt für das ganze Quartal. Kommt der Patient im Quartal nicht, gibt es keinen Abschlag. Höchstens 12 Abschläge, bei Frühbehandlung 6; eine Verlängerung bringt meist 4 weitere. Ober- und Unterkiefer je 119 (a bis d), die Bisslage 120 (a bis d), den Schwierigkeitsgrad legt Frau Dr. fest.",
+      "question": "q-leer"
+    },
+    {
+      "id": "R-126A",
+      "name": "Bracket, Attachment oder geklebtes Röhrchen",
+      "kind": "vorschlag",
+      "source": "BEMA 126a, Empfehlung vom 12.10.2026",
+      "trigger": "Bracket oder Attachment geklebt, oder Röhrchen geklebt",
+      "facts": [
+        "Durchführung",
+        "Bauteil",
+        "Anzahl oder Zähne",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "Röhrchen auf Band (dann 126b)"
+      ],
+      "reason": "BEMA 126a ist das Eingliedern eines Brackets oder Attachments einschließlich Kleben. Geklebte Röhrchen laufen hier, bis die KZV Sachsen etwas anderes bestätigt.",
+      "question": "q-kzv"
+    },
+    {
+      "id": "R-126B",
+      "name": "Band eingegliedert",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Band eingegliedert oder Röhrchen auf Band",
+      "facts": [
+        "Durchführung",
+        "Bauteil Band",
+        "Zähne",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "geklebtes Röhrchen ohne Band",
+        "Band wieder eingegliedert (dann 126c)"
+      ],
+      "reason": "Eingliedern eines Bandes laut BEMA 126b.",
+      "question": "q-roehrchen"
+    },
+    {
+      "id": "R-126C",
+      "name": "Band wieder eingegliedert, höchstens 5×",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Band rezementiert oder wieder eingegliedert",
+      "facts": [
+        "Durchführung",
+        "Zahn"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "mehr als 5× in der Behandlung"
+      ],
+      "reason": "Laut Praxis ist ein rezementiertes Band 126c, höchstens 5× während der Behandlung. Die Grenze stammt aus der Erfahrung mit den Kassen: Mehr führte zum Regress.",
+      "question": "q-roehrchen"
+    },
+    {
+      "id": "R-128A",
+      "name": "Neuer Bogen, konfektioniert",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Bogen eingesetzt oder gewechselt, ohne Stichwort für 128b und ohne dokumentierte Individualisierung",
+      "facts": [
+        "Durchführung",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "Bogen wieder eingesetzt (dann 129)",
+        "Teilbogen (dann 127a)",
+        "Privatpatient (dann GOZ 6150)"
+      ],
+      "reason": "Laut Praxis darf die Kasse höchstens 8 konfektionierte Bögen pro Behandlungsplan für beide Kiefer zusammen genehmigen. Ein Teilbogen ist 127a.",
+      "question": "q-menge"
+    },
+    {
+      "id": "R-128B",
+      "name": "Reverse-Bogen und T-Loop",
+      "kind": "vorschlag",
+      "source": "KZBV, BEMA 01.01.2026, S. 58 bis 59, Antwort von Sabine vom 12.10.2026",
+      "trigger": "Reverse-Bogen oder T-Loop, auch in Schreibvarianten",
+      "facts": [
+        "Durchführung",
+        "Material Edelstahl",
+        "Vollbogen",
+        "Individualisierung: mindestens 3 Biegungen 2. Ordnung oder 1 Biegung 3. Ordnung",
+        "Kiefer",
+        "freies 128b-Kontingent im Plan"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "aus altem Text übernommen",
+        "identisches Ereignis bereits abgerechnet"
+      ],
+      "reason": "Individualisierter Vollbogen aus Edelstahl laut BEMA 2026. Laut Praxis wird beim Stichwort Reverse-Bogen oder T-Loop 128b abgerechnet, solange im Plan noch 128b frei ist.",
+      "question": "q-faelle"
+    },
+    {
+      "id": "R-128C",
+      "name": "Alter Bogen ausgegliedert",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Neuer Bogen in einem Kiefer, in dem schon ein Bogen sitzt, oder Eintrag „gewechselt“",
+      "facts": [
+        "Durchführung",
+        "Kiefer",
+        "vorheriger Bogen im selben Kiefer"
+      ],
+      "exclusions": [
+        "1. Bogen im Kiefer",
+        "Bogen wieder eingesetzt",
+        "Privatpatient"
+      ],
+      "reason": "Laut Praxis wird bei jedem Bogenwechsel der neue Bogen und 128c für den alten abgerechnet. 14 Bögen rein, 14 raus.",
+      "question": "q-tloop"
+    },
+    {
+      "id": "R-129",
+      "name": "Bogen wieder eingegliedert, höchstens 5×",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Bogen wieder eingesetzt",
+      "facts": [
+        "Durchführung",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "nur Kassenpatienten",
+        "mehr als 5× in der Behandlung"
+      ],
+      "reason": "Laut Praxis gibt es bei der GKV die 129 für einen wieder eingesetzten Voll- oder Teilbogen, höchstens 5× während der Behandlungszeit. Die Grenze stammt aus der Erfahrung mit den Kassen: Mehr führte zum Regress.",
+      "question": "q-menge"
+    },
+    {
+      "id": "R-BDEX",
+      "name": "Bdex: Bögen und Brackets entfernt",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Bdex dokumentiert",
+      "facts": [
+        "Durchführung",
+        "Bögen im Mund",
+        "eingegliederte Brackets, Röhrchen und Bänder"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint"
+      ],
+      "reason": "Laut Praxis werden beim Bdex 128c 2× und 126d je entferntem Teil abgerechnet. Danach steht das Journal auf Null.",
+      "question": "q-ende"
+    },
+    {
+      "id": "R-6150",
+      "name": "Privat: Bogen eingegliedert (GOZ 6150)",
+      "kind": "vorschlag",
+      "source": "Antworten von Sabine vom 12.10. und 14.10.2026, GOZ Anlage 1",
+      "trigger": "Neuer Bogen bei Privatpatienten, unabhängig vom Bogentyp",
+      "facts": [
+        "Durchführung",
+        "Kiefer",
+        "Privatplan"
+      ],
+      "exclusions": [
+        "Kassenpatienten",
+        "keine 128c und keine 129 bei Privatpatienten"
+      ],
+      "reason": "Laut Praxis heißt die Position GOZ 6150 (früher 615), auch in IVORIS: Eingliederung eines ungeteilten Bogens, je Kiefer. Höchstens 14 Bögen für beide Kiefer zusammen; was darüber beantragt wird, zahlt der Patient selbst. Das Wiedereinsetzen ist damit abgegolten.",
+      "question": "q-6150"
+    },
+    {
+      "id": "R-ROEHRCHEN",
+      "name": "Röhrchen: geklebt oder auf Band",
+      "kind": "prueffall",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 126a und 126b",
+      "trigger": "Röhrchen dokumentiert, Befestigung unklar",
+      "facts": [
+        "Bauteil",
+        "Befestigung",
+        "Zahn"
+      ],
+      "exclusions": [
+        "keine pauschale Ersatzregel „Röhrchen gleich Band“"
+      ],
+      "reason": "Im Plan gibt es keine Röhrchen, nur Brackets und Bänder. Das System fragt nach der Befestigung: geklebt wird als 126a vorgeschlagen, auf Band als 126b.",
+      "question": "q-kzv"
+    },
+    {
+      "id": "R-KONTINGENT",
+      "name": "Kontingent erreicht",
+      "kind": "prueffall",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Die Bestätigung würde das Kontingent im Plan überschreiten",
+      "facts": [
+        "Kontingent je Position",
+        "verbrauchte Menge"
+      ],
+      "exclusions": [
+        "keine stille Verrechnung"
+      ],
+      "reason": "Laut Praxis darf minimal überzogen werden, sonst wird ein Nachantrag gestellt. Bei 129 und 126c gilt eine feste Obergrenze von 5.",
+      "question": "q-tloop"
+    },
+    {
+      "id": "R-BEGINN",
+      "name": "Behandlungsbeginn mit der 1. KFO-Leistung",
+      "kind": "hinweis",
+      "source": "Antworten von Sabine vom 12.10. und 14.10.2026, BEMA 119 Nr. 3",
+      "trigger": "Plan ohne Beginn, 1. KFO-Leistung dokumentiert",
+      "facts": [
+        "Separieren, Brackets oder Attachments geklebt, Gerät eingesetzt"
+      ],
+      "exclusions": [
+        "Anamnese allein ist kein Behandlungsbeginn"
+      ],
+      "reason": "Laut Praxis beginnt die Behandlung mit der 1. KFO-Leistung, auch schon mit dem Separieren (Nr. 12 mit Zahnangabe). Ab dann entsteht in jedem Quartal mit Termin ein Abschlag.",
+      "question": "q-start"
+    },
+    {
+      "id": "R-VERLAUF",
+      "name": "Nach 4 A-Bögen meist ein B-Bogen",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "4 oder mehr 128a abgerechnet und ein neuer 128a-Vorschlag",
+      "facts": [
+        "abgerechnete 128a im Plan"
+      ],
+      "exclusions": [
+        "keine automatische Umklassifizierung zu 128b"
+      ],
+      "reason": "Laut Praxis folgt nach 4× 128a meist 128b. 128b setzt aber einen individualisierten Bogen voraus, deshalb nur ein Hinweis zum Ergänzen der Merkmale.",
+      "question": "q-tloop"
+    },
+    {
+      "id": "R-TEMPO",
+      "name": "2 Bögen pro Behandlungsquartal",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Abgeschlossenes Behandlungsquartal mit weniger als 2 neuen Bögen",
+      "facts": [
+        "neue Bögen je Behandlungsquartal"
+      ],
+      "exclusions": [
+        "bestätigte Unterbrechungen",
+        "Quartale ohne Historie",
+        "nach dem Bdex"
+      ],
+      "reason": "Laut Praxis sind 2 Bögen pro Quartal üblich, in Ausnahmen 4. Weniger kann ein fehlender Eintrag sein. Es entsteht nie eine Position ohne Ereignis.",
+      "question": "q-tloop"
+    },
+    {
+      "id": "R-QUARTAL",
+      "name": "Quartalsprüfung ab dem 6. Behandlungsquartal",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Behandlungsquartal 6 oder höher",
+      "facts": [
+        "Behandlungsquartal",
+        "belegte, nicht abgerechnete Ereignisse"
+      ],
+      "exclusions": [
+        "Planrest allein erzeugt keine Leistung"
+      ],
+      "reason": "Im 6. oder 7. Quartal sind laut Praxis oft noch Leistungen offen. Das System legt belegte, noch nicht abgerechnete Leistungen zur Prüfung vor.",
+      "question": "q-pause"
+    },
+    {
+      "id": "R-ABSCHLUSS",
+      "name": "Abschlussprüfung nach dem Bdex",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Bdex dokumentiert",
+      "facts": [
+        "alle Ereignisse und Positionen des Behandlungskontos"
+      ],
+      "exclusions": [
+        "Kette oder dicker Bogen sind kein Behandlungsende"
+      ],
+      "reason": "Laut Praxis steht nach dem Bdex das Journal auf Null. Die Prüfung zeigt, was offen, nicht erbracht oder über dem Plan ist.",
+      "question": "q-ende"
+    },
+    {
+      "id": "R-127A",
+      "name": "Teilbogen eingegliedert",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Teilbogen oder Segmentbogen eingesetzt",
+      "facts": [
+        "Durchführung",
+        "Kiefer",
+        "Material"
+      ],
+      "exclusions": [
+        "nur geplant",
+        "verneint",
+        "Teilbogen wieder eingesetzt (dann 129)"
+      ],
+      "reason": "BEMA 127a: Teilbogen aus Edelstahl, je Teilbogen. Bisher fiel ein Teilbogen ohne Stichwort in 128a. Anderes Material ist Mehrleistung mit Vordruck 4d.",
+      "question": null
+    },
+    {
+      "id": "R-127B",
+      "name": "Teilbogen ausgegliedert",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Teilbogen entfernt oder gewechselt",
+      "facts": [
+        "Durchführung",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "nicht beim UK-Retainer"
+      ],
+      "reason": "BEMA 127b: Ausgliederung eines Teilbogens bei definitiver Entfernung oder Wechsel.",
+      "question": null
+    },
+    {
+      "id": "R-12",
+      "name": "Separieren",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 14.10.2026, BEMA 12",
+      "trigger": "Separieren dokumentiert, mit Zahnangabe",
+      "facts": [
+        "Durchführung",
+        "Zähne (daraus Kieferhälften oder Frontzahnbereich)",
+        "Brackets im Mund"
+      ],
+      "exclusions": [
+        "nach dem Bdex ohne neue Brackets",
+        "Privatpatient (dann GOZ 2030)"
+      ],
+      "reason": "Laut Praxis Nr. 12 mit Zahnangabe. Separieren zählt als KFO-Leistung, startet die Behandlung und löst den Abschlag aus. Es ist während der ganzen Behandlung möglich, aber nur, solange Multiband im Mund ist; danach droht Regress. BEMA: je Sitzung, je Kieferhälfte oder Frontzahnbereich.",
+      "question": "q-separieren"
+    },
+    {
+      "id": "R-2030",
+      "name": "Privat und Aligner: besondere Maßnahmen (GOZ 2030)",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 14.10.2026, GOZ 2030",
+      "trigger": "Separieren oder Schmelzreduktion bei Privatpatienten",
+      "facts": [
+        "Durchführung",
+        "Zähne"
+      ],
+      "exclusions": [
+        "Kassenpatienten mit Multiband (dann 12)"
+      ],
+      "reason": "Laut Praxis wird bei Alignern, solange Schienen getragen werden, die GOZ 2030 abgerechnet. Die PKV erkennt 2030 neben Brackets oft nicht an.",
+      "question": "q-separieren"
+    },
+    {
+      "id": "R-130",
+      "name": "Ergänzende festsitzende Apparatur",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Headgear, Lipbumper, Quadhelix, Palatinal-, Transversal- oder Lingualbogen eingesetzt",
+      "facts": [
+        "Durchführung",
+        "Apparatur",
+        "Kiefer"
+      ],
+      "exclusions": [
+        "andere Apparaturen sind Zusatzleistung"
+      ],
+      "reason": "BEMA 130, Aufzählung abschließend. Daneben bis 2× 126b für die Ankerbänder. Beim Entfernen 2× 128c.",
+      "question": null
+    },
+    {
+      "id": "R-131A",
+      "name": "Gaumennahterweiterung (GNE)",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "GNE eingesetzt",
+      "facts": [
+        "Durchführung"
+      ],
+      "exclusions": [
+        "gegossene oder implantatgestützte GNE ist Zusatzleistung",
+        "Entfernen ist enthalten"
+      ],
+      "reason": "BEMA 131a, Ein- und Ausgliederung. Daneben bis 4× 126b, Material und Labor extra.",
+      "question": null
+    },
+    {
+      "id": "R-131B",
+      "name": "Herbstscharnier, je Seite",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Herbstscharnier eingesetzt",
+      "facts": [
+        "Durchführung",
+        "Seiten",
+        "Indikation"
+      ],
+      "exclusions": [
+        "ohne Indikation Zusatzleistung"
+      ],
+      "reason": "BEMA 131b nur bei spätem Beginn, wenn konventionell nicht erreichbar. Je Seite bis 4× 126b.",
+      "question": null
+    },
+    {
+      "id": "R-131C",
+      "name": "Gesichtsmaske",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Gesichtsmaske eingesetzt",
+      "facts": [
+        "Durchführung"
+      ],
+      "exclusions": [],
+      "reason": "BEMA 131c, Material und Labor extra.",
+      "question": null
+    },
+    {
+      "id": "R-7A",
+      "name": "Abformung für Planungsmodelle",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Abdruck, Abformung oder Scan",
+      "facts": [
+        "Durchführung",
+        "Zweck Planungsmodell"
+      ],
+      "exclusions": [
+        "Abdruck für Gerät oder Arbeitsmodell (nur Material und Labor)",
+        "mehr als 3× (dann Zusatzleistung)"
+      ],
+      "reason": "BEMA 7a, bis 3× je Behandlung. Ein Intraoralscan ist 7aD: Mehrleistung mit Vordruck 4d.",
+      "question": null
+    },
+    {
+      "id": "R-116",
+      "name": "Fotos mit Auswertung",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Fotos oder Fotostatus",
+      "facts": [
+        "Durchführung",
+        "Anzahl"
+      ],
+      "exclusions": [
+        "mehr als 4× (dann Zusatzleistung)"
+      ],
+      "reason": "BEMA 116, je Aufnahme, bis 4× je Behandlung.",
+      "question": null
+    },
+    {
+      "id": "R-117",
+      "name": "Modellanalyse",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Modellanalyse",
+      "facts": [
+        "Durchführung"
+      ],
+      "exclusions": [
+        "mehr als 3×"
+      ],
+      "reason": "BEMA 117, je 7a, bis 3× je Behandlung, auch digital.",
+      "question": null
+    },
+    {
+      "id": "R-FRS",
+      "name": "Fernröntgenseitenbild und Auswertung",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "FRS angefertigt, ausgewertet",
+      "facts": [
+        "Durchführung",
+        "rechtfertigende Indikation",
+        "Auswertung"
+      ],
+      "exclusions": [
+        "mehr als 2× (begründet 3×)"
+      ],
+      "reason": "BEMA Ä934a für die Aufnahme, 118 für die Auswertung. Röntgen ist vom Eigenanteil befreit.",
+      "question": null
+    },
+    {
+      "id": "R-OPG",
+      "name": "Panoramaschichtaufnahme (OPG)",
+      "kind": "vorschlag",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "OPG angefertigt",
+      "facts": [
+        "Durchführung",
+        "rechtfertigende Indikation"
+      ],
+      "exclusions": [
+        "nicht neben Röntgenstatus Ä925d"
+      ],
+      "reason": "BEMA Ä935d. Röntgen ist vom Eigenanteil befreit.",
+      "question": null
+    },
+    {
+      "id": "R-LEERQUARTAL",
+      "name": "Quartal ohne Termin: kein Abschlag",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 14.10.2026, BEMA 119 Nr. 3",
+      "trigger": "Abgelaufenes Kalenderquartal nach dem Beginn ohne Termin",
+      "facts": [
+        "Termine aus IVORIS",
+        "Behandlungsquartale"
+      ],
+      "exclusions": [],
+      "reason": "Kommt der Patient im Quartal nicht, gibt es keinen Abschlag. Die Behandlungszeit verlängert sich entsprechend; die 12 Abschläge decken bis zu 16 Behandlungsquartale.",
+      "question": "q-leer"
+    },
+    {
+      "id": "R-MKV",
+      "name": "Mehrkostenvereinbarung erkannt",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 14.10.2026, § 29 SGB V, Anlage B BMV-Z",
+      "trigger": "Mehrkosten im Eintrag dokumentiert",
+      "facts": [
+        "vereinbarte Leistungen",
+        "Summe",
+        "Raten"
+      ],
+      "exclusions": [
+        "erzeugt keine Kassenposition"
+      ],
+      "reason": "Die Vereinbarung (Vordruck 4d) wird am Fall gespeichert. Anima prüft die Raten gegen die Summe und weist auf Begriffe hin, die bei einer Prüfung auffallen.",
+      "question": "q-punktwert"
+    },
+    {
+      "id": "R-LABOR",
+      "name": "Herausnehmbares Gerät: Labor nach BEL II",
+      "kind": "hinweis",
+      "source": "Antwort von Sabine vom 12.10.2026, BEMA 01.01.2026",
+      "trigger": "Herausnehmbares Gerät dokumentiert",
+      "facts": [
+        "Gerät"
+      ],
+      "exclusions": [
+        "keine eigene BEMA-Position"
+      ],
+      "reason": "Herausnehmbare Geräte sind mit dem Abschlag (119/120) abgegolten. Die Laborkosten laufen nach BEL II mit den sächsischen Preisen.",
+      "question": null
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-menge",
+      "title": "Bogenmengen",
+      "locks": [
+        "R-128A",
+        "R-129",
+        "R-6150"
+      ]
+    },
+    {
+      "id": "q-start",
+      "title": "Beginn des Behandlungsquartals",
+      "locks": [
+        "R-BEGINN"
+      ]
+    },
+    {
+      "id": "q-pause",
+      "title": "Pausen und Planänderungen",
+      "locks": [
+        "R-QUARTAL"
+      ]
+    },
+    {
+      "id": "q-roehrchen",
+      "title": "Röhrchen und Bänder",
+      "locks": [
+        "R-126B",
+        "R-126C"
+      ]
+    },
+    {
+      "id": "q-tloop",
+      "title": "T-Loop und Reverse-Bogen",
+      "locks": [
+        "R-128C",
+        "R-VERLAUF",
+        "R-TEMPO",
+        "R-KONTINGENT"
+      ]
+    },
+    {
+      "id": "q-historie",
+      "title": "Bisherige Abrechnung",
+      "locks": []
+    },
+    {
+      "id": "q-ende",
+      "title": "Behandlungsende",
+      "locks": [
+        "R-BDEX",
+        "R-ABSCHLUSS"
+      ]
+    },
+    {
+      "id": "q-kzv",
+      "title": "Anfrage an die KZV Sachsen",
+      "locks": [
+        "R-ROEHRCHEN",
+        "R-126A"
+      ]
+    },
+    {
+      "id": "q-faelle",
+      "title": "Echte Fälle für den Regeltest",
+      "locks": [
+        "R-128B"
+      ]
+    },
+    {
+      "id": "q-bisslage",
+      "title": "Bisslage: 119 oder 120?",
+      "locks": [
+        "R-ABSCHLAG"
+      ]
+    },
+    {
+      "id": "q-leer",
+      "title": "Quartale ohne Termin",
+      "locks": [
+        "R-LEERQUARTAL"
+      ]
+    },
+    {
+      "id": "q-separieren",
+      "title": "Separieren",
+      "locks": [
+        "R-12",
+        "R-2030"
+      ]
+    },
+    {
+      "id": "q-6150",
+      "title": "Privat: 6150 und 14 Bögen",
+      "locks": [
+        "R-6150"
+      ]
+    },
+    {
+      "id": "q-kuerzel",
+      "title": "Kürzel der Kartei",
+      "locks": []
+    },
+    {
+      "id": "q-mkvbegriffe",
+      "title": "Begriffe in der Mehrkostenvereinbarung",
+      "locks": [
+        "R-MKV"
+      ]
+    },
+    {
+      "id": "q-punktwert",
+      "title": "Kassenabzug bei Mehrkosten",
+      "locks": []
+    },
+    {
+      "id": "q-paketpreise",
+      "title": "Paketpreise nach der Umstellung",
+      "locks": []
+    },
+    {
+      "id": "q-journal",
+      "title": "PC-Journal in Anima Cura",
+      "locks": []
+    },
+    {
+      "id": "q-kanal",
+      "title": "Positionen an IVORIS übertragen",
+      "locks": []
+    }
+  ]
+}

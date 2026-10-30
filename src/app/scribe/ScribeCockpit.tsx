@@ -8,6 +8,7 @@ import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error
 import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
+import KnowledgeMenu from './KnowledgeMenu';
 import { t } from '@/lib/i18n';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
@@ -1622,6 +1623,7 @@ export default function ScribeCockpit({
         </span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          <KnowledgeMenu />
           <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>
           <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
           <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>

@@ -6,7 +6,9 @@
 // ============================================================
 
 import { treatmentTranslations } from './treatment-i18n';
+import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
+  ...referenceTranslations,
   'scribe.room.label': { de: 'Ort des Vorgangs', en: 'Location of the activity' },
   'scribe.room.required': { de: 'Bitte den Ort auswählen – auch Anmeldung, Röntgen oder ohne festen Ort sind möglich.', en: 'Please select a location, including reception, X-ray room or no fixed location.' },
   'scribe.room.choose': { de: 'Ort auswählen …', en: 'Choose a location …' },

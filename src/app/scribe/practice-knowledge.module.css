@@ -1,0 +1,29 @@
+.reference{max-width:1160px;margin:auto;padding:32px 24px 80px;color:var(--schrift);overflow-wrap:anywhere}
+.heading{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:24px}
+.heading h1{font:600 clamp(28px,4vw,42px)/1.2 var(--schrift-display);margin:8px 0}
+.reference p{margin:10px 0;max-width:80ch}
+.actions,.tabs{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.reference button,.reference a,.reference summary{cursor:pointer}
+.reference button,.actions a{display:inline-flex;align-items:center;min-height:44px;padding:10px 14px;border:1px solid var(--gedeckt);border-radius:8px;color:var(--schrift);background:var(--flaeche-flach);text-decoration:none;line-height:1.4}
+.reference button:hover,.actions a:hover{background:var(--primaer-soft)}
+.reference :is(button,a,input,select,summary):focus-visible{outline:3px solid var(--primaer);outline-offset:3px}
+.notice{padding:16px 20px;border-left:3px solid var(--gold-textton);background:var(--flaeche-flach);border-radius:4px;margin:16px 0}
+.tabs{margin:24px 0 16px}
+.tabs button[aria-pressed=true]{background:var(--primaer);color:var(--auf-primaer);border-color:var(--primaer)}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.filters label{display:grid;gap:8px;min-width:0}
+.filters input,.filters select{width:100%;min-height:44px;padding:10px;border-radius:8px;background:var(--eingabe);color:var(--schrift);border:1px solid var(--gedeckt);font:inherit}
+.filters option{background:var(--grund);color:var(--schrift)}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.reference article,.rule{border:1px solid var(--kante-hover);border-radius:12px;padding:20px;background:var(--flaeche-flach);margin-bottom:12px;min-width:0}
+.reference h2{font-size:18px;font-weight:600;line-height:1.5;margin:12px 0}
+.reference h3{font-size:16px;font-weight:600;margin-top:18px}
+.reference ul{list-style:disc;padding-left:22px}
+.reference dl div{margin:12px 0}
+.reference dt{font-size:13px;color:var(--gedeckt)}
+.reference dd{margin-top:4px}
+.badge{display:inline-block;font-size:13px;border:1px solid var(--gedeckt);border-radius:5px;padding:3px 8px}
+.context{font-size:13px;color:var(--gedeckt)}
+.rule summary{min-height:44px;font-weight:600}
+.rule summary span{display:block;font-size:13px;color:var(--gedeckt);font-weight:400;margin-top:6px}
+@media(max-width:700px){.reference{padding:20px 16px 60px}.heading{flex-direction:column}.cards,.filters{grid-template-columns:1fr}.reference article{padding:16px}.actions{align-items:stretch}}
