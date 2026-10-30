@@ -819,8 +819,8 @@ export default function ScribeCockpit({
     }
   }
 
-  function resetSitzung() {
-    setZimmerVersionId('');
+  function resetSitzung(keepRoom = false) {
+    if (!keepRoom) setZimmerVersionId('');
     setBestaetigt(null);
     setDirty(false);
     setAenderungsgrund("");
@@ -1053,7 +1053,7 @@ export default function ScribeCockpit({
     setZaehne([]);
     setSeiten({});
     setAusnahme("");
-    resetSitzung();
+    resetSitzung(true);
   }
 
   // Phase eines Termintyps bestimmen (fuer die Kombi-Regel)
@@ -1207,6 +1207,7 @@ export default function ScribeCockpit({
   }, [module, auswahl, zaehne]);
 
   const brauchtZaehne = module.some((m) => m.struktur.vars.includes("zaehne"));
+  const zimmerFehlt = !zimmerVersionId && !entwurfId && !bestaetigt && !demo;
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
 
@@ -1644,7 +1645,6 @@ export default function ScribeCockpit({
       </section>
 
       <main className="buehne">
-        <ScribeRoomPicker value={zimmerVersionId} onChange={id=>{setZimmerVersionId(id);bearbeitet();}} legacy={!!entwurfId || !!bestaetigt} disabled={sendet || speichert} />
         {/* ===== Doku-Wache ===== */}
         <div className="listenkopf">
           <p className="abschnitt" style={{ margin: 0 }}>Tagescockpit · Doku-Wache</p>
@@ -1821,6 +1821,9 @@ export default function ScribeCockpit({
               )}
             </section>
 
+            <section className="termin-panel termin-panel-breit">
+              <ScribeRoomPicker value={zimmerVersionId} onChange={id=>{setZimmerVersionId(id);bearbeitet();}} legacy={!!entwurfId || !!bestaetigt} disabled={sendet || speichert || !patient} />
+            </section>
             <section className="termin-panel termin-panel-breit">
               <span className="stufe">Leistungen in dieser Sitzung · stapelbar</span>
               {KOMBIS[art]?.length > 0 && (
@@ -2265,6 +2268,7 @@ export default function ScribeCockpit({
             onClick={bestaetigen}
             disabled={
               sendet ||
+              zimmerFehlt ||
               komposition.fehlt.length > 0 ||
               (!!bestaetigt && !dirty) ||
               (!!bestaetigt && dirty && !aenderungsgrund.trim()) ||
@@ -2293,8 +2297,8 @@ export default function ScribeCockpit({
           {bestaetigt && !dirty && (
             <button className="neben" onClick={naechsterPatient}>Nächster Patient →</button>
           )}
-          {komposition.fehlt.length > 0 && (
-            <span className="hinweis-fehlt">Gesperrt, fehlt: {komposition.fehlt.join(", ")}</span>
+          {(komposition.fehlt.length > 0 || zimmerFehlt) && (
+            <span className="hinweis-fehlt">Gesperrt, fehlt: {[...komposition.fehlt, ...(zimmerFehlt ? [t('scribe.room.label')] : [])].join(", ")}</span>
           )}
           {!nutzerKuerzel && (
             <span className="hinweis-fehlt">Gesperrt: Deinem persönlichen Mitarbeiterkonto fehlt ein Kürzel. Bitte Mitarbeiter wechseln oder das Kürzel in der Teamverwaltung hinterlegen.</span>

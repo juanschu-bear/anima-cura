@@ -19,7 +19,7 @@ Neue Einträge in klassischem Cockpit und Animus benötigen eine ausdrücklich g
 
 ## Tests vor Veröffentlichung
 
-Gesamte vorhandene Testsuite einschließlich 42 RPC-Verträge grün. Neue PGlite-Tests prüfen Migration, Alt-Einträge, Pflichtfeld, Historienzuordnung, veraltete Zimmer, Rollenbeschränkung, ererbte Standardrechte und Rücknahme. Produktions-Schemacheck vor Änderung am 30.10.2026 02:45:52 UTC grün, Modulrolle nicht vorhanden. Produktionsbuild erfolgreich; finaler Wiederholungslauf nach Warnhinweis-Anpassung läuft.
+Gesamte vorhandene Testsuite einschließlich 42 RPC-Verträge grün. Neue PGlite-Tests prüfen Migration, Alt-Einträge, Pflichtfeld, Historienzuordnung, veraltete Zimmer, Rollenbeschränkung, ererbte Standardrechte und Rücknahme. Produktions-Schemacheck vor Änderung am 30.10.2026 02:45:52 UTC grün, Modulrolle nicht vorhanden. Produktionsbuild einschließlich Wiederholung nach UI-/Warnhinweis-Anpassung erfolgreich.
 
 Die Zimmerprüfungen sind in `npm test` eingebunden. Ausschließlich synthetische Testdaten in isolierter Datenbank. Keine Patienten-Testschreibvorgänge live.
 
@@ -27,4 +27,19 @@ Die Zimmerprüfungen sind in `npm test` eingebunden. Ausschließlich synthetisch
 
 Vorherige App bereitstellen, dann `scribe-rooms-068-rollback.sql` ausführen. Es deaktiviert nur die neue Zimmerpflicht; erfasste Zimmer und Historie bleiben erhalten. Keine Tabellen oder Patientendaten löschen.
 
-Stand dieses Berichts: Code vorhanden, lokale Tests grün; Live-Migration, Deployment und Praxisabnahme noch nicht bestätigt. Kein neuer 48h-Beobachtungsbeginn. Workflow-Zeitgeber und Mail-Alarm sind ein separater nächster Schritt. Kein „Patient aufrufen“ für den Leitstand gebaut.
+## Live-Nachweis
+
+- Implementierungscommit `1c7080f`; isolierter Release auf origin/main `5dd05c936628ebfad31b8e51b0d218d3c760f771`.
+- Deployment Ready: https://anima-cura-dl46ojcyn-juanschu-bears-projects.vercel.app . GitHub-Vercel-Status erfolgreich.
+- Migration 068 live, exakte Register-/Repo-Prüfsumme `acd33a7d5b6376b52728e30086cedb24`. Beim ersten Registereintrag hatte die JavaScript-Ersetzung die Dollarzeichen im archivierten Quelltext verkürzt; ausschließlich dieser Registertext wurde hashgesichert berichtigt. Die ausgeführten Funktionen waren davon nicht betroffen.
+- Live-Abfrage: drei Zimmer-Versionen, null nachträglich zugeordnete Einträge, keine Modulrolle. Neue Triggerfunktionen für anon/authenticated nicht ausführbar.
+- Schemacheck nach Migration 30.10.2026 02:47:25 UTC grün, 72 Funktionen, keine Verletzungen. RPC-Nachprüfung: 42/42 grün.
+- Live HTTP: `/scribe/login` und `/patient/anamnese` 200; `/api/doku/eintrag`, `/api/doku/heute`, `/api/anima-sign/import-reviews` ohne Anmeldung erwartungsgemäß 401.
+- Angemeldete Browserprüfung nach Juans Anmeldung: Zimmer 1/2/3 werden geladen, Praxisleitungs-Verwaltung sichtbar. Keine echten Patienteneinträge zu Testzwecken angelegt. Kein Ersatz für fachliche Praxisabnahme.
+- Responsive Messung der Scribe-Ansicht bei 390 und 768 Pixeln: Dokumentbreite entspricht Viewport, kein horizontaler Überlauf in `main`. UI-Nachbesserung: Zimmer direkt bei Patient/Behandlungsart, Scribe-Farbvariablen, Auswahlpfeil mit 12 Pixel Innenabstand und reservierter Textfläche, fehlendes Zimmer am Bestätigungsbutton sichtbar. Zimmerauswahl bleibt bei Wechsel der Behandlungsart erhalten, wird bei Patientenwechsel geleert.
+
+## Nächster Blocker
+
+`vercel env ls production` im verifizierten Projekt `prj_eg9lIA7SqjiZOtfhTnEX2SzJHrm7` zeigt `CRON_SECRET`, aber **kein** `ANIMASIGN_GITHUB_ACTIONS_TOKEN`. Den freigegebenen Dispatch daher nicht aktiviert. Token niemals in diesen Bericht oder Chat kopieren. Hinterlegung in diesem Projekt/Production und Bestätigung durch Juan erforderlich.
+
+Der GitHub-Zeitplan bleibt unverändert dauerhaft bestehen. Mail-Heartbeat und dessen tatsächliche Zustellung sind noch nicht abgenommen. Kein neuer 48h-Beobachtungsbeginn. Kein „Patient aufrufen“ für den Leitstand gebaut, keine neue Rolle oder Leitstand-Schemaänderung.
