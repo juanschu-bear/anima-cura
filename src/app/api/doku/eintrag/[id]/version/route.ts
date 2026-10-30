@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 import { roomInputError } from '@/lib/scribe-rooms';
+import { versionPrecondition } from '@/lib/scribe-version-precondition';
+import { t } from '@/lib/i18n';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type VersionBody = {
+  expected_version?: number;
+  patient_id?: string;
   zimmer_version_id?: string | null;
   text: string;
   zaehne?: string[];
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .single();
 
   if (loadError || !alt) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (versionPrecondition(body,alt)) return NextResponse.json({error:t('scribe.clarify.conflict')},{status:409});
 
   const neueVersion = (alt.version as number) + 1;
   const roomError = roomInputError(body.zimmer_version_id, false);

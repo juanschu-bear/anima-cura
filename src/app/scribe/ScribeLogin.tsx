@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { pruefeEmail } from "@/lib/validation/feldpruefung";
 
-export default function ScribeLogin() {
+export default function ScribeLogin({destination='/scribe'}:{destination?:string}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
@@ -37,7 +37,7 @@ export default function ScribeLogin() {
       setFehler("Anmeldung fehlgeschlagen. E-Mail und Passwort pruefen.");
       return;
     }
-    router.push("/scribe");
+    router.push(destination);
     router.refresh();
   }
 

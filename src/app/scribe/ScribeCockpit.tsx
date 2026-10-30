@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/db/supabase";
 import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error";
 import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
+import ClarifyEntry from './ClarifyEntry';
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import { t } from '@/lib/i18n';
 
@@ -416,15 +417,27 @@ function PwFeld({ wert, setzen, platzhalter, label, onEnter }: { wert: string; s
 export default function ScribeCockpit({
   nutzerName,
   nutzerKuerzel,
+  initialEntry,
+  initialPatient,
 }: {
   nutzerName: string;
   nutzerKuerzel: string | null;
+  initialEntry?: string;
+  initialPatient?: string;
 }) {
   const router = useRouter();
   const { thema, wechseln } = useThema();
   const [detail, setDetail] = useState<TagesEintrag | null>(null);
   const [detailLaeuft, setDetailLaeuft] = useState(false);
   const [detailFehler, setDetailFehler] = useState<string | null>(null);
+  useEffect(() => {
+    if (!initialEntry || !initialPatient) return;
+    const controller = new AbortController();
+    fetch(`/api/doku/eintrag/${encodeURIComponent(initialEntry)}?patient=${encodeURIComponent(initialPatient)}`, {cache:'no-store',signal:controller.signal})
+      .then(async response => {const result=await response.json();if(!response.ok)throw new Error(result.error);return result.eintrag;})
+      .then(setDetail).catch(error=>{if(error.name!=='AbortError')setLadefehler(error.message);});
+    return()=>controller.abort();
+  },[initialEntry,initialPatient]);
   const [detailPatientSuche, setDetailPatientSuche] = useState("");
   const [detailPatientTreffer, setDetailPatientTreffer] = useState<PatientTreffer[]>([]);
   const [spickOffen, setSpickOffen] = useState(false);
@@ -2474,9 +2487,8 @@ export default function ScribeCockpit({
                   </table>
                 </div>
               )}
-              <p className="detailmeta" style={{ marginTop: 10 }}>
-                Nur Ansicht. Änderungen laufen über den Eintrag selbst als neue Version.
-              </p>
+              {detail.status === 'bestaetigt' && <ClarifyEntry key={detail.id} entry={detail} onSaved={updated=>setDetail(current=>current?{...current,...updated}:current)}/>}
+              {detail.status === 'entwurf' && <button className="neben" onClick={()=>entwurfLaden(detail)}>{t('scribe.clarify.draft')}</button>}
               {detail.ivoris_push_status === "fehler" && (
                 <p className="detailfehlerbox">
                   <b>Hinweis:</b> Das ist kein Praxisfehler.

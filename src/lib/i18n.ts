@@ -7,6 +7,22 @@
 
 import { treatmentTranslations } from './treatment-i18n';
 const translations: Record<string, { de: string; en: string }> = {
+  'scribe.clarify.open': {de:'Dokumentation klären',en:'Clarify documentation'},
+  'scribe.clarify.invalid': {de:'Ungültige Auswahl.',en:'Invalid selection.'},
+  'scribe.clarify.login': {de:'Anmeldung erforderlich.',en:'Sign-in required.'},
+  'scribe.clarify.denied': {de:'Keine Berechtigung.',en:'Access denied.'},
+  'scribe.clarify.load': {de:'Eintrag konnte nicht geladen werden.',en:'Entry could not be loaded.'},
+  'scribe.clarify.unavailable': {de:'Eintrag nicht verfügbar.',en:'Entry unavailable.'},
+  'scribe.clarify.draft': {de:'Entwurf bearbeiten',en:'Edit draft'},
+  'scribe.clarify.saved': {de:'Neue Version gespeichert. Kehre zum Leitstand zurück, um die Hinweise erneut prüfen zu lassen.',en:'New version saved. Return to the dashboard to recheck the notices.'},
+  'scribe.clarify.help': {de:'Hier kannst du den Originaltext fachlich korrigieren. Die Bestätigung erstellt eine neue Version mit Begründung. Sie bestätigt keinen vollständigen Bestand und keine Abrechnung.',en:'Correct the source text here. Confirmation creates a new version with a reason. It does not approve complete inventory or billing.'},
+  'scribe.clarify.text': {de:'Korrigierte Dokumentation',en:'Corrected documentation'},
+  'scribe.clarify.structured': {de:'Vorhandene Zahnfelder und Abrechnungspositionen bleiben unverändert. Diese Textkorrektur ersetzt nicht deren fachliche Prüfung im Eintrag bzw. Abrechnungsmodul.',en:'Existing tooth fields and billing items remain unchanged. This text correction does not replace their review in the entry or billing module.'},
+  'scribe.clarify.reason': {de:'Begründung der Korrektur',en:'Reason for correction'},
+  'scribe.clarify.save': {de:'Korrektur als neue Version bestätigen',en:'Confirm correction as a new version'},
+  'scribe.clarify.cancel': {de:'Abbrechen',en:'Cancel'},
+  'scribe.clarify.failed': {de:'Korrektur konnte nicht gespeichert werden.',en:'Correction could not be saved.'},
+  'scribe.clarify.conflict': {de:'Der Eintrag wurde zwischenzeitlich geändert oder ist nicht mehr verfügbar. Bitte neu öffnen und die aktuelle Version prüfen.',en:'The entry has changed or is no longer available. Reopen it and review the current version.'},
   'scribe.room.label': { de: 'Zimmer', en: 'Room' },
   'scribe.room.required': { de: 'Bitte vor dem Speichern ein Zimmer auswählen.', en: 'Please choose a room before saving.' },
   'scribe.room.choose': { de: 'Zimmer auswählen …', en: 'Choose a room …' },
