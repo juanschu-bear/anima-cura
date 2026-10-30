@@ -1,4 +1,6 @@
 "use client";
+import ScribeRoomPicker from '@/components/ScribeRoomPicker';
+import { t } from '@/lib/i18n';
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AnimusHud } from "@/vendor/animus-react";
@@ -285,6 +287,7 @@ export default function AnimusCockpit({
   }, [byId, oeffneKarte, resolvePatient]);
 
   const merkeDokuPatient = useCallback((_entwurf: DokuEntwurf, patient: string) => {
+    setZimmerVersionId('');
     if (patient.trim()) letzterName.current = patient.trim();
   }, []);
 
@@ -320,10 +323,12 @@ export default function AnimusCockpit({
 
   // Bestaetigen in der Doku-Flaeche: Entwurf ueber die eingeloggte Session in die
   // Akte schreiben. Bei Fehler wird geworfen, damit die Flaeche offen bleibt.
+  const [zimmerVersionId, setZimmerVersionId] = useState('');
   const speichern = useCallback(
     async (entwurf: DokuEntwurf) => {
       setHinweis(null);
       try {
+        if (!zimmerVersionId) throw new Error(t('scribe.room.required'));
         const patientId = await findePatientId(entwurf);
 
         const res = await fetch("/api/doku/eintrag", {
@@ -331,6 +336,7 @@ export default function AnimusCockpit({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             patient_id: patientId,
+            zimmer_version_id: zimmerVersionId,
             vorlage_id: entwurf.vorlage_id ?? null,
             behandlungsart: entwurf.behandlungsart ?? null,
             termin_typ: entwurf.termin_typ ?? null,
@@ -348,15 +354,15 @@ export default function AnimusCockpit({
           throw new Error(json.error ?? "Eintrag konnte nicht gespeichert werden.");
         }
 
-        const json = (await res.json()) as { eintrag: { version: number } };
-        setHinweis({ art: "ok", text: `Eintrag bestaetigt (Version ${json.eintrag.version}).` });
+        const json = (await res.json()) as { eintrag: { version: number }; warnung?: string };
+        setHinweis(json.warnung ? {art:'fehler',text:t('scribe.room.historyWarning')} : { art: "ok", text: `Eintrag bestaetigt (Version ${json.eintrag.version}).` });
       } catch (e) {
         const text = e instanceof Error ? e.message : "Eintrag konnte nicht gespeichert werden.";
         setHinweis({ art: "fehler", text });
         throw e instanceof Error ? e : new Error(text);
       }
     },
-    [findePatientId]
+    [findePatientId, zimmerVersionId]
   );
 
   const alter = karte ? berechneAlter(karte.geburtsdatum) : null;
@@ -364,6 +370,9 @@ export default function AnimusCockpit({
   return (
     <div className="animus-cockpit" style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}>
       <style>{CARD_CSS}</style>
+      <div style={{position:'absolute',top:80,left:20,zIndex:100,maxWidth:'calc(100% - 40px)'}}>
+        <ScribeRoomPicker value={zimmerVersionId} onChange={setZimmerVersionId} />
+      </div>
 
       <AnimusHud
         ref={hudRef}

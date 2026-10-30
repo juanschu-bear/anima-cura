@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
+import { roomInputError } from '@/lib/scribe-rooms';
+export { GET, PATCH } from '@/lib/scribe-room-api';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type EintragBody = {
+  zimmer_version_id?: string | null;
   patient_id: string;
   behandlungsfall_id?: string | null;
   vorlage_id?: string | null;
@@ -54,6 +57,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!body.patient_id) return NextResponse.json({ error: "patient_id fehlt" }, { status: 400 });
+  const roomError = roomInputError(body.zimmer_version_id, !body.entwurf_id);
+  if (roomError) return NextResponse.json({ error: roomError }, { status: 422 });
 
   const bestaetigen = body.bestaetigen !== false; // Default: bestaetigen (Cockpit-Flow)
   const mitarbeiterKuerzel = normalizeStaffInitials(profile?.kuerzel);
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
 
   // Inhaltsfelder, fuer Insert und Update gleich
   const daten = {
+    ...(body.zimmer_version_id !== undefined ? { zimmer_version_id: body.zimmer_version_id || null } : {}),
     behandlungsfall_id: body.behandlungsfall_id ?? null,
     vorlage_id: body.vorlage_id ?? null,
     behandlungsart: body.behandlungsart ?? null,

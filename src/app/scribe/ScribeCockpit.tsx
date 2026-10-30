@@ -7,6 +7,8 @@ import { createBrowserClient } from "@/lib/db/supabase";
 import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error";
 import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
+import ScribeRoomPicker from '@/components/ScribeRoomPicker';
+import { t } from '@/lib/i18n';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
@@ -36,6 +38,9 @@ type Vorlage = {
 };
 type PatientTreffer = { id: string; name: string; alter: number | null };
 type TagesEintrag = {
+  zimmer_version_id: string | null;
+  zimmer_name?: string | null;
+  created_at: string;
   id: string;
   status: string;
   version: number;
@@ -481,6 +486,7 @@ export default function ScribeCockpit({
   const [sendet, setSendet] = useState(false);
   const [speichert, setSpeichert] = useState(false);
   const [entwurfId, setEntwurfId] = useState<string | null>(null);
+  const [zimmerVersionId, setZimmerVersionId] = useState('');
   const [zwischenInfo, setZwischenInfo] = useState<string | null>(null);
   const [bestaetigt, setBestaetigt] = useState<{ id: string; version: number; am: string; terminDatum: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<"offen" | "laeuft" | "gepusht" | "fehler">("offen");
@@ -814,6 +820,7 @@ export default function ScribeCockpit({
   }
 
   function resetSitzung() {
+    setZimmerVersionId('');
     setBestaetigt(null);
     setDirty(false);
     setAenderungsgrund("");
@@ -1224,6 +1231,7 @@ export default function ScribeCockpit({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        zimmer_version_id: zimmerVersionId || null,
         text: komposition.text,
         zaehne: zaehne.map(String),
         variablen: {
@@ -1260,6 +1268,7 @@ export default function ScribeCockpit({
     setAenderungsgrund("");
     setPushStatus("offen");
     setPushInfo(null);
+    if (json.warnung) setAktionsFehler(t('scribe.room.historyWarning'));
     await ladeHeute();
   }
 
@@ -1275,6 +1284,7 @@ export default function ScribeCockpit({
   }
 
   async function bestaetigen() {
+    if (!zimmerVersionId && !entwurfId && !bestaetigt && !demo) { setAktionsFehler(t('scribe.room.required')); return; }
     if (bestaetigt && dirty) {
       await neueVersion();
       return;
@@ -1301,6 +1311,7 @@ export default function ScribeCockpit({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         patient_id: patient.id,
+        zimmer_version_id: zimmerVersionId || null,
         vorlage_id: module[0].id,
         behandlungsart: art,
         termin_typ: module.map((m) => m.termin_typ).join("+"),
@@ -1340,6 +1351,7 @@ export default function ScribeCockpit({
     setEntwurfId(null);
     setZwischenInfo(null);
     setPushStatus("offen");
+    if (json.warnung) setAktionsFehler(t('scribe.room.historyWarning'));
     await ladeHeute();
   }
 
@@ -1360,6 +1372,7 @@ export default function ScribeCockpit({
   // Zwischenspeichern: aktuellen Stand als Entwurf sichern, ohne Pflichtpruefung, ohne ivoris.
   // Mehrfaches Speichern aktualisiert denselben Entwurf (entwurfId).
   async function zwischenspeichern() {
+    if (!zimmerVersionId && !entwurfId && !demo) { setAktionsFehler(t('scribe.room.required')); return; }
     if (!patient || module.length === 0) {
       setAktionsFehler("Zum Zwischenspeichern bitte zuerst Patient und Leistung waehlen.");
       return;
@@ -1376,6 +1389,7 @@ export default function ScribeCockpit({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         patient_id: patient.id,
+        zimmer_version_id: zimmerVersionId || null,
         vorlage_id: module[0].id,
         behandlungsart: art,
         termin_typ: module.map((m) => m.termin_typ).join("+"),
@@ -1414,6 +1428,7 @@ export default function ScribeCockpit({
   // Einen gespeicherten Entwurf aus der Tagesliste zurueck in die Eingabemaske laden.
   function entwurfLaden(e: TagesEintrag) {
     if (e.status !== "entwurf") return;
+    setZimmerVersionId(e.zimmer_version_id ?? '');
     const alter = e.patients?.geburtsdatum ? berechneAlter(e.patients.geburtsdatum) : null;
     setPatient({ id: e.patient_id, name: e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt", alter });
     setSuche("");
@@ -1629,6 +1644,7 @@ export default function ScribeCockpit({
       </section>
 
       <main className="buehne">
+        <ScribeRoomPicker value={zimmerVersionId} onChange={id=>{setZimmerVersionId(id);bearbeitet();}} legacy={!!entwurfId || !!bestaetigt} disabled={sendet || speichert} />
         {/* ===== Doku-Wache ===== */}
         <div className="listenkopf">
           <p className="abschnitt" style={{ margin: 0 }}>Tagescockpit · Doku-Wache</p>
@@ -2433,6 +2449,8 @@ export default function ScribeCockpit({
                 <span className={`pille ${wachePille(detail).cls}`} style={{ position: "static" }}>{wachePille(detail).text}</span>
               </div>
               <div className="detailmeta">
+                {detail.zimmer_name || t('scribe.room.unknown')}
+                {detail.created_at && ` · ${t('scribe.room.created')} ${new Date(detail.created_at).toLocaleString('de-DE', {dateStyle:'short',timeStyle:'short'})}`}<br />
                 {leistungsName(detail.termin_typ, detail.behandlungsart)} · Version {detail.version}
                 {detail.bestaetigt_am && ` · bestätigt ${new Date(detail.bestaetigt_am).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}`}
                 {detail.zaehne?.length > 0 && ` · Zähne: ${detail.zaehne.join(", ")}`}
