@@ -45,6 +45,15 @@ Die zuerst erhobenen 2.680 negativen Archivzeilen bezogen sich auf das gesamte A
 - Keine neue Rolle, kein Schema, keine Migration, keine Änderung am Bank-Sync, Matcher, Ratenplan oder Mahnlauf. Vorhandene fremde Worktree-Änderungen bleiben unangetastet und werden nicht mitcommittet.
 - Deployment und fachliche Abnahme werden getrennt nachgewiesen; keine fertige automatische Rücklastschriftverarbeitung behauptet.
 
+## Veröffentlichung und CI-Nachprüfung
+
+- Implementierung: Commit `bace700` auf `origin/main`. Git-basierter Produktions-Build erfolgreich: `dpl_2jqGtX41FnJyZiHE6eEfsXGhHT1a`, https://anima-cura-ji0bq8mwr-juanschu-bears-projects.vercel.app, Alias https://animacura.io.
+- Angemeldete Live-Sichtprüfung unter `/zahlungen`: neue Überschrift „Bankrückgaben · Prüfstand“ und der ausdrückliche Hinweis, dass eine leere Zahlungsliste keine fehlenden Rücklastschriften beweist, sichtbar. Keine Synchronisierung oder finanzielle Aktion ausgelöst.
+- Erneuter Produktions-Schemacheck nach Veröffentlichung am 31.10.2026, 02:51:59 Europe/Berlin: grün, einschließlich 42 RPC-Verträgen.
+- GitHub-Lauf `41157242110` stoppte dagegen bei drei bereits bestehenden Typfehlern im Zimmer-Test: SQL-Abfrageergebnisse aus PGlite waren als `unknown` typisiert (`scribe-rooms.test.ts`, drei Zugriffe auf `zimmer_version_id`). Das ist kein Fehler in der neuen Rückgabenlogik und kein JSON-/API-Fehler. Vercel veröffentlichte unabhängig vom GitHub-Testlauf; der erfolgreiche Build allein ist deshalb keine vollständig grüne CI-Abnahme.
+- Eng begrenzte Korrektur: drei SQL-Abfragen im Test erhalten den Ergebnistyp `{zimmer_version_id: string | null}`. Keine Assertion entfernt, kein Test abgeschwächt, kein Produktionscode für Zimmer verändert. Lokale Typprüfung, alle sieben Zimmer-/Praxiswissen-Tests und abschließender Folge-Build bestanden. Die neue GitHub-Prüfung wird vor Abschluss kontrolliert.
+- Fachliche Abnahme der automatischen Finanzkorrektur: **offen / nicht implementiert**. Sämtliche echten Zahlungen, Rechnungsstände und Raten blieben unverändert.
+
 ## Nächster Schritt A2b
 
 1. Die 144 Betragsabweichungen aus den vorhandenen Bankinformationen aufschlüsseln: ursprünglicher Hauptbetrag, tatsächlicher Abgang, separat belegte Zusatzkosten. Eine höhere Rückgabe allein berechtigt nicht zur Belastung des Patienten mit der Differenz.

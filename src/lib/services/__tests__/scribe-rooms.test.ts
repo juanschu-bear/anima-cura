@@ -36,7 +36,7 @@ test('room migration: required new entries, unchanged legacy, append-only histor
       ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role;
     `);
     await db.exec(await readFile('supabase/migrations/068_scribe_rooms.sql','utf8'));
-    assert.equal((await db.query('SELECT zimmer_version_id FROM doku_eintraege')).rows[0].zimmer_version_id,null);
+    assert.equal((await db.query<{zimmer_version_id:string|null}>('SELECT zimmer_version_id FROM doku_eintraege')).rows[0].zimmer_version_id,null);
     await db.exec("UPDATE doku_eintraege SET status='bestaetigt',version=2 WHERE id='cccccccc-cccc-cccc-cccc-cccccccccccc'");
     await assert.rejects(db.exec('INSERT INTO doku_eintraege DEFAULT VALUES'),/Zimmer auswählen/);
     const room = (await db.query<{id:string;room_id:string}>('SELECT * FROM scribe_room_versions LIMIT 1')).rows[0];
@@ -45,7 +45,7 @@ test('room migration: required new entries, unchanged legacy, append-only histor
     await assert.rejects(db.query("INSERT INTO scribe_room_versions(room_id,version,name,created_by) VALUES($1,2,'Other',auth.uid())",[room.room_id]),/row-level security/);
     const entry=(await db.query<{id:string}>('INSERT INTO doku_eintraege(zimmer_version_id) VALUES($1) RETURNING id',[room.id])).rows[0];
     await db.query('INSERT INTO doku_eintrag_versionen(eintrag_id,version) VALUES($1,1)',[entry.id]);
-    assert.equal((await db.query('SELECT zimmer_version_id FROM doku_eintrag_versionen')).rows[0].zimmer_version_id,room.id);
+    assert.equal((await db.query<{zimmer_version_id:string|null}>('SELECT zimmer_version_id FROM doku_eintrag_versionen')).rows[0].zimmer_version_id,room.id);
     await assert.rejects(db.query('INSERT INTO doku_eintrag_versionen(eintrag_id,version) VALUES($1,2)',[entry.id]),/inzwischen geändert/);
     await db.exec("SET test.uid='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'");
     await db.query("INSERT INTO scribe_room_versions(room_id,version,name,active,created_by) VALUES($1,2,'<img onerror=alert(1)>',false,auth.uid())",[room.room_id]);
@@ -75,6 +75,6 @@ test('room migration: required new entries, unchanged legacy, append-only histor
     }
     await db.exec(await readFile('docs/reports/scribe-rooms-068-rollback.sql','utf8'));
     await db.exec('INSERT INTO doku_eintraege DEFAULT VALUES');
-    assert.equal((await db.query('SELECT zimmer_version_id FROM doku_eintrag_versionen')).rows[0].zimmer_version_id,room.id);
+    assert.equal((await db.query<{zimmer_version_id:string|null}>('SELECT zimmer_version_id FROM doku_eintrag_versionen')).rows[0].zimmer_version_id,room.id);
   } finally {await db.close();}
 });
