@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 import { roomInputError } from '@/lib/scribe-rooms';
+import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // dort entsteht ein zusaetzlicher Korrektur-Eintrag)
     ivoris_push_status: "ausstehend",
   };
+
+  // Validate the exact merged payload which will become this version, including
+  // retained positions/selection when a correction changed only the text.
+  const check = await checkScribeConsistency(supabase, { ...alt, ...update });
+  if (!check.canConfirm) return scribeConsistencyFailure(check, request.url);
 
   const { data: eintrag, error: updError } = await supabase
     .from("doku_eintraege")

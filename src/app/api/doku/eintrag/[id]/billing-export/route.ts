@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { prepareScribeBillingExport } from "@/lib/billing-foundation";
 import { t } from "@/lib/i18n";
+import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const { data: entry, error } = await supabase
     .from("doku_eintraege")
-    .select("id, version, status, bestaetigt_am, positionen")
+    .select("id, version, status, bestaetigt_am, positionen, vorlage_id, behandlungsart, termin_typ, text, auswahl, variablen, zaehne")
     .eq("id", params.id)
     .single();
   if (error || !entry) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
@@ -31,6 +32,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const locale = new URL(_request.url).searchParams.get("lang") === "en" ? "en" : "de";
+  // Existing confirmed entries also need a current consistency check. Reading
+  // them never repairs history or re-confirms a financial entitlement.
+  const check = await checkScribeConsistency(supabase, entry);
+  if (!check.canConfirm) return scribeConsistencyFailure(check, _request.url);
   const prepared = prepareScribeBillingExport(entry.positionen);
   if (!prepared.ok) return NextResponse.json({
     status: "needs_position_review",

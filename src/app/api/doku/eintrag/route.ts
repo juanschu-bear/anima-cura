@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 import { roomInputError } from '@/lib/scribe-rooms';
+import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
 export { GET, PATCH } from '@/lib/scribe-room-api';
 
 export const runtime = "nodejs";
@@ -74,6 +75,13 @@ export async function POST(request: NextRequest) {
     body.termin_datum && /^\d{4}-\d{2}-\d{2}$/.test(body.termin_datum)
       ? body.termin_datum
       : new Date().toISOString().slice(0, 10);
+
+  // Fail closed before either INSERT or draft promotion. Drafts remain savable;
+  // a client-supplied status/review flag never bypasses the server check.
+  if (bestaetigen) {
+    const check = await checkScribeConsistency(supabase, body);
+    if (!check.canConfirm) return scribeConsistencyFailure(check, request.url);
+  }
 
   // Inhaltsfelder, fuer Insert und Update gleich
   const daten = {
