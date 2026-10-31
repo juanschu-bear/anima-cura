@@ -3,6 +3,7 @@ export interface ReturnBankRow {
   id: string; providerId: string; connectionId: string | null; accountId: string | null;
   amount: number | string | null; date: string | null; currency: string | null;
   purpose: string | null; reference: string | null; counterpartIban: string | null;
+  mandateReference?: string | null; creditorId?: string | null;
   potentialDuplicate?: boolean; adjustingEntry?: boolean;
 }
 export interface ReturnWorkingRow {
@@ -27,6 +28,12 @@ export interface BankReturnReview {
   patientId: string | null; returnCents: number | null;
   reason: ReturnReviewReason; canApply: false;
   affectedInvoiceIds: string[]; affectedRateIds: string[];
+  amounts: {
+    originalCents: number; debitedCents: number; differenceCents: number;
+    bankFeeCents: null; patientFeeCents: null;
+  } | null;
+  // Same mandate is context only, not proof of which instalment was returned.
+  relatedMandateOriginalIds: string[];
 }
 
 // Do not round uncertain input into a financially valid amount.
@@ -54,6 +61,12 @@ function dateValid(value: string | null): value is string {
   return !!value&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
 }
 function scope(row: ReturnBankRow) {return JSON.stringify([row.connectionId,row.accountId,row.currency,reference(row.reference)]);}
+function cleanIban(value: string | null) {return value?.replace(/\s/g,'').toUpperCase();}
+function mandateScope(row: ReturnBankRow): string | null {
+  const mandate=reference(row.mandateReference??null), creditor=reference(row.creditorId??null), iban=cleanIban(row.counterpartIban);
+  if(!row.connectionId||!row.accountId||row.currency!=='EUR'||!mandate||!creditor||!iban)return null;
+  return JSON.stringify([row.connectionId,row.accountId,row.currency,mandate,creditor,iban]);
+}
 
 export function reviewBankReturns(input: {
   bank: ReturnBankRow[]; working: ReturnWorkingRow[]; allocations: ReturnAllocation[];
@@ -65,29 +78,41 @@ export function reviewBankReturns(input: {
   const findings=bank.filter(row=>Number(row.amount)<0&&hasBankReturnIndication(row.purpose)).map(row=>{
     const cents=bankAmountCents(row.amount);
     const result:BankReturnReview={returnId:row.id,originalId:null,transactionId:null,patientId:null,
-      returnCents:cents===null?null:Math.abs(cents),reason:'source_invalid',canApply:false,affectedInvoiceIds:[],affectedRateIds:[]};
+      returnCents:cents===null?null:Math.abs(cents),reason:'source_invalid',canApply:false,affectedInvoiceIds:[],affectedRateIds:[],amounts:null,relatedMandateOriginalIds:[]};
     const finish=(reason:ReturnReviewReason)=>({...result,reason});
     if(cents===null||!row.id||!row.providerId||!row.connectionId||!row.accountId||row.currency!=='EUR'||!dateValid(row.date)||row.potentialDuplicate||row.adjustingEntry)return finish('source_invalid');
     if(bank.filter(r=>r.providerId===row.providerId).length!==1)return finish('source_conflict');
-    if(!reference(row.reference))return finish('reference_missing');
+    if(!reference(row.reference)){
+      const mandate=mandateScope(row);
+      if(mandate)result.relatedMandateOriginalIds=Array.from(new Set(bank.filter(r=>
+        r.id&&r.providerId&&(bankAmountCents(r.amount)??0)>0&&dateValid(r.date)&&r.date<=row.date!
+        &&!r.potentialDuplicate&&!r.adjustingEntry&&mandateScope(r)===mandate
+      ).map(r=>r.id))).sort();
+      // Even a single candidate does not prove completeness of the bank archive.
+      return finish('reference_missing');
+    }
     const originals=(incoming.get(scope(row))||[]).filter(r=>dateValid(r.date)&&r.date<=row.date!);
     if(!originals.length)return finish('original_missing');
     if(originals.length!==1)return finish('original_ambiguous');
     const original=originals[0];result.originalId=original.id;
-    if(bank.filter(r=>r.providerId===original.providerId).length!==1||original.potentialDuplicate||original.adjustingEntry)return finish('source_conflict');
-    const cleanIban=(v:string|null)=>v?.replace(/\s/g,'').toUpperCase();
+    if(!original.id||!original.providerId||bank.filter(r=>r.providerId===original.providerId).length!==1||original.potentialDuplicate||original.adjustingEntry)return finish('source_conflict');
     if(row.counterpartIban&&original.counterpartIban&&cleanIban(row.counterpartIban)!==cleanIban(original.counterpartIban))return finish('source_conflict');
-    // Partial returns and combined fees cannot be represented by mirroring the
-    // existing full-allocation reversals. Never derive a fee from the difference.
-    if(bankAmountCents(original.amount)!==result.returnCents)return finish('amount_difference');
+    for(const field of ['mandateReference','creditorId'] as const){
+      const returned=reference(row[field]??null), received=reference(original[field]??null);
+      if(returned&&received&&returned!==received)return finish('source_conflict');
+    }
+    const originalCents=bankAmountCents(original.amount)!;
+    result.amounts={originalCents,debitedCents:result.returnCents!,differenceCents:result.returnCents!-originalCents,bankFeeCents:null,patientFeeCents:null};
+    // Follow the original payment's existing evidence even when the debit differs.
+    // The difference remains unresolved: never a fee, invoice or reversal amount.
     const sources=working.filter(w=>w.providerId===original.providerId);
     if(sources.length!==1)return finish('working_source_missing');
     const tx=sources[0];result.transactionId=tx.id;
-    if(tx.connectionId!==original.connectionId||bankAmountCents(tx.amount)!==result.returnCents)return finish('source_conflict');
+    if(tx.connectionId!==original.connectionId||bankAmountCents(tx.amount)!==originalCents)return finish('source_conflict');
     if(!tx.patientId||!['auto','manuell'].includes(tx.matchingStatus||''))return finish('patient_assignment_unconfirmed');
     const history=allocations.filter(a=>a.transactionId===tx.id);
     if(history.some(a=>!['confirmed_auto','confirmed_manual'].includes(a.state)||a.reversalOf))return finish('prior_decision');
-    if(!history.length||history.some(a=>a.patientId!==tx.patientId||!Number.isSafeInteger(a.amountCents)||a.amountCents<=0)||history.reduce((s,a)=>s+a.amountCents,0)!==result.returnCents)return finish('allocation_missing_or_incomplete');
+    if(!history.length||history.some(a=>a.patientId!==tx.patientId||!Number.isSafeInteger(a.amountCents)||a.amountCents<=0)||history.reduce((s,a)=>s+a.amountCents,0)!==originalCents)return finish('allocation_missing_or_incomplete');
     if(new Set(history.map(a=>a.id)).size!==history.length)return finish('source_conflict');
     const allocationIds=new Set(history.map(a=>a.id));
     const invoiceHistory=invoiceAllocations.filter(a=>allocationIds.has(a.patientAllocationId));
@@ -99,9 +124,11 @@ export function reviewBankReturns(input: {
     result.patientId=tx.patientId;
     result.affectedInvoiceIds=Array.from(new Set(invoiceHistory.map(a=>a.invoiceId))).sort();
     result.affectedRateIds=Array.from(new Set(linkedRates.map(r=>r.id))).sort();
-    return finish('evidence_linked');
+    return finish(result.amounts.differenceCents===0?'evidence_linked':'amount_difference');
   });
   // Two distinct return bookings must never each reverse the same incoming payment.
-  for(const finding of findings){if(finding.originalId&&findings.filter(f=>f.originalId===finding.originalId).length>1){finding.reason='multiple_returns';}}
+  for(const finding of findings){if(finding.originalId&&findings.filter(f=>f.originalId===finding.originalId).length>1){
+    finding.reason='multiple_returns';finding.patientId=null;finding.affectedInvoiceIds=[];finding.affectedRateIds=[];
+  }}
   return findings;
 }

@@ -8,7 +8,7 @@ const outgoing:ReturnBankRow={...incoming,id:'raw-out',providerId:'bank-out',amo
 function fixture(){return {bank:[{...incoming},{...outgoing}],working:[{id:'tx',providerId:'bank-in',connectionId:'connection',amount:'67.81',patientId:'p',matchingStatus:'auto'}],allocations:[{id:'pa',transactionId:'tx',patientId:'p',amountCents:6781,state:'confirmed_auto',reversalOf:null as string|null}],invoiceAllocations:[{id:'ia',patientAllocationId:'pa',invoiceId:'invoice',amountCents:6781,state:'allocated_auto',reversalOf:null as string|null}],rates:[{id:'rate',patientId:'p',transactionId:'tx'}]};}
 test('exact reference chain locates affected records but never authorizes a mutation',()=>{
  const input=fixture(), before=structuredClone(input), result=reviewBankReturns(input);
- assert.deepEqual(result,[{returnId:'raw-out',originalId:'raw-in',transactionId:'tx',patientId:'p',returnCents:6781,reason:'evidence_linked',canApply:false,affectedInvoiceIds:['invoice'],affectedRateIds:['rate']}]);
+ assert.deepEqual(result,[{returnId:'raw-out',originalId:'raw-in',transactionId:'tx',patientId:'p',returnCents:6781,reason:'evidence_linked',canApply:false,affectedInvoiceIds:['invoice'],affectedRateIds:['rate'],amounts:{originalCents:6781,debitedCents:6781,differenceCents:0,bankFeeCents:null,patientFeeCents:null},relatedMandateOriginalIds:[]}]);
  assert.deepEqual(input,before);assert.deepEqual(reviewBankReturns(input),result);
 });
 test('ordinary outgoings, incoming text matches and explicit negation are not returns',()=>{
@@ -41,12 +41,52 @@ test('reused references cannot be disambiguated by coincidentally equal amounts'
  const f=fixture();f.bank.push({...incoming,id:'second',providerId:'second',amount:'90.00'});
  assert.equal(reviewBankReturns(f)[0].reason,'original_ambiguous');
 });
+test('exact payment reference cannot override conflicting mandate or creditor evidence',()=>{
+ for(const field of ['mandateReference','creditorId'] as const){
+  const f=fixture();f.bank[0][field]='original';f.bank[1][field]='different';const r=reviewBankReturns(f)[0];
+  assert.equal(r.reason,'source_conflict');assert.equal(r.amounts,null);assert.equal(r.patientId,null);
+ }
+});
 test('partial return and larger debit including possible fees require separate evidence',()=>{
- for(const amount of ['-30.00','-71.31']){const f=fixture();f.bank[1].amount=amount;assert.equal(reviewBankReturns(f)[0].reason,'amount_difference');assert.equal(reviewBankReturns(f)[0].patientId,null);}
+ for(const amount of ['-30.00','-71.31']){
+  const f=fixture();f.bank[1].amount=amount;const before=structuredClone(f),r=reviewBankReturns(f)[0];
+  assert.equal(r.reason,'amount_difference');assert.equal(r.patientId,'p');assert.equal(r.canApply,false);
+  assert.deepEqual(r.affectedInvoiceIds,['invoice']);assert.deepEqual(r.affectedRateIds,['rate']);
+  assert.deepEqual(r.amounts,{originalCents:6781,debitedCents:Math.abs(bankAmountCents(amount)!),differenceCents:Math.abs(bankAmountCents(amount)!)-6781,bankFeeCents:null,patientFeeCents:null});
+  assert.deepEqual(f,before);
+ }
+});
+test('amount differences do not bypass working source, allocation or invoice validation',()=>{
+ const f=fixture();f.bank[1].amount='-72.81';f.working[0].amount='72.81';assert.equal(reviewBankReturns(f)[0].reason,'source_conflict');
+ f.working[0].amount='67.81';f.allocations[0].amountCents=7281;assert.equal(reviewBankReturns(f)[0].reason,'allocation_missing_or_incomplete');
+ f.allocations[0].amountCents=6781;f.invoiceAllocations[0].amountCents=7281;const r=reviewBankReturns(f)[0];
+ assert.equal(r.reason,'invoice_allocation_conflict');assert.equal(r.patientId,null);assert.equal(r.amounts?.differenceCents,500);
+});
+test('amount comparison survives missing downstream data without claiming a patient chain',()=>{
+ const f=fixture();f.bank[1].amount='-72.81';f.working=[];const r=reviewBankReturns(f)[0];
+ assert.equal(r.reason,'working_source_missing');assert.equal(r.amounts?.differenceCents,500);assert.equal(r.patientId,null);assert.deepEqual(r.affectedInvoiceIds,[]);
+});
+test('one same-mandate candidate is context, never an original payment decision',()=>{
+ const f=fixture();for(const r of f.bank){r.reference=null;r.mandateReference='MANDATE';r.creditorId='CREDITOR';}
+ const before=structuredClone(f),r=reviewBankReturns(f)[0];
+ assert.equal(r.reason,'reference_missing');assert.deepEqual(r.relatedMandateOriginalIds,['raw-in']);
+ assert.equal(r.originalId,null);assert.equal(r.transactionId,null);assert.equal(r.patientId,null);assert.equal(r.amounts,null);assert.equal(r.canApply,false);assert.deepEqual(f,before);
+});
+test('same mandate across months never selects the latest or equal-amount instalment',()=>{
+ const f=fixture();for(const r of f.bank){r.reference=null;r.mandateReference='MANDATE';r.creditorId='CREDITOR';}
+ f.bank.push({...f.bank[0],id:'older',providerId:'older',date:'2026-09-01',amount:'125.00'});
+ const r=reviewBankReturns(f)[0];assert.deepEqual(r.relatedMandateOriginalIds,['older','raw-in']);assert.equal(r.originalId,null);assert.equal(r.canApply,false);
+});
+test('mandate context requires same account, connection, creditor, mandate, IBAN and chronology',()=>{
+ for(const change of [{accountId:'other'},{connectionId:'other'},{currency:'USD'},{creditorId:'other'},{creditorId:null},{mandateReference:'other'},{mandateReference:'NOTPROVIDED'},{counterpartIban:null},{counterpartIban:'OTHER'},{date:'2026-10-04'},{date:'2026-02-30'},{potentialDuplicate:true},{adjustingEntry:true},{amount:'-67.81'}]){
+  const f=fixture();for(const r of f.bank){r.reference=null;r.mandateReference='MANDATE';r.creditorId='CREDITOR';}
+  Object.assign(f.bank[0],change);assert.deepEqual(reviewBankReturns(f)[0].relatedMandateOriginalIds,[]);
+ }
 });
 test('duplicate provider payload and repeated distinct returns cannot double reverse',()=>{
  const f=fixture();f.bank.push({...outgoing,id:'duplicate'});assert.ok(reviewBankReturns(f).every(r=>r.reason==='source_conflict'));
  const g=fixture();g.bank.push({...outgoing,id:'second-return',providerId:'second-return'});assert.ok(reviewBankReturns(g).every(r=>r.reason==='multiple_returns'&&!r.canApply));
+ assert.ok(reviewBankReturns(g).every(r=>r.patientId===null&&r.affectedInvoiceIds.length===0&&r.affectedRateIds.length===0));
 });
 test('working-source changes or missing working source block projection',()=>{
  const f=fixture();f.working=[];assert.equal(reviewBankReturns(f)[0].reason,'working_source_missing');
