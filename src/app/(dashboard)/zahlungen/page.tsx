@@ -1129,7 +1129,7 @@ export default function ZahlungenPage() {
       {/* Rücklastschriften */}
       <div className="stat-card">
         <h3 className="mb-2 text-xl font-bold" style={{ color: "var(--ac-text)" }}>
-          {t("payments.chargebacks", locale)}
+          {t("payments.chargebackReview", locale)}
         </h3>
         <p className="mb-4 text-sm" style={{ color: "var(--ac-text-soft)" }}>
           {t("payments.chargebacksDesc", locale)}
@@ -1153,7 +1153,7 @@ export default function ZahlungenPage() {
                     <td className="table-cell text-sm font-semibold">{tx.patients ? `${tx.patients.nachname}, ${tx.patients.vorname}` : getDisplaySender(tx) || "—"}</td>
                     <td className="table-cell text-right text-sm font-bold" style={{ color: "var(--ac-danger)" }}>{Number(tx.betrag).toLocaleString(locale === "en" ? "en-GB" : "de-DE")}€</td>
                     <td className="table-cell text-sm">{tx.verwendungszweck || t("payments.chargebacks.defaultReason", locale)}</td>
-                    <td className="table-cell text-sm" style={{ color: "var(--ac-warning)" }}>+3,50€</td>
+                    <td className="table-cell text-sm" style={{ color: "var(--ac-text-soft)" }}>{t("payments.chargebacks.unverifiedFee", locale)}</td>
                   </tr>
                 ))}
               </tbody>
