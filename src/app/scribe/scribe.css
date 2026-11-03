@@ -1214,3 +1214,10 @@
 .scribe details.weitere-details summary::-webkit-details-marker{display:none}
 .scribe .weitere-panel{margin-top:10px;padding:12px;border:1px solid var(--kante);border-radius:12px;
   background:var(--flaeche-soft)}
+/* Gründe der Konsistenzprüfung beim Bestätigen: je Problem ein Satz, Sprung zum Baustein, Entwurf sichern */
+.scribe .pruef-hinweise{flex-basis:100%;margin-top:10px;padding:14px 16px;border-radius:14px;background:var(--rot-soft);border:1px solid var(--rot);color:var(--schrift);display:grid;gap:8px}
+.scribe .pruef-hinweise strong{font-size:14px;color:var(--rot)}
+.scribe .pruef-hinweise ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.45}
+.scribe .pruef-hinweise .pruef-ort{margin-left:8px;padding:0;border:0;background:none;color:var(--primaer-tief);font:inherit;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer}
+.scribe .pruef-hinweise .pruef-fuss{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--gedeckt)}
+.scribe .gruppe.pruef-markiert{outline:2px solid var(--rot);outline-offset:6px;border-radius:12px}

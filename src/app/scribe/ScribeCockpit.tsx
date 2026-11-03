@@ -500,6 +500,8 @@ export default function ScribeCockpit({
   const [pwHinweis, setPwHinweis] = useState<{ ok: boolean; text: string } | null>(null);
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [aktionsFehler, setAktionsFehler] = useState<string | null>(null);
+  // Gründe der Konsistenzprüfung beim Bestätigen (422 needs_consistency_review), je Problem ein Satz vom Server.
+  const [pruefHinweise, setPruefHinweise] = useState<PruefHinweis[]>([]);
   const [dirty, setDirty] = useState(false);
   const [aenderungsgrund, setAenderungsgrund] = useState("");
   const [syncLaeuft, setSyncLaeuft] = useState(false);
@@ -1257,6 +1259,7 @@ export default function ScribeCockpit({
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
       setAktionsFehler(json.error ?? "Neue Version konnte nicht gespeichert werden.");
+      setPruefHinweise(pruefHinweiseAus(json));
       return;
     }
     const json = await res.json();
@@ -1308,6 +1311,7 @@ export default function ScribeCockpit({
     }
     setSendet(true);
     setAktionsFehler(null);
+    setPruefHinweise([]);
     const res = await fetch("/api/doku/eintrag", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1341,6 +1345,7 @@ export default function ScribeCockpit({
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
       setAktionsFehler(json.error ?? "Eintrag konnte nicht gespeichert werden.");
+      setPruefHinweise(pruefHinweiseAus(json));
       return;
     }
     const json = await res.json();
@@ -2060,7 +2065,7 @@ export default function ScribeCockpit({
                 : restOpts;
 
               return (
-                <div className="gruppe" key={`${m.termin_typ}:${g}`}>
+                <div className={`gruppe${pruefHinweise.some((h) => h.group === g && (!h.module || h.module === m.termin_typ)) ? " pruef-markiert" : ""}`} key={`${m.termin_typ}:${g}`} data-pruef-gruppe={`${m.termin_typ}:${g}`}>
                   <div className="gname">
                     {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
                     {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
@@ -2309,7 +2314,33 @@ export default function ScribeCockpit({
           {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
           {pushStatus === "fehler" && pushInfo && <span className="hinweis-fehlt">{pushInfo}</span>}
-          {aktionsFehler && <span className="hinweis-fehlt">{aktionsFehler}</span>}
+          {aktionsFehler && pruefHinweise.length === 0 && <span className="hinweis-fehlt">{aktionsFehler}</span>}
+          {pruefHinweise.length > 0 && (
+            <div className="pruef-hinweise" role="alert">
+              <strong>{t("scribe.consistency.ui.title")}</strong>
+              <ul>
+                {pruefHinweise.map((h, i) => {
+                  const mod = module.find((x) => x.termin_typ === h.module);
+                  const grp = mod && h.group ? mod.struktur.groups[h.group] : undefined;
+                  const ort = [module.length > 1 && mod ? anzeigeName(mod) : null, grp?.label ?? null].filter(Boolean).join(" · ");
+                  return (
+                    <li key={i}>
+                      {h.message}
+                      {ort && (
+                        <button type="button" className="pruef-ort" onClick={() => document.querySelector(`[data-pruef-gruppe="${h.module}:${h.group}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" })}>
+                          {t("scribe.consistency.ui.where")} {ort}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="pruef-fuss">
+                <button type="button" className="neben" onClick={zwischenspeichern} disabled={speichert}>{speichert ? t("scribe.consistency.ui.saving") : t("scribe.consistency.ui.saveDraft")}</button>
+                <span>{t("scribe.consistency.ui.draft")}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ===== Ausgänge ===== */}
@@ -2532,4 +2563,23 @@ export default function ScribeCockpit({
 
     </>
   );
+}
+
+/** Ein Grund der Konsistenzprüfung, wie ihn der Server in der 422-Antwort liefert. */
+type PruefHinweis = { code: string; message: string; module?: string; group?: string; positionIndex?: number };
+/** Liest die Gründe aus der Serverantwort; gleiche Sätze am gleichen Ort erscheinen nur einmal. */
+function pruefHinweiseAus(json: unknown): PruefHinweis[] {
+  const issues = (json as { consistency?: { issues?: unknown } })?.consistency?.issues;
+  if (!Array.isArray(issues)) return [];
+  const seen = new Set<string>();
+  const out: PruefHinweis[] = [];
+  for (const raw of issues) {
+    const i = raw as Partial<PruefHinweis>;
+    if (typeof i?.message !== "string" || !i.message.trim()) continue;
+    const key = `${i.message}|${i.module ?? ""}|${i.group ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ code: String(i.code ?? ""), message: i.message, module: typeof i.module === "string" ? i.module : undefined, group: typeof i.group === "string" ? i.group : undefined, positionIndex: typeof i.positionIndex === "number" ? i.positionIndex : undefined });
+  }
+  return out;
 }
