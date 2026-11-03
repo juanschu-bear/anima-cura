@@ -81,7 +81,8 @@ test('both jaws require their two bindings and two rows, not a duplicated quarte
 test('a single unconditioned wire row cannot cover both jaws with quantity one',()=>{
   const {input,template}=fixture();template.positionen=[{code:'BEMA 128a',text:'Belegte Bogenleistung'}];
   input.positionen=[input.positionen[0]];input.auswahl.kontrolle.bogen_uk=[1];input.text='MB-Kontrolle. Bogenwechsel OK 016. Bogenwechsel UK 016.';
-  assert.ok(codes(input,template).includes('wire_jaw_quantity_unproven'));
+  const result=codes(input,template);assert.ok(result.includes('wire_jaw_quantity_unproven'));
+  assert.ok(!result.includes('wire_position_unmapped'));
 });
 test('invalid references and hidden groups are configuration failures regardless of client positions',()=>{
   const {input,template}=fixture();template.positionen[0].if!.i=100;
@@ -98,9 +99,15 @@ test('malformed or duplicate selection is not repaired; posted review flags have
 });
 test('quantity-by-teeth needs actual teeth; no Math.max(1, missing) assumption',()=>{
   const {input,template}=fixture();template.positionen[0].count='zaehne';
-  assert.ok(codes(input,template).includes('position_quantity_unproven'));
+  const missing=codes(input,template);assert.ok(missing.includes('position_quantity_unproven'));
+  assert.ok(!missing.includes('position_unexpected_or_changed'));assert.ok(!missing.includes('expected_position_missing'));
   input.zaehne=['16'];assert.equal(assessScribeConsistency(input,[template]).canConfirm,true);
   input.zaehne=['16','16'];assert.ok(codes(input,template).includes('teeth_duplicate'));
+});
+test('missing archwire value blocks with one specific reason and mirrors the Cockpit text',()=>{
+  const {input,template}=fixture();template.struktur.groups.bogen_ok.opts[1].t='Bogenwechsel OK {bogen}.';
+  input.text='MB-Kontrolle. Bogenwechsel OK . Kein Wechsel UK. NT: Kontrolle.';input.variablen={bogen:''};
+  const result=codes(input,template);assert.deepEqual(result,['text_variable_unresolved']);
 });
 test('templates, variables and posted payload shape cannot be silently replaced with empty values',()=>{
   const {input,template}=fixture();
@@ -111,6 +118,13 @@ test('templates, variables and posted payload shape cannot be silently replaced 
   template.struktur.groups.bogen_ok.opts[1].t='Bogenwechsel OK {bogen}.';
   assert.ok(codes(input,template).includes('text_variable_unresolved'));
   input.variablen.bogen='016';assert.equal(assessScribeConsistency(input,[template]).canConfirm,true);
+});
+test('optional aligner range matches the Cockpit question marks without blocking',()=>{
+  const {input,template}=fixture();
+  template.struktur.groups.bogen_ok.opts[1].t='Ausgegeben von {von} bis {bis}.';
+  input.text='MB-Kontrolle. Ausgegeben von ? bis ?. Kein Wechsel UK. NT: Kontrolle.';
+  input.variablen={schienen_von:'',schienen_bis:''};
+  assert.equal(assessScribeConsistency(input,[template]).canConfirm,true);
 });
 test('stacked modules preserve multiplicities; inactive leftover selections do not add positions',()=>{
   const {input,template}=fixture();const other=structuredClone(template);other.id='second';other.termin_typ='extra';

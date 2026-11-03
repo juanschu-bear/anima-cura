@@ -49,7 +49,8 @@ test('confirmation and draft promotion reject broken mapping before any entry/hi
     const f=harness(entry,{broken:true});const response=await f.handle.POST(request({...f.body,entwurf_id,bestaetigen:true,canConfirm:true}));
     assert.equal(response.status,422);assert.deepEqual(f.writes,[]);
     const json=await response.json();assert.equal(json.status,'needs_consistency_review');
-    assert.ok(json.consistency.issues.some((i:{code:string})=>i.code==='template_rule_reference_invalid'));
+    const issue=json.consistency.issues.find((i:{code:string})=>i.code==='template_rule_reference_invalid');
+    assert.match(issue.message,/Positionsregel/);assert.equal(issue.module,'kontrolle');assert.equal(issue.group,'bogen');
   }
 });
 test('draft saving remains possible without a successful consistency review',async()=>{
@@ -85,4 +86,10 @@ test('all guarded routes enforce login and permission before loading template da
 test('an unavailable validation source never allows confirmation',async()=>{
   const f=harness(entry,{sourceFails:true});const response=await f.handle.POST(request(f.body));
   assert.equal(response.status,503);assert.equal(f.writes.length,0);assert.doesNotMatch(await response.text(),/secret/);
+});
+test('every issue in a 422 response contains a readable practice message',async()=>{
+  const f=harness(entry,{broken:true});const response=await f.handle.POST(request(f.body));
+  const json=await response.json();assert.equal(response.status,422);
+  assert.ok(json.consistency.issues.length>0);
+  assert.ok(json.consistency.issues.every((issue:{message?:string})=>typeof issue.message==='string'&&issue.message.length>20));
 });

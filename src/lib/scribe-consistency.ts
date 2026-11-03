@@ -41,6 +41,7 @@ export type ScribeConsistencyIssue = {
   positionIndex?: number;
   ruleIndex?: number;
   jaw?: 'OK' | 'UK';
+  variable?: string;
 };
 export type ScribeConsistencyResult = {
   ruleVersion: 'scribe-consistency-v1';
@@ -51,9 +52,10 @@ export type ScribeConsistencyResult = {
   issues: ScribeConsistencyIssue[];
 };
 export function consistencyResult(issues: ScribeConsistencyIssue[]): ScribeConsistencyResult {
-  return { ruleVersion: 'scribe-consistency-v1', status: issues.length ? 'blocked' : 'no_detected_conflict',
-    canConfirm: issues.length === 0, billingApproved: false,
-    coverage: ['template_references', 'selection_text', 'position_multiset', 'wire_change'], issues };
+  const unique = Array.from(new Map(issues.map(issue => [JSON.stringify(issue), issue])).values());
+  return { ruleVersion: 'scribe-consistency-v1', status: unique.length ? 'blocked' : 'no_detected_conflict',
+    canConfirm: unique.length === 0, billingApproved: false,
+    coverage: ['template_references', 'selection_text', 'position_multiset', 'wire_change'], issues:unique };
 }
 const norm = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
 const wireCode = (s: string) => /^(?:BEMA\s*(?:127[ab]|128[abc]|129)|GOZ\s*(?:6140|6150))$/i.test(s.trim());
@@ -104,8 +106,14 @@ export function assessScribeConsistency(raw: unknown, rawTemplates: unknown[]): 
       const field = ({von:'schienen_von',bis:'schienen_bis',bogen:'bogen'} as Record<string,string>)[key];
       const value = field ? input.variablen[field] : undefined;
       if (typeof value === 'string' && value.trim()) return value;
-      add({code:'text_variable_unresolved',scope:'text',module});
-      return '?';
+      // Product decision: the issued aligner range is optional. The Cockpit
+      // renders an omitted boundary as "?", so the server must validate the
+      // exact same text instead of blocking an explicitly optional field.
+      if (key === 'von' || key === 'bis') return '?';
+      add({code:'text_variable_unresolved',scope:'text',module,variable:key});
+      // Match the Cockpit's empty rendering for a missing archwire value. The
+      // dedicated issue remains blocking without producing text mismatch noise.
+      return key === 'bogen' ? '' : '?';
     });
   }
 
@@ -150,13 +158,18 @@ export function assessScribeConsistency(raw: unknown, rawTemplates: unknown[]): 
         add({code:'position_without_text_binding',scope:'template',module:slug,group:condition.g,ruleIndex});
       const count = position.count === 'zaehne' ? input.zaehne.length : 1;
       if (!count) add({code:'position_quantity_unproven',scope:'positions',module:slug,ruleIndex});
-      expected.push({code:position.code,text:position.text,anzahl:count});
+      // The Cockpit currently renders one proposal when no tooth is selected.
+      // Compare against that exact payload, but keep the dedicated missing-tooth
+      // issue blocking instead of adding misleading quantity/missing-line noise.
+      expected.push({code:position.code,text:position.text,anzahl:count || 1});
       if (wireCode(position.code)) {
         const evidence = condition ? fill(groups[condition.g].opts[condition.i].t, slug) : rendered.join('');
         const evidenceJaws = wireMentions(evidence).filter(m => m.performed && m.jaw);
         if (new Set(evidenceJaws.map(m => m.jaw)).size > count)
           add({code:'wire_jaw_quantity_unproven',scope:'positions',module:slug,ruleIndex});
-        else for (const mention of evidenceJaws) mappedWireJaws.add(mention.jaw!);
+        // The rule is mapped to those jaws even when its quantity is insufficient.
+        // Preserve that fact so the response reports the one actionable cause.
+        for (const mention of evidenceJaws) mappedWireJaws.add(mention.jaw!);
       }
     });
   }

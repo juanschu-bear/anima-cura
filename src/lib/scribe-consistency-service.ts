@@ -47,11 +47,19 @@ export async function checkScribeConsistency(db: Pick<SupabaseClient, 'from'>, r
 export function scribeConsistencyFailure(check: ScribeConsistencyResult, url: string) {
   const unavailable = check.issues.some(issue => issue.scope === 'source');
   const locale = new URL(url).searchParams.get('lang') === 'en' ? 'en' : 'de';
+  const issues = check.issues.map(issue => {
+    const suffix = issue.code === 'text_variable_unresolved' && issue.variable === 'bogen'
+      ? 'text_variable_unresolved_bogen'
+      : issue.code;
+    const key = `scribe.consistency.${suffix}`;
+    const translated = t(key, locale);
+    return {...issue, message: translated === key ? t('scribe.consistency.review_required', locale) : translated};
+  });
   return NextResponse.json({
     status: 'needs_consistency_review',
     // Existing translated message is already shown by the Cockpit's error path.
     // Claude owns the detailed visible issue labels/navigation, not this service.
     error: t(unavailable ? 'billing.loadError' : 'billing.issue.invalid_field', locale),
-    consistency: check,
+    consistency: {...check, issues},
   }, {status:unavailable ? 503 : 422,headers:{'Cache-Control':'private, no-store'}});
 }
