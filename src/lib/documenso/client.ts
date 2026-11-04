@@ -354,6 +354,26 @@ export async function getEnvelope(
   return { status: raw.status as EnvelopeStatus, raw };
 }
 
+/** Löscht einen nicht abgeschlossenen Envelope über die offizielle V2-API. */
+export async function deleteEnvelope(envelopeId: string): Promise<void> {
+  const { baseUrl, apiKey } = getConfig();
+  const res = await fetchDocumenso(`${baseUrl}/envelope/delete`, {
+    method: "POST",
+    headers: {
+      Authorization: apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ envelopeId }),
+  });
+  if (!res.ok) {
+    throw new DocumensoError(
+      `envelope/delete fehlgeschlagen (${res.status})`,
+      res.status,
+      await readError(res),
+    );
+  }
+}
+
 function extractUrl(data: unknown): string | null {
   if (typeof data === "string" && /^https?:\/\//.test(data)) return data;
   if (data && typeof data === "object") {
