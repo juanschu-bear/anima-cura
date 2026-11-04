@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
+import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -105,6 +106,9 @@ export async function POST(
   }
 
   try {
+    const patientDocument = await syncSignedAnamnesisToPatientDocuments(db, {
+      id: params.id,
+    });
     const result = await syncAnimaSignSubmission(params.id, {
       db,
       stages: ["patient", "document"],
@@ -113,12 +117,12 @@ export async function POST(
         document: { attemptNo: 0, retryCountOnFailure: 0 },
       },
     });
-
     return NextResponse.json({
       ok: true,
       matched_patient_id: resolvedPatientId,
       ivoris_patient_id: resolvedIvorisId,
       result,
+      patient_document: patientDocument,
     });
   } catch (error) {
     return NextResponse.json({

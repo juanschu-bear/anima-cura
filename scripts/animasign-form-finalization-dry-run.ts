@@ -1,6 +1,7 @@
 import { createServerClient } from "@/lib/db/supabase";
 import { validateIntakeAnswers } from "@/lib/services/intake-required-fields";
 import { isFormSignatureFinalizationEnabled } from "@/lib/services/animasign-form-signature-finalization";
+import { deterministicAnamnesisDocumentId } from "@/lib/services/patient-document-sync";
 
 type Submission = {
   id: string;
@@ -11,6 +12,8 @@ type Submission = {
   nachname: string | null;
   geburtsdatum: string | null;
   answers: Record<string, unknown> | null;
+  patient_id: string | null;
+  matched_patient_id: string | null;
 };
 
 function normalize(value: string | null) {
@@ -39,7 +42,7 @@ async function main() {
   const db = createServerClient();
   const { data, error } = await db
     .from("anamnese_submissions")
-    .select("id,created_at,status,signed_pdf_path,vorname,nachname,geburtsdatum,answers")
+    .select("id,created_at,status,signed_pdf_path,vorname,nachname,geburtsdatum,answers,patient_id,matched_patient_id")
     .order("created_at", { ascending: true })
     .limit(5000);
   if (error) throw new Error(error.message);
@@ -101,6 +104,20 @@ async function main() {
     featureEnabled: isFormSignatureFinalizationEnabled(),
   };
 
+  const signed = rows.filter(isCompleted);
+  const signedLinked = signed.filter((row) => row.matched_patient_id ?? row.patient_id);
+  const signedUnlinked = signed.length - signedLinked.length;
+  const existingDocumentIds = new Set<string>();
+  const expectedDocumentIds = signedLinked.map((row) => deterministicAnamnesisDocumentId(row.id));
+  for (let index = 0; index < expectedDocumentIds.length; index += 150) {
+    const ids = expectedDocumentIds.slice(index, index + 150);
+    if (!ids.length) continue;
+    const existing = await db.from("patient_documents").select("id").in("id", ids);
+    if (existing.error) throw new Error(existing.error.message);
+    for (const row of existing.data ?? []) existingDocumentIds.add(row.id);
+  }
+  const actionableLinked = actionable.filter((row) => row.matched_patient_id ?? row.patient_id).length;
+
   console.log("# AnimaSign Formularabschluss - Dry-Run");
   console.log("");
   console.log("Es wurden keine Daten, PDFs, Statuswerte, Envelopes oder E-Mails verändert.");
@@ -117,6 +134,18 @@ async function main() {
   console.log(`| Mit Ort und Datum | ${readiness.withLocationAndDate} |`);
   console.log(`| Pflichtfelder nach heutiger Prüfung vollständig | ${readiness.completeRequiredFields} |`);
   console.log(`| Nach heutigem Datenstand technisch finalisierbar | ${readiness.technicallyFinalizable} |`);
+  console.log(`| Davon bereits einem Patienten zugeordnet | ${actionableLinked} |`);
+  console.log(`| Davon ohne Patientenzuordnung | ${actionable.length - actionableLinked} |`);
+  console.log("");
+  console.log("## Dry-Run: Kopien bereits signierter Einreichungen");
+  console.log("");
+  console.log("| Kennzahl | Anzahl |");
+  console.log("|---|---:|");
+  console.log(`| Bereits signierte Einreichungen | ${signed.length} |`);
+  console.log(`| Mit zugeordnetem Patienten | ${signedLinked.length} |`);
+  console.log(`| Ohne zugeordneten Patienten | ${signedUnlinked} |`);
+  console.log(`| Patientendokument bereits vorhanden | ${existingDocumentIds.size} |`);
+  console.log(`| Nach Juans Los neu anzulegende Kopien | ${signedLinked.length - existingDocumentIds.size} |`);
   console.log("");
   console.log("| Konfiguration | Bereit |");
   console.log("|---|---|");

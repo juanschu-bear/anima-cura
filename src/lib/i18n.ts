@@ -609,6 +609,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "patientActivation.emailTitle": { de: "Patientenzugang sicher aktivieren", en: "Securely activate patient access" },
   "patientActivation.emailIntro": { de: "Gib diesen Code in der geöffneten Anima-Cura-App ein. Du musst keinen Link öffnen und keinen neuen Anamnesebogen ausfüllen.", en: "Enter this code in the open Anima Cura app. You do not need to open a link or complete a new medical history form." },
   "patient.documentType.invoice": { de: "Rechnung", en: "Invoice" },
+  "patient.documentType.anamnesis": { de: "Anamnesebogen", en: "Medical history form" },
   "billing.publish.documentName": { de: "Rechnung {quarter} · {schedule} · {amount}", en: "Invoice {quarter} · {schedule} · {amount}" },
   "billing.publish.notificationTitle": { de: "Neue Rechnung {quarter} verfügbar", en: "New invoice {quarter} available" },
   "billing.publish.notificationBody": { de: "Deine Rechnung für {quarter} steht jetzt im geschützten Patientenportal bereit. Öffne den Bereich Dokumente und prüfe Betrag, Zahlungsfrist und Zahlungsweg.", en: "Your invoice for {quarter} is now available in the secure patient portal. Open Documents and review the amount, payment deadline and payment method." },

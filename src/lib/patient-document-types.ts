@@ -3,6 +3,7 @@ import { t } from "./i18n";
 export type PatientDocumentTypeOption = {
   value: string;
   label: string;
+  labelEn?: string;
   storageType: string;
   icon: string;
 };
@@ -10,6 +11,13 @@ export type PatientDocumentTypeOption = {
 const TYPE_PREFIX = "[[typ:";
 
 export const patientDocumentTypeOptions: PatientDocumentTypeOption[] = [
+  {
+    value: "anamnesebogen",
+    label: t("patient.documentType.anamnesis", "de"),
+    labelEn: t("patient.documentType.anamnesis", "en"),
+    storageType: "sonstiges",
+    icon: "📋",
+  },
   { value: "anfangsdiagnostik", label: "Anfangsdiagnostik", storageType: "sonstiges", icon: "🦷" },
   { value: "diagnose", label: "Diagnose", storageType: "sonstiges", icon: "🩺" },
   { value: "behandlungsplan", label: "Behandlungsplan", storageType: "kostenplan", icon: "🗂️" },
@@ -56,6 +64,8 @@ export function decodePatientDocumentRecord(input: {
     name: cleanName,
     typ: option.value,
     anzeige_typ: option.label,
+    anzeige_typ_de: option.label,
+    anzeige_typ_en: option.labelEn ?? option.label,
     icon: option.icon,
   };
 }
