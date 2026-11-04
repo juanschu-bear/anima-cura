@@ -3,6 +3,8 @@ import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 import { roomInputError } from '@/lib/scribe-rooms';
 import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
+import { createServerClient } from '@/lib/db/supabase';
+import { makeScribeConfirmationAttempt, recordScribeConfirmationAttempt } from '@/lib/scribe-confirmation-monitor';
 export { GET, PATCH } from '@/lib/scribe-room-api';
 
 export const runtime = "nodejs";
@@ -80,7 +82,12 @@ export async function POST(request: NextRequest) {
   // a client-supplied status/review flag never bypasses the server check.
   if (bestaetigen) {
     const check = await checkScribeConsistency(supabase, body);
-    if (!check.canConfirm) return scribeConsistencyFailure(check, request.url);
+    if (!check.canConfirm) {
+      const response = scribeConsistencyFailure(check, request.url);
+      if (response.status === 422) await recordScribeConfirmationAttempt(
+        createServerClient(), makeScribeConfirmationAttempt(body, 'rejected', check));
+      return response;
+    }
   }
 
   // Inhaltsfelder, fuer Insert und Update gleich
@@ -141,12 +148,16 @@ export async function POST(request: NextRequest) {
         erstellt_von: user.id,
       });
       if (vError) {
+        await recordScribeConfirmationAttempt(
+          createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
         return NextResponse.json(
           { eintrag, warnung: `Eintrag bestaetigt, Versionszeile fehlgeschlagen: ${vError.message}` },
           { status: 207 }
         );
       }
     }
+    if (bestaetigen) await recordScribeConfirmationAttempt(
+      createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
     return NextResponse.json({ eintrag }, { status: 200 });
   }
 
@@ -183,6 +194,8 @@ export async function POST(request: NextRequest) {
       erstellt_von: user.id,
     });
     if (vError) {
+      await recordScribeConfirmationAttempt(
+        createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
       return NextResponse.json(
         { eintrag, warnung: `Eintrag angelegt, Versionszeile fehlgeschlagen: ${vError.message}` },
         { status: 207 }
@@ -190,5 +203,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (bestaetigen) await recordScribeConfirmationAttempt(
+    createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
   return NextResponse.json({ eintrag }, { status: 201 });
 }

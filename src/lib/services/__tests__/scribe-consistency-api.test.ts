@@ -8,6 +8,7 @@ import * as identity from '../../scribe-identity';
 import * as rooms from '../../scribe-rooms';
 import * as billing from '../../billing-foundation';
 import * as i18n from '../../i18n';
+import * as monitor from '../../scribe-confirmation-monitor';
 
 // Execute the actual route with a session-bound synthetic DB. No live keys,
 // runtime import hacks in production, or writes to real patient data.
@@ -31,7 +32,9 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
       then(resolve:(v:unknown)=>unknown){return Promise.resolve(result()).then(resolve);}};
     return q;
   }};
+  const monitorDb={from(table:string){return {insert:async()=>({data:null,error:null})};}};
   const imports:Record<string,unknown>={'next/server':{NextRequest,NextResponse},'@/lib/db/supabase-server':{createServerComponentClient:()=>db},
+    '@/lib/db/supabase':{createServerClient:()=>monitorDb},'@/lib/scribe-confirmation-monitor':monitor,
     '@/lib/scribe-consistency-service':consistency,'@/lib/scribe-identity':identity,'@/lib/scribe-rooms':rooms,
     '@/lib/scribe-room-api':{},'@/lib/billing-foundation':billing,'@/lib/i18n':i18n};
   const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;

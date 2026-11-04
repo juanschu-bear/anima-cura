@@ -3,6 +3,8 @@ import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
 import { roomInputError } from '@/lib/scribe-rooms';
 import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
+import { createServerClient } from '@/lib/db/supabase';
+import { makeScribeConfirmationAttempt, recordScribeConfirmationAttempt } from '@/lib/scribe-confirmation-monitor';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,7 +95,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   // Validate the exact merged payload which will become this version, including
   // retained positions/selection when a correction changed only the text.
   const check = await checkScribeConsistency(supabase, { ...alt, ...update });
-  if (!check.canConfirm) return scribeConsistencyFailure(check, request.url);
+  if (!check.canConfirm) {
+    const response = scribeConsistencyFailure(check, request.url);
+    if (response.status === 422) await recordScribeConfirmationAttempt(
+      createServerClient(), makeScribeConfirmationAttempt(alt, 'rejected', check));
+    return response;
+  }
 
   const { data: eintrag, error: updError } = await supabase
     .from("doku_eintraege")
@@ -119,11 +126,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   });
 
   if (vError) {
+    await recordScribeConfirmationAttempt(
+      createServerClient(), makeScribeConfirmationAttempt(alt, 'confirmed'));
     return NextResponse.json(
       { eintrag, warnung: `Version aktualisiert, Historienzeile fehlgeschlagen: ${vError.message}` },
       { status: 207 }
     );
   }
 
+  await recordScribeConfirmationAttempt(
+    createServerClient(), makeScribeConfirmationAttempt(alt, 'confirmed'));
   return NextResponse.json({ eintrag });
 }
