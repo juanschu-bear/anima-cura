@@ -9,6 +9,7 @@ test("AnimaSign dashboard maps every stored error source to a safe practice mess
     ["Documenso: envelope/create fehlgeschlagen (502)", "signing_service"],
     ["PDF: PDF-Dienst antwortete mit 500", "pdf_service"],
     ["ANIMASIGN_PDF_URL oder ANIMASIGN_PDF_KEY fehlt", "config"],
+    ["Documenso: ANIMASIGN_API_KEY/DOCUMENSO_API_KEY fehlt", "config"],
   ] as const;
 
   for (const [reason, expectedKind] of cases) {

@@ -35,7 +35,7 @@ export function classifyAnimaSignError(
   }
 
   if (
-    /ANIMASIGN_PDF_URL|ANIMASIGN_PDF_KEY|PDF_SIGNING_CERT|PDF_SIGNING_PASSPHRASE|nicht konfiguriert|Konfiguration/i.test(
+    /ANIMASIGN_PDF_URL|ANIMASIGN_PDF_KEY|PDF_SIGNING_CERT|PDF_SIGNING_PASSPHRASE|ANIMASIGN_API_KEY|DOCUMENSO_API_KEY|DOCUMENSO_KEY|DOCUMENSO_BASE_URL|nicht konfiguriert|Konfiguration/i.test(
       reason,
     )
   ) {
