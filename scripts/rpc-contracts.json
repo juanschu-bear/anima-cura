@@ -329,7 +329,7 @@
     },
     {
       "file": "src/lib/services/scribe-ivoris-retry.ts",
-      "sha256": "423f2366a9bdbb051ee9dc339fe9b8e7e13e61a3e18ef8077839b2f889b14f71",
+      "sha256": "def8f4c8643c4bc8f2ea6b7374a7cb731a7978fa63c8259078f8508e080ad5f5",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {

@@ -33,8 +33,41 @@ type RetryEntry = {
   ivoris_fehler: string | null;
   ivoris_retry_count: number | null;
   ivoris_next_retry_at: string | null;
+  ivoris_gepusht_am: string | null;
   patients: PatientIdentity | PatientIdentity[] | null;
 };
+
+export async function settleAlreadyPushedScribeOutboxClaims(
+  db: DbClient,
+  entries: RetryEntry[],
+  workerId: string,
+) {
+  const alreadyPushed = entries.filter((entry) => entry.ivoris_push_status === "gepusht");
+
+  for (const entry of alreadyPushed) {
+    const { error } = await db
+      .from("integration_outbox_jobs")
+      .update({
+        status: "succeeded",
+        next_attempt_at: null,
+        last_error: null,
+        locked_at: null,
+        locked_by: null,
+        succeeded_at: entry.ivoris_gepusht_am ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("artifact_type", "carteitext")
+      .eq("artifact_id", entry.id)
+      .eq("status", "processing")
+      .eq("locked_by", workerId);
+
+    if (error) {
+      throw new Error(`Bereits gepushter Scribe-Job konnte nicht abgeschlossen werden: ${error.message}`);
+    }
+  }
+
+  return alreadyPushed.length;
+}
 
 export async function retryPendingScribeIvorisPushes(options: RetryOptions = {}) {
   const db = options.db ?? createServerClient();
@@ -43,7 +76,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   const workerId = `scribe-${crypto.randomUUID()}`;
 
   const baseSelect =
-    "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )";
+    "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, ivoris_gepusht_am, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )";
 
   let data: RetryEntry[] | null = null;
   let error: { message: string } | null = null;
@@ -87,6 +120,10 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   }
 
   if (error) throw new Error(error.message);
+
+  const settledAlreadyPushed = claimedIds.length > 0
+    ? await settleAlreadyPushedScribeOutboxClaims(db, data ?? [], workerId)
+    : 0;
 
   const manualReviewEntries = (data ?? []).filter((eintrag) => {
     const pushStatus = (eintrag as { ivoris_push_status?: string | null }).ivoris_push_status;
@@ -232,6 +269,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
     processed,
     recovered,
     failed,
+    settledAlreadyPushed,
     circuitBreakerOpen,
     results,
   };
