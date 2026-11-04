@@ -347,7 +347,7 @@ const SignaturePad = forwardRef<HTMLCanvasElement, { fehlt?: boolean; onSign?: (
 });
 
 const DONE_T: Record<string, Record<string, string | string[]>> = {
-  de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Du erh\u00e4ltst deine unterschriebenen Unterlagen per E-Mail. Unsere Praxis hat bereits alles vorliegen.",
+  de: { thanks: "Vielen Dank", received: "Dein Anamnesebogen ist bei uns eingegangen. Unsere Praxis hat bereits alles vorliegen.",
     next: "Was kommt als N\u00e4chstes?", appTitle: "Deine pers\u00f6nliche Anima Cura App",
     appDesc: "Ab sofort steht dir ein eigener, gesch\u00fctzter Bereich zur Verf\u00fcgung. Kein Papierchaos, keine verlorenen Briefe, alles an einem Ort, jederzeit abrufbar von deinem Handy aus.",
     f1: "Alle Rechnungen und Zahlungspl\u00e4ne \u00fcbersichtlich an einem Ort", f2: "Deine Dokumente: Befunde, R\u00f6ntgenbilder, Behandlungspl\u00e4ne",
@@ -363,7 +363,7 @@ const DONE_T: Record<string, Record<string, string | string[]>> = {
     and: ["\u00d6ffne die App in Chrome", "Tippe auf die drei Punkte oben rechts", "Zum Startbildschirm hinzuf\u00fcgen", "Best\u00e4tige mit Hinzuf\u00fcgen"],
     appNote: "Die App ist vorerst auf Deutsch, Englisch und Spanisch verf\u00fcgbar. Weitere Sprachen folgen.",
     loading: ["Dein Account wird erstellt...", "Zugangsdaten werden generiert...", "Fast fertig..."], success: "Dein Account ist erstellt!", signLater: "Dein Anamnesebogen ist bei uns gespeichert, du musst nichts neu ausfüllen. Den Abschluss erledigen wir für dich. Falls noch etwas fehlt, melden wir uns bei dir.", submitRetry: "Das Absenden hat gerade nicht geklappt. Deine Angaben bleiben erhalten. Bitte versuche es in 1 Minute noch einmal.", footer: "Bei Fragen sind wir f\u00fcr dich da." },
-  en: { thanks: "Thank you", received: "Your medical history form has been received. You will receive your signed documents by email. Our practice already has everything on file.",
+  en: { thanks: "Thank you", received: "Your medical history form has been received. Our practice already has everything on file.",
     next: "What happens next?", appTitle: "Your personal Anima Cura App",
     appDesc: "From now on, you have your own secure space where you can find everything about your treatment. No paper clutter, no lost letters, everything in one place, accessible anytime from your phone.",
     f1: "All your invoices and payment plans in one place", f2: "Your documents: findings, X-rays, treatment plans",
@@ -379,7 +379,7 @@ const DONE_T: Record<string, Record<string, string | string[]>> = {
     and: ["Open the app in Chrome", "Tap the three dots in the top right", "Add to Home screen", "Confirm with Add"],
     appNote: "The app is currently available in German, English and Spanish. More languages coming soon.",
     loading: ["Creating your account...", "Generating login credentials...", "Almost done..."], success: "Your account is ready!", signLater: "Your medical history form has been saved, you do not need to fill anything in again. We will take care of completing it. If anything is missing, we will get in touch.", submitRetry: "Sending did not work just now. Your answers are kept. Please try again in 1 minute.", footer: "Questions? We are here for you." },
-  es: { thanks: "Gracias", received: "Hemos recibido tu formulario. Recibir\u00e1s tus documentos firmados por correo electr\u00f3nico. Nuestra consulta ya tiene todo archivado.",
+  es: { thanks: "Gracias", received: "Hemos recibido tu formulario. Nuestra consulta ya tiene todo archivado.",
     next: "Que viene ahora?", appTitle: "Tu app personal Anima Cura",
     appDesc: "A partir de ahora tienes tu propio espacio seguro donde encontrar\u00e1s todo sobre tu tratamiento. Sin papeles perdidos, sin cartas extraviadas, todo en un solo lugar, accesible en cualquier momento desde tu m\u00f3vil.",
     f1: "Todas tus facturas y planes de pago en un solo lugar", f2: "Tus documentos: diagn\u00f3sticos, radiograf\u00edas, planes de tratamiento",
@@ -395,7 +395,7 @@ const DONE_T: Record<string, Record<string, string | string[]>> = {
     and: ["Abre la app en Chrome", "Pulsa los tres puntos arriba a la derecha", "A\u00f1adir a pantalla de inicio", "Confirma con A\u00f1adir"],
     appNote: "La app est\u00e1 disponible de momento en alem\u00e1n, ingl\u00e9s y espa\u00f1ol. M\u00e1s idiomas pr\u00f3ximamente.",
     loading: ["Creando tu cuenta...", "Generando datos de acceso...", "Casi listo..."], success: "Tu cuenta est\u00e1 lista!", signLater: "Tu cuestionario de anamnesis está guardado, no tienes que volver a rellenar nada. Nosotros nos encargamos de completarlo. Si falta algo, nos pondremos en contacto contigo.", submitRetry: "El envío no ha funcionado en este momento. Tus datos se conservan. Por favor, inténtalo de nuevo en 1 minuto.", footer: "Preguntas? Estamos aqu\u00ed para ti." },
-  ru: { thanks: "\u0421\u043f\u0430\u0441\u0438\u0431\u043e", received: "\u0422\u0432\u043e\u044f \u0430\u043d\u043a\u0435\u0442\u0430 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0430. \u041f\u043e\u0434\u043f\u0438\u0441\u0430\u043d\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u043f\u0440\u0438\u0434\u0443\u0442 \u0442\u0435\u0431\u0435 \u043d\u0430 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u0443\u044e \u043f\u043e\u0447\u0442\u0443.",
+  ru: { thanks: "\u0421\u043f\u0430\u0441\u0438\u0431\u043e", received: "\u0422\u0432\u043e\u044f \u0430\u043d\u043a\u0435\u0442\u0430 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0430. Наша практика уже всё получила.",
     next: "\u0427\u0442\u043e \u0434\u0430\u043b\u044c\u0448\u0435?", appTitle: "\u0422\u0432\u043e\u0451 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 Anima Cura", appDesc: "\u0422\u0435\u043f\u0435\u0440\u044c \u0443 \u0442\u0435\u0431\u044f \u0435\u0441\u0442\u044c \u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0435 \u0437\u0430\u0449\u0438\u0449\u0451\u043d\u043d\u043e\u0435 \u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0441\u0442\u0432\u043e.",
     f1: "\u0412\u0441\u0435 \u0441\u0447\u0435\u0442\u0430 \u0438 \u043f\u043b\u0430\u0442\u0451\u0436\u043d\u044b\u0435 \u043f\u043b\u0430\u043d\u044b", f2: "\u0422\u0432\u043e\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b", f3: "\u041e\u0431\u0437\u043e\u0440 \u044d\u0442\u0430\u043f\u043e\u0432 \u043b\u0435\u0447\u0435\u043d\u0438\u044f", f4: "\u0422\u0432\u043e\u0438 \u0440\u0430\u0441\u0441\u0440\u043e\u0447\u043a\u0438", f5: "\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u043e\u0442 \u043a\u043b\u0438\u043d\u0438\u043a\u0438",
     credLabel: "\u0422\u0432\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u0434\u043b\u044f \u0432\u0445\u043e\u0434\u0430", credTitle: "\u0422\u0432\u043e\u0438 \u043b\u043e\u0433\u0438\u043d-\u0434\u0430\u043d\u043d\u044b\u0435", emailLabel: "E-mail", pwLabel: "\u041f\u0430\u0440\u043e\u043b\u044c", pwTap: "\u041d\u0430\u0436\u043c\u0438", pwHide: "\u0421\u043a\u0440\u044b\u0442\u044c",
