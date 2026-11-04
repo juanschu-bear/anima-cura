@@ -9,6 +9,10 @@ import {
   createAndDistribute,
   type DocumensoField,
 } from "@/lib/documenso/client";
+import {
+  documensoFailureForStorage,
+  recordDocumensoServiceError,
+} from "@/lib/services/animasign-service-observability";
 
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { signPdfWithP12 } from "@/lib/animasign/x509-signing";
@@ -832,12 +836,21 @@ export async function POST(request: Request) {
         account: account ?? null,
       });
     } catch (documensoError) {
+      const storedReason = documensoFailureForStorage(
+        "envelope/create-or-distribute",
+        documensoError,
+      );
+      await recordDocumensoServiceError({
+        operation: "envelope/create-or-distribute",
+        error: documensoError,
+        db: supabase,
+      });
       // Keep the saved draft, but return an error rather than completion.
       await supabase
         .from("anamnese_submissions")
         .update({
           status: "fehler",
-          fehler_text: `Documenso: ${String(documensoError)}`,
+          fehler_text: `Documenso: ${storedReason}`,
         })
         .eq("id", submissionId);
 
@@ -845,7 +858,7 @@ export async function POST(request: Request) {
         {
           ok: false,
           id: submissionId,
-          error: `Signaturanforderung fehlgeschlagen: ${String(documensoError)}`,
+          error: "Signaturanforderung fehlgeschlagen. Bitte später erneut versuchen.",
         },
         { status: 502 }
       );

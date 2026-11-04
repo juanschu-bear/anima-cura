@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { downloadSignedPdf, getEnvelope } from "@/lib/documenso/client";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
+import { recordDocumensoServiceError } from "@/lib/services/animasign-service-observability";
 
 type DbClient = ReturnType<typeof createServerClient>;
 
@@ -253,6 +254,11 @@ export async function reconcilePendingAnimaSignSignatures(options: {
         })
       );
     } catch (reconcileError) {
+      await recordDocumensoServiceError({
+        operation: "envelope/get-or-download",
+        error: reconcileError,
+        db,
+      });
       try {
         await markSignatureReconciliationChecked(db, submission.id);
       } catch (markError) {

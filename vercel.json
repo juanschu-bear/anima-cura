@@ -9,6 +9,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/animasign-health",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/access-code-repair",
       "schedule": "* * * * *"
     },

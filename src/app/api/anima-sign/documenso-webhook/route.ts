@@ -5,6 +5,10 @@ import { downloadSignedPdf } from "@/lib/documenso/client";
 import { syncAnimaSignSubmission } from "@/lib/services/animasign-ivoris-sync";
 import { syncSignedAnamnesisToPatientDocuments } from "@/lib/services/patient-document-sync";
 import { hasCompletedPatientSignature } from "@/lib/services/animasign-completion";
+import {
+  documensoFailureForStorage,
+  recordDocumensoServiceError,
+} from "@/lib/services/animasign-service-observability";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -186,11 +190,17 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    const storedReason = documensoFailureForStorage("document/download", error);
+    await recordDocumensoServiceError({
+      operation: "document/download",
+      error,
+      db: supabase,
+    });
     // 500 -> Documenso stellt erneut zu.
     await supabase
       .from("anamnese_submissions")
-      .update({ fehler_text: `Webhook-Download: ${String(error)}` })
+      .update({ fehler_text: `Webhook-Download: ${storedReason}` })
       .eq("id", submissionId);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Signiertes Dokument konnte nicht geladen werden" }, { status: 500 });
   }
 }

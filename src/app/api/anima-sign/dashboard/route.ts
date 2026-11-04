@@ -125,6 +125,27 @@ export async function GET(req: Request) {
     observedDays: observations.length,
   };
 
+  const { data: signatureServiceRow, error: signatureServiceError } = await supabase
+    .from("animasign_service_health")
+    .select("checked_at,healthy,http_status,service_status,database_status,certificate_status,response_ms")
+    .order("checked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (signatureServiceError) {
+    console.error("[AnimaSign API] Signaturdienstzustand konnte nicht geladen werden:", signatureServiceError.message);
+  }
+  const signatureService = signatureServiceRow
+    ? {
+        checkedAt: signatureServiceRow.checked_at,
+        healthy: signatureServiceRow.healthy,
+        httpStatus: signatureServiceRow.http_status,
+        serviceStatus: signatureServiceRow.service_status,
+        databaseStatus: signatureServiceRow.database_status,
+        certificateStatus: signatureServiceRow.certificate_status,
+        responseMs: signatureServiceRow.response_ms,
+      }
+    : null;
+
   // Stats
   const [
     { count: total },
@@ -189,5 +210,6 @@ export async function GET(req: Request) {
     },
     outbox,
     stability,
+    signatureService,
   });
 }
