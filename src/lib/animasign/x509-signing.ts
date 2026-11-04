@@ -1,6 +1,7 @@
 import { pdflibAddPlaceholder } from "@signpdf/placeholder-pdf-lib";
 import { P12Signer } from "@signpdf/signer-p12";
 import signpdf from "@signpdf/signpdf";
+import { SUBFILTER_ETSI_CADES_DETACHED } from "@signpdf/utils";
 import { PDFDocument } from "pdf-lib";
 
 export type PdfSignatureMetadata = {
@@ -28,6 +29,7 @@ export async function signPdfWithP12(params: {
     contactInfo: params.metadata.contactInfo,
     name: params.metadata.name,
     location: params.metadata.location,
+    subFilter: SUBFILTER_ETSI_CADES_DETACHED,
   });
 
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());

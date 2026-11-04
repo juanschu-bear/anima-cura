@@ -387,7 +387,7 @@
     },
     {
       "file": "src/app/api/anima-sign/submit/route.ts",
-      "sha256": "9d1840beea92951f88c2527a857f449dca5bfaf04e41c6564b3c10327fb69604"
+      "sha256": "42e41ccf6c11dba5cca9a92d201571bc36c7cc8b3bcb6ddf21d4856a8920328f"
     },
     {
       "file": "src/app/api/cron/ivoris-sync/route.ts",
@@ -412,6 +412,10 @@
     {
       "file": "src/lib/services/animasign-local-patient-link.ts",
       "sha256": "43bdac90fed3e339e0c6ac3e8f3601a53c25f29495c9105912f69137286014a9"
+    },
+    {
+      "file": "src/lib/services/animasign-form-signature-finalization.ts",
+      "sha256": "60fc54f4525a01273ca40f590d9890fcf8c5c052b71c78ec5de50a1ae4090fc5"
     },
     {
       "file": "src/lib/services/animasign-signature-reconciliation.ts",

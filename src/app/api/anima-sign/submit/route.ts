@@ -18,6 +18,12 @@ import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { signPdfWithP12 } from "@/lib/animasign/x509-signing";
 import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
 import { classifyRecentIdentitySubmission } from "@/lib/services/animasign-submit-resume";
+import {
+  buildAnimaSignFormVersion,
+  buildFormSignatureFinalizationArtifacts,
+  isFormSignatureFinalizationEnabled,
+  persistFormSignatureFinalization,
+} from "@/lib/services/animasign-form-signature-finalization";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -752,6 +758,96 @@ export async function POST(request: Request) {
 
     const patientName =
       [vorname, nachname].filter(Boolean).join(" ").trim() || "Patient";
+
+    if (isFormSignatureFinalizationEnabled()) {
+      const certBase64 = process.env.PDF_SIGNING_CERT;
+      const certPass = process.env.PDF_SIGNING_PASSPHRASE;
+      const signatureDataUrl = asString(answers["unterschrift_versicherter"]);
+      const signedDate = asString(answers["abschluss_datum"]);
+      const location = asString(answers["abschluss_ort"]);
+
+      if (!certBase64 || !certPass || !signatureDataUrl || !signedDate || !location) {
+        await supabase
+          .from("anamnese_submissions")
+          .update({
+            status: "fehler",
+            fehler_text: "Formularabschluss: Signatur, Ort, Datum oder Praxiszertifikat fehlt",
+          })
+          .eq("id", submissionId);
+        return NextResponse.json(
+          { ok: false, id: submissionId, error: "Formularabschluss nicht möglich" },
+          { status: 500 },
+        );
+      }
+
+      const { data: submission, error: submissionError } = await supabase
+        .from("anamnese_submissions")
+        .select("created_at,patient_id,matched_patient_id")
+        .eq("id", submissionId)
+        .single();
+      if (submissionError || !submission?.created_at) {
+        return NextResponse.json(
+          { ok: false, id: submissionId, error: "Einreichungszeit konnte nicht geladen werden" },
+          { status: 500 },
+        );
+      }
+
+      try {
+        const artifacts = await buildFormSignatureFinalizationArtifacts({
+          renderedPdf: pdfBuffer,
+          patientName,
+          signatureDataUrl,
+          location,
+          signedDate,
+          submittedAt: submission.created_at,
+          certificate: Buffer.from(certBase64, "base64"),
+          passphrase: certPass,
+        });
+        await persistFormSignatureFinalization({
+          db: supabase,
+          signedPdf: artifacts.signedPdf,
+          record: {
+            submissionId,
+            submittedAt: submission.created_at,
+            formVersion: buildAnimaSignFormVersion(body.schema),
+            signatureSha256: artifacts.signatureSha256,
+            pdfSha256: artifacts.pdfSha256,
+            sealedPdfSha256: artifacts.sealedPdfSha256,
+            location,
+            signedDate,
+            certificate: artifacts.certificate,
+          },
+          patient: {
+            patientId: submission.patient_id,
+            matchedPatientId: submission.matched_patient_id,
+            firstName: vorname,
+            lastName: nachname,
+          },
+        });
+
+        return NextResponse.json({
+          ok: true,
+          id: submissionId,
+          finalized: true,
+          signingUrl: null,
+          abgleich: { status: abgleich.status },
+          account: account ?? null,
+        });
+      } catch (finalizationError) {
+        console.error("[ANIMASIGN] Formularabschluss fehlgeschlagen:", finalizationError);
+        await supabase
+          .from("anamnese_submissions")
+          .update({
+            status: "fehler",
+            fehler_text: "Formularabschluss: PDF konnte nicht versiegelt werden",
+          })
+          .eq("id", submissionId);
+        return NextResponse.json(
+          { ok: false, id: submissionId, error: "Formularabschluss fehlgeschlagen" },
+          { status: 500 },
+        );
+      }
+    }
 
     // 2b) Feste Abschlussseite anhaengen, damit Datum und Unterschrift nie im Formular landen.
     const preparedPdf = await appendReservedSignaturePage(pdfBuffer, patientName);

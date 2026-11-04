@@ -14,6 +14,7 @@ function formatSignedAt(value: string | null): string {
 export async function appendReservedSignaturePage(
   pdf: Buffer,
   patientName: string,
+  mode: "remote-signing" | "stored-form-signature" = "remote-signing",
 ): Promise<{ pdfBuffer: Buffer; signaturePage: number }> {
   const doc = await PDFDocument.load(pdf);
   const page = doc.addPage([595.28, 841.89]);
@@ -42,7 +43,10 @@ export async function appendReservedSignaturePage(
     color: textColor,
   });
 
-  page.drawText("Diese Seite ist ausschliesslich fuer Datum und Unterschrift reserviert.", {
+  page.drawText(
+    mode === "stored-form-signature"
+      ? "Diese Seite dokumentiert die im Formular geleistete Unterschrift."
+      : "Diese Seite ist ausschliesslich fuer Datum und Unterschrift reserviert.", {
     x: 52,
     y: height - 116,
     size: 11,
@@ -58,7 +62,10 @@ export async function appendReservedSignaturePage(
     color: textColor,
   });
 
-  page.drawText("Bitte unterschreiben Sie nur im vorgesehenen Feld auf dieser Seite.", {
+  page.drawText(
+    mode === "stored-form-signature"
+      ? "Unterschrift, Ort und Datum wurden beim Absenden gemeinsam übernommen."
+      : "Bitte unterschreiben Sie nur im vorgesehenen Feld auf dieser Seite.", {
     x: 52,
     y: height - 176,
     size: 11,
@@ -331,7 +338,7 @@ export async function stampStoredSignatureOnReservedPage(params: {
     });
   }
 
-  const dateText = params.signedDateText?.trim() || formatDateOnly(params.signedAt);
+  const dateText = formatDateOnly(params.signedDateText?.trim() || params.signedAt);
   if (dateText) {
     page.drawText(dateText, {
       x: width * 0.58,
