@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
-import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
+import { pdflibAddPlaceholder } from "@signpdf/placeholder-pdf-lib";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
 import { parseDocumensoRequestTimeoutMs } from "@/lib/documenso/client";
 import {
@@ -11,7 +11,7 @@ import {
   isScribePath,
 } from "@/lib/auth-refresh-recovery";
 
-test("prepared AnimaSign PDFs use a classic xref table accepted by signpdf", async () => {
+test("prepared AnimaSign PDFs accept the official pdf-lib placeholder", async () => {
   const input = await PDFDocument.create();
   input.addPage();
   const prepared = await appendReservedSignaturePage(
@@ -19,13 +19,17 @@ test("prepared AnimaSign PDFs use a classic xref table accepted by signpdf", asy
     "Test",
   );
 
-  const placeholderPdf = plainAddPlaceholder({
-    pdfBuffer: prepared.pdfBuffer,
+  const preparedDoc = await PDFDocument.load(prepared.pdfBuffer);
+  pdflibAddPlaceholder({
+    pdfDoc: preparedDoc,
     reason: "Regression test",
+    contactInfo: "test@example.invalid",
+    name: "AnimaSign Test",
+    location: "Test",
   });
+  const placeholderPdf = await preparedDoc.save();
 
   assert.ok(placeholderPdf.byteLength > prepared.pdfBuffer.byteLength);
-  assert.match(prepared.pdfBuffer.toString("latin1"), /\nxref\n/);
 });
 
 test("Documenso requests have a bounded production-safe timeout", () => {

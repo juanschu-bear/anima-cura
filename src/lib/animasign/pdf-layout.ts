@@ -116,10 +116,7 @@ export async function appendReservedSignaturePage(
     color: mutedColor,
   });
 
-  // @signpdf/placeholder-plain parses a classic cross-reference table. pdf-lib
-  // otherwise emits object streams/xref streams, which fail with
-  // "Expected xref at NaN" before the X.509 placeholder can be added.
-  const pdfBytes = await doc.save({ useObjectStreams: false });
+  const pdfBytes = await doc.save();
   return { pdfBuffer: Buffer.from(pdfBytes), signaturePage };
 }
 

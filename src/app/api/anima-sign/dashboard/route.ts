@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/db/supabase";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { isManualReviewErrorText, stripManualReviewPrefix } from "@/lib/services/animasign-sync-status";
 import { isIvorisServiceOutage } from "@/lib/services/scribe-ivoris-error";
+import { classifyAnimaSignError } from "@/lib/animasign/error-classification";
 
 function safeOutageCategory(error: string | null) {
   const status = error?.match(/\((502|503|504)\)/)?.[1];
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
   // Submissions query
   let query = supabase
     .from("anamnese_submissions")
-    .select("id, vorname, nachname, email, created_at, status, is_existing, matched_patient_id, account_email, signed_pdf_path, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_field_results")
+    .select("id, vorname, nachname, email, created_at, status, fehler_text, is_existing, matched_patient_id, account_email, signed_pdf_path, ivoris_synced, ivoris_sync_error, ivoris_doc_synced, ivoris_sync_failed_permanently, ivoris_doc_failed_permanently, ivoris_field_results")
     .order("created_at", { ascending: false });
 
   if (filter === "today") query = query.gte("created_at", todayStart.toISOString());
@@ -155,16 +156,23 @@ export async function GET(req: Request) {
   }
 
   // Enrich submissions with login status
-  const enriched = (submissions || []).map(s => ({
-    ...s,
-    has_logged_in: s.account_email ? !!loginMap[s.account_email] : false,
-    last_login: s.account_email ? loginMap[s.account_email] || null : null,
-    ivoris_manual_review:
-      isManualReviewErrorText(s.ivoris_sync_error) ||
-      s.ivoris_sync_failed_permanently === true ||
-      s.ivoris_doc_failed_permanently === true,
-    ivoris_manual_review_reason: stripManualReviewPrefix(s.ivoris_sync_error),
-  }));
+  const enriched = (submissions || []).map(s => {
+    const { fehler_text: rawErrorReason, ...submission } = s;
+    const error = classifyAnimaSignError(s.status, rawErrorReason);
+
+    return {
+      ...submission,
+      error_kind: error?.error_kind ?? null,
+      error_reason: error?.error_reason ?? null,
+      has_logged_in: s.account_email ? !!loginMap[s.account_email] : false,
+      last_login: s.account_email ? loginMap[s.account_email] || null : null,
+      ivoris_manual_review:
+        isManualReviewErrorText(s.ivoris_sync_error) ||
+        s.ivoris_sync_failed_permanently === true ||
+        s.ivoris_doc_failed_permanently === true,
+      ivoris_manual_review_reason: stripManualReviewPrefix(s.ivoris_sync_error),
+    };
+  });
 
   // Count actual logins
   const loggedInCount = enriched.filter(s => s.has_logged_in).length;

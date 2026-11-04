@@ -10,10 +10,8 @@ import {
   type DocumensoField,
 } from "@/lib/documenso/client";
 
-import signpdf from "@signpdf/signpdf";
-import { P12Signer } from "@signpdf/signer-p12";
-import { plainAddPlaceholder } from "@signpdf/placeholder-plain";
 import { appendReservedSignaturePage } from "@/lib/animasign/pdf-layout";
+import { signPdfWithP12 } from "@/lib/animasign/x509-signing";
 import { buildSubmissionReplayFingerprint } from "@/lib/services/animasign-submit-idempotency";
 import { classifyRecentIdentitySubmission } from "@/lib/services/animasign-submit-resume";
 
@@ -761,16 +759,17 @@ export async function POST(request: Request) {
     if (certBase64 && certPass) {
       try {
         const certBuffer = Buffer.from(certBase64, "base64");
-        const pdfWithPlaceholder = plainAddPlaceholder({
-          pdfBuffer,
-          reason: "Anamnesebogen digital signiert",
-          contactInfo: "praxis@praxis-schubert.de",
-          name: "AnimaSign / KFO-Praxis Dr. Maria Elena Schubert",
-          location: "Leipzig, Deutschland",
+        pdfBuffer = await signPdfWithP12({
+          pdf: pdfBuffer,
+          certificate: certBuffer,
+          passphrase: certPass,
+          metadata: {
+            reason: "Anamnesebogen digital signiert",
+            contactInfo: "praxis@praxis-schubert.de",
+            name: "AnimaSign / KFO-Praxis Dr. Maria Elena Schubert",
+            location: "Leipzig, Deutschland",
+          },
         });
-        const signer = new P12Signer(certBuffer, { passphrase: certPass });
-        const signedResult = await signpdf.sign(pdfWithPlaceholder, signer);
-        pdfBuffer = Buffer.from(signedResult);
         console.log("[ANIMASIGN] PDF erfolgreich digital signiert");
       } catch (signError) {
         console.error("[ANIMASIGN] PDF-Signierung fehlgeschlagen (nicht-blockierend):", signError);
