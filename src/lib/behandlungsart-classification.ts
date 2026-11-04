@@ -234,3 +234,9 @@ export function getConfidenceLabel(score: number) {
   if (score >= 50) return "wahrscheinlich";
   return "unklar";
 }
+
+/** Praxisdauer für Vorschläge, niemals Beleg einer genehmigten Laufzeit.
+ * MB3: 12 Monatsraten sind keine belegte Behandlungsdauer. */
+export const BEHANDLUNGSDAUER_QUARTALE: Record<Behandlungskategorie, number | null> = {
+  A1: 8, A2: 8, A3: 8, MB1: 16, MB2: 16, MB3: null, H1: 6, H2: 12,
+};
