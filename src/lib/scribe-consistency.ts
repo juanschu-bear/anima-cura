@@ -24,7 +24,7 @@ export const scribeConsistencyTemplate = z.object({
   struktur: z.object({
     template: z.array(z.union([z.string(), z.object({ g: short })])),
     groups: z.record(z.object({
-      type: z.enum(['single', 'multi']), req: z.boolean().optional(),
+      type: z.enum(['single', 'multi']), req: z.boolean().optional(), explizit: z.boolean().optional(),
       opts: z.array(z.object({ t: z.string(), id: z.string().optional() })),
     })),
   }),
@@ -131,6 +131,10 @@ export function assessScribeConsistency(raw: unknown, rawTemplates: unknown[]): 
       if (!group || indices.some(i => i >= group.opts.length) || new Set(indices).size !== indices.length || (group.type === 'single' && indices.length > 1)) {
         add({code:'selection_invalid',scope:'selection',module:slug,group:name});
       }
+    }
+    for (const [name, group] of Object.entries(groups)) {
+      if (group.explizit && (selected[name] ?? []).length === 0)
+        add({code:'explicit_choice_required',scope:'selection',module:slug,group:name});
     }
     for (const segment of template.struktur.template) {
       if (typeof segment === 'string') { rendered.push(segment); continue; }

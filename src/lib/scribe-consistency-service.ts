@@ -50,7 +50,9 @@ export function scribeConsistencyFailure(check: ScribeConsistencyResult, url: st
   const issues = check.issues.map(issue => {
     const suffix = issue.code === 'text_variable_unresolved' && issue.variable === 'bogen'
       ? 'text_variable_unresolved_bogen'
-      : issue.code;
+      : issue.code === 'explicit_choice_required' && (issue.group === 'bogen_ok' || issue.group === 'bogen_uk')
+        ? `explicit_choice_required_${issue.group}`
+        : issue.code;
     const key = `scribe.consistency.${suffix}`;
     const translated = t(key, locale);
     return {...issue, message: translated === key ? t('scribe.consistency.review_required', locale) : translated};

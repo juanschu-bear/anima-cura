@@ -91,6 +91,16 @@ test('invalid references and hidden groups are configuration failures regardless
   assert.ok(codes(input,template).includes('template_text_reference_invalid'));
   assert.ok(codes(input,template).includes('position_without_text_binding'));
 });
+test('explicit archwire groups require a real option instead of an empty selection',()=>{
+  const {input,template}=fixture();
+  template.struktur.groups.bogen_ok.explizit=true;
+  template.struktur.groups.bogen_uk.explizit=true;
+  input.auswahl.kontrolle.bogen_uk=[];
+  input.text='MB-Kontrolle. Bogenwechsel OK 016.';
+  const result=assessScribeConsistency(input,[template]);
+  assert.deepEqual(result.issues,[{code:'explicit_choice_required',scope:'selection',module:'kontrolle',group:'bogen_uk'}]);
+  assert.equal(result.canConfirm,false);
+});
 test('malformed or duplicate selection is not repaired; posted review flags have no authority',()=>{
   for(const selection of ([{bogen_ok:[100]},{bogen_ok:[-1]},{bogen_ok:[1,1]},{bogen_ok:[0,1]},{old:[0]}] as Array<Record<string,number[]>>)) {
     const {input,template}=fixture();input.auswahl={kontrolle:selection};
@@ -170,4 +180,20 @@ test('invalid input fails before source access and returns actionable machine fi
   const f=dbFixture();const result=await checkScribeConsistency(f.db,{...f.input,positionen:null});
   assert.equal(f.reads.length,0);const response=scribeConsistencyFailure(result,'https://example.invalid');
   assert.equal(response.status,422);assert.equal((await response.json()).status,'needs_consistency_review');
+});
+test('explicit upper and lower archwire choices return the approved practice wording',async()=>{
+  const {input,template}=fixture();
+  template.struktur.groups.bogen_ok.explizit=true;
+  template.struktur.groups.bogen_uk.explizit=true;
+  input.auswahl.kontrolle={bogen_ok:[],bogen_uk:[]};
+  input.text='MB-Kontrolle.';
+  input.positionen=[input.positionen[1]];
+  const result=assessScribeConsistency(input,[template]);
+  const response=scribeConsistencyFailure(result,'https://example.invalid');
+  const body=await response.json();
+  const messages=body.consistency.issues.filter((issue:{code:string})=>issue.code==='explicit_choice_required').map((issue:{message:string})=>issue.message);
+  assert.deepEqual(messages,[
+    'Bitte beim Bogen OK eine Angabe wählen, bei Bedarf „Kein Bogen OK“.',
+    'Bitte beim Bogen UK eine Angabe wählen, bei Bedarf „Kein Bogen UK“.',
+  ]);
 });
