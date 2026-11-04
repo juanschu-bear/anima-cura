@@ -100,6 +100,56 @@ interface DocumensoConfig {
   apiKey: string;
 }
 
+const DEFAULT_DOCUMENSO_REQUEST_TIMEOUT_MS = 15_000;
+const MIN_DOCUMENSO_REQUEST_TIMEOUT_MS = 1_000;
+const MAX_DOCUMENSO_REQUEST_TIMEOUT_MS = 60_000;
+
+export function parseDocumensoRequestTimeoutMs(
+  raw = process.env.DOCUMENSO_REQUEST_TIMEOUT_MS,
+) {
+  if (!raw) return DEFAULT_DOCUMENSO_REQUEST_TIMEOUT_MS;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_DOCUMENSO_REQUEST_TIMEOUT_MS;
+  return Math.max(
+    MIN_DOCUMENSO_REQUEST_TIMEOUT_MS,
+    Math.min(MAX_DOCUMENSO_REQUEST_TIMEOUT_MS, parsed),
+  );
+}
+
+async function fetchDocumenso(input: string | URL, init: RequestInit = {}) {
+  const timeoutMs = parseDocumensoRequestTimeoutMs();
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort(init.signal?.reason);
+
+  if (init.signal?.aborted) {
+    forwardAbort();
+  } else {
+    init.signal?.addEventListener("abort", forwardAbort, { once: true });
+  }
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) {
+      throw new DocumensoError(
+        `Signaturdienst-Timeout nach ${timeoutMs} ms`,
+        0,
+        "",
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener("abort", forwardAbort);
+  }
+}
+
 /** Normalisiert DOCUMENSO_BASE_URL: ohne abschliessenden Slash, mit /api/v2. */
 function normalizeBaseUrl(raw: string): string {
   let base = raw.trim().replace(/\/+$/, "");
@@ -174,7 +224,7 @@ export async function createEnvelope(
     input.pdfFilename
   );
 
-  const res = await fetch(`${baseUrl}/envelope/create`, {
+  const res = await fetchDocumenso(`${baseUrl}/envelope/create`, {
     method: "POST",
     headers: { Authorization: apiKey },
     body: form,
@@ -227,7 +277,7 @@ export async function distributeForSigning(
     meta.redirectUrl = options.redirectUrl;
   }
 
-  const res = await fetch(`${baseUrl}/envelope/distribute`, {
+  const res = await fetchDocumenso(`${baseUrl}/envelope/distribute`, {
     method: "POST",
     headers: {
       Authorization: apiKey,
@@ -289,7 +339,7 @@ export async function getEnvelope(
   envelopeId: string
 ): Promise<{ status: EnvelopeStatus; raw: Record<string, unknown> }> {
   const { baseUrl, apiKey } = getConfig();
-  const res = await fetch(
+  const res = await fetchDocumenso(
     `${baseUrl}/envelope/${encodeURIComponent(envelopeId)}`,
     { headers: { Authorization: apiKey } }
   );
@@ -329,7 +379,7 @@ function extractUrl(data: unknown): string | null {
  */
 export async function downloadSignedPdf(documentId: number): Promise<Buffer> {
   const { baseUrl, apiKey } = getConfig();
-  const res = await fetch(
+  const res = await fetchDocumenso(
     `${baseUrl}/document/${documentId}/download?version=signed`,
     { headers: { Authorization: apiKey } }
   );
@@ -359,7 +409,7 @@ export async function downloadSignedPdf(documentId: number): Promise<Buffer> {
       JSON.stringify(data)
     );
   }
-  const fileRes = await fetch(fileUrl);
+  const fileRes = await fetchDocumenso(fileUrl);
   if (!fileRes.ok) {
     throw new DocumensoError(
       `Download-URL fehlgeschlagen (${fileRes.status})`,

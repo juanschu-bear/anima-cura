@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getDefaultDashboardPath } from "@/lib/auth";
 import { safePatientTarget } from "@/lib/patient-navigation";
+import {
+  isMissingRefreshTokenError,
+  isProtectedScribePath,
+} from "@/lib/auth-refresh-recovery";
 
 type CookieMutation = {
   name: string;
@@ -101,12 +105,22 @@ export async function middleware(request: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user && authError?.code === "refresh_token_not_found") {
-    request.cookies.getAll().filter(cookie => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"))
-      .forEach(cookie => response.cookies.set(cookie.name, "", { path: "/", maxAge: 0 }));
+  const { pathname, search } = request.nextUrl;
+
+  if (!user && isMissingRefreshTokenError(authError)) {
+    request.cookies
+      .getAll()
+      .filter(cookie => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"))
+      .forEach(cookie => {
+        request.cookies.set(cookie.name, "");
+        response.cookies.set(cookie.name, "", { path: "/", maxAge: 0 });
+      });
+
+    if (isProtectedScribePath(pathname)) {
+      return redirectWithCookies(new URL("/scribe/login", request.url), response);
+    }
   }
 
-  const { pathname, search } = request.nextUrl;
   const isDashboard = isDashboardPath(pathname);
   const isPatient = isPatientPath(pathname);
 
@@ -173,5 +187,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/animapay/:path*", "/finanzen/:path*", "/zahlungen/:path*", "/kasse/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/rechnungen/:path*", "/offene-posten/:path*", "/intelligence/:path*", "/nachrichten/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
+  matcher: ["/login", "/scribe/:path*", "/patient/login", "/patient/portal/:path*", "/uebersicht/:path*", "/animapay/:path*", "/finanzen/:path*", "/zahlungen/:path*", "/kasse/:path*", "/patienten/:path*", "/ratenplan/:path*", "/mahnwesen/:path*", "/quartal/:path*", "/berichte/:path*", "/rechnungen/:path*", "/offene-posten/:path*", "/intelligence/:path*", "/nachrichten/:path*", "/automatisierungen/:path*", "/import/:path*", "/einstellungen/:path*"],
 };

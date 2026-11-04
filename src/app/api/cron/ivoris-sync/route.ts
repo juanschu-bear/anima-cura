@@ -5,7 +5,12 @@ import { reconcilePendingAnimaSignSignatures } from "@/lib/services/animasign-si
 import { retryPendingScribeIvorisPushes } from "@/lib/services/scribe-ivoris-retry";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
+
+// The route runs every minute. Small batches make every invocation a bounded
+// stage and let the following invocation continue with the next due records.
+const SIGNATURE_BATCH_SIZE = 2;
+const SCRIBE_BATCH_SIZE = 2;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -18,10 +23,10 @@ export async function GET(req: NextRequest) {
 
   const signatureReconciliation = await reconcilePendingAnimaSignSignatures({
     db,
-    limit: 10,
+    limit: SIGNATURE_BATCH_SIZE,
     minAgeSeconds: 60,
   });
-  const scribe = await retryPendingScribeIvorisPushes({ db, limit: 20 });
+  const scribe = await retryPendingScribeIvorisPushes({ db, limit: SCRIBE_BATCH_SIZE });
 
   const patient = await runNextPendingAnimaSignStage("patient", { db });
   const document = {

@@ -27,6 +27,17 @@ function scheduleFastRetryAt() {
   return new Date(Date.now() + 5 * 60_000).toISOString();
 }
 
+async function markSignatureReconciliationChecked(db: DbClient, submissionId: string) {
+  const { error } = await db
+    .from("anamnese_submissions")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", submissionId);
+
+  if (error) {
+    throw new Error(`Signatur-Prüfzeit konnte nicht gespeichert werden: ${error.message}`);
+  }
+}
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && /^\d+$/.test(value.trim())) {
@@ -182,11 +193,14 @@ export async function reconcilePendingAnimaSignSignatures(options: {
 
   const { data: submissions, error } = await db
     .from("anamnese_submissions")
-    .select("id, status, signed_pdf_path, signiert_am, documenso_envelope_id, created_at, patient_id, matched_patient_id, vorname, nachname")
+    .select("id, status, signed_pdf_path, signiert_am, documenso_envelope_id, created_at, updated_at, patient_id, matched_patient_id, vorname, nachname")
     .eq("status", "signatur_ausstehend")
     .is("signed_pdf_path", null)
     .not("documenso_envelope_id", "is", null)
     .lte("created_at", threshold)
+    // A pending envelope is moved to the end after every check. This rotates
+    // through the backlog instead of polling the same oldest rows forever.
+    .order("updated_at", { ascending: true })
     .order("created_at", { ascending: true })
     .limit(limit);
 
@@ -206,6 +220,7 @@ export async function reconcilePendingAnimaSignSignatures(options: {
       const envelope = await getEnvelope(submission.documenso_envelope_id);
 
       if (envelope.status === "PENDING" || envelope.status === "DRAFT") {
+        await markSignatureReconciliationChecked(db, submission.id);
         results.push({ submissionId: submission.id, status: "pending", detail: envelope.status });
         continue;
       }
@@ -238,6 +253,11 @@ export async function reconcilePendingAnimaSignSignatures(options: {
         })
       );
     } catch (reconcileError) {
+      try {
+        await markSignatureReconciliationChecked(db, submission.id);
+      } catch (markError) {
+        console.error("[ANIMASIGN] Signatur-Prüfzeit konnte nicht aktualisiert werden:", markError);
+      }
       results.push({
         submissionId: submission.id,
         status: "error",
