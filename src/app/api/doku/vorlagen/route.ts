@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { SCRIBE_CAPABILITIES } from "@/lib/scribe-capabilities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,5 +88,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ vorlagen });
+  return NextResponse.json({ vorlagen, capabilities: SCRIBE_CAPABILITIES });
 }

@@ -144,6 +144,17 @@ test('stacked modules preserve multiplicities; inactive leftover selections do n
   assert.equal(assessScribeConsistency(input,[template,other]).canConfirm,true);
   input.termin_typ='kontrolle+kontrolle';assert.equal(assessScribeConsistency(input,[template]).canConfirm,false);
 });
+test('one encounter can combine appointment types from different workflow phases',()=>{
+  const {input,template}=fixture();
+  const diagnostic=structuredClone(template);
+  diagnostic.id='diagnostic-template';diagnostic.termin_typ='diagnostik';
+  diagnostic.struktur.template=['Diagnostik. ',{g:'bogen_ok'},{g:'bogen_uk'}];
+  input.termin_typ='kontrolle+diagnostik';
+  input.text='MB-Kontrolle. Bogenwechsel OK 016. Kein Wechsel UK. Diagnostik. Bogenwechsel OK 016. Kein Wechsel UK. NT: Kontrolle.';
+  input.auswahl.diagnostik=structuredClone(input.auswahl.kontrolle);
+  input.positionen.push(...structuredClone(input.positionen));
+  assert.equal(assessScribeConsistency(input,[template,diagnostic]).canConfirm,true);
+});
 test('free text beyond the rule vocabulary is never advertised as a full clinical audit',()=>{
   const {input,template}=fixture();input.text+=' Zusätzlicher Befund im Freitext.';
   const result=assessScribeConsistency(input,[template]);assert.equal(result.billingApproved,false);
