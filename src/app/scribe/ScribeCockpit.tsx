@@ -13,7 +13,8 @@ import { t } from '@/lib/i18n';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
-type Gruppe = { label: string; req: boolean; type: "single" | "multi"; opts: Opt[] };
+// explizit: Pflichtgruppe ohne „keine Angabe“, es muss eine Option gewählt werden (z. B. „Kein Bogen OK“). Entscheidung Juan 04.11.2026.
+type Gruppe = { label: string; req: boolean; explizit?: boolean; type: "single" | "multi"; opts: Opt[] };
 type TemplateSeg = string | { g: string };
 type Struktur = {
   template: TemplateSeg[];
@@ -1159,7 +1160,7 @@ export default function ScribeCockpit({
         }
         const grp = m.struktur.groups[seg.g];
         const sel = auswahl[m.termin_typ]?.[seg.g] ?? [];
-        const istLeer = leer[`${m.termin_typ}:${seg.g}`] === true;
+        const istLeer = leer[`${m.termin_typ}:${seg.g}`] === true && !grp?.explizit;
         if (sel.length === 0) {
           if (grp?.req && !istLeer) {
             const label = module.length > 1 ? `${grp.label} (${anzeigeName(m)})` : grp.label;
@@ -2093,7 +2094,7 @@ export default function ScribeCockpit({
                         )}
                       </div>
                     ))}
-                    {!vieleOptionen && grp.req && (
+                    {!vieleOptionen && grp.req && !grp.explizit && (
                       <button
                         className="wahl keine"
                         aria-pressed={leer[`${m.termin_typ}:${g}`] === true}
@@ -2140,7 +2141,7 @@ export default function ScribeCockpit({
                               )}
                             </div>
                           ))}
-                          {grp.req && (
+                          {grp.req && !grp.explizit && (
                             <button
                               className="wahl keine"
                               aria-pressed={leer[`${m.termin_typ}:${g}`] === true}
