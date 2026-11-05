@@ -10,6 +10,7 @@ import PraxisInboxWidget from "./PraxisInboxWidget";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
 import { t } from '@/lib/i18n';
+import { scribeAppointmentTypeDisplayName } from '@/lib/scribe-appointment-type';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
@@ -147,9 +148,7 @@ function sektionsNameVonVorlage(v: Vorlage): string | null {
 }
 
 function anzeigeName(v: Vorlage): string {
-  const muster = v.struktur?.praxis_muster?.trim();
-  if (istEigeneTerminart(v) && muster) return muster;
-  return v.name;
+  return scribeAppointmentTypeDisplayName(v);
 }
 
 function artName(value: string | null | undefined): string {
