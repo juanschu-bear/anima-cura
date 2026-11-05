@@ -12,7 +12,7 @@ try{
  CREATE TABLE doku_eintraege(id uuid PRIMARY KEY,patient_id uuid,termin_datum date,status text,text text,positionen jsonb,zaehne text[],variablen jsonb,auswahl jsonb,version int DEFAULT 1,created_at timestamptz DEFAULT now());
  CREATE TABLE doku_tagesdatensaetze(id uuid,canonical_entry_id uuid);
  CREATE FUNCTION decide_doku_day_part() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'SELECT';
- GRANT USAGE ON SCHEMA public TO authenticated;GRANT SELECT,INSERT,UPDATE ON doku_eintraege TO authenticated;GRANT SELECT ON doku_tagesdatensaetze TO authenticated;`);
+ GRANT USAGE ON SCHEMA public TO authenticated;GRANT SELECT,INSERT,UPDATE,DELETE ON doku_eintraege TO authenticated;GRANT SELECT ON doku_tagesdatensaetze TO authenticated;`);
  await sql(readFileSync('supabase/migrations/076_scribe_day_entry_guards.sql','utf8'));
  const patient=randomUUID(),a=randomUUID(),b=randomUUID();
  const insert=(id,date,status='bestaetigt')=>`INSERT INTO doku_eintraege(id,patient_id,termin_datum,status,text) VALUES('${id}','${patient}','${date}','${status}','synthetic');`;
@@ -26,5 +26,16 @@ try{
  await assert.rejects(sql(`SET ROLE authenticated;UPDATE doku_eintraege SET text='overwrite',version=2 WHERE id='${a}';`),/day_record_correction_required/);
  await sql(`UPDATE doku_eintraege SET text='authorized day command owner',version=2 WHERE id='${a}';`);
  assert.equal(await sql(`SELECT count(*) FROM doku_eintraege WHERE id='${d}' AND status='entwurf'`),'1');
- console.log('PASS: concurrent insert, concurrent draft promotion, canonical guard, authorized owner update; synthetic database only.');
+ // Lifecycle: move day and patient, release status, delete, and rollback conflict.
+ const e=randomUUID(),f=randomUUID(),other=randomUUID();
+ await sql(`SET ROLE authenticated;${insert(e,'2026-12-01')}UPDATE doku_eintraege SET termin_datum='2026-12-02' WHERE id='${e}';${insert(f,'2026-12-01')}`);
+ await sql(`SET ROLE authenticated;UPDATE doku_eintraege SET patient_id='${other}' WHERE id='${e}';`);
+ assert.equal(await sql(`SELECT count(*) FROM doku_confirmed_day_guards WHERE entry_id='${e}' AND patient_id='${other}' AND service_date='2026-12-02'`),'1');
+ await assert.rejects(sql(`SET ROLE authenticated;UPDATE doku_eintraege SET patient_id='${patient}',termin_datum='2026-12-01' WHERE id='${e}';`),/day_record_exists/);
+ assert.equal(await sql(`SELECT count(*) FROM doku_confirmed_day_guards WHERE entry_id='${e}' AND patient_id='${other}'`),'1');
+ await sql(`SET ROLE authenticated;UPDATE doku_eintraege SET status='verworfen' WHERE id='${f}';${insert(randomUUID(),'2026-12-01')}`);
+ assert.equal(await sql(`SELECT count(*) FROM doku_confirmed_day_guards WHERE entry_id='${f}'`),'0');
+ await sql(`SET ROLE authenticated;DELETE FROM doku_eintraege WHERE id='${e}';`);
+ assert.equal(await sql(`SELECT count(*) FROM doku_confirmed_day_guards WHERE entry_id='${e}'`),'0');
+ console.log('PASS: insert/promotion races, canonical guard, day/patient moves, conflict rollback, status release and deletion; synthetic database only.');
 }finally{if(container)execFileSync('docker',['stop','--time','1',container],{stdio:'ignore'});}

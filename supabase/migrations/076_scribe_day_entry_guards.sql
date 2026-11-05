@@ -3,20 +3,33 @@ BEGIN;
 CREATE TABLE public.doku_confirmed_day_guards (
  patient_id uuid NOT NULL,
  service_date date NOT NULL,
- entry_id uuid NOT NULL REFERENCES public.doku_eintraege(id) DEFERRABLE INITIALLY DEFERRED,
+ entry_id uuid NOT NULL REFERENCES public.doku_eintraege(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
  PRIMARY KEY(patient_id,service_date)
 );
 ALTER TABLE public.doku_confirmed_day_guards ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.doku_confirmed_day_guards FROM PUBLIC,anon,authenticated,service_role;
 CREATE FUNCTION public.guard_scribe_confirmed_day() RETURNS trigger
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE existing_id uuid;
+DECLARE existing_id uuid; old_key bigint; new_key bigint; lock_key bigint;
 BEGIN
- IF NEW.status<>'bestaetigt' OR NEW.patient_id IS NULL THEN RETURN NEW; END IF;
- IF TG_OP='UPDATE' AND OLD.status='bestaetigt' AND OLD.patient_id=NEW.patient_id AND OLD.termin_datum=NEW.termin_datum THEN RETURN NEW; END IF;
- -- A volatile trigger obtains a fresh query snapshot after waiting on this lock.
- -- All INSERTs and draft promotions for the same day serialize here.
- PERFORM pg_advisory_xact_lock(hashtextextended(NEW.patient_id::text||':'||NEW.termin_datum::text,76));
+ IF TG_OP='UPDATE' AND (OLD.status,OLD.patient_id,OLD.termin_datum)
+  IS NOT DISTINCT FROM (NEW.status,NEW.patient_id,NEW.termin_datum) THEN RETURN NEW; END IF;
+ IF TG_OP<>'INSERT' AND OLD.status='bestaetigt' AND OLD.patient_id IS NOT NULL THEN
+  old_key:=hashtextextended(OLD.patient_id::text||':'||OLD.termin_datum::text,76);
+ END IF;
+ IF TG_OP<>'DELETE' AND NEW.status='bestaetigt' AND NEW.patient_id IS NOT NULL THEN
+  new_key:=hashtextextended(NEW.patient_id::text||':'||NEW.termin_datum::text,76);
+ END IF;
+ -- Lock both days in a stable order, including releases and deletes.
+ FOR lock_key IN SELECT DISTINCT k FROM unnest(ARRAY[old_key,new_key]) k WHERE k IS NOT NULL ORDER BY k LOOP
+  PERFORM pg_advisory_xact_lock(lock_key);
+ END LOOP;
+ IF TG_OP<>'INSERT' THEN
+  DELETE FROM public.doku_confirmed_day_guards WHERE entry_id=OLD.id;
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ IF NEW.status IS DISTINCT FROM 'bestaetigt' OR NEW.patient_id IS NULL THEN RETURN NEW; END IF;
+ -- Release and acquisition roll back together if the destination is occupied.
  SELECT e.id INTO existing_id FROM public.doku_eintraege e
  WHERE e.patient_id=NEW.patient_id AND e.termin_datum=NEW.termin_datum AND e.status='bestaetigt' AND e.id<>NEW.id
  ORDER BY e.created_at,e.id LIMIT 1;
@@ -31,7 +44,7 @@ BEGIN
  IF existing_id<>NEW.id THEN RAISE EXCEPTION 'day_record_exists' USING ERRCODE='P0001',DETAIL=jsonb_build_object('entryId',existing_id)::text; END IF;
  RETURN NEW;
 END $$;
-CREATE TRIGGER guard_scribe_confirmed_day BEFORE INSERT OR UPDATE ON public.doku_eintraege
+CREATE TRIGGER guard_scribe_confirmed_day BEFORE INSERT OR UPDATE OR DELETE ON public.doku_eintraege
  FOR EACH ROW EXECUTE FUNCTION public.guard_scribe_confirmed_day();
 
 CREATE FUNCTION public.guard_scribe_canonical_content() RETURNS trigger
