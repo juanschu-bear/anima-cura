@@ -82,10 +82,23 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Patient hat keine ivoris_id" }, { status: 422 });
   }
 
-  // Korrektur-Kennzeichnung: ab Version 2 entsteht in ivoris ein zusaetzlicher Eintrag
+  // A confirmed day-part is append-only in IVORIS. Only its delta is sent;
+  // the complete canonical day text remains in Anima Cura and is never
+  // repeated. Legacy versions without delta metadata keep the old behaviour.
   const zaehne = (eintrag.zaehne as string[]) ?? [];
-  const prefix = (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
-  const text = appendStaffInitials(`${prefix}${eintrag.text}`, eintrag.bestaetigt_kuerzel);
+  const dayDelta = eintrag.variablen && typeof eintrag.variablen === "object"
+    ? (eintrag.variablen as { _dayDelta?: { kind?: unknown; text?: unknown } })._dayDelta
+    : null;
+  const deltaKind = dayDelta?.kind === "nachtrag" || dayDelta?.kind === "korrektur" ? dayDelta.kind : null;
+  const sourceText = typeof dayDelta?.text === "string" && dayDelta.text.trim()
+    ? dayDelta.text.trim()
+    : eintrag.text;
+  const prefix = deltaKind === "nachtrag"
+    ? "NACHTRAG: "
+    : deltaKind === "korrektur"
+      ? "KORREKTUR: "
+      : (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
+  const text = appendStaffInitials(`${prefix}${sourceText}`, eintrag.bestaetigt_kuerzel);
 
   try {
     const result = await addIvorisKarteiEintrag({

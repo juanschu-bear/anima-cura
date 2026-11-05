@@ -168,13 +168,35 @@
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
-      "sha256": "a25474b506abcd68eda7e53202d9e6ae9ef83eb5a743ec5c6b350f3a65ba3a69",
+      "sha256": "95393a741ea3977838cf5ac333e941c4fe7155be3ba5708c9173a0ce27e35c5b",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
           "name": "claim_integration_outbox_job_for_artifact",
           "signature": "public.claim_integration_outbox_job_for_artifact(p_artifact_type text, p_artifact_id uuid, p_worker_id text, p_lease_minutes integer, p_force boolean)",
           "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/scribe-day-record-service.ts",
+      "sha256": "0863e7f10c751b9605a1944e8b9c85e85aba2a648e186ce6577adf5f6dce020e",
+      "proof": "All day-record RPCs receive the signed-in Anima Cura/Scribe Supabase client after requireScribeDayWriter checks the authenticated user, profile permission and server-side staff initials; JWT role authenticated.",
+      "calls": [
+        {
+          "name": "bootstrap_doku_day_record",
+          "signature": "public.bootstrap_doku_day_record(p_entry_id uuid, p_expected_entry_version integer)",
+          "role": "authenticated"
+        },
+        {
+          "name": "decide_doku_day_part",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "role": "authenticated"
+        },
+        {
+          "name": "decide_doku_day_part",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "role": "authenticated"
         }
       ]
     },
@@ -329,7 +351,7 @@
     },
     {
       "file": "src/lib/services/scribe-ivoris-retry.ts",
-      "sha256": "def8f4c8643c4bc8f2ea6b7374a7cb731a7978fa63c8259078f8508e080ad5f5",
+      "sha256": "ac951dd3d722d11f704fd764262cc442a74c79d51b34f57ac86efb91c3a88c64",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {

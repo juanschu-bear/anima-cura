@@ -34,6 +34,7 @@ type RetryEntry = {
   ivoris_retry_count: number | null;
   ivoris_next_retry_at: string | null;
   ivoris_gepusht_am: string | null;
+  variablen?: { _dayDelta?: { kind?: unknown; text?: unknown } } | null;
   patients: PatientIdentity | PatientIdentity[] | null;
 };
 
@@ -76,7 +77,7 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
   const workerId = `scribe-${crypto.randomUUID()}`;
 
   const baseSelect =
-    "id, termin_datum, version, text, zaehne, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, ivoris_gepusht_am, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )";
+    "id, termin_datum, version, text, zaehne, variablen, bestaetigt_kuerzel, ivoris_push_status, ivoris_fehler, ivoris_retry_count, ivoris_next_retry_at, ivoris_gepusht_am, patients ( id, ivoris_id, vorname, nachname, geburtsdatum )";
 
   let data: RetryEntry[] | null = null;
   let error: { message: string } | null = null;
@@ -186,8 +187,15 @@ export async function retryPendingScribeIvorisPushes(options: RetryOptions = {})
     }
 
     const zaehne = ((eintrag.zaehne as string[] | null) ?? []).map(String);
-    const prefix = (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
-    const text = appendStaffInitials(`${prefix}${(eintrag.text as string) ?? ""}`, eintrag.bestaetigt_kuerzel);
+    const dayDelta = eintrag.variablen?._dayDelta;
+    const deltaKind = dayDelta?.kind === "nachtrag" || dayDelta?.kind === "korrektur" ? dayDelta.kind : null;
+    const sourceText = typeof dayDelta?.text === "string" && dayDelta.text.trim() ? dayDelta.text.trim() : (eintrag.text as string) || "";
+    const prefix = deltaKind === "nachtrag"
+      ? "NACHTRAG: "
+      : deltaKind === "korrektur"
+        ? "KORREKTUR: "
+        : (eintrag.version as number) > 1 ? `KORREKTUR (v${eintrag.version}): ` : "";
+    const text = appendStaffInitials(`${prefix}${sourceText}`, eintrag.bestaetigt_kuerzel);
 
     try {
       const entryPayload = {
