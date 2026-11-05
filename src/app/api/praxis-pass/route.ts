@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAppUser } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
+import { normalizeScribeAppointmentTypeName } from "@/lib/scribe-appointment-type";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,8 +83,12 @@ export async function POST(request: NextRequest) {
   // Eigene Termin-Art umbenennen.
   if (body.umbenennen && body.umbenennen.termin_typ) {
     const { behandlungsart, termin_typ, name, basis_termin_typ, sort_index, sofort_aktivieren } = body.umbenennen;
+    const eigenerName = normalizeScribeAppointmentTypeName(name);
     const sortIndexZahl = Number.isFinite(Number(sort_index)) ? Number(sort_index) : null;
     if (behandlungsart && termin_typ) {
+      if (String(termin_typ).startsWith("eigen-") && !eigenerName) {
+        return NextResponse.json({ error: "Bitte einen Namen mit höchstens 120 Zeichen eingeben." }, { status: 400 });
+      }
       const { data: vorhanden } = await supabase
         .from("praxis_pass")
         .select("id")
@@ -91,17 +96,23 @@ export async function POST(request: NextRequest) {
         .eq("termin_typ", termin_typ)
         .maybeSingle();
       if (vorhanden) {
-        const updatePass: Record<string, unknown> = { eigener_name: name ?? null };
+        const updatePass: Record<string, unknown> = { eigener_name: eigenerName ?? name ?? null };
         if (sortIndexZahl != null) updatePass.position = sortIndexZahl;
-        await supabase.from("praxis_pass").update(updatePass).eq("behandlungsart", behandlungsart).eq("termin_typ", termin_typ);
+        const { error: passFehler } = await supabase
+          .from("praxis_pass")
+          .update(updatePass)
+          .eq("behandlungsart", behandlungsart)
+          .eq("termin_typ", termin_typ);
+        if (passFehler) return NextResponse.json({ error: passFehler.message }, { status: 500 });
       } else {
-        await supabase.from("praxis_pass").insert({
+        const { error: passFehler } = await supabase.from("praxis_pass").insert({
           behandlungsart,
           termin_typ,
-          eigener_name: name ?? null,
+          eigener_name: eigenerName ?? name ?? null,
           status: "offen",
           ...(sortIndexZahl != null ? { position: sortIndexZahl } : {}),
         });
+        if (passFehler) return NextResponse.json({ error: passFehler.message }, { status: 500 });
       }
 
       if (sofort_aktivieren === true) {
@@ -117,7 +128,7 @@ export async function POST(request: NextRequest) {
 
         if (vorhandeneVorlage) {
           const updateVorlage: Record<string, unknown> = { aktiv: true };
-          if (name != null) updateVorlage.name = name;
+          if (name != null) updateVorlage.name = eigenerName ?? name;
           if (sortIndexZahl != null) updateVorlage.sort_index = sortIndexZahl;
           const { error: updateVorlageErr } = await supabase
             .from("doku_vorlagen")
@@ -149,7 +160,7 @@ export async function POST(request: NextRequest) {
           const { error: insertVorlageErr } = await supabase.from("doku_vorlagen").insert({
             behandlungsart,
             termin_typ,
-            name: String(name ?? "").trim() || termin_typ,
+            name: eigenerName ?? termin_typ,
             sort_index: sortIndexZahl ?? 900,
             aktiv: true,
             struktur,
@@ -169,10 +180,24 @@ export async function POST(request: NextRequest) {
     const art = String(body.loeschen.behandlungsart ?? "");
     const tt = String(body.loeschen.termin_typ ?? "");
     if (art && tt) {
-      await supabase.from("praxis_pass").delete().eq("behandlungsart", art).eq("termin_typ", tt);
-      if (tt.startsWith("eigen-")) {
-        await supabase.from("doku_vorlagen").delete().eq("behandlungsart", art).eq("termin_typ", tt);
+      if (!tt.startsWith("eigen-")) {
+        return NextResponse.json({ error: "Nur selbst angelegte Terminarten können gelöscht werden." }, { status: 400 });
       }
+      // Bereits verwendete Einträge behalten ihren Vorlagenbezug. Deshalb wird die
+      // Terminart ausgeblendet statt ihre Vorlage aus der Dokumentation zu entfernen.
+      const { error: vorlageFehler } = await supabase
+        .from("doku_vorlagen")
+        .update({ aktiv: false })
+        .eq("behandlungsart", art)
+        .eq("termin_typ", tt);
+      if (vorlageFehler) return NextResponse.json({ error: vorlageFehler.message }, { status: 500 });
+
+      const { error: passFehler } = await supabase
+        .from("praxis_pass")
+        .delete()
+        .eq("behandlungsart", art)
+        .eq("termin_typ", tt);
+      if (passFehler) return NextResponse.json({ error: passFehler.message }, { status: 500 });
     }
     return NextResponse.json({ ok: true, geloescht: true });
   }

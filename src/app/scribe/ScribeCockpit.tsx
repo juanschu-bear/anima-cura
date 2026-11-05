@@ -463,6 +463,7 @@ export default function ScribeCockpit({
   const [neueArtName, setNeueArtName] = useState("");
   const [neueArtBasis, setNeueArtBasis] = useState<"aligner" | "multiband" | "removable">("aligner");
   const [neueTerminartName, setNeueTerminartName] = useState("");
+  const [terminartBearbeitung, setTerminartBearbeitung] = useState<{ terminTyp: string; name: string } | null>(null);
 
   const [auswahl, setAuswahl] = useState<Record<string, Record<string, number[]>>>({});
   const [zaehne, setZaehne] = useState<number[]>([]);
@@ -1033,7 +1034,47 @@ export default function ScribeCockpit({
       }
       setVorlagen((alt) => alt.filter((eintrag) => !(eintrag.behandlungsart === v.behandlungsart && eintrag.termin_typ === v.termin_typ)));
       setGewaehlt((alt) => alt.filter((slug) => slug !== v.termin_typ));
+      setTerminartBearbeitung((alt) => alt?.terminTyp === v.termin_typ ? null : alt);
       setManagerHinweis(`Terminart „${v.name}“ gelöscht.`);
+    } finally {
+      setArtenSpeichert(false);
+    }
+  }
+
+  async function eigeneTerminartUmbenennen(v: Vorlage) {
+    if (!istEigeneTerminart(v) || artenSpeichert) return;
+    const name = terminartBearbeitung?.terminTyp === v.termin_typ ? terminartBearbeitung.name.trim() : "";
+    if (!name) {
+      setManagerHinweis("Bitte einen Namen für die Terminart eingeben.");
+      return;
+    }
+    setArtenSpeichert(true);
+    setManagerHinweis(null);
+    try {
+      const res = await fetch("/api/praxis-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          umbenennen: {
+            behandlungsart: v.behandlungsart,
+            termin_typ: v.termin_typ,
+            name,
+            sofort_aktivieren: true,
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManagerHinweis(json.error ?? "Terminart konnte nicht bearbeitet werden.");
+        return;
+      }
+      setVorlagen((alt) => alt.map((eintrag) =>
+        eintrag.behandlungsart === v.behandlungsart && eintrag.termin_typ === v.termin_typ
+          ? { ...eintrag, name }
+          : eintrag,
+      ));
+      setTerminartBearbeitung(null);
+      setManagerHinweis(`Terminart in „${name}“ umbenannt.`);
     } finally {
       setArtenSpeichert(false);
     }
@@ -2133,14 +2174,39 @@ export default function ScribeCockpit({
               <div className="inline-manager-liste">
                 {artVorlagen.map((v) => (
                   <div key={v.id} className="inline-manager-item">
-                    <button type="button" className="inline-manager-select" onClick={() => { setGewaehlt([v.termin_typ]); setTerminOffen(false); }}>
-                      {anzeigeName(v)}
-                    </button>
-                    {istEigeneTerminart(v) ? (
-                      <button type="button" className="inline-manager-delete" onClick={() => eigeneTerminartLoeschen(v)}>Löschen</button>
+                    {terminartBearbeitung?.terminTyp === v.termin_typ ? (
+                      <input
+                        className="feld-input inline-manager-name"
+                        type="text"
+                        maxLength={120}
+                        autoFocus
+                        value={terminartBearbeitung.name}
+                        onChange={(e) => setTerminartBearbeitung({ terminTyp: v.termin_typ, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void eigeneTerminartUmbenennen(v);
+                          if (e.key === "Escape") setTerminartBearbeitung(null);
+                        }}
+                      />
                     ) : (
-                      <span className="inline-manager-fix">Standard</span>
+                      <button type="button" className="inline-manager-select" onClick={() => { setGewaehlt([v.termin_typ]); setTerminOffen(false); }}>
+                        {anzeigeName(v)}
+                      </button>
                     )}
+                    <div className="inline-manager-actions">
+                      {istEigeneTerminart(v) ? terminartBearbeitung?.terminTyp === v.termin_typ ? (
+                        <>
+                          <button type="button" className="inline-manager-edit" disabled={artenSpeichert} onClick={() => void eigeneTerminartUmbenennen(v)}>Speichern</button>
+                          <button type="button" className="inline-manager-fix" onClick={() => setTerminartBearbeitung(null)}>Abbrechen</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="inline-manager-edit" onClick={() => setTerminartBearbeitung({ terminTyp: v.termin_typ, name: v.name })}>Bearbeiten</button>
+                          <button type="button" className="inline-manager-delete" onClick={() => eigeneTerminartLoeschen(v)}>Löschen</button>
+                        </>
+                      ) : (
+                        <span className="inline-manager-fix">Standard</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

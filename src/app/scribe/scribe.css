@@ -1184,9 +1184,15 @@
   border:0;background:transparent;color:var(--schrift);font:inherit;cursor:pointer;padding:0;text-align:left
 }
 .scribe .inline-manager-select:hover{color:var(--primaer)}
-.scribe .inline-manager-delete,.scribe .inline-manager-fix{
+.scribe .inline-manager-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.scribe .inline-manager-name{height:38px;min-width:0}
+.scribe .inline-manager-delete,.scribe .inline-manager-edit,.scribe .inline-manager-fix{
   display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 12px;border-radius:999px;font-size:11px
 }
+.scribe .inline-manager-edit{
+  border:1px solid rgba(94,162,255,.28);background:rgba(59,110,185,.14);color:#b8d4ff;cursor:pointer
+}
+.scribe .inline-manager-edit:disabled{opacity:.55;cursor:wait}
 .scribe .inline-manager-delete{
   border:1px solid rgba(255,123,123,.26);background:rgba(140,43,43,.12);color:#ffb7b7;cursor:pointer
 }
