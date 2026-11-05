@@ -8,11 +8,12 @@ import * as identity from '../../scribe-identity';
 import * as rooms from '../../scribe-rooms';
 import * as billing from '../../billing-foundation';
 import * as i18n from '../../i18n';
+import * as dayGuard from '../../scribe-entry-day-guard';
 import * as monitor from '../../scribe-confirmation-monitor';
 
 // Execute the actual route with a session-bound synthetic DB. No live keys,
 // runtime import hacks in production, or writes to real patient data.
-function harness(path: string, options:{broken?:boolean;authenticated?:boolean;allowed?:boolean;sourceFails?:boolean}={}) {
+function harness(path: string, options:{broken?:boolean;authenticated?:boolean;allowed?:boolean;sourceFails?:boolean;existingDay?:boolean;canonicalDay?:boolean}={}) {
   const template={id:'template-test',behandlungsart:'multiband',termin_typ:'kontrolle',
     struktur:{template:['MB-Kontrolle. ',{g:'bogen_ok'}],groups:{bogen_ok:{type:'single',opts:[{t:'Bogenwechsel OK 016.'}]}}},
     positionen:[{code:'BEMA 128a',text:'Belegte Bogenleistung',if:{g:options.broken?'bogen':'bogen_ok',i:0}}]};
@@ -22,11 +23,11 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
   const writes:unknown[]=[];const reads:string[]=[];
   const stored={...body,id:'entry-test',status:'bestaetigt',version:1,bestaetigt_am:'2026-10-31T12:00:00Z'};
   const db={auth:{getUser:async()=>({data:{user:options.authenticated===false?null:{id:'staff-test'}}})},from(table:string){
-    reads.push(table);let changes:Record<string,unknown>={};
+    reads.push(table);let listed=false;let changes:Record<string,unknown>={};
     const result=()=>({error:options.sourceFails&&table==='doku_vorlagen'?{message:'secret'}:null,
       data:table==='user_profiles'?{role:'admin',kuerzel:'MS',permissions:{scribe_schreiben:options.allowed!==false}}
-        :table==='doku_vorlagen'?[template]:table==='doku_vorlagen_optionen'?[]:{...stored,...changes}});
-    const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},limit(){return Promise.resolve(result());},range(){return Promise.resolve(result());},
+        :table==='doku_tagesdatensaetze'?(options.canonicalDay?{id:'day-test'}:null):table==='doku_eintraege'&&listed?(options.existingDay?[stored]:[]):table==='doku_vorlagen'?[template]:table==='doku_vorlagen_optionen'?[]:{...stored,...changes}});
+    const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},limit(){listed=true;return q;},neq(){return q;},maybeSingle(){return Promise.resolve(result());},range(){return Promise.resolve(result());},
       single(){return Promise.resolve(result());},insert(value:Record<string,unknown>){writes.push({table,insert:value});changes=value;return q;},
       update(value:Record<string,unknown>){writes.push({table,update:value});changes=value;return q;},
       then(resolve:(v:unknown)=>unknown){return Promise.resolve(result()).then(resolve);}};
@@ -36,7 +37,7 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
   const imports:Record<string,unknown>={'next/server':{NextRequest,NextResponse},'@/lib/db/supabase-server':{createServerComponentClient:()=>db},
     '@/lib/db/supabase':{createServerClient:()=>monitorDb},'@/lib/scribe-confirmation-monitor':monitor,
     '@/lib/scribe-consistency-service':consistency,'@/lib/scribe-identity':identity,'@/lib/scribe-rooms':rooms,
-    '@/lib/scribe-room-api':{},'@/lib/billing-foundation':billing,'@/lib/i18n':i18n};
+    '@/lib/scribe-entry-day-guard':dayGuard,'@/lib/scribe-room-api':{},'@/lib/billing-foundation':billing,'@/lib/i18n':i18n};
   const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   const mod={exports:{} as Record<string,(...args:any[])=>Promise<Response>>};
   new Function('require','module','exports',code)((id:string)=>{assert.ok(id in imports,`unexpected dependency ${id}`);return imports[id];},mod,mod.exports);
@@ -95,4 +96,12 @@ test('every issue in a 422 response contains a readable practice message',async(
   const json=await response.json();assert.equal(response.status,422);
   assert.ok(json.consistency.issues.length>0);
   assert.ok(json.consistency.issues.every((issue:{message?:string})=>typeof issue.message==='string'&&issue.message.length>20));
+});
+
+test('confirmed duplicate gets 409 with existing entry while draft is still saved',async()=>{
+ const f=harness(entry,{existingDay:true});const r=await f.handle.POST(request(f.body));assert.equal(r.status,409);const body=await r.json();assert.equal(body.code,'day_record_exists');assert.equal(body.eintrag.id,'entry-test');assert.equal(f.writes.length,0);
+ const g=harness(entry,{existingDay:true});assert.equal((await g.handle.POST(request({...g.body,bestaetigen:false}))).status,201);
+});
+test('legacy version route rejects canonical content and supplies day correction path',async()=>{
+ const f=harness(version,{canonicalDay:true});const r=await f.handle.POST(request({...f.body,aenderungsgrund:'Korrektur'}),{params:{id:'entry-test'}});assert.equal(r.status,409);const b=await r.json();assert.equal(b.code,'day_record_correction_required');assert.equal(b.dayRecordId,'day-test');assert.equal(f.writes.length,0);
 });

@@ -279,11 +279,30 @@ export async function saveDraftDayPart(db: Db, id: string, raw: unknown, preview
   };
 }
 
-export async function previewStoredDayPart(db: Db, id: string, partId: string) {
+const decisionPreviewSchema = z.object({
+  decision: z.enum(["nachtrag", "korrektur"]),
+  correctsPartId: z.string().uuid().nullish(),
+}).superRefine((value, ctx) => {
+  if (value.decision === "korrektur" && !value.correctsPartId)
+    ctx.addIssue({code:z.ZodIssueCode.custom,path:["correctsPartId"],message:"corrected_part_not_found"});
+});
+
+function decisionPart(part: StoredDayPart, parts: StoredDayPart[], raw: unknown): StoredDayPart {
+  const parsed = decisionPreviewSchema.safeParse(raw);
+  if (!parsed.success) throw new DayRecordError("day_part_decision_invalid",422,"Entscheidung oder Korrekturbezug ist ungültig.");
+  const target = parsed.data.decision === "korrektur" ? parsed.data.correctsPartId! : null;
+  if (target && !parts.some(p => p.id === target && p.state === "bestaetigt" && p.tagesdatensatz_id === part.tagesdatensatz_id))
+    throw new DayRecordError("corrected_part_not_found",422,"Der zu korrigierende Tagesabschnitt wurde nicht gefunden.");
+  return {...part,kind:parsed.data.decision,corrects_part_id:target};
+}
+
+export async function previewStoredDayPart(db: Db, id: string, partId: string, raw?: unknown) {
   const { record, parts } = await readDayRecord(db, id);
   const part = parts.find(value => value.id === partId);
   if (!part || part.state !== "entwurf") throw new DayRecordError("draft_part_not_found", 404, "Entwurfsteil nicht gefunden.");
-  return previewValue(record, parts.filter(value => value.id !== partId), part);
+  // Legacy callers may preview a stored non-null decision. Bootstrap drafts must choose one.
+  const proposed = decisionPart(part,parts,raw ?? {decision:part.kind,correctsPartId:part.corrects_part_id});
+  return previewValue(record, parts.filter(value => value.id !== partId), proposed);
 }
 
 export async function decideStoredDayPart(db: Db, id: string, partId: string, raw: unknown) {
@@ -312,10 +331,7 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
     return data;
   }
 
-  const proposed = { ...part, kind: input.decision, corrects_part_id: input.correctsPartId ?? part.corrects_part_id } as StoredDayPart;
-  if (input.decision === "korrektur" && !proposed.corrects_part_id) {
-    throw new DayRecordError("corrected_part_not_found", 422, "Korrektur benötigt den ursprünglichen Tagesabschnitt.");
-  }
+  const proposed = decisionPart(part, parts, input);
   if (part.template_id && part.treatment_type && part.appointment_type) {
     const consistency = await checkScribeConsistency(db, {
       vorlage_id: part.template_id,

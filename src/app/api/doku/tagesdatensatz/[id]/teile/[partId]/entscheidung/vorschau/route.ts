@@ -6,11 +6,11 @@ import { dayRouteError, requireScribeDayWriter } from "@/lib/scribe-day-route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(_request: NextRequest, { params }: { params: { id: string; partId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: { id: string; partId: string } }) {
   const db = createServerComponentClient();
   try {
     await requireScribeDayWriter(db);
-    return NextResponse.json(await previewStoredDayPart(db, params.id, params.partId));
+    return NextResponse.json(await previewStoredDayPart(db, params.id, params.partId, await request.json()));
   } catch (error) {
     return dayRouteError(error);
   }

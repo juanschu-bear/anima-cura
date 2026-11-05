@@ -1,3 +1,4 @@
+import {canonicalDayConflict,dayGuardDatabaseError} from '@/lib/scribe-entry-day-guard';
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   if (loadError || !alt) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
 
+  const dayConflict=await canonicalDayConflict(supabase,params.id);
+  if(dayConflict)return dayConflict;
+
   const neueVersion = (alt.version as number) + 1;
   const roomError = roomInputError(body.zimmer_version_id, false);
   if (roomError) return NextResponse.json({ error: roomError }, { status: 422 });
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .select("*")
     .single();
 
-  if (updError) return NextResponse.json({ error: updError.message }, { status: updError.code === 'PGRST116' ? 409 : 500 });
+  if (updError) return await dayGuardDatabaseError(supabase,updError,alt.patient_id,alt.termin_datum,params.id) ?? NextResponse.json({ error: updError.message }, { status: updError.code === 'PGRST116' ? 409 : 500 });
 
   const { error: vError } = await supabase.from("doku_eintrag_versionen").insert({
     eintrag_id: eintrag.id,

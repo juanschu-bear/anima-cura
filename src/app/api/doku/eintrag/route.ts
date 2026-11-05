@@ -1,3 +1,4 @@
+import {existingDayConflict,dayGuardDatabaseError} from '@/lib/scribe-entry-day-guard';
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { MISSING_STAFF_INITIALS_MESSAGE, normalizeStaffInitials } from "@/lib/scribe-identity";
@@ -76,11 +77,13 @@ export async function POST(request: NextRequest) {
   const terminDatum =
     body.termin_datum && /^\d{4}-\d{2}-\d{2}$/.test(body.termin_datum)
       ? body.termin_datum
-      : new Date().toISOString().slice(0, 10);
+      : new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 
   // Fail closed before either INSERT or draft promotion. Drafts remain savable;
   // a client-supplied status/review flag never bypasses the server check.
   if (bestaetigen) {
+    const conflict = await existingDayConflict(supabase,body.patient_id,terminDatum,body.entwurf_id);
+    if(conflict)return conflict;
     const check = await checkScribeConsistency(supabase, body);
     if (!check.canConfirm) {
       const response = scribeConsistencyFailure(check, request.url);
@@ -110,12 +113,13 @@ export async function POST(request: NextRequest) {
   if (body.entwurf_id) {
     const { data: vorhanden, error: ladeFehler } = await supabase
       .from("doku_eintraege")
-      .select("id, status")
+      .select("id, status, patient_id")
       .eq("id", body.entwurf_id)
       .single();
     if (ladeFehler || !vorhanden) {
       return NextResponse.json({ error: "Entwurf nicht gefunden" }, { status: 404 });
     }
+    if(vorhanden.patient_id!==body.patient_id)return NextResponse.json({code:"draft_patient_mismatch"},{status:409});
     if (vorhanden.status !== "entwurf") {
       return NextResponse.json({ error: "Nur Entwuerfe koennen weiterbearbeitet werden" }, { status: 409 });
     }
@@ -130,9 +134,10 @@ export async function POST(request: NextRequest) {
       .from("doku_eintraege")
       .update(update)
       .eq("id", body.entwurf_id)
+      .eq("status", "entwurf")
       .select("*")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return await dayGuardDatabaseError(supabase,error,body.patient_id,terminDatum,body.entwurf_id??undefined) ?? NextResponse.json({ error: error.message }, { status: error.code==='PGRST116'?409:500 });
 
     if (bestaetigen) {
       const { error: vError } = await supabase.from("doku_eintrag_versionen").insert({
@@ -178,7 +183,7 @@ export async function POST(request: NextRequest) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return await dayGuardDatabaseError(supabase,error,body.patient_id,terminDatum,body.entwurf_id??undefined) ?? NextResponse.json({ error: error.message }, { status: error.code==='PGRST116'?409:500 });
 
   if (bestaetigen) {
     const { error: vError } = await supabase.from("doku_eintrag_versionen").insert({

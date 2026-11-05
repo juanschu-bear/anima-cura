@@ -188,3 +188,16 @@ test("a correction replaces the previous part instead of adding its positions ag
   assert.equal(preview.ivoris.action, "already_pushed");
   assert.equal(preview.ivoris.text, null);
 });
+
+test('bootstrap null kind previews the requested decision and binds token to decision and target',async()=>{
+ const day='11111111-1111-4111-8111-111111111111', original='22222222-2222-4222-8222-222222222222', draft='33333333-3333-4333-8333-333333333333';
+ const record={id:day,version:1,canonical_entry_id:'canonical'};
+ const base={tagesdatensatz_id:day,occurred_at:'2026-11-05T08:00:00Z',documented_at:'2026-11-05T08:10:00Z',positions:[],text:'Original',teeth:[],corrects_part_id:null,source_entry_id:null};
+ const parts=[{...base,id:original,state:'bestaetigt',kind:'original'},{...base,id:draft,state:'entwurf',kind:null,text:'Zusatz'}];
+ let calls=0;const db={from(table:string){const q={select(){return q;},eq(){return q;},order(){return q;},maybeSingle:async()=>({data:record,error:null}),then(resolve:any){return Promise.resolve({data:table==='doku_tagesdatensaetze'?record:parts,error:null}).then(resolve);}};return q;},rpc:async()=>{calls++;return {data:{state:'bestaetigt'},error:null};}};
+ const a=await previewStoredDayPart(db as never,day,draft,{decision:'nachtrag',correctsPartId:original});assert.equal(a.proposedPart.correctsPartId,null);assert.equal(a.resultingClinicalText,'Original\n\nZusatz');
+ const c=await previewStoredDayPart(db as never,day,draft,{decision:'korrektur',correctsPartId:original});assert.equal(c.resultingClinicalText,'Zusatz');assert.notEqual(a.previewToken,c.previewToken);
+ await assert.rejects(decideStoredDayPart(db as never,day,draft,{decision:'korrektur',correctsPartId:original,expectedVersion:1,reason:'Korrektur',previewToken:a.previewToken}),/Vorschau/);assert.equal(calls,0);
+ await decideStoredDayPart(db as never,day,draft,{decision:'nachtrag',expectedVersion:1,reason:'Nachtrag',previewToken:a.previewToken});assert.equal(calls,1);
+ await assert.rejects(previewStoredDayPart(db as never,day,draft,{decision:'korrektur',correctsPartId:draft}),/Tagesabschnitt/);
+});
