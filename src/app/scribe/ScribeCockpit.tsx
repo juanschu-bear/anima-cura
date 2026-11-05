@@ -10,6 +10,7 @@ import PraxisInboxWidget from "./PraxisInboxWidget";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
 import { t } from '@/lib/i18n';
+import { DayAddPanel, DayHint, DayPartsPanel, gleicherTag, type DayDraftContent } from './ScribeDayRecord';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
@@ -508,6 +509,10 @@ export default function ScribeCockpit({
   const [syncLaeuft, setSyncLaeuft] = useState(false);
   const [syncInfo, setSyncInfo] = useState<string | null>(null);
   const ivorisNachsyncRef = useRef<string | null>(null);
+  // Tagesdatensatz: gibt es heute schon einen bestätigten Eintrag, wird ergänzt statt neu angelegt.
+  const [ergaenzen, setErgaenzen] = useState<{ content: DayDraftContent; canonical: { id: string; version: number } | null; preset?: { kind: "nachtrag" | "korrektur"; correctsPartId: string | null } } | null>(null);
+  const [tagesModus, setTagesModus] = useState<{ partId: string; kind: "nachtrag" | "korrektur" } | null>(null);
+  const [tagReload, setTagReload] = useState(0);
 
   const ladeHeute = useCallback(async () => {
     const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
@@ -838,6 +843,8 @@ export default function ScribeCockpit({
     setSchieneNotiz("");
     setNaechsterTermin("");
     setNtVorschlag(null);
+    setErgaenzen(null);
+    setTagesModus(null);
   }
 
   async function eigenenBausteinLoeschen(m: Vorlage, g: string, opt: Opt, index: number) {
@@ -1211,6 +1218,8 @@ export default function ScribeCockpit({
   }, [module, auswahl, zaehne]);
 
   const brauchtZaehne = module.some((m) => m.struktur.vars.includes("zaehne"));
+  // Ortsnamen der heutigen Einträge, für die Teile eines Tagesdatensatzes (dort steht nur die Ortsversion).
+  const raumNamen = useMemo(() => Object.fromEntries(heute.filter((e) => e.zimmer_version_id && e.zimmer_name).map((e) => [e.zimmer_version_id as string, e.zimmer_name as string])), [heute]);
   const zimmerFehlt = !zimmerVersionId && !entwurfId && !bestaetigt && !demo;
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
@@ -1289,14 +1298,79 @@ export default function ScribeCockpit({
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  /** Inhalt der aktuellen Dokumentation für einen Tagesabschnitt (gleiche Felder wie beim neuen Eintrag). */
+  function tagesInhalt(): DayDraftContent {
+    return {
+      roomId: zimmerVersionId || null,
+      templateId: module[0]?.id ?? null,
+      treatmentType: art || null,
+      appointmentType: module.map((m) => m.termin_typ).join("+") || null,
+      text: komposition.text,
+      teeth: zaehne.map(String),
+      variables: {
+        schienen_von: schienenVon,
+        schiene_aktuell: schieneAktuell,
+        schiene_notiz: schieneNotiz,
+        schienen_bis: schienenBis,
+        bogen,
+        naechster_termin: naechsterTermin.trim() || null,
+        zahn_seiten: seiten,
+        leistungen: module.map((m) => anzeigeName(m)),
+      },
+      selection: auswahl,
+      positions: positionen,
+    };
+  }
+
+  async function ergaenzungFertig(result: { canonicalEntryId: string; kind: "nachtrag" | "korrektur"; partId: string }) {
+    // Ein zwischengespeicherter Entwurf dieser Sitzung ist durch die Ergänzung erledigt und darf nicht als zweiter Eintrag stehen bleiben.
+    if (entwurfId) await fetch(`/api/doku/eintrag/${entwurfId}/verwerfen`, { method: "POST" }).catch(() => null);
+    setEntwurfId(null);
+    setZwischenInfo(null);
+    setBestaetigt({
+      id: result.canonicalEntryId,
+      version: 0,
+      am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+      terminDatum: listenDatum,
+    });
+    setTagesModus({ partId: result.partId, kind: result.kind });
+    setErgaenzen(null);
+    setDirty(false);
+    setAenderungsgrund("");
+    setPushStatus("offen");
+    setPushInfo(null);
+    setTagReload((n) => n + 1);
+    await ladeHeute();
+  }
+
   async function bestaetigen() {
     if (!zimmerVersionId && !entwurfId && !bestaetigt && !demo) { setAktionsFehler(t('scribe.room.required')); return; }
+    if (bestaetigt && dirty && tagesModus && !demo) {
+      // Nach einer Ergänzung läuft jede weitere Änderung als Korrektur des eigenen Teils über den Tagesdatensatz.
+      setErgaenzen({ content: tagesInhalt(), canonical: null, preset: { kind: "korrektur", correctsPartId: tagesModus.partId } });
+      return;
+    }
     if (bestaetigt && dirty) {
       await neueVersion();
       return;
     }
     if (bestaetigt) return;
     if (!patient || module.length === 0 || komposition.fehlt.length > 0) return;
+    if (!demo) {
+      // Gibt es heute schon einen bestätigten Eintrag für diesen Patienten, wird er ergänzt. Ist die Prüfung nicht
+      // möglich, wird wie bisher gespeichert: Die Dokumentation darf nie an der Prüfung scheitern.
+      const gleich = await gleicherTag(patient.id, listenDatum, entwurfId).catch(() => null);
+      if (gleich && gleich.length > 0) {
+        setAktionsFehler(null);
+        setErgaenzen({ content: tagesInhalt(), canonical: { id: gleich[0].id, version: gleich[0].version } });
+        return;
+      }
+    }
+    await neuerEintrag();
+  }
+
+  async function neuerEintrag() {
+    if (!patient) return;
     if (demo) {
       setBestaetigt({
         id: "demo",
@@ -2260,7 +2334,21 @@ export default function ScribeCockpit({
         </div>
 
         <div className="aktionen">
-          {bestaetigt && dirty && (
+          {patient && !bestaetigt && !ergaenzen && <DayHint name={patient.name} entries={heute.filter((e) => e.patient_id === patient.id && e.status === "bestaetigt" && e.id !== entwurfId).sort((a, b) => a.created_at.localeCompare(b.created_at))} />}
+          {ergaenzen && patient && (
+            <DayAddPanel
+              patientId={patient.id}
+              datum={listenDatum}
+              content={ergaenzen.content}
+              canonical={ergaenzen.canonical}
+              preset={ergaenzen.preset}
+              rooms={raumNamen}
+              onDone={ergaenzungFertig}
+              onCancel={() => setErgaenzen(null)}
+              onFallback={ergaenzen.canonical ? () => { setErgaenzen(null); void neuerEintrag(); } : undefined}
+            />
+          )}
+          {bestaetigt && dirty && !tagesModus && (
             <input
               className="freitext"
               style={{ marginTop: 0, maxWidth: 420 }}
@@ -2276,10 +2364,11 @@ export default function ScribeCockpit({
             onClick={bestaetigen}
             disabled={
               sendet ||
+              !!ergaenzen ||
               zimmerFehlt ||
               komposition.fehlt.length > 0 ||
               (!!bestaetigt && !dirty) ||
-              (!!bestaetigt && dirty && !aenderungsgrund.trim()) ||
+              (!!bestaetigt && dirty && !tagesModus && !aenderungsgrund.trim()) ||
               !nutzerKuerzel
             }
           >
@@ -2287,8 +2376,12 @@ export default function ScribeCockpit({
               ? "Speichert ..."
               : bestaetigt
                 ? dirty
-                  ? `Als Version v${bestaetigt.version + 1} bestätigen`
-                  : "Eingetragen ✓"
+                  ? tagesModus
+                    ? t("scribe.day.correctOwn")
+                    : `Als Version v${bestaetigt.version + 1} bestätigen`
+                  : tagesModus
+                    ? t(tagesModus.kind === "nachtrag" ? "scribe.day.doneNachtrag" : "scribe.day.doneKorrektur")
+                    : "Eingetragen ✓"
                 : "Bestätigen & eintragen"}
           </button>
           {bestaetigt && !dirty && (
@@ -2297,9 +2390,11 @@ export default function ScribeCockpit({
                 ? "Schreibt in ivoris ..."
                 : pushStatus === "gepusht"
                   ? "In ivoris übernommen ✓"
-                  : bestaetigt.version > 1
-                    ? "Korrektur in ivoris schreiben"
-                    : "In ivoris-Akte schreiben"}
+                  : tagesModus
+                    ? t(tagesModus.kind === "nachtrag" ? "scribe.day.pushNachtrag" : "scribe.day.pushKorrektur")
+                    : bestaetigt.version > 1
+                      ? "Korrektur in ivoris schreiben"
+                      : "In ivoris-Akte schreiben"}
             </button>
           )}
           {bestaetigt && !dirty && (
@@ -2343,6 +2438,7 @@ export default function ScribeCockpit({
             </div>
           )}
         </div>
+        {patient && !demo && <DayPartsPanel patientId={patient.id} datum={listenDatum} rooms={raumNamen} reloadKey={tagReload} onChanged={() => { void ladeHeute(); }} />}
 
         {/* ===== Ausgänge ===== */}
         <p className="abschnitt">Ausgänge · zwei getrennte Artefakte, eine Quelle</p>
