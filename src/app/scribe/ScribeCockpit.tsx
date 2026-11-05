@@ -10,7 +10,7 @@ import PraxisInboxWidget from "./PraxisInboxWidget";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
 import { t } from '@/lib/i18n';
-import { DayAddPanel, DayHint, DayPartsPanel, gleicherTag, type DayDraftContent } from './ScribeDayRecord';
+import { ArtWahl, KarteBisher, OffeneTeile, TagFehler, TagesLeistungen, bisherAusTag, ergaenzeTag, gleicherTag, korrekturZiele, useRaumNamen, useTagesdatensatz, type BisherTeil, type DayDraftContent, type DayPreview, type EntscheidungErgebnis, type Kind as TagArt, type TargetOption } from './ScribeDayRecord';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
@@ -510,16 +510,26 @@ export default function ScribeCockpit({
   const [syncInfo, setSyncInfo] = useState<string | null>(null);
   const ivorisNachsyncRef = useRef<string | null>(null);
   // Tagesdatensatz: gibt es heute schon einen bestätigten Eintrag, wird ergänzt statt neu angelegt.
-  const [ergaenzen, setErgaenzen] = useState<{ content: DayDraftContent; canonical: { id: string; version: number } | null; preset?: { kind: "nachtrag" | "korrektur"; correctsPartId: string | null } } | null>(null);
-  const [tagesModus, setTagesModus] = useState<{ partId: string; kind: "nachtrag" | "korrektur" } | null>(null);
+  // Art der Ergänzung (Nachtrag oder Korrektur eines Teils) und Uhrzeit, falls ein früherer Tag nachdokumentiert wird.
+  const [tagWahl, setTagWahl] = useState<{ kind: TagArt; ziel: TargetOption | null }>({ kind: "nachtrag", ziel: null });
+  const [tagUhrzeit, setTagUhrzeit] = useState("");
+  // Nach dem Eintragen: welcher Teil es war, die Vorschau des Servers und was vorher auf der Karte stand.
+  const [tagesModus, setTagesModus] = useState<{ partId: string; kind: TagArt; preview: DayPreview | null; bisher: BisherTeil[]; bezug: string | null; ersetzt: string | null } | null>(null);
+  // Notweg, wenn der Tagesdatensatz nicht erreichbar war und noch nichts gesichert wurde.
+  const [tagNotweg, setTagNotweg] = useState(false);
+  // Teil, der schon als Entwurf im Tag liegt, weil die Entscheidung nicht durchging. Dann wird er unten entschieden.
+  const [tagGesichert, setTagGesichert] = useState<string | null>(null);
+  const [tagHinweis, setTagHinweis] = useState<string | null>(null);
   const [tagReload, setTagReload] = useState(0);
 
-  const ladeHeute = useCallback(async () => {
+  const ladeHeute = useCallback(async (): Promise<TagesEintrag[] | null> => {
     const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
     if (res.ok) {
       const json = await res.json();
       setHeute(json.eintraege ?? []);
+      return json.eintraege ?? [];
     }
+    return null;
   }, [listenDatum]);
 
   useEffect(() => {
@@ -843,8 +853,12 @@ export default function ScribeCockpit({
     setSchieneNotiz("");
     setNaechsterTermin("");
     setNtVorschlag(null);
-    setErgaenzen(null);
     setTagesModus(null);
+    setTagWahl({ kind: "nachtrag", ziel: null });
+    setTagUhrzeit("");
+    setTagNotweg(false);
+    setTagGesichert(null);
+    setTagHinweis(null);
   }
 
   async function eigenenBausteinLoeschen(m: Vorlage, g: string, opt: Opt, index: number) {
@@ -1218,8 +1232,33 @@ export default function ScribeCockpit({
   }, [module, auswahl, zaehne]);
 
   const brauchtZaehne = module.some((m) => m.struktur.vars.includes("zaehne"));
-  // Ortsnamen der heutigen Einträge, für die Teile eines Tagesdatensatzes (dort steht nur die Ortsversion).
-  const raumNamen = useMemo(() => Object.fromEntries(heute.filter((e) => e.zimmer_version_id && e.zimmer_name).map((e) => [e.zimmer_version_id as string, e.zimmer_name as string])), [heute]);
+  // Tagesdatensatz: Bestätigte Einträge dieses Patienten am gewählten Tag. Gibt es welche, wird ergänzt statt neu angelegt.
+  const tagHeute = listenDatum === heutigesIsoDatum();
+  const tagesBestand = useMemo(
+    () => (patient && !demo ? heute.filter((e) => e.patient_id === patient.id && e.status === "bestaetigt" && e.id !== entwurfId).sort((a, b) => a.created_at.localeCompare(b.created_at)) : []),
+    [heute, patient, demo, entwurfId],
+  );
+  const tagAktiv = !bestaetigt && tagesBestand.length > 0;
+  const tagRecord = useTagesdatensatz(patient && !demo ? patient.id : null, listenDatum, tagesBestand.length > 0 || !!tagesModus, tagReload);
+  const raumVersionen = useRaumNamen(tagesBestand.length > 0 || !!tagesModus);
+  // Ortsnamen für die Teile eines Tagesdatensatzes (dort steht nur die Ortsversion).
+  const raumNamen = useMemo(
+    () => ({ ...Object.fromEntries(heute.filter((e) => e.zimmer_version_id && e.zimmer_name).map((e) => [e.zimmer_version_id as string, e.zimmer_name as string])), ...raumVersionen }),
+    [heute, raumVersionen],
+  );
+  const tagBisher = useMemo(() => bisherAusTag(tagRecord, tagesBestand, raumNamen), [tagRecord, tagesBestand, raumNamen]);
+  const tagZiele = useMemo(() => korrekturZiele(tagRecord, tagesBestand, raumNamen), [tagRecord, tagesBestand, raumNamen]);
+  const tagErster = tagBisher[0]?.zeit ?? null;
+  // Ein gewähltes Korrekturziel, das es nicht mehr gibt, fällt auf Nachtrag zurück.
+  useEffect(() => {
+    if (tagWahl.ziel && !tagZiele.some((z) => z.key === tagWahl.ziel?.key)) setTagWahl({ kind: "nachtrag", ziel: null });
+  }, [tagZiele, tagWahl.ziel]);
+  // Was die Karteikarte über dem neuen Teil zeigt: vor dem Eintragen der aktuelle Stand, danach der Stand von vorher.
+  const karteTag = tagesModus && bestaetigt
+    ? { bisher: tagesModus.bisher, ersetzt: tagesModus.ersetzt, kind: tagesModus.kind, bezug: tagesModus.bezug, fertig: !dirty }
+    : tagAktiv
+      ? { bisher: tagBisher, ersetzt: tagWahl.kind === "korrektur" ? tagWahl.ziel?.key ?? null : null, kind: tagWahl.kind, bezug: tagWahl.kind === "korrektur" ? tagWahl.ziel?.zeit ?? null : tagErster, fertig: false }
+      : null;
   const zimmerFehlt = !zimmerVersionId && !entwurfId && !bestaetigt && !demo;
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
@@ -1268,6 +1307,11 @@ export default function ScribeCockpit({
     setSendet(false);
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
+      if (res.status === 409 && json.code === "day_record_correction_required" && bestaetigt) {
+        // Dieser Eintrag ist inzwischen der Tageseintrag: Die Änderung geht als Korrektur seines Teils in den Tagesdatensatz.
+        await tagEintragen("korrektur", { key: `entry:${bestaetigt.id}`, target: { entry: bestaetigt.id }, label: "", zeit: "" }, null, aenderungsgrund.trim());
+        return;
+      }
       setAktionsFehler(json.error ?? "Neue Version konnte nicht gespeichert werden.");
       setPruefHinweise(pruefHinweiseAus(json));
       return;
@@ -1322,23 +1366,73 @@ export default function ScribeCockpit({
     };
   }
 
-  async function ergaenzungFertig(result: { canonicalEntryId: string; kind: "nachtrag" | "korrektur"; partId: string }) {
+  /** Nach dem Eintragen in den Tagesdatensatz: Das Cockpit zeigt den heutigen Eintrag als bestätigt, mit dem neuen Teil. */
+  async function ergaenzungFertig(result: { canonicalEntryId: string; partId: string; preview: DayPreview | null }, kind: TagArt, bisher: BisherTeil[], bezug: string | null, ersetzt: string | null) {
     // Ein zwischengespeicherter Entwurf dieser Sitzung ist durch die Ergänzung erledigt und darf nicht als zweiter Eintrag stehen bleiben.
     if (entwurfId) await fetch(`/api/doku/eintrag/${entwurfId}/verwerfen`, { method: "POST" }).catch(() => null);
     setEntwurfId(null);
     setZwischenInfo(null);
-    setBestaetigt({
-      id: result.canonicalEntryId,
-      version: 0,
-      am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
-      terminDatum: listenDatum,
-    });
-    setTagesModus({ partId: result.partId, kind: result.kind });
-    setErgaenzen(null);
+    setTagesModus({ partId: result.partId, kind, preview: result.preview, bisher, bezug, ersetzt });
+    setTagGesichert(null);
+    setTagNotweg(false);
+    setTagHinweis(null);
     setDirty(false);
     setAenderungsgrund("");
     setPushStatus("offen");
     setPushInfo(null);
+    setTagReload((n) => n + 1);
+    const liste = await ladeHeute();
+    setBestaetigt({
+      id: result.canonicalEntryId,
+      version: liste?.find((e) => e.id === result.canonicalEntryId)?.version ?? 0,
+      am: new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+      terminDatum: listenDatum,
+    });
+  }
+
+  /**
+   * Ergänzt den heutigen Eintrag in einem Zug als Nachtrag oder Korrektur. Positionskonflikte blockieren nicht.
+   * Ist der Tagesdatensatz nicht erreichbar, bevor etwas gesichert ist, bietet das Cockpit den Notweg an.
+   */
+  async function tagEintragen(kind: TagArt, ziel: TargetOption | null, canonical: { id: string; version: number } | null, reason?: string) {
+    if (!patient) return;
+    const occurredAt = tagHeute
+      ? new Date().toISOString()
+      : /^\d{2}:\d{2}$/.test(tagUhrzeit) ? new Date(`${listenDatum}T${tagUhrzeit}:00`).toISOString() : null;
+    if (!occurredAt) { setAktionsFehler(t("scribe.day.timeMissing")); return; }
+    if (kind === "korrektur" && !ziel) { setAktionsFehler(t("scribe.day.correctsMissing")); return; }
+    const bisher = tagesModus ? tagesModus.bisher : tagBisher;
+    const bezug = tagesModus ? tagesModus.bezug : kind === "korrektur" ? ziel?.zeit ?? null : tagErster;
+    const ersetzt = tagesModus ? tagesModus.ersetzt : kind === "korrektur" ? ziel?.key ?? null : null;
+    setSendet(true);
+    setAktionsFehler(null);
+    setTagNotweg(false);
+    setTagHinweis(null);
+    try {
+      const r = await ergaenzeTag({ patientId: patient.id, datum: listenDatum, content: tagesInhalt(), canonical, kind, target: ziel?.target ?? null, occurredAt, reason });
+      await ergaenzungFertig(r, kind, bisher, bezug, ersetzt);
+    } catch (e) {
+      const gesichert = e instanceof TagFehler ? e.gesichert : null;
+      if (gesichert) {
+        setTagGesichert(gesichert);
+        setTagReload((n) => n + 1);
+        setAktionsFehler(t("scribe.day.savedAsDraft"));
+      } else {
+        setAktionsFehler(e instanceof Error ? e.message : t("scribe.day.error"));
+        setTagNotweg(!bestaetigt);
+      }
+    } finally {
+      setSendet(false);
+    }
+  }
+
+  /** Ein offener Teil wurde unten entschieden. War es der eigene gesicherte Teil, gilt die Doku damit als eingetragen. */
+  async function teilEntschieden(r: EntscheidungErgebnis) {
+    if (r.partId === tagGesichert) {
+      if (r.decision === "verwerfen") { setTagGesichert(null); setAktionsFehler(null); setTagReload((n) => n + 1); return; }
+      await ergaenzungFertig({ canonicalEntryId: r.canonicalEntryId, partId: r.partId, preview: r.preview }, r.decision, tagBisher, tagErster, null);
+      return;
+    }
     setTagReload((n) => n + 1);
     await ladeHeute();
   }
@@ -1347,7 +1441,7 @@ export default function ScribeCockpit({
     if (!zimmerVersionId && !entwurfId && !bestaetigt && !demo) { setAktionsFehler(t('scribe.room.required')); return; }
     if (bestaetigt && dirty && tagesModus && !demo) {
       // Nach einer Ergänzung läuft jede weitere Änderung als Korrektur des eigenen Teils über den Tagesdatensatz.
-      setErgaenzen({ content: tagesInhalt(), canonical: null, preset: { kind: "korrektur", correctsPartId: tagesModus.partId } });
+      await tagEintragen("korrektur", { key: `part:${tagesModus.partId}`, target: { part: tagesModus.partId }, label: "", zeit: "" }, null);
       return;
     }
     if (bestaetigt && dirty) {
@@ -1358,11 +1452,18 @@ export default function ScribeCockpit({
     if (!patient || module.length === 0 || komposition.fehlt.length > 0) return;
     if (!demo) {
       // Gibt es heute schon einen bestätigten Eintrag für diesen Patienten, wird er ergänzt. Ist die Prüfung nicht
-      // möglich, wird wie bisher gespeichert: Die Dokumentation darf nie an der Prüfung scheitern.
-      const gleich = await gleicherTag(patient.id, listenDatum, entwurfId).catch(() => null);
-      if (gleich && gleich.length > 0) {
-        setAktionsFehler(null);
-        setErgaenzen({ content: tagesInhalt(), canonical: { id: gleich[0].id, version: gleich[0].version } });
+      // möglich, gilt der Stand der Tagesliste; ohne Eintrag dort wird wie bisher gespeichert. Die Dokumentation darf nie scheitern.
+      const frisch = await gleicherTag(patient.id, listenDatum, entwurfId).catch(() => null);
+      const bestand = frisch ?? tagesBestand;
+      if (bestand.length > 0) {
+        if (!tagAktiv) {
+          // Inzwischen hat jemand anderes für diesen Patienten eingetragen: erst zeigen, dann ergänzen.
+          await ladeHeute();
+          setAktionsFehler(null);
+          setTagHinweis(t("scribe.day.raceHint", "de", { name: patient.name }));
+          return;
+        }
+        await tagEintragen(tagWahl.kind, tagWahl.ziel, { id: bestand[0].id, version: bestand[0].version });
         return;
       }
     }
@@ -1419,6 +1520,13 @@ export default function ScribeCockpit({
     setSendet(false);
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
+      if (res.status === 409 && json.code === "day_record_exists") {
+        // Für diesen Patienten ist der Tag schon bestätigt: Das Cockpit zeigt den Eintrag und ergänzt beim nächsten Klick.
+        await ladeHeute();
+        setAktionsFehler(null);
+        setTagHinweis(t("scribe.day.raceHint", "de", { name: patient.name }));
+        return;
+      }
       setAktionsFehler(json.error ?? "Eintrag konnte nicht gespeichert werden.");
       setPruefHinweise(pruefHinweiseAus(json));
       return;
@@ -2046,10 +2154,18 @@ export default function ScribeCockpit({
         <p className="abschnitt">Eintrag · vorgelegt vom System, bestätigt von {nutzerName}</p>
         {ladefehler && <div className="feld" style={{ color: "var(--rot)" }}>{ladefehler}</div>}
 
-        <div className="karteikarte">
+        <div className={`karteikarte${karteTag ? " tag-karte" : ""}`}>
           <div className="kartenkopf">
             {patient ? patient.name : "Kein Patient gewählt"} · {artAnzeigeName} · {module.map((m) => anzeigeName(m)).join(" + ") || "Keine Leistung gewählt"}
+            {karteTag && karteTag.bezug && <> · <span className="tag-kopf-bezug">{t(karteTag.kind === "korrektur" ? "scribe.day.headKorrektur" : "scribe.day.headNachtrag", "de", { zeit: karteTag.bezug })}</span></>}
           </div>
+          {karteTag && (
+            <KarteBisher
+              teile={karteTag.bisher}
+              ersetzt={karteTag.ersetzt}
+              linie={t(karteTag.kind === "korrektur" ? "scribe.day.lineKorrektur" : "scribe.day.lineNachtrag", "de", { stand: t(karteTag.fertig ? "scribe.day.lineDone" : "scribe.day.lineOpen") })}
+            />
+          )}
           <div className="schreibflaeche">
             {komposition.segs.map((s, i) => (
               <span key={i} className={s.art === "var" ? "seg-var" : s.art === "fehlt" ? "seg-fehlt" : undefined}>
@@ -2059,7 +2175,16 @@ export default function ScribeCockpit({
             {bereinigeZusatztext(ausnahme) && <span className="seg-var"> {bereinigeZusatztext(ausnahme)}</span>}
           </div>
           <div className="kartenfuss">
-            {bestaetigt ? (
+            {bestaetigt && tagesModus ? (
+              <>
+                {dirty ? (
+                  <span style={{ color: "var(--gold-textton)", fontWeight: 600 }}>{t("scribe.day.footDirty")}</span>
+                ) : (
+                  <span>{t("scribe.day.footDone")}</span>
+                )}
+                {!dirty && <span className="stempel">{t(tagesModus.kind === "korrektur" ? "scribe.day.stampKorrektur" : "scribe.day.stampNachtrag", "de", { am: bestaetigt.am })}</span>}
+              </>
+            ) : bestaetigt ? (
               <>
                 {dirty ? (
                   <span style={{ color: "var(--gold-textton)", fontWeight: 600 }}>
@@ -2070,6 +2195,8 @@ export default function ScribeCockpit({
                 )}
                 {!dirty && <span className="stempel">Bestätigt · v{bestaetigt.version} · {bestaetigt.am}</span>}
               </>
+            ) : tagAktiv ? (
+              <span>{t(tagWahl.kind === "korrektur" ? "scribe.day.footKorrektur" : "scribe.day.footNachtrag")}</span>
             ) : (
               <span>Entwurf. Wird mit Bestätigung Teil der Akte, Aufbewahrung 10 Jahre.</span>
             )}
@@ -2334,19 +2461,22 @@ export default function ScribeCockpit({
         </div>
 
         <div className="aktionen">
-          {patient && !bestaetigt && !ergaenzen && <DayHint name={patient.name} entries={heute.filter((e) => e.patient_id === patient.id && e.status === "bestaetigt" && e.id !== entwurfId).sort((a, b) => a.created_at.localeCompare(b.created_at))} />}
-          {ergaenzen && patient && (
-            <DayAddPanel
-              patientId={patient.id}
-              datum={listenDatum}
-              content={ergaenzen.content}
-              canonical={ergaenzen.canonical}
-              preset={ergaenzen.preset}
-              rooms={raumNamen}
-              onDone={ergaenzungFertig}
-              onCancel={() => setErgaenzen(null)}
-              onFallback={ergaenzen.canonical ? () => { setErgaenzen(null); void neuerEintrag(); } : undefined}
-            />
+          {tagAktiv && (
+            <ArtWahl
+              kind={tagWahl.kind}
+              selected={tagWahl.ziel?.key ?? null}
+              options={tagZiele}
+              disabled={sendet || !!tagGesichert}
+              onNachtrag={() => setTagWahl({ kind: "nachtrag", ziel: null })}
+              onKorrektur={(o) => setTagWahl({ kind: "korrektur", ziel: o })}
+            >
+              {!tagHeute && (
+                <label className="tag-uhrzeit">
+                  <span>{t("scribe.day.timeLabel")}</span>
+                  <input type="time" value={tagUhrzeit} onChange={(e) => setTagUhrzeit(e.target.value)} disabled={sendet || !!tagGesichert} />
+                </label>
+              )}
+            </ArtWahl>
           )}
           {bestaetigt && dirty && !tagesModus && (
             <input
@@ -2364,7 +2494,8 @@ export default function ScribeCockpit({
             onClick={bestaetigen}
             disabled={
               sendet ||
-              !!ergaenzen ||
+              !!tagGesichert ||
+              (tagAktiv && !tagHeute && !tagUhrzeit) ||
               zimmerFehlt ||
               komposition.fehlt.length > 0 ||
               (!!bestaetigt && !dirty) ||
@@ -2382,8 +2513,15 @@ export default function ScribeCockpit({
                   : tagesModus
                     ? t(tagesModus.kind === "nachtrag" ? "scribe.day.doneNachtrag" : "scribe.day.doneKorrektur")
                     : "Eingetragen ✓"
-                : "Bestätigen & eintragen"}
+                : tagAktiv
+                  ? t(tagWahl.kind === "korrektur" ? "scribe.day.confirmKorrektur" : "scribe.day.confirmNachtrag")
+                  : "Bestätigen & eintragen"}
           </button>
+          {tagNotweg && (
+            <button className="neben" type="button" onClick={() => { setTagNotweg(false); void zwischenspeichern(); }} disabled={sendet || speichert}>
+              {t("scribe.day.fallback")}
+            </button>
+          )}
           {bestaetigt && !dirty && (
             <button className="neben" onClick={ivorisPush} disabled={pushStatus === "laeuft" || pushStatus === "gepusht"}>
               {pushStatus === "laeuft"
@@ -2410,7 +2548,9 @@ export default function ScribeCockpit({
           {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
           {pushStatus === "fehler" && pushInfo && <span className="hinweis-fehlt">{pushInfo}</span>}
-          {aktionsFehler && pruefHinweise.length === 0 && <span className="hinweis-fehlt">{aktionsFehler}</span>}
+          {aktionsFehler && pruefHinweise.length === 0 && <span className="hinweis-fehlt" role="alert">{aktionsFehler}</span>}
+          {tagNotweg && <span className="hinweis-ok">{t("scribe.day.fallbackNote")}</span>}
+          {tagHinweis && <span className="hinweis-ok" role="status">{tagHinweis}</span>}
           {pruefHinweise.length > 0 && (
             <div className="pruef-hinweise" role="alert">
               <strong>{t("scribe.consistency.ui.title")}</strong>
@@ -2438,7 +2578,7 @@ export default function ScribeCockpit({
             </div>
           )}
         </div>
-        {patient && !demo && <DayPartsPanel patientId={patient.id} datum={listenDatum} rooms={raumNamen} reloadKey={tagReload} onChanged={() => { void ladeHeute(); }} />}
+        {patient && !demo && <OffeneTeile record={tagRecord} patientName={patient.name} rooms={raumNamen} onChanged={(r) => { void teilEntschieden(r); }} />}
 
         {/* ===== Ausgänge ===== */}
         <p className="abschnitt">Ausgänge · zwei getrennte Artefakte, eine Quelle</p>
@@ -2449,7 +2589,19 @@ export default function ScribeCockpit({
               <span className="otitel">Verlaufsdokumentation → Akte (ivoris)</span>
               <span className="marke">rechtsverbindlich · § 630f BGB</span>
             </div>
-            {bestaetigt ? (
+            {bestaetigt && tagesModus ? (
+              <>
+                <div className="aktemeta">
+                  {formatDatumKurz(bestaetigt.terminDatum)} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {t(tagesModus.kind === "korrektur" ? "scribe.day.headKorrektur" : "scribe.day.headNachtrag", "de", { zeit: tagesModus.bezug ?? "—" })}
+                </div>
+                <div className="aktetext">
+                  {tagesModus.preview?.ivoris.action === "already_pushed"
+                    ? t("scribe.day.ivorisAlready")
+                    : <><b>{tagesModus.preview?.ivoris.heading ?? (tagesModus.kind === "korrektur" ? "KORREKTUR" : "NACHTRAG")}:</b> {tagesModus.preview?.ivoris.text ?? komposition.text}</>}
+                </div>
+                <div className="akteversion">{t("scribe.day.akteFoot", "de", { version: bestaetigt.version, name: nutzerName })}</div>
+              </>
+            ) : bestaetigt ? (
               <>
                 <div className="aktemeta">
                   {formatDatumKurz(bestaetigt.terminDatum)} {bestaetigt.am.split(",")[1] ?? ""} · Pat. {patient?.name} · {artAnzeigeName} · {module.map((m) => anzeigeName(m)).join(" + ")}
@@ -2459,6 +2611,8 @@ export default function ScribeCockpit({
                   Eintrag v{bestaetigt.version} · bestätigt: {nutzerName} · revisionssicher: spätere Änderungen bleiben sichtbar · Aufbewahrung 10 Jahre
                 </div>
               </>
+            ) : tagAktiv ? (
+              <span className="leer">{t(tagWahl.kind === "korrektur" ? "scribe.day.akteEmptyKorrektur" : "scribe.day.akteEmptyNachtrag", "de", { zeit: (tagWahl.kind === "korrektur" ? tagWahl.ziel?.zeit : tagErster) ?? "—" })}</span>
             ) : (
               <span className="leer">Erscheint nach Bestätigung als Karteieintrag.</span>
             )}
@@ -2471,6 +2625,9 @@ export default function ScribeCockpit({
               <span className="otitel">{abrechnungTitel}</span>
               <span className="marke">nur Positionen · keine Texte</span>
             </div>
+            {bestaetigt && !dirty && tagesModus?.preview ? (
+              <TagesLeistungen preview={tagesModus.preview} />
+            ) : (
             <div className="geldtabelle">
               <table>
                 <tbody>
@@ -2483,6 +2640,8 @@ export default function ScribeCockpit({
                 </tbody>
               </table>
             </div>
+            )}
+            {tagAktiv && <p className="geldnotiz">{t("scribe.day.geldBefore", "de", { zeit: tagErster ?? "—" })}</p>}
             {abrechnungHinweis && (
               <p className="geldnotiz" dangerouslySetInnerHTML={{ __html: abrechnungHinweis }} />
             )}

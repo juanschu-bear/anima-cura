@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 
 /*
  * Tagesdatensatz im Scribe-Cockpit (Vertrag: anima-leitstand/docs/2026-11-05-tagesdatensatz-klaerfaelle.md).
- * Ein Patient hat je Behandlungstag einen Eintrag. Wer später am selben Tag dokumentiert, ergänzt ihn als Nachtrag
- * oder Korrektur, nach einer Vorschau, die nichts speichert. Positionskonflikte blockieren nie die Dokumentation,
- * sie gehen als Klärfall an die Abrechnung. Nach IVORIS geht nur der neue Teil.
+ * Ein Patient hat je Behandlungstag einen Eintrag. Wer später am selben Tag dokumentiert, schreibt auf derselben
+ * Karteikarte weiter: als Nachtrag oder als Korrektur eines Teils. Nach IVORIS geht nur der neue Teil.
+ * Positionskonflikte blockieren nie die Dokumentation, sie gehen als Klärfall an die Abrechnung.
+ * Die Darstellung nutzt die Bausteine des Cockpits: Karteikarte, Wahl-Pillen, Wache-Karten und Ausgänge.
  */
 
 export type DayPosition = {
@@ -39,9 +40,9 @@ export type DayRecord = {
   record: { id: string; patient_id: string; service_date: string; version: number; canonical_entry_id: string };
   parts: DayPart[];
 };
-export type AddDayPartRequest = {
+type AddDayPartRequest = {
   expectedVersion: number;
-  proposedKind: "nachtrag" | "korrektur";
+  proposedKind: Kind;
   correctsPartId?: string | null;
   occurredAt: string;
   roomId: string | null;
@@ -54,50 +55,61 @@ export type AddDayPartRequest = {
   selection: Record<string, unknown>;
   positions: { code: string; text: string; anzahl?: number }[];
 };
-/** Inhalt aus dem Cockpit, ohne Tagesversion, Art und Zeit. Diese setzt die Ergänzung selbst. */
+/** Inhalt aus dem Cockpit, ohne Tagesversion, Art und Zeit. */
 export type DayDraftContent = Omit<AddDayPartRequest, "expectedVersion" | "proposedKind" | "correctsPartId" | "occurredAt">;
-type Conflict = { id: string; kind: string; code: string; message: string };
-type Preview = {
+export type DayConflict = { id: string; kind: string; code: string; message: string };
+export type DayPreview = {
   dayRecordId: string;
   basedOnVersion: number;
   resultingPositions: DayPosition[];
-  conflicts: Conflict[];
+  conflicts: DayConflict[];
   billingClarificationRequired: boolean;
   ivoris: { action: "append_nachtrag" | "append_korrektur" | "already_pushed"; heading: "NACHTRAG" | "KORREKTUR" | null; text: string | null };
   previewToken: string;
 };
-export type SameDayEntry = { id: string; version: number; created_at: string; zimmer_name?: string | null; bestaetigt_am: string | null };
-type Kind = "nachtrag" | "korrektur";
-
-const zeit = (v: string | null | undefined) =>
-  v ? new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }).format(new Date(v)) : "—";
-const heuteBerlin = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const kiefer = (j: DayPosition["jaw"]) => (j === "both" ? "OK + UK" : j || "");
-const positionText = (p: DayPosition) => {
-  const menge = p.quantity ?? p.anzahl ?? 1;
-  return [p.code, kiefer(p.jaw), p.teeth?.length ? `${t("scribe.day.tooth")} ${p.teeth.join(", ")}` : "", menge > 1 ? `× ${menge}` : ""].filter(Boolean).join(" ");
+export type SameDayEntry = {
+  id: string; version: number; created_at: string; bestaetigt_am: string | null; text: string;
+  zimmer_version_id?: string | null; zimmer_name?: string | null; bestaetigt_kuerzel?: string | null; ivoris_push_status?: string | null;
 };
+export type Kind = "nachtrag" | "korrektur";
+/** Ziel einer Korrektur: ein Teil des Tagesdatensatzes oder, solange er noch nicht eröffnet ist, der erste bestätigte Eintrag. */
+export type Target = { part: string } | { entry: string };
+export type TargetOption = { key: string; target: Target; label: string; zeit: string };
+/** Ein Stück Text, das heute schon auf der Karteikarte steht. */
+export type BisherTeil = { key: string; kopf: string; text: string; inIvoris: boolean; zeit: string };
+/** Fehler beim Ergänzen. `gesichert` heißt: der neue Teil liegt schon als Entwurf im Tagesdatensatz. */
+export class TagFehler extends Error {
+  constructor(message: string, readonly gesichert: string | null) { super(message); }
+}
+
+export const zeit = (v: string | null | undefined) =>
+  v ? new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }).format(new Date(v)) : "—";
+const kiefer = (j: DayPosition["jaw"]) => (j === "both" ? "OK + UK" : j || "");
+export const positionCode = (p: DayPosition) => {
+  const menge = p.quantity ?? p.anzahl ?? 1;
+  return [p.code, kiefer(p.jaw), p.teeth?.length ? `${t("scribe.day.tooth")} ${p.teeth.join(", ")}` : "", menge > 1 ? `×${menge}` : ""].filter(Boolean).join(" ");
+};
+const ort = (roomId: string | null | undefined, rooms: Record<string, string>, fallback?: string | null) =>
+  (roomId && rooms[roomId]) || fallback || t("scribe.day.noRoom");
 const teilName = (p: DayPart, rooms: Record<string, string>) =>
-  t("scribe.day.partLabel", "de", { zeit: zeit(p.occurred_at), ort: (p.room_version_id && rooms[p.room_version_id]) || t("scribe.day.noRoom"), kuerzel: p.staff_initials || "—" });
+  t("scribe.day.partLabel", "de", { zeit: zeit(p.occurred_at), ort: ort(p.room_version_id, rooms), kuerzel: p.staff_initials || "—" });
+const eintragName = (e: SameDayEntry) =>
+  t("scribe.day.partLabel", "de", { zeit: zeit(e.bestaetigt_am || e.created_at), ort: e.zimmer_name || t("scribe.day.noRoom"), kuerzel: e.bestaetigt_kuerzel || "—" });
 
 async function json<T>(res: Response): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
   if (!res.ok) throw new Error(body.message || body.error || t("scribe.day.error"));
   return body as T;
 }
+const post = <T,>(url: string, body: unknown, headers: Record<string, string> = {}) =>
+  fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }).then((r) => json<T>(r));
+
+/** Tagesdatensatz lesen. Fehlt er, ist das kein Fehler: dann gibt es heute höchstens den ersten Eintrag. */
 export async function findeTag(patientId: string, datum: string): Promise<DayRecord | null> {
   const res = await fetch(`/api/doku/tagesdatensatz?patient_id=${encodeURIComponent(patientId)}&termin_datum=${datum}`, { cache: "no-store" });
   if (res.status === 404) return null;
   return json<DayRecord>(res);
 }
-async function eroeffneTag(entry: { id: string; version: number }): Promise<DayRecord> {
-  return json<DayRecord>(await fetch("/api/doku/tagesdatensatz", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ canonicalEntryId: entry.id, expectedEntryVersion: entry.version }),
-  }));
-}
-const post = <T,>(url: string, body: unknown, headers: Record<string, string> = {}) =>
-  fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }).then((r) => json<T>(r));
 
 /** Bestätigte Einträge desselben Patienten am selben Tag, frisch vom Server. Der eigene Entwurf zählt nicht. */
 export async function gleicherTag(patientId: string, datum: string, eigenerEntwurf: string | null): Promise<SameDayEntry[]> {
@@ -108,252 +120,216 @@ export async function gleicherTag(patientId: string, datum: string, eigenerEntwu
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-/** Hinweis vor dem Bestätigen: Für diesen Patienten gibt es heute schon einen Eintrag. */
-export function DayHint({ entries, name }: { entries: SameDayEntry[]; name: string }) {
-  if (!entries.length) return null;
-  const first = entries[0];
-  return (
-    <div className="tag-hinweis" role="note">
-      <strong>{t("scribe.day.hintTitle")}</strong>
-      <span>{t("scribe.day.hint", "de", { name, ort: first.zimmer_name || t("scribe.day.noRoom"), zeit: zeit(first.bestaetigt_am || first.created_at) })}</span>
-    </div>
-  );
+/** Bestätigte Teile, die im Tagestext stehen. Ein korrigierter Teil ist durch seine Korrektur ersetzt. */
+function geltendeTeile(record: DayRecord) {
+  const ersetzt = new Set(record.parts.filter((p) => p.state === "bestaetigt" && p.kind === "korrektur" && p.corrects_part_id).map((p) => p.corrects_part_id as string));
+  return record.parts.filter((p) => p.state === "bestaetigt" && !ersetzt.has(p.id));
 }
 
-/** Vorschau in Alltagssprache: was nach IVORIS geht, welche Leistungen danach zählen, was Sabine klärt. */
-function PreviewView({ preview }: { preview: Preview }) {
+/** Was heute schon auf der Karteikarte steht: die Teile des Tagesdatensatzes, sonst die bestätigten Einträge. */
+export function bisherAusTag(record: DayRecord | null, entries: SameDayEntry[], rooms: Record<string, string>): BisherTeil[] {
+  if (record) {
+    return geltendeTeile(record).map((p) => ({ key: `part:${p.id}`, kopf: teilName(p, rooms), text: p.text, inIvoris: p.source_ivoris_push_status === "gepusht", zeit: zeit(p.occurred_at) }));
+  }
+  return entries.map((e) => ({ key: `entry:${e.id}`, kopf: eintragName(e), text: e.text, inIvoris: e.ivoris_push_status === "gepusht", zeit: zeit(e.bestaetigt_am || e.created_at) }));
+}
+
+/**
+ * Mögliche Korrekturziele. Ohne Tagesdatensatz nur der erste bestätigte Eintrag: weitere Einträge desselben Tages
+ * werden beim Eröffnen als Entwurf vorgelegt und erst nach ihrer Entscheidung korrigierbar.
+ */
+export function korrekturZiele(record: DayRecord | null, entries: SameDayEntry[], rooms: Record<string, string>): TargetOption[] {
+  if (record) return geltendeTeile(record).map((p) => ({ key: `part:${p.id}`, target: { part: p.id }, label: teilName(p, rooms), zeit: zeit(p.occurred_at) }));
+  return entries.slice(0, 1).map((e) => ({ key: `entry:${e.id}`, target: { entry: e.id }, label: eintragName(e), zeit: zeit(e.bestaetigt_am || e.created_at) }));
+}
+
+/** Liest den Tagesdatensatz zum Patienten und Tag, nur lesend. Ist er nicht erreichbar, arbeitet das Cockpit mit den Einträgen. */
+export function useTagesdatensatz(patientId: string | null, datum: string, aktiv: boolean, reloadKey: number) {
+  const [record, setRecord] = useState<DayRecord | null>(null);
+  useEffect(() => {
+    if (!patientId || !aktiv) { setRecord(null); return; }
+    let live = true;
+    findeTag(patientId, datum).then((r) => { if (live) setRecord(r); }).catch(() => { if (live) setRecord(null); });
+    return () => { live = false; };
+  }, [patientId, datum, aktiv, reloadKey]);
+  return record;
+}
+
+/** Ortsnamen aller Raumversionen, damit jeder Teil seinen Ort zeigt, auch aus anderen Räumen. */
+export function useRaumNamen(aktiv: boolean) {
+  const [namen, setNamen] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!aktiv) return;
+    let live = true;
+    fetch("/api/doku/eintrag", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { versions?: { id: string; name: string }[] } | null) => {
+        if (live && j?.versions) setNamen(Object.fromEntries(j.versions.map((v) => [v.id, v.name])));
+      })
+      .catch(() => null);
+    return () => { live = false; };
+  }, [aktiv]);
+  return namen;
+}
+
+/**
+ * Ergänzung in einem Zug: Tag lesen oder aus dem ersten bestätigten Eintrag eröffnen, Vorschau holen, den Teil als
+ * Entwurf sichern und als Nachtrag oder Korrektur entscheiden. Jeder Schritt folgt dem Vertrag (Vorschau-Token).
+ * Scheitert ein Schritt nach dem Sichern, ist nichts verloren: der Teil steht als offener Entwurf im Tag.
+ */
+export async function ergaenzeTag(args: {
+  patientId: string; datum: string; content: DayDraftContent; canonical: { id: string; version: number } | null;
+  kind: Kind; target: Target | null; occurredAt: string; reason?: string;
+}): Promise<{ canonicalEntryId: string; partId: string; preview: DayPreview }> {
+  let tag = await findeTag(args.patientId, args.datum);
+  if (!tag) {
+    if (!args.canonical) throw new TagFehler(t("scribe.day.notFound"), null);
+    tag = await post<DayRecord>("/api/doku/tagesdatensatz", { canonicalEntryId: args.canonical.id, expectedEntryVersion: args.canonical.version });
+  }
+  let correctsPartId: string | null = null;
+  if (args.kind === "korrektur") {
+    const ziel = args.target;
+    const teil = ziel && "part" in ziel
+      ? tag.parts.find((p) => p.id === ziel.part)
+      : ziel && "entry" in ziel ? tag.parts.find((p) => p.source_entry_id === ziel.entry) : undefined;
+    if (!teil || teil.state !== "bestaetigt") throw new TagFehler(t("scribe.day.correctsMissing"), null);
+    correctsPartId = teil.id;
+  }
+  const request: AddDayPartRequest = { ...args.content, expectedVersion: tag.record.version, proposedKind: args.kind, correctsPartId, occurredAt: args.occurredAt };
+  const vorschau = await post<DayPreview>(`/api/doku/tagesdatensatz/${tag.record.id}/ergaenzung/vorschau`, request);
+  const saved = await post<{ part: DayPart; decisionPreview: DayPreview }>(
+    `/api/doku/tagesdatensatz/${tag.record.id}/ergaenzung`, request, { "x-day-preview-token": vorschau.previewToken });
+  try {
+    await post(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${saved.part.id}/entscheidung`, {
+      expectedVersion: saved.decisionPreview.basedOnVersion,
+      decision: args.kind,
+      reason: args.reason && args.reason.length >= 3 ? args.reason : args.kind === "nachtrag" ? t("scribe.day.reasonNachtrag") : t("scribe.day.reasonKorrektur"),
+      correctsPartId,
+      previewToken: saved.decisionPreview.previewToken,
+    });
+  } catch (e) {
+    throw new TagFehler(e instanceof Error ? e.message : t("scribe.day.error"), saved.part.id);
+  }
+  return { canonicalEntryId: tag.record.canonical_entry_id, partId: saved.part.id, preview: saved.decisionPreview };
+}
+
+/**
+ * Auf der Karteikarte: was heute schon dasteht, gedämpft. Darunter beginnt mit einer grünen Linie der neue Teil.
+ * Bei einer Korrektur ist der ersetzte Teil durchgestrichen.
+ */
+export function KarteBisher({ teile, ersetzt, linie }: { teile: BisherTeil[]; ersetzt: string | null; linie: string }) {
+  if (!teile.length) return null;
   return (
-    <div className="tag-vorschau">
-      <div>
-        <span className="tag-label">{t("scribe.day.ivorisLabel")}</span>
-        {preview.ivoris.action === "already_pushed"
-          ? <p>{t("scribe.day.ivorisAlready")}</p>
-          : <p className="tag-ivoris"><b>{preview.ivoris.heading}:</b> {preview.ivoris.text}</p>}
-        <small>{t("scribe.day.ivorisOnlyNew")}</small>
-      </div>
-      <div>
-        <span className="tag-label">{t("scribe.day.positionsLabel")}</span>
-        <p>{preview.resultingPositions.length ? preview.resultingPositions.map(positionText).join(" · ") : t("scribe.day.noPositions")}</p>
-      </div>
-      {preview.conflicts.length > 0 && (
-        <div className="tag-konflikt">
-          <span className="tag-label">{t("scribe.day.conflictsLabel")}</span>
-          <ul>{preview.conflicts.map((c) => <li key={c.id}>{c.message}</li>)}</ul>
-          <small>{t("scribe.day.conflictsNote")}</small>
+    <div className="tag-bisher">
+      {teile.map((p) => (
+        <div key={p.key} className={`tag-bisher-teil${ersetzt === p.key ? " ersetzt" : ""}`}>
+          <div className="tag-bisher-kopf">
+            <span>{p.kopf}</span>
+            {p.inIvoris && <span>· {t("scribe.day.inIvoris")}</span>}
+            {ersetzt === p.key && <span className="tag-ersetzt-marke">· {t("scribe.day.replaced")}</span>}
+          </div>
+          <div className="tag-bisher-text">{p.text}</div>
         </div>
-      )}
+      ))}
+      <div className="tag-neu-linie"><span>{linie}</span></div>
     </div>
   );
 }
 
-/** Art der Ergänzung: Nachtrag (Standard) oder Korrektur eines bestätigten Teils. */
-function KindChoice({ kind, corrects, parts, rooms, onKind, onCorrects, name }: {
-  kind: Kind; corrects: string | null; parts: DayPart[]; rooms: Record<string, string>; name: string;
-  onKind: (k: Kind) => void; onCorrects: (id: string) => void;
+/** Wahl-Pillen wie bei der Behandlungsart: Nachtrag oder Korrektur eines bestimmten Teils. */
+export function ArtWahl({ kind, selected, options, onNachtrag, onKorrektur, disabled, children }: {
+  kind: Kind; selected: string | null; options: TargetOption[]; disabled?: boolean;
+  onNachtrag: () => void; onKorrektur: (o: TargetOption) => void; children?: ReactNode;
 }) {
-  const confirmed = parts.filter((p) => p.state === "bestaetigt");
   return (
-    <fieldset className="tag-art">
-      <legend>{t("scribe.day.kindLegend")}</legend>
-      <label><input type="radio" name={`${name}-art`} checked={kind === "nachtrag"} onChange={() => onKind("nachtrag")} /> {t("scribe.day.kindNachtrag")}</label>
-      <label><input type="radio" name={`${name}-art`} checked={kind === "korrektur"} onChange={() => onKind("korrektur")} disabled={!confirmed.length} /> {t("scribe.day.kindKorrektur")}</label>
-      {kind === "korrektur" && (
-        <div className="tag-teile">
-          {confirmed.map((p) => (
-            <label key={p.id}><input type="radio" name={`${name}-teil`} checked={corrects === p.id} onChange={() => onCorrects(p.id)} /> {teilName(p, rooms)}<small>{p.text.slice(0, 120)}{p.text.length > 120 ? " …" : ""}</small></label>
+    <div className="tag-artwahl">
+      <span className="tag-artwahl-label">{t("scribe.day.kindLegend")}</span>
+      <div className="wahlzeile">
+        <button type="button" className="wahl" aria-pressed={kind === "nachtrag"} onClick={onNachtrag} disabled={disabled}>{t("scribe.day.kindNachtragShort")}</button>
+        {options.map((o) => (
+          <button key={o.key} type="button" className="wahl" aria-pressed={kind === "korrektur" && selected === o.key} onClick={() => onKorrektur(o)} disabled={disabled}>
+            {t("scribe.day.kindKorrekturOf", "de", { teil: o.label })}
+          </button>
+        ))}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Ausgang Abrechnung nach dem Eintragen: Leistungen des ganzen Tages und was die Abrechnung klärt. */
+export function TagesLeistungen({ preview }: { preview: DayPreview }) {
+  return (
+    <>
+      <div className="geldtabelle">
+        <table>
+          <tbody>
+            {preview.resultingPositions.length
+              ? preview.resultingPositions.map((p, i) => <tr key={p.id ?? i}><td className="code">{positionCode(p)}</td><td>{p.text ?? ""}</td></tr>)
+              : <tr><td className="leer">{t("scribe.day.noPositions")}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="geldnotiz">{t("scribe.day.dayPositionsNote")}</p>
+      {preview.conflicts.length > 0 && (
+        <p className="geldnotiz tag-klaerung"><b>{t("scribe.day.conflictsLabel")}:</b> {preview.conflicts.map((c) => c.message).join(" ")} {t("scribe.day.conflictsNote")}</p>
+      )}
+    </>
+  );
+}
+
+export type EntscheidungErgebnis = { partId: string; decision: Kind | "verwerfen"; preview: DayPreview | null; canonicalEntryId: string };
+
+/**
+ * Offene Entwurfsteile des Tages als Wache-Karten. Ein Mensch entscheidet: Nachtrag, Korrektur oder verwerfen.
+ * Nachtrag und Korrektur zeigen vorher, was in die Akte geht und welche Leistungen danach zählen.
+ * Ohne offene Teile oder wenn der Tagesdatensatz nicht lesbar ist, bleibt der Bereich unsichtbar.
+ */
+export function OffeneTeile({ record, patientName, rooms, onChanged }: {
+  record: DayRecord | null; patientName: string; rooms: Record<string, string>; onChanged: (r: EntscheidungErgebnis) => void;
+}) {
+  const [offen, setOffen] = useState<string | null>(null);
+  const entwuerfe = record?.parts.filter((p) => p.state === "entwurf") ?? [];
+  if (!record || !entwuerfe.length) return null;
+  return (
+    <>
+      <p className="abschnitt">{t("scribe.day.openTitle", "de", { name: patientName })}</p>
+      <div className="listengruppe">
+        <p className="gruppenlabel offen">{t("scribe.day.openGroup", "de", { n: entwuerfe.length })}</p>
+        <div className="tag-entwuerfe">
+          {entwuerfe.map((p) => (
+            <div key={p.id} className="wache tag-entwurf">
+              <div className="zeit">{zeit(p.occurred_at)} · {ort(p.room_version_id, rooms)} · {p.staff_initials || "—"}</div>
+              <div className="wer">{p.source_entry_id ? t("scribe.day.draftFromEntry") : t("scribe.day.draftFromCockpit")}</div>
+              <div className="was">{p.text}</div>
+              <span className="pille rot">{t("scribe.day.draftPill")}</span>
+              {offen === p.id
+                ? <Entscheidung tag={record} part={p} rooms={rooms} onCancel={() => setOffen(null)} onDone={(r) => { setOffen(null); onChanged(r); }} />
+                : <div className="tag-entwurf-aktion"><button type="button" className="neben klein" onClick={() => setOffen(p.id)}>{t("scribe.day.decide")}</button></div>}
+            </div>
           ))}
         </div>
-      )}
-    </fieldset>
+      </div>
+    </>
   );
 }
 
-/**
- * Ergänzen eines vorhandenen Tages: Tag finden oder aus dem frühesten bestätigten Eintrag eröffnen, Vorschau,
- * dann Entwurfsteil speichern und als Nachtrag oder Korrektur entscheiden. Erst der letzte Schritt ist endgültig.
- */
-export function DayAddPanel({ patientId, datum, content, canonical, preset, rooms, onDone, onCancel, onFallback }: {
-  patientId: string;
-  datum: string;
-  content: DayDraftContent;
-  canonical: { id: string; version: number } | null;
-  preset?: { kind: Kind; correctsPartId: string | null };
-  rooms: Record<string, string>;
-  onDone: (result: { canonicalEntryId: string; kind: Kind; partId: string }) => void;
-  onCancel: () => void;
-  /** Notweg, wenn der Tagesdatensatz nicht erreichbar ist: wie bisher als eigenen Eintrag speichern. Die Dokumentation darf nie scheitern. */
-  onFallback?: () => void;
-}) {
-  const heute = datum === heuteBerlin();
-  const [tag, setTag] = useState<DayRecord | null>(null);
-  const [kind, setKind] = useState<Kind>(preset?.kind ?? "nachtrag");
-  const [corrects, setCorrects] = useState<string | null>(preset?.correctsPartId ?? null);
-  const [uhrzeit, setUhrzeit] = useState("");
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [laedt, setLaedt] = useState(true);
-  const [sendet, setSendet] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  // Uhrzeit beim Öffnen festhalten, damit Vorschau und Speichern denselben Inhalt prüfen.
-  const [jetzt] = useState(() => new Date().toISOString());
-  const occurredAt = heute ? jetzt : /^\d{2}:\d{2}$/.test(uhrzeit) ? new Date(`${datum}T${uhrzeit}:00`).toISOString() : null;
-  const request = useMemo<AddDayPartRequest | null>(() => {
-    if (!tag || !occurredAt || (kind === "korrektur" && !corrects)) return null;
-    return { ...content, expectedVersion: tag.record.version, proposedKind: kind, correctsPartId: kind === "korrektur" ? corrects : null, occurredAt };
-  }, [tag, occurredAt, kind, corrects, content]);
-
-  // Tag laden oder eröffnen. Eröffnen legt nur den Tagesdatensatz zum vorhandenen Eintrag an und ändert keinen Text.
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      try {
-        const vorhanden = await findeTag(patientId, datum);
-        const rec = vorhanden ?? (canonical ? await eroeffneTag(canonical) : null);
-        if (!rec) throw new Error(t("scribe.day.notFound"));
-        if (live) setTag(rec);
-      } catch (e) {
-        if (live) setFehler(e instanceof Error ? e.message : t("scribe.day.error"));
-      } finally {
-        if (live) setLaedt(false);
-      }
-    })();
-    return () => { live = false; };
-  }, [patientId, datum, canonical]);
-
-  // Vorschau neu holen, sobald Art, Bezug oder Uhrzeit feststehen. Sie speichert nichts.
-  useEffect(() => {
-    if (!tag || !request) { setPreview(null); return; }
-    let live = true;
-    setFehler(null);
-    post<Preview>(`/api/doku/tagesdatensatz/${tag.record.id}/ergaenzung/vorschau`, request)
-      .then((p) => { if (live) setPreview(p); })
-      .catch((e) => { if (live) { setPreview(null); setFehler(e instanceof Error ? e.message : t("scribe.day.error")); } });
-    return () => { live = false; };
-  }, [tag, request]);
-
-  async function bestaetigen() {
-    if (!tag || !request || !preview) return;
-    setSendet(true);
-    setFehler(null);
-    try {
-      const saved = await post<{ part: DayPart; decisionPreview: Preview }>(
-        `/api/doku/tagesdatensatz/${tag.record.id}/ergaenzung`, request, { "x-day-preview-token": preview.previewToken });
-      await post(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${saved.part.id}/entscheidung`, {
-        expectedVersion: saved.decisionPreview.basedOnVersion,
-        decision: kind,
-        reason: kind === "nachtrag" ? t("scribe.day.reasonNachtrag") : t("scribe.day.reasonKorrektur"),
-        correctsPartId: kind === "korrektur" ? corrects : null,
-        previewToken: saved.decisionPreview.previewToken,
-      });
-      onDone({ canonicalEntryId: tag.record.canonical_entry_id, kind, partId: saved.part.id });
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : t("scribe.day.error"));
-    } finally {
-      setSendet(false);
-    }
-  }
-
-  return (
-    <section className="tag-panel" aria-label={t("scribe.day.panelTitle")}>
-      <div className="tag-kopf">
-        <strong>{t("scribe.day.panelTitle")}</strong>
-        <span>{t("scribe.day.panelLead")}</span>
-      </div>
-      {laedt && <p role="status">{t("scribe.day.loading")}</p>}
-      {tag && (
-        <>
-          <ul className="tag-bestand">
-            {tag.parts.filter((p) => p.state === "bestaetigt").map((p) => <li key={p.id}>{teilName(p, rooms)}</li>)}
-          </ul>
-          <KindChoice kind={kind} corrects={corrects} parts={tag.parts} rooms={rooms} name={tag.record.id} onKind={setKind} onCorrects={setCorrects} />
-          {!heute && (
-            <label className="tag-zeit">
-              <span>{t("scribe.day.timeLabel")}</span>
-              <input type="time" value={uhrzeit} onChange={(e) => setUhrzeit(e.target.value)} aria-label={t("scribe.day.timeLabel")} />
-            </label>
-          )}
-          {!occurredAt && <p className="hinweis-fehlt">{t("scribe.day.timeMissing")}</p>}
-          {kind === "korrektur" && !corrects && <p className="hinweis-fehlt">{t("scribe.day.correctsMissing")}</p>}
-          {preview && <PreviewView preview={preview} />}
-        </>
-      )}
-      {fehler && <p className="hinweis-fehlt" role="alert">{fehler}</p>}
-      <div className="tag-aktionen">
-        <button type="button" className="haupt" onClick={bestaetigen} disabled={!preview || sendet}>
-          {sendet ? t("scribe.day.saving") : kind === "nachtrag" ? t("scribe.day.confirmNachtrag") : t("scribe.day.confirmKorrektur")}
-        </button>
-        <button type="button" className="neben" onClick={onCancel} disabled={sendet}>{t("scribe.day.cancel")}</button>
-        {fehler && !tag && onFallback && <button type="button" className="neben" onClick={onFallback} disabled={sendet}>{t("scribe.day.fallback")}</button>}
-      </div>
-      {fehler && !tag && onFallback && <small className="tag-hinweis-klein">{t("scribe.day.fallbackNote")}</small>}
-    </section>
-  );
-}
-
-/**
- * Teile des heutigen Tages für den gewählten Patienten. Offene Entwurfsteile entscheidet ein Mensch:
- * Nachtrag, Korrektur oder verwerfen. Nachtrag und Korrektur brauchen eine aktuelle Vorschau.
- */
-export function DayPartsPanel({ patientId, datum, rooms, reloadKey, onChanged }: {
-  patientId: string; datum: string; rooms: Record<string, string>; reloadKey: number; onChanged: () => void;
-}) {
-  const [tag, setTag] = useState<DayRecord | null>(null);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [offen, setOffen] = useState<string | null>(null);
-  const [neu, setNeu] = useState(0);
-  useEffect(() => {
-    let live = true;
-    // Ist der Tagesdatensatz nicht lesbar (z. B. noch nicht freigeschaltet), bleibt das Feld still: das Cockpit arbeitet wie bisher.
-    findeTag(patientId, datum).then((r) => { if (live) { setTag(r); setFehler(null); } }).catch(() => { if (live) { setTag(null); setFehler(null); } });
-    return () => { live = false; };
-  }, [patientId, datum, reloadKey, neu]);
-  if (fehler) return <p className="hinweis-fehlt">{fehler}</p>;
-  if (!tag) return null;
-  const sichtbar = tag.parts.filter((p) => p.state !== "verworfen");
-  const entwuerfe = sichtbar.filter((p) => p.state === "entwurf");
-  return (
-    <section className="tag-teile-panel" aria-label={t("scribe.day.partsTitle")}>
-      <div className="tag-kopf">
-        <strong>{t("scribe.day.partsTitle")}</strong>
-        <span>{entwuerfe.length ? t("scribe.day.partsOpen", "de", { n: entwuerfe.length }) : t("scribe.day.partsAllDone")}</span>
-      </div>
-      <ol className="tag-teil-liste">
-        {sichtbar.map((p) => (
-          <li key={p.id} className={p.state === "entwurf" ? "ist-entwurf" : ""}>
-            <div className="tag-teil-zeile">
-              <span>{teilName(p, rooms)}</span>
-              <span className="tag-status">{p.state === "entwurf" ? t("scribe.day.stateDraft") : p.kind === "nachtrag" ? t("scribe.day.stateNachtrag") : p.kind === "korrektur" ? t("scribe.day.stateKorrektur") : t("scribe.day.stateOriginal")}</span>
-            </div>
-            <p>{p.text}</p>
-            {p.state === "entwurf" && offen !== p.id && (
-              <button type="button" className="neben klein" onClick={() => setOffen(p.id)}>{t("scribe.day.decide")}</button>
-            )}
-            {p.state === "entwurf" && offen === p.id && (
-              <DraftDecision tag={tag} part={p} rooms={rooms} onCancel={() => setOffen(null)} onDone={() => { setOffen(null); setNeu((n) => n + 1); onChanged(); }} />
-            )}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-/** Entscheidung über einen Entwurfsteil. Die Vorschau zeigt vorher, was nach IVORIS geht und welche Leistungen zählen. */
-function DraftDecision({ tag, part, rooms, onCancel, onDone }: {
-  tag: DayRecord; part: DayPart; rooms: Record<string, string>; onCancel: () => void; onDone: () => void;
+function Entscheidung({ tag, part, rooms, onCancel, onDone }: {
+  tag: DayRecord; part: DayPart; rooms: Record<string, string>; onCancel: () => void; onDone: (r: EntscheidungErgebnis) => void;
 }) {
   const [decision, setDecision] = useState<Kind | "verwerfen">(part.kind === "korrektur" ? "korrektur" : "nachtrag");
   const [corrects, setCorrects] = useState<string | null>(part.corrects_part_id);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<DayPreview | null>(null);
   const [grund, setGrund] = useState("");
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const confirmed = tag.parts.filter((p) => p.state === "bestaetigt");
+  const ziele = geltendeTeile(tag);
 
   useEffect(() => {
     if (decision === "verwerfen" || (decision === "korrektur" && !corrects)) { setPreview(null); return; }
     let live = true;
     setFehler(null);
-    post<Preview>(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${part.id}/entscheidung/vorschau`, { decision, correctsPartId: decision === "korrektur" ? corrects : null })
+    post<DayPreview>(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${part.id}/entscheidung/vorschau`, { decision, correctsPartId: decision === "korrektur" ? corrects : null })
       .then((p) => { if (live) setPreview(p); })
       .catch((e) => { if (live) { setPreview(null); setFehler(e instanceof Error ? e.message : t("scribe.day.error")); } });
     return () => { live = false; };
@@ -368,7 +344,7 @@ function DraftDecision({ tag, part, rooms, onCancel, onDone }: {
       await post(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${part.id}/entscheidung`, decision === "verwerfen"
         ? { expectedVersion: tag.record.version, decision, reason }
         : { expectedVersion: preview?.basedOnVersion ?? tag.record.version, decision, reason, correctsPartId: decision === "korrektur" ? corrects : null, previewToken: preview?.previewToken ?? null });
-      onDone();
+      onDone({ partId: part.id, decision, preview: decision === "verwerfen" ? null : preview, canonicalEntryId: tag.record.canonical_entry_id });
     } catch (e) {
       setFehler(e instanceof Error ? e.message : t("scribe.day.error"));
     } finally {
@@ -376,26 +352,30 @@ function DraftDecision({ tag, part, rooms, onCancel, onDone }: {
     }
   }
 
+  const grundLabel = decision === "verwerfen" ? t("scribe.day.reasonRequired") : t("scribe.day.reasonOptional");
   return (
     <div className="tag-entscheidung">
-      <fieldset className="tag-art">
-        <legend>{t("scribe.day.decisionLegend")}</legend>
-        <label><input type="radio" name={`${part.id}-d`} checked={decision === "nachtrag"} onChange={() => setDecision("nachtrag")} /> {t("scribe.day.kindNachtrag")}</label>
-        <label><input type="radio" name={`${part.id}-d`} checked={decision === "korrektur"} onChange={() => setDecision("korrektur")} disabled={!confirmed.length} /> {t("scribe.day.kindKorrektur")}</label>
-        <label><input type="radio" name={`${part.id}-d`} checked={decision === "verwerfen"} onChange={() => setDecision("verwerfen")} /> {t("scribe.day.discard")}</label>
-        {decision === "korrektur" && (
-          <div className="tag-teile">
-            {confirmed.map((p) => <label key={p.id}><input type="radio" name={`${part.id}-k`} checked={corrects === p.id} onChange={() => setCorrects(p.id)} /> {teilName(p, rooms)}</label>)}
+      <div className="wahlzeile">
+        <button type="button" className="wahl" aria-pressed={decision === "nachtrag"} onClick={() => setDecision("nachtrag")}>{t("scribe.day.kindNachtragShort")}</button>
+        {ziele.map((p) => (
+          <button key={p.id} type="button" className="wahl" aria-pressed={decision === "korrektur" && corrects === p.id} onClick={() => { setDecision("korrektur"); setCorrects(p.id); }}>
+            {t("scribe.day.kindKorrekturOf", "de", { teil: teilName(p, rooms) })}
+          </button>
+        ))}
+        <button type="button" className="wahl" aria-pressed={decision === "verwerfen"} onClick={() => setDecision("verwerfen")}>{t("scribe.day.discard")}</button>
+      </div>
+      {decision === "verwerfen"
+        ? <p className="geldnotiz">{t("scribe.day.discardNote")}</p>
+        : preview && (
+          <div className="tag-entscheidung-vorschau">
+            <p><span className="tag-mini-label">{t("scribe.day.ivorisLabel")}</span>{preview.ivoris.action === "already_pushed" ? t("scribe.day.ivorisAlready") : <><b>{preview.ivoris.heading}:</b> {preview.ivoris.text}</>}</p>
+            <p><span className="tag-mini-label">{t("scribe.day.positionsLabel")}</span>{preview.resultingPositions.length ? preview.resultingPositions.map(positionCode).join(" · ") : t("scribe.day.noPositions")}</p>
+            {preview.conflicts.length > 0 && <p className="tag-klaerung"><span className="tag-mini-label">{t("scribe.day.conflictsLabel")}</span>{preview.conflicts.map((c) => c.message).join(" ")}</p>}
           </div>
         )}
-      </fieldset>
-      {decision === "verwerfen" ? <p className="tag-hinweis-klein">{t("scribe.day.discardNote")}</p> : preview && <PreviewView preview={preview} />}
-      <label className="tag-grund">
-        <span>{decision === "verwerfen" ? t("scribe.day.reasonRequired") : t("scribe.day.reasonOptional")}</span>
-        <input className="freitext" value={grund} onChange={(e) => setGrund(e.target.value)} maxLength={2000} />
-      </label>
-      {fehler && <p className="hinweis-fehlt" role="alert">{fehler}</p>}
-      <div className="tag-aktionen">
+      <input className="freitext" placeholder={grundLabel} aria-label={grundLabel} value={grund} onChange={(e) => setGrund(e.target.value)} maxLength={2000} />
+      {fehler && <span className="hinweis-fehlt" role="alert">{fehler}</span>}
+      <div className="tag-entwurf-aktion">
         <button type="button" className="haupt" onClick={speichern} disabled={sendet || (decision !== "verwerfen" && !preview)}>
           {sendet ? t("scribe.day.saving") : decision === "verwerfen" ? t("scribe.day.discardConfirm") : t("scribe.day.decisionConfirm")}
         </button>
