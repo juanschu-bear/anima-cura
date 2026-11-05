@@ -180,7 +180,7 @@
     },
     {
       "file": "src/lib/scribe-day-record-service.ts",
-      "sha256": "0863e7f10c751b9605a1944e8b9c85e85aba2a648e186ce6577adf5f6dce020e",
+      "sha256": "16e6dfb1f688bea3c6c551c847ecb68ca6009a68388dfe707e23f3b143fda41e",
       "proof": "All day-record RPCs receive the signed-in Anima Cura/Scribe Supabase client after requireScribeDayWriter checks the authenticated user, profile permission and server-side staff initials; JWT role authenticated.",
       "calls": [
         {
