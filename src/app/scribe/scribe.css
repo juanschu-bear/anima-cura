@@ -1221,3 +1221,45 @@
 .scribe .pruef-hinweise .pruef-ort{margin-left:8px;padding:0;border:0;background:none;color:var(--primaer-tief);font:inherit;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer}
 .scribe .pruef-hinweise .pruef-fuss{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--gedeckt)}
 .scribe .gruppe.pruef-markiert{outline:2px solid var(--rot);outline-offset:6px;border-radius:12px}
+
+/* ===== Tagesdatensatz: ein Eintrag je Patient und Tag, auf derselben Karteikarte weiterschreiben ===== */
+/* Was heute schon dasteht: gedämpft auf derselben Lineatur, darunter die grüne Linie, ab der der neue Teil beginnt. */
+.scribe .tag-bisher-kopf{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:#8A8268;line-height:18px;
+  padding:7px 0}
+.scribe .tag-bisher-kopf span+span{margin-left:6px}
+.scribe .tag-bisher-text{background-image:repeating-linear-gradient(transparent 0 31px,var(--lineatur) 31px 32px);
+  line-height:32px;font-size:15px;color:#7A725E;white-space:pre-wrap}
+.scribe .tag-bisher-teil.ersetzt .tag-bisher-text{text-decoration:line-through;text-decoration-color:rgba(216,101,79,.75);
+  text-decoration-thickness:1.5px;color:#A39A84}
+.scribe .tag-ersetzt-marke{color:#B23A24;font-weight:600}
+.scribe .tag-neu-linie{display:flex;align-items:center;gap:10px;height:32px;margin-top:4px;font-family:var(--mono);
+  font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#0E9966}
+.scribe .tag-neu-linie::before,.scribe .tag-neu-linie::after{content:"";height:1.5px;background:rgba(14,153,102,.5)}
+.scribe .tag-neu-linie::before{width:14px;flex-shrink:0}
+.scribe .tag-neu-linie::after{flex:1}
+.scribe .tag-kopf-bezug{color:#0E9966;font-weight:600}
+/* Eintragen als: Wahl-Pillen in der Aktionszeile, bei einem früheren Tag mit Uhrzeit */
+.scribe .tag-artwahl{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.scribe .tag-artwahl-label,.scribe .tag-uhrzeit span{font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--gedeckt)}
+.scribe .tag-artwahl .wahlzeile{gap:8px}
+.scribe .tag-uhrzeit{display:inline-flex;align-items:center;gap:10px}
+.scribe .tag-uhrzeit input{width:auto;min-width:112px;font-family:var(--mono);font-size:13px;padding:8px 10px;color-scheme:dark}
+.scribe[data-thema="hell"] .tag-uhrzeit input{color-scheme:light}
+.scribe .geldnotiz.tag-klaerung b,.scribe .tag-klaerung .tag-mini-label{color:var(--gold-textton)}
+/* Offene Teile: Wache-Karten mit Entscheidung direkt in der Karte */
+.scribe .tag-entwuerfe{display:grid;gap:12px}
+.scribe .wache.tag-entwurf{cursor:default}
+.scribe .wache.tag-entwurf:hover{transform:none;border-color:var(--kante)}
+.scribe .tag-entwurf .was{margin-top:6px;max-width:calc(100% - 130px);font-size:13.5px;line-height:1.5;
+  color:var(--schrift);white-space:pre-wrap}
+.scribe .tag-entwurf-aktion{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.scribe .tag-entscheidung{display:grid;gap:12px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--kante)}
+.scribe .tag-entscheidung .wahlzeile{gap:8px}
+.scribe .tag-entscheidung .freitext{margin-top:0}
+.scribe .tag-entscheidung .tag-entwurf-aktion{margin-top:0}
+.scribe .tag-entscheidung-vorschau{display:grid;gap:8px;font-size:13.5px;line-height:1.5}
+.scribe .tag-entscheidung-vorschau p{margin:0}
+.scribe .tag-mini-label{display:block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gedeckt);margin-bottom:2px}
+@media(max-width:560px){.scribe .tag-entwurf .was{max-width:100%;margin-top:30px}}
