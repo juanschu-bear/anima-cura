@@ -506,6 +506,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const hd: React.CSSProperties = { fontFamily: "'Fraunces', serif" };
   const lb: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: muted };
   const card: React.CSSProperties = { borderRadius: 18, padding: 22, marginBottom: 14, background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" };
+  const geld = (n: number) => Number(n || 0).toLocaleString(getLocale(lang), { style: "currency", currency: "EUR" });
   /** Originalrechnung mit allen Positionen, zum Einreichen bei der Versicherung. */
   const belegDetail = (b: Beleg) => {
     const L = (de: string, en: string, es: string) => (lang === "en" ? en : lang === "es" ? es : de);
@@ -1249,7 +1250,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       )}
       {rechnungen.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
+        <div id="portal-rechnungen" style={{ marginBottom: 16, scrollMarginTop: 16 }}>
           <div style={{ padding: "0 20px" }}>
             <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
               {lang === "en" ? "Invoices & claims" : lang === "es" ? "Facturas y cargos" : "Rechnungen & Forderungen"}
@@ -1260,6 +1261,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               const settledByCredit = r.zahlungsmodus === "credit";
               const isDirectDebit = r.zahlungsmodus === "direct_debit";
               const isBeleg = r.status === "beleg";
+              const openColor = dk ? "#fbbf24" : "#b45309";
+              const pillColor = r.status === "bezahlt" || settledByCredit || isDirectDebit ? grn : openColor;
               const statusColor = isBeleg ? fg : r.status === "bezahlt" || settledByCredit ? grn : r.status === "teilbezahlt" || r.guthaben_angerechnet > 0 ? warn : fg;
               const mainAmount = r.status === "bezahlt" || isBeleg ? r.betrag : r.zahlbetrag;
               const statusLabel =
@@ -1277,7 +1280,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               const offen = !!r.beleg && offenerBeleg === r.id;
               return (
                 <div key={r.id} style={{ padding: "14px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" }}>
+                <div
+                  {...(r.beleg ? { role: "button", tabIndex: 0, "aria-expanded": offen, onClick: () => setOffenerBeleg(offen ? null : r.id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOffenerBeleg(offen ? null : r.id); } } } : {})}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", cursor: r.beleg ? "pointer" : "default" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: fg }}>
                       {r.unser_zeichen || r.rechnung_nr || (lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung")}
@@ -1285,13 +1290,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
                       {[isBeleg ? (r.beleg?.art ?? null) : (r.typ?.toUpperCase() || null), r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
                     </div>
-                    <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>
-                      {statusLabel}
-                      {r.gezahlt > 0 && r.status !== "bezahlt" && !isBeleg ? ` · ${lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} ${fmtEuro(r.gezahlt)}` : ""}
-                    </div>
+                    {isBeleg ? (
+                      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{statusLabel}</div>
+                    ) : (
+                      <div style={{ marginTop: 7, display: "inline-flex", alignItems: "center", padding: "3px 11px", borderRadius: 999, fontSize: 13, fontWeight: 800, color: pillColor, background: pillColor + "22", border: "1px solid " + pillColor + "55" }}>{statusLabel}</div>
+                    )}
+                    {r.gezahlt > 0 && r.status !== "bezahlt" && !isBeleg && (
+                      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} {geld(r.gezahlt)}</div>
+                    )}
                     {r.guthaben_angerechnet > 0 && r.status !== "bezahlt" && (
                       <div style={{ fontSize: 11, color: grn, marginTop: 4, fontWeight: 700 }}>
-                        {lang === "en" ? "Credit applied" : lang === "es" ? "Saldo aplicado" : "Guthaben angerechnet"}: {fmtEuro(r.guthaben_angerechnet)}
+                        {lang === "en" ? "Credit applied" : lang === "es" ? "Saldo aplicado" : "Guthaben angerechnet"}: {geld(r.guthaben_angerechnet)}
                       </div>
                     )}
                     {isDirectDebit && (
@@ -1301,8 +1310,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     )}
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ ...hd, fontSize: 18, fontWeight: 800, color: statusColor }}>{fmtEuro(mainAmount)}</div>
-                    <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>
+                    <div style={{ ...hd, fontSize: 18, fontWeight: 800, color: statusColor }}>{geld(mainAmount)}</div>
+                    <div style={{ fontSize: 12, color: muted, marginTop: 3 }}>
                       {isBeleg
                         ? (lang === "en" ? "Invoice amount" : lang === "es" ? "Importe de la factura" : "Rechnungsbetrag")
                         : r.status === "bezahlt"
@@ -1316,10 +1325,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   </div>
                 </div>
                 {r.beleg && (
-                  <button type="button" aria-expanded={offen} onClick={() => setOffenerBeleg(offen ? null : r.id)} style={{ marginTop: 10, borderRadius: 999, border: "1px solid " + border, padding: "8px 14px", background: "transparent", color: fg, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  <button type="button" aria-expanded={offen} onClick={() => setOffenerBeleg(offen ? null : r.id)} style={{ marginTop: 10, borderRadius: 999, border: "1px solid " + border, padding: "9px 15px", background: "transparent", color: fg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                     {offen
-                      ? (lang === "en" ? "Close" : lang === "es" ? "Cerrar" : "Schließen")
-                      : (lang === "en" ? "Items and PDF" : lang === "es" ? "Posiciones y PDF" : "Positionen und PDF")}
+                      ? (lang === "en" ? "Close ˄" : lang === "es" ? "Cerrar ˄" : "Schließen ˄")
+                      : (lang === "en" ? "Items and PDF ›" : lang === "es" ? "Posiciones y PDF ›" : "Positionen und PDF ›")}
                   </button>
                 )}
                 {r.beleg && offen && belegDetail(r.beleg)}
@@ -1706,6 +1715,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
+            {rechnungen.length > 0 && (
+              <button onClick={() => { setBalanceView(false); setTab("progress"); setFinSheet(false); hapticLight(); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderRadius: 18, padding: "15px 14px", marginBottom: 10, background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", fontFamily: "inherit" }}>
+                <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)" }}>🧾</span>
+                <span><b style={{ display: "block", fontSize: 15, color: fg }}>{lang === "en" ? "Your invoices" : lang === "es" ? "Tus facturas" : "Deine Rechnungen"}</b><span style={{ fontSize: 12, color: muted }}>{lang === "en" ? "All items, PDF for your insurance" : lang === "es" ? "Todas las posiciones, PDF para tu seguro" : "Alle Positionen, PDF für die Versicherung"}</span></span>
+                <span style={{ marginLeft: "auto", color: muted, fontSize: 18 }}>›</span>
+              </button>
+            )}
             <button onClick={() => { setBalanceView(false); setTab("progress"); setFinSheet(false); hapticLight(); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderRadius: 18, padding: "15px 14px", marginBottom: 10, background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", fontFamily: "inherit" }}>
               <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)" }}>📈</span>
               <span><b style={{ display: "block", fontSize: 15, color: fg }}>Dein Fortschritt</b><span style={{ fontSize: 12, color: muted }}>Investiert, offen, Raten im Blick</span></span>
