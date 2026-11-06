@@ -7,12 +7,14 @@ interface AnimaPayProps {
   betrag: number;
   verwendungszweck: string;
   rateNummer: number;
+  /** "rechnung": eine einzelne Rechnung bezahlen (Titel und Zeile ohne Ratennummer). */
+  art?: "rate" | "rechnung";
   onClose: () => void;
   dark?: boolean;
   lang?: string;
 }
 
-export default function AnimaPayOverlay({ betrag, verwendungszweck, rateNummer, onClose, dark = true, lang = "de" }: AnimaPayProps) {
+export default function AnimaPayOverlay({ betrag, verwendungszweck, rateNummer, art = "rate", onClose, dark = true, lang = "de" }: AnimaPayProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState<string>("");
   const [showAnleitung, setShowAnleitung] = useState(false);
@@ -55,7 +57,7 @@ export default function AnimaPayOverlay({ betrag, verwendungszweck, rateNummer, 
 
   const t = (key: string) => {
     const texts: Record<string, Record<string, string>> = {
-      title: { de: "Rate bezahlen", en: "Pay installment", es: "Pagar cuota" },
+      title: art === "rechnung" ? { de: "Rechnung bezahlen", en: "Pay invoice", es: "Pagar factura" } : { de: "Rate bezahlen", en: "Pay installment", es: "Pagar cuota" },
       scanTitle: { de: "Mit Banking-App scannen", en: "Scan with banking app", es: "Escanear con app bancaria" },
       scanDesc: { de: "Öffne deine Banking-App, wähle \"QR-Code scannen\" und halte die Kamera auf den Code.", en: "Open your banking app, select \"Scan QR code\" and point the camera at the code.", es: "Abre tu app bancaria, selecciona \"Escanear QR\" y apunta la cámara al código." },
       orManual: { de: "Oder manuell überweisen", en: "Or transfer manually", es: "O transferir manualmente" },
@@ -89,7 +91,7 @@ export default function AnimaPayOverlay({ betrag, verwendungszweck, rateNummer, 
           <div style={{ fontSize: 32, fontWeight: 800, color: grn, fontFamily: "'Fraunces', serif", margin: "8px 0" }}>
             {betrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
           </div>
-          <div style={{ fontSize: 13, color: muted }}>Rate {rateNummer} · {verwendungszweck}</div>
+          <div style={{ fontSize: 13, color: muted }}>{art === "rate" && rateNummer > 0 ? `Rate ${rateNummer} · ` : ""}{verwendungszweck}</div>
         </div>
 
         {/* QR Code */}

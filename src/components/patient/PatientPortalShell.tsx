@@ -1,5 +1,6 @@
 "use client";
 import { trackEvent } from "@/lib/useTracking";
+import { explainPosition } from "@/lib/patient-position-explanations";
 import QRCode from "qrcode";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -92,10 +93,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [offenerBeleg, setOffenerBeleg] = useState<string | null>(null);
-  const [alleRechnungen, setAlleRechnungen] = useState(false);
+  const [rechnungSeite, setRechnungSeite] = useState(0);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number } | null>(null);
+  const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number; art?: "rate" | "rechnung" } | null>(null);
   const [chatArchive, setChatArchive] = useState<{msgs: any[]; firstText: string; date: string}[]>([]);
   const [consent, setConsent] = useState<{ portal_nutzung: boolean; datenschutz_akzeptiert: boolean; digitaler_rechnungsempfang: boolean; push_benachrichtigungen: boolean } | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
@@ -363,7 +364,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     if (tab === "more") trackEvent(patientId, "document_view");
   }, [tab]);
 
-  const openPayment = (rate: { betrag: number; verwendungszweck: string; rateNummer: number }) => {
+  const openPayment = (rate: { betrag: number; verwendungszweck: string; rateNummer: number; art?: "rate" | "rechnung" }) => {
     if (patientId) {
       trackEvent(patientId, "animapay_open", { verwendungszweck: rate.verwendungszweck });
       trackEvent(patientId, "qrcode_view", { betrag: rate.betrag });
@@ -525,10 +526,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           {b.positionen.map((p, k) => (
             <div key={k} style={{ padding: "9px 12px", borderTop: k > 0 ? "1px solid " + border : "none", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: fg, lineHeight: 1.35 }}>
-                  {p.nr ? p.nr + " · " : ""}{p.text}
-                  {p.begruendungen.length > 0 && <sup style={{ color: warn, marginLeft: 2 }}>{p.begruendungen.join(",")}</sup>}
-                </div>
+                {(() => {
+                  const reasons = p.begruendungen.map(ref => b.begruendungen.find(x => x.key === ref.replace(/\)$/, ""))?.text || "");
+                  const plain = explainPosition(p, reasons, lang);
+                  const official = [p.tarif && p.tarif !== "material" ? p.tarif : null, p.nr].filter(Boolean).join(" ") + (p.text ? " · " + p.text : "");
+                  return <>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: fg, lineHeight: 1.35 }}>
+                      {plain || p.text}
+                      {p.begruendungen.length > 0 && <sup style={{ color: warn, marginLeft: 2 }}>{p.begruendungen.join(",")}</sup>}
+                    </div>
+                    {plain && <div style={{ fontSize: 11, color: muted, marginTop: 2, lineHeight: 1.35 }}>{official}</div>}
+                  </>;
+                })()}
                 <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
                   {[p.datum ? datum(p.datum) : null, ort(p.region), L("Menge", "Qty", "Cantidad") + " " + p.anzahlText,
                     p.faktor !== null ? L("Faktor", "Factor", "Factor") + " " + num(p.faktor) : p.punkte !== null ? num(p.punkte) + " " + L("Punkte", "points", "puntos") : null]
@@ -1250,14 +1259,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         </div>
       )}
       {rechnungen.length > 0 && (
-        <div id="portal-rechnungen" style={{ marginBottom: 16, scrollMarginTop: 16 }}>
+        <div id="portal-rechnungen" style={{ marginBottom: 16, scrollMarginTop: 72 }}>
           <div style={{ padding: "0 20px" }}>
             <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
               {lang === "en" ? "Invoices & claims" : lang === "es" ? "Facturas y cargos" : "Rechnungen & Forderungen"}
             </p>
           </div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
-            {(alleRechnungen ? rechnungen : rechnungen.slice(0, 6)).map((r, i) => {
+            {rechnungen.slice(rechnungSeite * 6, rechnungSeite * 6 + 6).map((r, i) => {
               const settledByCredit = r.zahlungsmodus === "credit";
               const isDirectDebit = r.zahlungsmodus === "direct_debit";
               const isBeleg = r.status === "beleg";
@@ -1279,20 +1288,31 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     : (lang === "en" ? "Open" : lang === "es" ? "Pendiente" : "Offen");
               const offen = !!r.beleg && offenerBeleg === r.id;
               return (
-                <div key={r.id} style={{ padding: "14px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
+                <div key={r.id} style={{ padding: "18px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
                 <div
                   {...(r.beleg ? { role: "button", tabIndex: 0, "aria-expanded": offen, onClick: () => setOffenerBeleg(offen ? null : r.id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOffenerBeleg(offen ? null : r.id); } } } : {})}
                   style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", cursor: r.beleg ? "pointer" : "default" }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: fg }}>
-                      {r.unser_zeichen || r.rechnung_nr || (lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung")}
-                    </div>
-                    <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
-                      {[isBeleg ? (r.beleg?.art ?? null) : (r.typ?.toUpperCase() || null), r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
-                    </div>
-                    {isBeleg ? (
-                      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{statusLabel}</div>
-                    ) : (
+                    {r.beleg ? (() => {
+                      const q = r.beleg.quartal.match(/^(\d{4})-Q([1-4])$/);
+                      const art = r.beleg.art === "GOZ" ? (lang === "en" ? "private" : lang === "es" ? "privada" : "privat") : (lang === "en" ? "health insurance" : lang === "es" ? "seguro público" : "Krankenkasse");
+                      return <>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>
+                          {lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung"} {q ? (lang === "en" ? `Q${q[2]} ${q[1]}` : lang === "es" ? `${q[2]}.º trimestre ${q[1]}` : `${q[2]}. Quartal ${q[1]}`) : ""}
+                        </div>
+                        <div style={{ fontSize: 12, color: muted, marginTop: 3 }}>
+                          {[art, r.rechnung_nr ? (lang === "en" ? "No. " : "Nr. ") + r.rechnung_nr : null, r.rechnung_datum ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(r.rechnung_datum) ? r.rechnung_datum + "T12:00:00Z" : r.rechnung_datum).toLocaleDateString(getLocale(lang), { day: "2-digit", month: "2-digit", year: "numeric" }) : null].filter(Boolean).join(" · ")}
+                        </div>
+                      </>;
+                    })() : <>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>
+                        {r.unser_zeichen || r.rechnung_nr || (lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung")}
+                      </div>
+                      <div style={{ fontSize: 12, color: muted, marginTop: 3 }}>
+                        {[r.typ?.toUpperCase() || null, r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
+                      </div>
+                    </>}
+                    {isBeleg ? null : (
                       <div style={{ marginTop: 7, display: "inline-flex", alignItems: "center", padding: "3px 11px", borderRadius: 999, fontSize: 13, fontWeight: 800, color: pillColor, background: pillColor + "22", border: "1px solid " + pillColor + "55" }}>{statusLabel}</div>
                     )}
                     {r.gezahlt > 0 && r.status !== "bezahlt" && !isBeleg && (
@@ -1324,24 +1344,42 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     </div>
                   </div>
                 </div>
-                {r.beleg && (
-                  <button type="button" aria-expanded={offen} onClick={() => setOffenerBeleg(offen ? null : r.id)} style={{ marginTop: 10, borderRadius: 999, border: "1px solid " + border, padding: "9px 15px", background: "transparent", color: fg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    {offen
-                      ? (lang === "en" ? "Close ˄" : lang === "es" ? "Cerrar ˄" : "Schließen ˄")
-                      : (lang === "en" ? "Items and PDF ›" : lang === "es" ? "Posiciones y PDF ›" : "Positionen und PDF ›")}
-                  </button>
-                )}
+                {(() => {
+                  const zahlbar = !isBeleg && r.manuelle_zahlung_erlaubt && r.zahlbetrag > 0 && !isDirectDebit && !settledByCredit;
+                  if (!r.beleg && !zahlbar) return null;
+                  return (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+                      {r.beleg && (
+                        <button type="button" aria-expanded={offen} onClick={() => setOffenerBeleg(offen ? null : r.id)} style={{ flex: "1 1 230px", whiteSpace: "nowrap", borderRadius: 999, border: "1px solid " + border, padding: "11px 15px", background: "transparent", color: fg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                          {offen
+                            ? (lang === "en" ? "Close ˄" : lang === "es" ? "Cerrar ˄" : "Schließen ˄")
+                            : (lang === "en" ? "Items and PDF ›" : lang === "es" ? "Posiciones y PDF ›" : "Positionen und PDF ›")}
+                        </button>
+                      )}
+                      {zahlbar && (
+                        <button type="button" onClick={() => { hapticMedium(); openPayment({ betrag: r.zahlbetrag, verwendungszweck: `Rechnungs-Nr.: ${r.rechnung_nr || "—"} / Unser Zeichen: ${r.unser_zeichen || "—"}`, rateNummer: 0, art: "rechnung" }); }} style={{ flex: "1 1 230px", whiteSpace: "nowrap", borderRadius: 999, border: "none", padding: "11px 15px", background: "#22c55e", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                          {lang === "en" ? "Pay now" : lang === "es" ? "Pagar ahora" : "Jetzt bezahlen"} · {geld(r.zahlbetrag)}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 {r.beleg && offen && belegDetail(r.beleg)}
                 </div>
               );
             })}
-            {rechnungen.length > 6 && (
-              <button type="button" onClick={() => setAlleRechnungen(v => !v)} style={{ width: "100%", padding: "12px 0", border: "none", borderTop: "1px solid " + (dk ? "#252525" : "#f0e8dc"), background: "transparent", color: grn, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                {alleRechnungen
-                  ? (lang === "en" ? "Show fewer" : lang === "es" ? "Mostrar menos" : "Weniger anzeigen")
-                  : (lang === "en" ? `Show all ${rechnungen.length} invoices` : lang === "es" ? `Mostrar las ${rechnungen.length} facturas` : `Alle ${rechnungen.length} Rechnungen anzeigen`)}
-              </button>
-            )}
+            {rechnungen.length > 6 && (() => {
+              const seiten = Math.ceil(rechnungen.length / 6);
+              const geh = (n: number) => { setRechnungSeite(n); setOffenerBeleg(null); hapticLight(); document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+              const pb = (aktiv: boolean): React.CSSProperties => ({ minWidth: 92, padding: "10px 14px", borderRadius: 999, border: "1px solid " + border, background: "transparent", color: aktiv ? fg : muted, opacity: aktiv ? 1 : 0.4, fontSize: 13, fontWeight: 700, cursor: aktiv ? "pointer" : "default", fontFamily: "inherit" });
+              return (
+                <nav aria-label={lang === "en" ? "Invoice pages" : lang === "es" ? "Páginas de facturas" : "Rechnungsseiten"} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 14, borderTop: "1px solid " + (dk ? "#252525" : "#f0e8dc") }}>
+                  <button type="button" disabled={rechnungSeite === 0} onClick={() => geh(rechnungSeite - 1)} style={pb(rechnungSeite > 0)}>‹ {lang === "en" ? "Back" : lang === "es" ? "Atrás" : "Zurück"}</button>
+                  <span style={{ fontSize: 13, color: muted, fontWeight: 600 }}>{lang === "en" ? `Page ${rechnungSeite + 1} of ${seiten}` : lang === "es" ? `Página ${rechnungSeite + 1} de ${seiten}` : `Seite ${rechnungSeite + 1} von ${seiten}`}</span>
+                  <button type="button" disabled={rechnungSeite >= seiten - 1} onClick={() => geh(rechnungSeite + 1)} style={pb(rechnungSeite < seiten - 1)}>{lang === "en" ? "Next" : lang === "es" ? "Siguiente" : "Weiter"} ›</button>
+                </nav>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2133,6 +2171,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           betrag={payingRate.betrag}
           verwendungszweck={payingRate.verwendungszweck}
           rateNummer={payingRate.rateNummer}
+          art={payingRate.art}
           onClose={() => setPayingRate(null)}
           dark={dk}
           lang={lang}
