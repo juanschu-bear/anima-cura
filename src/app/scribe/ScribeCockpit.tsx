@@ -1300,6 +1300,8 @@ export default function ScribeCockpit({
       ? { bisher: tagBisher, ersetzt: tagWahl.kind === "korrektur" ? tagWahl.ziel?.key ?? null : null, kind: tagWahl.kind, bezug: tagWahl.kind === "korrektur" ? tagWahl.ziel?.zeit ?? null : tagErster, fertig: false }
       : null;
   const zimmerFehlt = !zimmerVersionId && !entwurfId && !bestaetigt && !demo;
+  // Eine geänderte, schon bestätigte Dokumentation wird erst mit Grund zur neuen Version. Ohne Hinweis wirkte der gesperrte Knopf wie ein Fehler.
+  const grundFehlt = !!bestaetigt && dirty && !tagesModus && !aenderungsgrund.trim();
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
 
@@ -2564,7 +2566,7 @@ export default function ScribeCockpit({
               zimmerFehlt ||
               komposition.fehlt.length > 0 ||
               (!!bestaetigt && !dirty) ||
-              (!!bestaetigt && dirty && !tagesModus && !aenderungsgrund.trim()) ||
+              grundFehlt ||
               !nutzerKuerzel
             }
           >
@@ -2603,8 +2605,8 @@ export default function ScribeCockpit({
           {bestaetigt && !dirty && (
             <button className="neben" onClick={naechsterPatient}>Nächster Patient →</button>
           )}
-          {(komposition.fehlt.length > 0 || zimmerFehlt) && (
-            <span className="hinweis-fehlt">Gesperrt, fehlt: {[...komposition.fehlt, ...(zimmerFehlt ? [t('scribe.room.label')] : [])].join(", ")}</span>
+          {(komposition.fehlt.length > 0 || zimmerFehlt || grundFehlt) && (
+            <span className="hinweis-fehlt">Gesperrt, fehlt: {[...komposition.fehlt, ...(zimmerFehlt ? [t('scribe.room.label')] : []), ...(grundFehlt ? ["Änderungsgrund"] : [])].join(", ")}</span>
           )}
           {!nutzerKuerzel && (
             <span className="hinweis-fehlt">Gesperrt: Deinem persönlichen Mitarbeiterkonto fehlt ein Kürzel. Bitte Mitarbeiter wechseln oder das Kürzel in der Teamverwaltung hinterlegen.</span>
