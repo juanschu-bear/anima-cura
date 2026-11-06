@@ -1249,6 +1249,7 @@
 .scribe .tag-artwahl-label,.scribe .tag-uhrzeit span{font-family:var(--mono);font-size:11px;font-weight:700;
   letter-spacing:.14em;text-transform:uppercase;color:var(--gedeckt)}
 .scribe .tag-artwahl .wahlzeile{gap:8px}
+.scribe .grund-wahl .freitext{flex:1 1 240px}
 .scribe .tag-uhrzeit{display:inline-flex;align-items:center;gap:10px}
 .scribe .tag-uhrzeit input{width:auto;min-width:112px;font-family:var(--mono);font-size:13px;padding:8px 10px;color-scheme:dark}
 .scribe[data-thema="hell"] .tag-uhrzeit input{color-scheme:light}

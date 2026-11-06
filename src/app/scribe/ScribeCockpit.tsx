@@ -245,6 +245,9 @@ function korrigiereWort(original: string, wortschatz: string[]): string {
   return original.replace(kern, kandidat);
 }
 
+/** Häufige Gründe für eine neue Version, zum Antippen. Der Grund kommt ins Protokoll; Eintippen bleibt möglich, wenn keiner passt. */
+const AENDERUNGSGRUENDE = ["Ergänzung", "Tippfehler", "Falscher Zahn", "Falscher Wert"];
+
 function korrigiereFreitext(input: string, wortschatz: string[]): string {
   return input
     .split(/(\s+)/)
@@ -271,7 +274,7 @@ const SPICKZETTEL: { bereich: (typeof SPICK_BEREICHE)[number]; frage: string; an
   { bereich: "Patient & Termin", frage: "Warum sehe ich manche Leistungen bei diesem Patienten nicht?", antwort: "Altersregeln. Beispiel: IP-Prophylaxe ist Kassenleistung für 6- bis 17-Jährige und erscheint nur bei passendem Alter." },
   { bereich: "Patient & Termin", frage: "Wie setze ich Zähne?", antwort: "Im Zahnbogen oder im FDI-Raster anklicken, beides ist synchron. Gewählte Zähne bekommen im Bogen ein goldenes Attachment aufgesetzt, die Zahnliste landet automatisch im Text." },
   { bereich: "Eintrag & Versionen", frage: "Was passiert beim Bestätigen?", antwort: "Der Eintrag wird als Version 1 revisionssicher in Anima gespeichert. Er ist damit Teil der Akte (Aufbewahrung 10 Jahre), aber noch NICHT in ivoris." },
-  { bereich: "Eintrag & Versionen", frage: "Ich habe etwas falsch eingetragen. Wie korrigiere ich?", antwort: "Einfach ändern. Der Knopf wird zu 'Als Version v2 bestätigen', ein Änderungsgrund ist Pflicht. Die alte Fassung bleibt sichtbar in der Historie, nichts wird gelöscht." },
+  { bereich: "Eintrag & Versionen", frage: "Ich habe etwas falsch eingetragen. Wie korrigiere ich?", antwort: "Einfach ändern. Der Knopf wird zu 'Als Version v2 bestätigen'. Dann einen Änderungsgrund antippen (Ergänzung, Tippfehler, Falscher Zahn, Falscher Wert) oder selbst eintippen, er ist Pflicht und kommt ins Protokoll. Die alte Fassung bleibt sichtbar in der Historie, nichts wird gelöscht." },
   { bereich: "Eintrag & Versionen", frage: "Warum kann ich nichts löschen?", antwort: "Patientenakten sind gesetzlich revisionssicher (§ 630f BGB). Einträge werden versioniert, nie gelöscht. Das schützt die Praxis bei Prüfungen und Streitfällen. Korrigieren ist ausdrücklich erlaubt, nur eben sichtbar." },
   { bereich: "ivoris & Abrechnung", frage: "Wann ist der Eintrag in ivoris?", antwort: "Erst nach Klick auf 'In ivoris-Akte schreiben'. Solange zeigt die Tagesliste 'noch nicht in ivoris'. Nachholen geht jederzeit: Patientenkarte in der Tagesliste anklicken, dort steht der Knopf." },
   { bereich: "ivoris & Abrechnung", frage: "Was bedeuten die Pillen in der Tagesliste?", antwort: "Rot pulsierend: handeln (Doku offen oder Push-Fehler). Bernstein: bestätigt, aber noch nicht in ivoris. Grün: in ivoris angekommen." },
@@ -2546,15 +2549,23 @@ export default function ScribeCockpit({
             </ArtWahl>
           )}
           {bestaetigt && dirty && !tagesModus && (
-            <input
-              className="freitext"
-              style={{ marginTop: 0, maxWidth: 420 }}
-              type="text"
-              placeholder="Änderungsgrund (Pflicht für neue Version)"
-              value={aenderungsgrund}
-              onChange={(e) => setAenderungsgrund(e.target.value)}
-              aria-label="Änderungsgrund"
-            />
+            <div className="tag-artwahl grund-wahl" role="group" aria-label="Änderungsgrund">
+              <span className="tag-artwahl-label">Änderungsgrund</span>
+              <div className="wahlzeile">
+                {AENDERUNGSGRUENDE.map((g) => (
+                  <button key={g} type="button" className="wahl" aria-pressed={aenderungsgrund.trim() === g} onClick={() => setAenderungsgrund(aenderungsgrund.trim() === g ? "" : g)} disabled={sendet}>{g}</button>
+                ))}
+              </div>
+              <input
+                className="freitext"
+                style={{ marginTop: 0, maxWidth: 420 }}
+                type="text"
+                placeholder="Oder eigenen Grund eintippen"
+                value={aenderungsgrund}
+                onChange={(e) => setAenderungsgrund(e.target.value)}
+                aria-label="Eigener Änderungsgrund"
+              />
+            </div>
           )}
           <button
             className="haupt"
