@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
 import { resolveOpenItemAmount, resolvePaidItemAmount, resolveOpenItemStatus } from "@/lib/open-items";
 import { projectInvoicePaymentGuidance } from "@/lib/patient-payment-guidance";
+import { createServerComponentClient } from "@/lib/db/supabase-server";
+import { attachPatientInvoiceDocuments, type PatientInvoiceDocument } from "@/lib/patient-invoice-documents";
 
 export async function GET() {
-  const patient = await requirePatient();
-  if (patient instanceof NextResponse) return patient;
+  const session = createServerComponentClient();
+  const {data:{user},error:authError}=await session.auth.getUser();
+  if(authError||!user)return NextResponse.json({code:"sign_in_required"},{status:401});
+  const {data:profile,error:profileError}=await session.from("user_profiles").select("role,patient_id").eq("id",user.id).maybeSingle();
+  // Invoice reads never repair/reassign a profile from editable user metadata.
+  if(profileError||profile?.role!=="patient"||!profile.patient_id)return NextResponse.json({code:"patient_invoice_forbidden"},{status:403});
+  const patient={patientId:profile.patient_id as string};
 
   const supabase = createServerClient();
 
-  const [postenResult, patientResult, directDebitResult] = await Promise.all([
+  const [postenResult, patientResult, directDebitResult, documentsResult] = await Promise.all([
     supabase
       .from("offene_posten")
       .select("id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
@@ -30,6 +36,8 @@ export async function GET() {
       .eq("status", "aktiv")
       .eq("sepa_mandat", true)
       .limit(1),
+    // Uses the patient's session. No service-role access to the billing module.
+    session.rpc("patient_invoice_documents"),
   ]);
 
   const { data: posten, error } = postenResult;
@@ -55,10 +63,11 @@ export async function GET() {
   const hasActiveDirectDebit = (directDebitResult.data?.length ?? 0) > 0;
 
   return NextResponse.json({
-    rechnungen: projectInvoicePaymentGuidance(normalized, availableCredit, hasActiveDirectDebit).slice(0, 20),
+    rechnungen: attachPatientInvoiceDocuments(projectInvoicePaymentGuidance(normalized, availableCredit, hasActiveDirectDebit), documentsResult.error ? [] : (documentsResult.data ?? []) as PatientInvoiceDocument[]),
+    belegeStatus: documentsResult.error ? "unavailable" : "available",
     zahlungsprofil: {
       guthaben: Math.max(0, availableCredit),
       lastschrift_aktiv: hasActiveDirectDebit,
     },
-  });
+  }, {headers: {"Cache-Control":"private, no-store", "Vary":"Cookie", "X-Content-Type-Options":"nosniff"}});
 }

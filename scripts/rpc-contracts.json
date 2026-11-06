@@ -372,6 +372,30 @@
           "role": "service_role"
         }
       ]
+    },
+    {
+      "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
+      "sha256": "d688a5dc38f6f87f8171f1953d09c580e5fabfeeb4bdd2923d3727309d33f2de",
+      "proof": "createServerComponentClient uses the existing authenticated cookie/JWT; auth.getUser verifies the session. The RPC accepts only a document UUID and checks ownership through auth.uid() and the authoritative patient profile. No service client or client-provided patient ID.",
+      "calls": [
+        {
+          "name": "patient_invoice_document_pdf",
+          "signature": "public.patient_invoice_document_pdf(document_id uuid)",
+          "role": "authenticated"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patient/rechnungen/route.ts",
+      "sha256": "7cba054e0ca7f36d3b2d2150a7717605daebad987921b1d1f466d98a3a1fc7ba",
+      "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The RPC executes as abrechnung_runtime, checks auth.uid() and never accepts a patient ID.",
+      "calls": [
+        {
+          "name": "patient_invoice_documents",
+          "signature": "public.patient_invoice_documents()",
+          "role": "authenticated"
+        }
+      ]
     }
   ],
   "proofs": [
@@ -442,6 +466,10 @@
     {
       "file": "src/lib/services/animasign-signature-reconciliation.ts",
       "sha256": "e6f50347c18cc558ce7db14d8c39acb5902d8f22ef38f40bd084ff99935e8195"
+    },
+    {
+      "file": "src/lib/db/supabase-server.ts",
+      "sha256": "9babb090f6f362a350c4cd6f6763f5f8981cf2996259b6fbc94b8860db571fff"
     }
   ],
   "boundaries": [
