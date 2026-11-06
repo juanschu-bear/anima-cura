@@ -28,11 +28,14 @@ interface Notif { id: string; typ: string; titel: string; text: string; gelesen:
 interface Doc { id: string; name: string; typ: string; anzeige_typ?: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
-interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean }
+interface BelegPosition { datum: string | null; nr: string | null; text: string; region: string | null; anzahl: number; anzahlText: string; punkte: number | null; faktor: number | null; eur: number | null; abschnitt: string; tarif: string; begruendungen: string[] }
+/** Originalrechnung aus der Praxisabrechnung (Vertrag: Leitstand docs/2026-11-06-invoice-startbestand-contract.md). */
+interface Beleg { id: string; quartal: string; art: "BEMA" | "GOZ"; pdf: true; pdfUrl: string; positionen: BelegPosition[]; begruendungen: { key: string; text: string }[] }
+interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
-const fmtDateL = (d: string, l: string) => { try { return new Date(d).toLocaleDateString(getLocale(l), { day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
+const fmtDateL = (d: string, l: string) => { try { return new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + "T12:00:00Z" : d).toLocaleDateString(getLocale(l), { day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
 const fmtShortL = (d: string, l: string) => { try { return new Date(d).toLocaleDateString(getLocale(l), { day: "numeric", month: "short" }); } catch { return d; } };
 const fmtTimeL = (d: string, l: string) => { try { return new Date(d).toLocaleTimeString(getLocale(l), { hour: "2-digit", minute: "2-digit" }); } catch { return d; } };
 const fmtEuro = (n: number) => n.toLocaleString("de-DE") + " €";
@@ -88,6 +91,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
+  const [offenerBeleg, setOffenerBeleg] = useState<string | null>(null);
+  const [alleRechnungen, setAlleRechnungen] = useState(false);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number } | null>(null);
@@ -501,6 +506,50 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const hd: React.CSSProperties = { fontFamily: "'Fraunces', serif" };
   const lb: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: muted };
   const card: React.CSSProperties = { borderRadius: 18, padding: 22, marginBottom: 14, background: cardBg, border: "1px solid " + border, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" };
+  /** Originalrechnung mit allen Positionen, zum Einreichen bei der Versicherung. */
+  const belegDetail = (b: Beleg) => {
+    const L = (de: string, en: string, es: string) => (lang === "en" ? en : lang === "es" ? es : de);
+    const num = (n: number) => n.toLocaleString(getLocale(lang), { maximumFractionDigits: 4 });
+    const eur = (n: number) => n.toLocaleString(getLocale(lang), { style: "currency", currency: "EUR" });
+    const datum = (d: string) => { try { return new Date(d.length === 10 ? d + "T12:00:00Z" : d).toLocaleDateString(getLocale(lang), { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return d; } };
+    const q = b.quartal.match(/^(\d{4})-Q([1-4])$/);
+    const ort = (r: string | null) => !r ? null : r === "both" ? "OK + UK" : r === "OK" || r === "UK" ? r : L("Zahn", "Tooth", "Diente") + " " + r;
+    return (
+      <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+        <div style={{ fontSize: 11, color: muted }}>
+          {b.art === "GOZ" ? L("Privatrechnung", "Private invoice", "Factura privada") : L("Kassenrechnung, Eigenanteil", "Statutory insurance invoice, own share", "Factura de la caja, parte propia")}
+          {" · "}{L("Quartal", "Quarter", "Trimestre")} {q ? `${q[2]}/${q[1]}` : b.quartal}
+        </div>
+        <div style={{ borderRadius: 12, border: "1px solid " + border, overflow: "hidden" }}>
+          {b.positionen.map((p, k) => (
+            <div key={k} style={{ padding: "9px 12px", borderTop: k > 0 ? "1px solid " + border : "none", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: fg, lineHeight: 1.35 }}>
+                  {p.nr ? p.nr + " · " : ""}{p.text}
+                  {p.begruendungen.length > 0 && <sup style={{ color: warn, marginLeft: 2 }}>{p.begruendungen.join(",")}</sup>}
+                </div>
+                <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
+                  {[p.datum ? datum(p.datum) : null, ort(p.region), L("Menge", "Qty", "Cantidad") + " " + p.anzahlText,
+                    p.faktor !== null ? L("Faktor", "Factor", "Factor") + " " + num(p.faktor) : p.punkte !== null ? num(p.punkte) + " " + L("Punkte", "points", "puntos") : null]
+                    .filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: fg, whiteSpace: "nowrap" }}>{p.eur !== null ? eur(p.eur) : ""}</div>
+            </div>
+          ))}
+        </div>
+        {b.begruendungen.length > 0 && (
+          <div style={{ fontSize: 11, color: muted, display: "grid", gap: 2 }}>
+            {b.begruendungen.map(x => <div key={x.key}><b style={{ color: warn }}>{x.key}</b> {x.text}</div>)}
+          </div>
+        )}
+        <a href={b.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ justifySelf: "start", borderRadius: 999, padding: "10px 16px", background: grn, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+          {L("Rechnung als PDF", "Invoice as PDF", "Factura en PDF")}
+        </a>
+        <div style={{ fontSize: 11, color: muted }}>{L("Diese Rechnung kannst du bei deiner Versicherung einreichen.", "You can submit this invoice to your insurance.", "Puedes presentar esta factura a tu seguro.")}</div>
+      </div>
+    );
+  };
   const WelcomeGuide = showWelcomeGuide ? (
     <div style={{ position: "absolute", right: 16, bottom: 104, zIndex: 230, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, pointerEvents: "none" }}>
       {welcomeGuideExpanded && (
@@ -1207,13 +1256,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             </p>
           </div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
-            {rechnungen.slice(0, 6).map((r, i) => {
+            {(alleRechnungen ? rechnungen : rechnungen.slice(0, 6)).map((r, i) => {
               const settledByCredit = r.zahlungsmodus === "credit";
               const isDirectDebit = r.zahlungsmodus === "direct_debit";
-              const statusColor = r.status === "bezahlt" || settledByCredit ? grn : r.status === "teilbezahlt" || r.guthaben_angerechnet > 0 ? warn : fg;
-              const mainAmount = r.status === "bezahlt" ? r.betrag : r.zahlbetrag;
+              const isBeleg = r.status === "beleg";
+              const statusColor = isBeleg ? fg : r.status === "bezahlt" || settledByCredit ? grn : r.status === "teilbezahlt" || r.guthaben_angerechnet > 0 ? warn : fg;
+              const mainAmount = r.status === "bezahlt" || isBeleg ? r.betrag : r.zahlbetrag;
               const statusLabel =
-                r.status === "bezahlt"
+                isBeleg
+                  ? (lang === "en" ? "Invoice with all items" : lang === "es" ? "Factura con todas las posiciones" : "Rechnung mit allen Positionen")
+                : r.status === "bezahlt"
                   ? (lang === "en" ? "Paid" : lang === "es" ? "Pagado" : "Bezahlt")
                   : settledByCredit
                     ? (lang === "en" ? "Covered by credit" : lang === "es" ? "Cubierto por saldo" : "Durch Guthaben abgedeckt")
@@ -1222,18 +1274,20 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   : r.status === "teilbezahlt"
                     ? (lang === "en" ? "Partially paid" : lang === "es" ? "Parcialmente pagado" : "Teilbezahlt")
                     : (lang === "en" ? "Open" : lang === "es" ? "Pendiente" : "Offen");
+              const offen = !!r.beleg && offenerBeleg === r.id;
               return (
-                <div key={r.id} style={{ padding: "14px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none", display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" }}>
+                <div key={r.id} style={{ padding: "14px 0", borderTop: i > 0 ? "1px solid " + (dk ? "#252525" : "#f0e8dc") : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: fg }}>
                       {r.unser_zeichen || r.rechnung_nr || (lang === "en" ? "Invoice" : lang === "es" ? "Factura" : "Rechnung")}
                     </div>
                     <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
-                      {[r.typ?.toUpperCase() || null, r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
+                      {[isBeleg ? (r.beleg?.art ?? null) : (r.typ?.toUpperCase() || null), r.rechnung_datum ? fmtDateL(r.rechnung_datum, lang) : null].filter(Boolean).join(" · ")}
                     </div>
                     <div style={{ fontSize: 11, color: muted, marginTop: 4 }}>
                       {statusLabel}
-                      {r.gezahlt > 0 && r.status !== "bezahlt" ? ` · ${lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} ${fmtEuro(r.gezahlt)}` : ""}
+                      {r.gezahlt > 0 && r.status !== "bezahlt" && !isBeleg ? ` · ${lang === "en" ? "Already paid" : lang === "es" ? "Ya pagado" : "Bereits gezahlt"} ${fmtEuro(r.gezahlt)}` : ""}
                     </div>
                     {r.guthaben_angerechnet > 0 && r.status !== "bezahlt" && (
                       <div style={{ fontSize: 11, color: grn, marginTop: 4, fontWeight: 700 }}>
@@ -1249,7 +1303,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ ...hd, fontSize: 18, fontWeight: 800, color: statusColor }}>{fmtEuro(mainAmount)}</div>
                     <div style={{ fontSize: 10, color: muted, marginTop: 3 }}>
-                      {r.status === "bezahlt"
+                      {isBeleg
+                        ? (lang === "en" ? "Invoice amount" : lang === "es" ? "Importe de la factura" : "Rechnungsbetrag")
+                        : r.status === "bezahlt"
                         ? (r.bezahlt_am ? fmtShortL(r.bezahlt_am, lang) : statusLabel)
                         : settledByCredit
                           ? (lang === "en" ? "Nothing to transfer" : lang === "es" ? "Nada que transferir" : "Nichts zu überweisen")
@@ -1259,8 +1315,24 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     </div>
                   </div>
                 </div>
+                {r.beleg && (
+                  <button type="button" aria-expanded={offen} onClick={() => setOffenerBeleg(offen ? null : r.id)} style={{ marginTop: 10, borderRadius: 999, border: "1px solid " + border, padding: "8px 14px", background: "transparent", color: fg, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    {offen
+                      ? (lang === "en" ? "Close" : lang === "es" ? "Cerrar" : "Schließen")
+                      : (lang === "en" ? "Items and PDF" : lang === "es" ? "Posiciones y PDF" : "Positionen und PDF")}
+                  </button>
+                )}
+                {r.beleg && offen && belegDetail(r.beleg)}
+                </div>
               );
             })}
+            {rechnungen.length > 6 && (
+              <button type="button" onClick={() => setAlleRechnungen(v => !v)} style={{ width: "100%", padding: "12px 0", border: "none", borderTop: "1px solid " + (dk ? "#252525" : "#f0e8dc"), background: "transparent", color: grn, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {alleRechnungen
+                  ? (lang === "en" ? "Show fewer" : lang === "es" ? "Mostrar menos" : "Weniger anzeigen")
+                  : (lang === "en" ? `Show all ${rechnungen.length} invoices` : lang === "es" ? `Mostrar las ${rechnungen.length} facturas` : `Alle ${rechnungen.length} Rechnungen anzeigen`)}
+              </button>
+            )}
           </div>
         </div>
       )}
