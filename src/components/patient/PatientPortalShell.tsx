@@ -25,6 +25,8 @@ interface RpData {
 interface Phase { id: string; name: string; beschreibung: string | null; status: string; reihenfolge: number; start_datum: string | null; end_datum: string | null; video_url?: string | null }
 interface Badge { id: string; icon: string; titel: string; beschreibung: string; freigeschaltet: boolean }
 interface Msg { id: string; sender_type: string; sender_name: string | null; text: string; created_at: string }
+/** Terminbuchung der Praxis (auch in den Erinnerungen an Patienten). */
+const DOCTOLIB_URL = "https://www.doctolib.de/kieferorthopadie/leipzig/maria-elena-schubert/booking/patient-insurance-sector?specialityId=1325&telehealth=false&placeId=practice-270296&source=profile";
 interface Notif { id: string; typ: string; titel: string; text: string; gelesen: boolean; geoeffnet_am?: string | null; bestaetigt_am?: string | null; created_at: string }
 interface Doc { id: string; name: string; typ: string; anzeige_typ?: string; file_url: string | null; hochgeladen_am: string }
 interface Tipp { id: string; titel: string; text: string }
@@ -263,6 +265,10 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       if (document) setDocDrawer(document);
     } else if (section === "documents" || section === "invoices") {
       setTab("more");
+    } else if (section === "rechnungen") {
+      // Quartalsrechnungen mit Positionen: Liste im Bereich Fortschritt (Link aus der Mail „Deine Rechnungen sind da“).
+      setBalanceView(false); setTab("progress");
+      window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
     }
     deepLinkHandledRef.current = true;
   }, [docs, loading, searchParams]);
@@ -679,7 +685,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ── NOTIFICATIONS ──
   const renderNotif = (n: Notif, frueher: boolean) => (
     <div key={n.id} style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", opacity: frueher ? 0.6 : 1, background: cardBg, border: "1px solid " + (!frueher ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
-      <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
+      <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" || n.typ === "invoice_available" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           onClick={() => { hapticLight(); const auf = expandedNotif === n.id ? null : n.id; setExpandedNotif(auf); if (auf && !n.geoeffnet_am) markNotif(n.id, "geoeffnet"); }}
@@ -697,6 +703,12 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
               {n.typ === "balance" && (
                 <button onClick={() => { hapticLight(); setNOpen(false); setBalanceView(true); setTab("progress"); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#f6c453" }}>{lang === "en" ? "View balance \u2192" : lang === "es" ? "Ver saldo \u2192" : "Zum Guthaben \u2192"}</button>
+              )}
+              {n.typ === "invoice_available" && (
+                <button onClick={() => { hapticLight(); setNOpen(false); setBalanceView(false); setTab("progress"); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}>{lang === "en" ? "View invoices \u203a" : lang === "es" ? "Ver facturas \u203a" : "Rechnungen ansehen \u203a"}</button>
+              )}
+              {n.typ === "appointment_reminder" && (
+                <a href={DOCTOLIB_URL} target="_blank" rel="noopener noreferrer" onClick={() => hapticLight()} style={{ textDecoration: "none", fontSize: 12, fontWeight: 700, color: grn }}>{lang === "en" ? "Book an appointment \u203a" : lang === "es" ? "Reservar cita \u203a" : "Termin buchen \u203a"}</a>
               )}
               {!n.bestaetigt_am && (
                 <button onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); setExpandedNotif(null); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}>{"\u2713"} {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
@@ -1489,7 +1501,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       
       {/* Doctolib */}
       <div style={{ padding: "0 20px 8px" }}>
-        <a href="https://www.doctolib.de/kieferorthopadie/leipzig/maria-elena-schubert/booking/patient-insurance-sector?specialityId=1325&telehealth=false&placeId=practice-270296&source=profile" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, background: cardBg, border: "1px solid " + border, textDecoration: "none" }}>
+        <a href={DOCTOLIB_URL} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", borderRadius: 14, background: cardBg, border: "1px solid " + border, textDecoration: "none" }}>
           <span style={{ fontSize: 20 }}>📅</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: fg }}>{lang === "en" ? "Book an appointment" : lang === "es" ? "Reservar cita" : "Termin vereinbaren"}</div>
