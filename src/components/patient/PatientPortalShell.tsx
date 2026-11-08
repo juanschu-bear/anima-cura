@@ -683,9 +683,59 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   ) : null;
 
   // ── NOTIFICATIONS ──
-  const renderNotif = (n: Notif, frueher: boolean) => (
+  // Rechnungen und Kontrolltermin bekommen eine eigene Karte im Stil der Mail: kleines Bild, Titel in Fraunces, Text sofort lesbar, klare Knöpfe.
+  const notifTile = (typ: string) => (
+    <div aria-hidden style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, position: "relative", background: "linear-gradient(145deg,#5fd0a8,#0f8a72)", boxShadow: "0 8px 20px -10px #0f8a72" }}>
+      {typ === "invoice_available" ? (
+        <>
+          <div style={{ position: "absolute", left: 15, top: 8, width: 17, height: 22, borderRadius: 3, background: "rgba(255,255,255,0.45)" }} />
+          <div style={{ position: "absolute", left: 10, top: 12, width: 17, height: 22, borderRadius: 3, background: "#fffdf9", padding: "5px 3px 0", boxSizing: "border-box" }}>
+            {[9, 7, 8].map((w, i) => <div key={i} style={{ height: 2, width: w, borderRadius: 1, background: i === 2 ? "#22c55e" : "#d8d0c3", marginBottom: 3 }} />)}
+          </div>
+        </>
+      ) : (
+        <div style={{ position: "absolute", left: 10, top: 9, width: 22, height: 24, borderRadius: 4, overflow: "hidden", background: "#fffdf9" }}>
+          <div style={{ height: 7, background: "#16a34a" }} />
+          <div style={{ textAlign: "center", fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 13, lineHeight: "16px", color: "#0f2a22" }}>?</div>
+        </div>
+      )}
+    </div>
+  );
+  const renderRichNotif = (n: Notif, frueher: boolean) => {
+    const invoice = n.typ === "invoice_available";
+    const opened = () => { if (!n.geoeffnet_am) markNotif(n.id, "geoeffnet"); };
+    const pill: React.CSSProperties = { display: "inline-block", border: "none", borderRadius: 999, padding: "9px 15px", background: "linear-gradient(145deg,#22c55e,#15803d)", color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none", lineHeight: 1.2 };
+    return (
+      <div key={n.id} style={{ padding: 14, borderRadius: 16, marginBottom: 8, opacity: frueher ? 0.6 : 1, background: dk ? "linear-gradient(150deg, rgba(34,197,94,0.13), rgba(20,20,20,0.75) 60%)" : "linear-gradient(150deg, rgba(34,197,94,0.10), #fffdf9 60%)", border: "1px solid " + (!frueher ? (dk ? "rgba(74,222,128,0.22)" : "rgba(34,197,94,0.22)") : border) }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {notifTile(n.typ)}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 700, lineHeight: 1.25, color: fg }}>{n.titel}</div>
+            <div style={{ fontSize: 10.5, color: muted, marginTop: 3 }}>
+              {!frueher && <span style={{ display: "inline-block", marginRight: 6, padding: "1px 7px", borderRadius: 999, background: dk ? "rgba(74,222,128,0.16)" : "rgba(34,197,94,0.14)", color: grn, fontWeight: 700 }}>{lang === "en" ? "New" : lang === "es" ? "Nuevo" : "Neu"}</span>}
+              {fmtDateL(n.created_at, lang)}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 12.5, color: soft, lineHeight: 1.55, marginTop: 10 }}>{n.text}</div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+          {invoice ? (
+            <button onClick={() => { hapticLight(); opened(); setNOpen(false); setBalanceView(false); setTab("progress"); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250); }} style={pill}>{lang === "en" ? "View invoices →" : lang === "es" ? "Ver facturas →" : "Rechnungen ansehen →"}</button>
+          ) : (
+            <a href={DOCTOLIB_URL} target="_blank" rel="noopener noreferrer" onClick={() => { hapticLight(); opened(); }} style={pill}>{lang === "en" ? "Book on Doctolib →" : lang === "es" ? "Reservar en Doctolib →" : "Termin bei Doctolib →"}</a>
+          )}
+          {!n.bestaetigt_am && (
+            <button onClick={() => { hapticLight(); opened(); markNotif(n.id, "bestaetigt"); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: soft }}>
+              {invoice ? (lang === "en" ? "✓ Got it" : lang === "es" ? "✓ Entendido" : "✓ Verstanden") : (lang === "en" ? "✓ Already booked" : lang === "es" ? "✓ Ya reservé" : "✓ Schon gebucht")}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+  const renderNotif = (n: Notif, frueher: boolean) => n.typ === "invoice_available" || n.typ === "appointment_reminder" ? renderRichNotif(n, frueher) : (
     <div key={n.id} style={{ padding: 14, borderRadius: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start", opacity: frueher ? 0.6 : 1, background: cardBg, border: "1px solid " + (!frueher ? (dk ? "rgba(74,222,128,0.2)" : "rgba(34,197,94,0.15)") : border) }}>
-      <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" || n.typ === "invoice_available" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
+      <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: n.typ === "warnung" ? red : n.typ === "eingang" ? grn : n.typ === "balance" ? "#f6c453" : warn }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           onClick={() => { hapticLight(); const auf = expandedNotif === n.id ? null : n.id; setExpandedNotif(auf); if (auf && !n.geoeffnet_am) markNotif(n.id, "geoeffnet"); }}
@@ -703,12 +753,6 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
               {n.typ === "balance" && (
                 <button onClick={() => { hapticLight(); setNOpen(false); setBalanceView(true); setTab("progress"); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#f6c453" }}>{lang === "en" ? "View balance \u2192" : lang === "es" ? "Ver saldo \u2192" : "Zum Guthaben \u2192"}</button>
-              )}
-              {n.typ === "invoice_available" && (
-                <button onClick={() => { hapticLight(); setNOpen(false); setBalanceView(false); setTab("progress"); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}>{lang === "en" ? "View invoices \u203a" : lang === "es" ? "Ver facturas \u203a" : "Rechnungen ansehen \u203a"}</button>
-              )}
-              {n.typ === "appointment_reminder" && (
-                <a href={DOCTOLIB_URL} target="_blank" rel="noopener noreferrer" onClick={() => hapticLight()} style={{ textDecoration: "none", fontSize: 12, fontWeight: 700, color: grn }}>{lang === "en" ? "Book an appointment \u203a" : lang === "es" ? "Reservar cita \u203a" : "Termin buchen \u203a"}</a>
               )}
               {!n.bestaetigt_am && (
                 <button onClick={() => { hapticLight(); markNotif(n.id, "bestaetigt"); setExpandedNotif(null); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: grn }}>{"\u2713"} {lang === "en" ? "Got it" : lang === "es" ? "Entendido" : "Verstanden"}</button>
