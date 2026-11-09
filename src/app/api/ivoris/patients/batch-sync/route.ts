@@ -1,3 +1,4 @@
+import {isPatientSyncCron,discoveryRows} from "@/lib/services/patient-sync-schedule";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
@@ -25,6 +26,7 @@ async function fetchIvorisPage(page: number) {
   const res = await fetch(url, {
     headers: { Authorization: `Basic ${basic}`, Accept: "application/json" },
     cache: "no-store",
+    signal:AbortSignal.timeout(15000),
   });
 
   if (!res.ok) throw new Error(`IVORIS page ${page}: HTTP ${res.status}`);
@@ -93,14 +95,17 @@ function buildPersonIdentityKey(patient: BatchPatientRow) {
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isPatientSyncCron(request,process.env.CRON_SECRET)) {
     const authError = await requirePraxisRole(["admin", "verwaltung"]);
     if (authError) return authError;
   }
 
   const { searchParams } = new URL(request.url);
-  const startPage = parseInt(searchParams.get("startPage") || "0", 10);
+  const startPage = Number(searchParams.get("startPage") || "0");
+  if(!Number.isSafeInteger(startPage)||startPage<0||startPage>100000)return NextResponse.json({error:"invalid_start_page"},{status:400});
+  const discoverOnly=searchParams.get("mode")==="discover";
+  const started=Date.now();
+  let nextPageNumber=startPage;
 
   const db = createServerClient();
   let totalFetched = 0;
@@ -111,15 +116,19 @@ export async function GET(request: Request) {
   const errors: string[] = [];
 
   for (let page = startPage; page < startPage + PAGES_PER_BATCH; page++) {
+    nextPageNumber=page;
+    if(Date.now()-started>200000)break;
     let patients: any[];
     try {
       patients = await fetchIvorisPage(page);
     } catch (e) {
-      errors.push(String(e));
-      continue;
+      errors.push(`IVORIS page ${page}: request failed`);
+      break;
     }
 
-    if (!Array.isArray(patients) || patients.length === 0) {
+    if(!Array.isArray(patients)){errors.push(`IVORIS page ${page}: invalid response`);break;}
+    nextPageNumber=page+1;
+    if (patients.length === 0) {
       reachedEnd = true;
       break;
     }
@@ -174,6 +183,10 @@ export async function GET(request: Request) {
         .filter((value): value is string => Boolean(value))
     );
 
+    // Discovery must not rewrite existing clinical/contact fields every 15 minutes.
+    const importRows=discoverOnly?discoveryRows(normalizedRows,existingByIvorisId,knownAliasIds):normalizedRows;
+    if(discoverOnly)totalSkipped+=normalizedRows.length-importRows.length;
+    if(!importRows.length)continue;
     let birthdayCandidates: ExistingPatientCandidate[] = [];
     if (birthdays.length > 0) {
       const { data: sameBirthdayRows, error: sameBirthdayError } = await db
@@ -192,7 +205,7 @@ export async function GET(request: Request) {
 
     const rows: BatchPatientRow[] = [];
     const queuedIdentityKeys = new Set<string>();
-    for (const row of normalizedRows) {
+    for (const row of importRows) {
       const identityKey = buildPersonIdentityKey(row);
 
       if (knownAliasIds.has(row.ivoris_id)) {
@@ -295,7 +308,7 @@ export async function GET(request: Request) {
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  const nextPage = reachedEnd ? null : startPage + PAGES_PER_BATCH;
+  const nextPage = reachedEnd ? null : nextPageNumber;
 
   return NextResponse.json({
     ok: true,
