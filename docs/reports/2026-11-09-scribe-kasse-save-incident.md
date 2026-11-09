@@ -1,6 +1,6 @@
 # Speicherfehler Scribe und Kasse — 09.11.2026
 
-## Befund aus Production, nur lesend
+## Befund vor der Korrektur aus Production, nur lesend
 
 `doku_eintraege_behandlungsart_check` erlaubt ausschließlich `aligner`, `removable`, `multiband`. Aktive Vorlagen enthalten zusätzlich sieben `custom-{UUID}`-Behandlungsarten. Migration 052 hatte die Beschränkung bei Vorlagen/Optionen/Praxispass entfernt, aber nicht bei den Einträgen. Die eigene Behandlungsart wird daher beim Speichern abgelehnt, obwohl sie auswählbar ist.
 
@@ -22,4 +22,12 @@ Beide alten Constraints mit synthetischen Daten in isoliertem PostgreSQL (PGlite
 
 399 Tests erfolgreich, Build erfolgreich. `npm test` endet beim abschließenden Live-RPC-Audit mit zwei schon fehlenden Rechnungsdesign-Funktionen (`patient_invoice_document_edition`, `patient_invoice_document_editions`, aus noch nicht installierter Leitstand-Migration 027). Keine Prüfregel übersprungen oder gelockert. Der Scribe-/Kassen-Fix führt keine neue RPC ein.
 
-SQL-Ausführung zum Commit-Zeitpunkt noch offen: Chrome wurde während der Vorbereitung vom Benutzer gewechselt. Keine Ausführung ohne Kontrolle des richtigen Editors. Nachprüfung und Deployment werden nach Abschluss ergänzt.
+## Production-Abschluss am 09.11.2026
+
+077 nach erneutem SHA-256-Abgleich unverändert im SQL-Editor des Projekts `zymqxzhjbcxzhzvjqvbv`, main/PRODUCTION, ausgeführt: `Success. No rows returned`. Die anschließende lesende Prüfung über `pg_get_constraintdef` bestätigt beide neuen Definitionen mit `convalidated = true`. Die übrigen acht CHECK-Constraints sind unverändert, einschließlich `betrag > 0`.
+
+Vorlagenabgleich: 10 aktive Behandlungsarten, 10 durch die neue Prüfung unterstützt, 0 nicht unterstützte aktive Vorlagen. Keine echten Scribe-Einträge oder Kassenbuchungen zum Test angelegt. Damit sind die zwei gemeldeten Constraint-Ursachen beseitigt; ein vollständiger Bedienablauf mit echter Praxisbuchung wurde nicht durchgeführt.
+
+Code `af738e9` ist als Production-Deployment READY bereitgestellt, einschließlich `animacura.io` und `scribe.animacura.io`: `https://anima-cura-qssh9aq17-juanschu-bears-projects.vercel.app`. Der Schutz beim Patientenwechsel ist darin enthalten. Bereits offene Cockpits müssen den neuen Code laden; vor dem Neuladen noch ungespeicherten Text sichern.
+
+Lokaler Screenshot der installierten und validierten Regeln: `/tmp/anima-save-077-verification.png`.
