@@ -16,7 +16,7 @@ export async function GET() {
 
   const supabase = createServerClient();
 
-  const [postenResult, patientResult, directDebitResult, documentsResult] = await Promise.all([
+  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult] = await Promise.all([
     supabase
       .from("offene_posten")
       .select("id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
@@ -38,6 +38,7 @@ export async function GET() {
       .limit(1),
     // Uses the patient's session. No service-role access to the billing module.
     session.rpc("patient_invoice_documents"),
+    session.rpc("patient_invoice_document_editions"),
   ]);
 
   const { data: posten, error } = postenResult;
@@ -62,8 +63,10 @@ export async function GET() {
   const availableCredit = Number(patientResult.data?.guthaben ?? 0);
   const hasActiveDirectDebit = (directDebitResult.data?.length ?? 0) > 0;
 
+  const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
+  const documents:PatientInvoiceDocument[]=documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)}));
   return NextResponse.json({
-    rechnungen: attachPatientInvoiceDocuments(projectInvoicePaymentGuidance(normalized, availableCredit, hasActiveDirectDebit), documentsResult.error ? [] : (documentsResult.data ?? []) as PatientInvoiceDocument[]),
+    rechnungen: attachPatientInvoiceDocuments(projectInvoicePaymentGuidance(normalized, availableCredit, hasActiveDirectDebit), documents),
     belegeStatus: documentsResult.error ? "unavailable" : "available",
     zahlungsprofil: {
       guthaben: Math.max(0, availableCredit),

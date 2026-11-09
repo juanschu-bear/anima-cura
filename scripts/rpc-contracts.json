@@ -375,24 +375,34 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
-      "sha256": "d688a5dc38f6f87f8171f1953d09c580e5fabfeeb4bdd2923d3727309d33f2de",
-      "proof": "createServerComponentClient uses the existing authenticated cookie/JWT; auth.getUser verifies the session. The RPC accepts only a document UUID and checks ownership through auth.uid() and the authoritative patient profile. No service client or client-provided patient ID.",
+      "sha256": "90ca01a924cb69a81e51039b8801a879e356e016cc3b699526ca2b2ebdd4091a",
+      "proof": "createServerComponentClient uses the existing authenticated cookie/JWT; auth.getUser verifies the session. The RPC accepts only a document UUID and checks ownership through auth.uid() and the authoritative patient profile. No service client or client-provided patient ID. Edition RPC uses the same authenticated patient session; SECURITY DEFINER is owned by restricted abrechnung_runtime and checks auth.uid()/patient profile. No privileged retry.",
       "calls": [
         {
           "name": "patient_invoice_document_pdf",
           "signature": "public.patient_invoice_document_pdf(document_id uuid)",
+          "role": "authenticated"
+        },
+        {
+          "name": "patient_invoice_document_edition",
+          "signature": "public.patient_invoice_document_edition(document_id uuid, original_only boolean)",
           "role": "authenticated"
         }
       ]
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "7cba054e0ca7f36d3b2d2150a7717605daebad987921b1d1f466d98a3a1fc7ba",
-      "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The RPC executes as abrechnung_runtime, checks auth.uid() and never accepts a patient ID.",
+      "sha256": "650f958925cec395f6fbea75e89cd2be93533bf9a954f46ff872bc0fa431e362",
+      "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The RPC executes as abrechnung_runtime, checks auth.uid() and never accepts a patient ID. Edition RPC uses the same authenticated patient session; SECURITY DEFINER is owned by restricted abrechnung_runtime and checks auth.uid()/patient profile. No privileged retry.",
       "calls": [
         {
           "name": "patient_invoice_documents",
           "signature": "public.patient_invoice_documents()",
+          "role": "authenticated"
+        },
+        {
+          "name": "patient_invoice_document_editions",
+          "signature": "public.patient_invoice_document_editions()",
           "role": "authenticated"
         }
       ]
@@ -470,6 +480,10 @@
     {
       "file": "src/lib/db/supabase-server.ts",
       "sha256": "9babb090f6f362a350c4cd6f6763f5f8981cf2996259b6fbc94b8860db571fff"
+    },
+    {
+      "file": "src/lib/patient-invoice-documents.ts",
+      "sha256": "284171c1c6660829fb4515dd24b8a81a93e6da7b78fa1800b78d44587dbc29bf"
     }
   ],
   "boundaries": [
@@ -482,6 +496,7 @@
     "retryPendingAnimaSignSyncs",
     "retryPendingScribeIvorisPushes",
     "ensureLinkedLocalPatientForSubmission",
-    "reconcilePendingAnimaSignSignatures"
+    "reconcilePendingAnimaSignSignatures",
+    "resolvePatientInvoicePdf"
   ]
 }

@@ -1,5 +1,6 @@
 /** Patient API projection. Only the JWT-scoped RPC may supply these records. */
 export type PatientInvoiceDocument = {
+  edition?: {delivered:"original"|"typeset";typesetAvailable:boolean};
   id: string; invoiceNumber: string; date: string; reference: string | null;
   quarter: string; art: "BEMA" | "GOZ"; patientCents: number | null; grossCents: number | null;
   linkedOpenItemId: string | null;
@@ -15,7 +16,30 @@ export function patientInvoiceProof(document: PatientInvoiceDocument) {
       punkte: p.points, faktor: p.factor, eur: p.cents === null ? null : p.cents / 100,
       abschnitt: p.section, tarif: p.tariff, begruendungen: p.reasonRefs})),
     begruendungen: document.reasons.map(r => ({key: r.key, text: r.text})),
-    pdfUrl: `/api/patient/rechnungen/${document.id}/pdf`};
+    pdfUrl: `/api/patient/rechnungen/${document.id}/pdf`,
+    edition:{delivered:document.edition?.delivered??"original",typesetAvailable:document.edition?.typesetAvailable??false,
+      pdfUrl:`/api/patient/rechnungen/${document.id}/pdf`,originalPdfUrl:`/api/patient/rechnungen/${document.id}/pdf?original=1`}};
+}
+/** Both calls use the authenticated patient client. Never retry with a privileged client. */
+export async function resolvePatientInvoicePdf(rpc:(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:{code?:string}|null}>,id:string,originalOnly=false){
+  if(!originalOnly){
+    const result=await rpc("patient_invoice_document_edition",{document_id:id,original_only:false});
+    if(result.error?.code==="42501")return {error:"patient_invoice_forbidden" as const,status:403};
+    if(!result.error){
+      if(result.data===null)return {error:"invoice_not_found" as const,status:404};
+      const value=result.data as {edition?:string;pdf?:string};
+      if((value.edition==="original"||value.edition==="typeset")&&typeof value.pdf==="string"){
+        const bytes=Buffer.from(value.pdf,"base64");
+        if(bytes.subarray(0,5).toString()==="%PDF-")return {bytes,edition:value.edition};
+      }
+    }
+  }
+  const result=await rpc("patient_invoice_document_pdf",{document_id:id});
+  if(result.error)return {error:result.error.code==="42501"?"patient_invoice_forbidden":"invoice_source_unavailable",status:result.error.code==="42501"?403:503};
+  if(typeof result.data!=="string"||!result.data)return {error:"invoice_not_found",status:404};
+  const bytes=Buffer.from(result.data,"base64");
+  if(bytes.subarray(0,5).toString()!=="%PDF-")return {error:"invoice_source_unavailable",status:503};
+  return {bytes,edition:"original"};
 }
 export function attachPatientInvoiceDocuments<T extends {id:string;rechnung_nr?:string|null}>(items:T[],documents:PatientInvoiceDocument[]) {
   const linked=new Set<string>();
