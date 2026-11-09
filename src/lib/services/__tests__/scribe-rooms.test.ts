@@ -9,7 +9,8 @@ test('room can be selected before the patient; explicit patient switch still cle
   assert.match(ui,/disabled=\{sendet \|\| speichert\} \/>/);
   assert.doesNotMatch(ui,/disabled=\{sendet \|\| speichert \|\| !patient\}/);
   assert.match(ui,/setPatient\(t\); setTreffer\(\[\]\); resetSitzung\(true\)/);
-  assert.match(ui,/setPatient\(null\); setSuche\(""\); resetSitzung\(\)/);
+  assert.match(ui,/onClick=\{naechsterPatient\}/);
+  assert.match(ui,/async function naechsterPatient\(\) \{\s*if\(!await wechselSichern\(\)\)return;\s*resetSitzung\(\);\s*setPatient\(null\)/);
 });
 
 test('room input rejects malformed and missing values; legacy absence remains valid',()=>{

@@ -9,6 +9,7 @@ import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
+import {protectScribeDeparture} from '@/lib/scribe-departure';
 import { t } from '@/lib/i18n';
 import { scribeAppointmentTypeDisplayName } from '@/lib/scribe-appointment-type';
 import { ArtWahl, KarteBisher, OffeneTeile, TagFehler, TagesLeistungen, bisherAusTag, ergaenzeTag, gleicherTag, korrekturZiele, useRaumNamen, useTagesdatensatz, type BisherTeil, type DayDraftContent, type DayPreview, type EntscheidungErgebnis, type Kind as TagArt, type TargetOption } from './ScribeDayRecord';
@@ -833,6 +834,7 @@ export default function ScribeCockpit({
   }
 
   function bearbeitet() {
+    setZwischenInfo(null);
     setAktionsFehler(null);
     if (bestaetigt) {
       setDirty(true);
@@ -1376,7 +1378,28 @@ export default function ScribeCockpit({
     await ladeHeute();
   }
 
-  function naechsterPatient() {
+  const departureBusy=useRef(false);
+  const latestDraftFingerprint=useRef('');
+  latestDraftFingerprint.current=JSON.stringify({patientId:patient?.id,day:listenDatum,content:tagesInhalt(),extra:ausnahme});
+  const unsavedDeparture=!!patient&&(bestaetigt?dirty:module.length>0&&!zwischenInfo);
+  useEffect(()=>{
+    if(!unsavedDeparture)return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
+  },[unsavedDeparture]);
+  async function wechselSichern(){
+    if(departureBusy.current)return false;
+    departureBusy.current=true;
+    const snapshot=latestDraftFingerprint.current;
+    try{
+      const outcome=await protectScribeDeparture({busy:sendet||speichert,hasPatient:!!patient,confirmed:!!bestaetigt,changed:dirty,hasContent:module.length>0||!!ausnahme.trim()||!!naechsterTermin.trim(),demo},zwischenspeichern);
+      if(outcome==='confirm_changes'){setAktionsFehler(t('scribe.save.confirmBeforeLeaving'));return false;}
+      if(outcome==='leave'&&snapshot!==latestDraftFingerprint.current){setAktionsFehler(t('scribe.save.changedDuringSave'));return false;}
+      return outcome==='leave';
+    }finally{departureBusy.current=false;}
+  }
+  async function naechsterPatient() {
+    if(!await wechselSichern())return;
     resetSitzung();
     setPatient(null);
     setSuche("");
@@ -1606,19 +1629,20 @@ export default function ScribeCockpit({
 
   // Zwischenspeichern: aktuellen Stand als Entwurf sichern, ohne Pflichtpruefung, ohne ivoris.
   // Mehrfaches Speichern aktualisiert denselben Entwurf (entwurfId).
-  async function zwischenspeichern() {
-    if (!zimmerVersionId && !entwurfId && !demo) { setAktionsFehler(t('scribe.room.required')); return; }
+  async function zwischenspeichern():Promise<boolean> {
+    if (!zimmerVersionId && !entwurfId && !demo) { setAktionsFehler(t('scribe.room.required')); return false; }
     if (!patient || module.length === 0) {
       setAktionsFehler("Zum Zwischenspeichern bitte zuerst Patient und Leistung waehlen.");
-      return;
+      return false;
     }
     if (demo) {
       setZwischenInfo(new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
       setAktionsFehler(null);
-      return;
+      return true;
     }
     setSpeichert(true);
     setAktionsFehler(null);
+    try {
     const res = await fetch("/api/doku/eintrag", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1648,21 +1672,25 @@ export default function ScribeCockpit({
         entwurf_id: entwurfId,
       }),
     });
-    setSpeichert(false);
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
       setAktionsFehler(json.error ?? "Zwischenspeichern fehlgeschlagen.");
-      return;
+      return false;
     }
     const json = await res.json();
     setEntwurfId(json.eintrag.id);
     setZwischenInfo(new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
-    await ladeHeute();
+    await ladeHeute().catch(()=>null);
+    return true;
+    } catch {
+      setAktionsFehler(t('scribe.save.failedRetained'));return false;
+    } finally {setSpeichert(false);}
   }
 
   // Einen gespeicherten Entwurf aus der Tagesliste zurueck in die Eingabemaske laden.
-  function entwurfLaden(e: TagesEintrag) {
-    if (e.status !== "entwurf") return;
+  async function entwurfLaden(e: TagesEintrag) {
+    if (e.status !== "entwurf" || e.id===entwurfId) return;
+    if(!await wechselSichern())return;
     setZimmerVersionId(e.zimmer_version_id ?? '');
     const alter = e.patients?.geburtsdatum ? berechneAlter(e.patients.geburtsdatum) : null;
     setPatient({ id: e.patient_id, name: e.patients ? `${e.patients.vorname} ${e.patients.nachname}` : "Unbekannt", alter });
@@ -1736,6 +1764,7 @@ export default function ScribeCockpit({
   }
 
   async function abmelden() {
+    if(!await wechselSichern())return;
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
     router.push("/scribe/login");
@@ -1976,7 +2005,7 @@ export default function ScribeCockpit({
               {patient ? (
                 <div className="gewaehlt">
                   {patient.name}{patient.alter !== null && <span style={{ color: "var(--gedeckt)", fontWeight: 400 }}>&nbsp;· {patient.alter} J.</span>}
-                  <button onClick={() => { setPatient(null); setSuche(""); resetSitzung(); }}>wechseln</button>
+                  <button onClick={naechsterPatient}>wechseln</button>
                 </div>
               ) : (
                 <>
@@ -1991,7 +2020,7 @@ export default function ScribeCockpit({
                     <ul className="suchliste">
                       {treffer.map((t) => (
                         <li key={t.id}>
-                          <button onClick={() => { setPatient(t); setTreffer([]); resetSitzung(true); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
+                          <button onClick={async () => { if(!await wechselSichern())return; setPatient(t); setTreffer([]); resetSitzung(true); }}>{t.name}{t.alter !== null && <span style={{ color: "var(--gedeckt)" }}> · {t.alter} J.</span>}</button>
                         </li>
                       ))}
                     </ul>

@@ -9,6 +9,10 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
   ...referenceTranslations,
+  'scribe.save.confirmBeforeLeaving': {de:'Die Änderungen sind noch nicht gespeichert. Bitte zuerst als neue Version oder Korrektur bestätigen. Der Text bleibt hier erhalten.',en:'Changes are not saved. Please confirm the new version or correction first. Your text remains here.'},
+  'scribe.save.changedDuringSave': {de:'Während des Speicherns wurde der Text geändert. Bitte erneut speichern; der Patientenwechsel wurde angehalten.',en:'The text changed while saving. Please save again; switching patients was stopped.'},
+  'scribe.save.failedRetained': {de:'Speichern ist gerade nicht möglich. Dein Text bleibt erhalten. Bitte erneut versuchen.',en:'Saving is currently unavailable. Your text is retained. Please try again.'},
+
   'scribe.day.cancel': { de: 'Abbrechen', en: 'Cancel' },
   'scribe.day.confirmNachtrag': { de: 'Als Nachtrag eintragen', en: 'Add as supplement' },
   'scribe.day.confirmKorrektur': { de: 'Als Korrektur eintragen', en: 'Add as correction' },
