@@ -1,5 +1,7 @@
+import {workspaceActor,requireWriter,workspaceError,ScribeWorkspaceError,storageError} from "@/lib/scribe-workspace-auth";
+import {changeTemplate,SCRIBE_PRACTICE} from "@/lib/scribe-template-history-service";
+import {randomUUID} from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 
 export const runtime = "nodejs";
@@ -19,10 +21,9 @@ type AddBody = {
 };
 
 // GET /api/doku/optionen  -> list active practice options for this practice (admin/overview)
-export async function GET() {
-  const auth = createServerComponentClient();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+async function getOptions() {
+  const actor=await workspaceActor();requireWriter(actor);
+  const user={id:actor.id!};
 
   const db = createServerClient();
   const { data, error } = await db
@@ -38,10 +39,9 @@ export async function GET() {
 }
 
 // POST /api/doku/optionen  -> add one practice option text to an existing group
-export async function POST(request: NextRequest) {
-  const auth = createServerComponentClient();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+async function postOption(request: NextRequest) {
+  const actor=await workspaceActor();requireWriter(actor);
+  const user={id:actor.id!};
 
   const body = (await request.json().catch(() => null)) as AddBody | null;
   if (!body) return NextResponse.json({ error: "Ungueltiger Body" }, { status: 400 });
@@ -124,24 +124,18 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, option: data });
 }
 
-// PATCH /api/doku/optionen  -> hide a practice option (soft delete) by id
-export async function PATCH(request: NextRequest) {
-  const auth = createServerComponentClient();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
-
-  const body = (await request.json().catch(() => null)) as { id?: string; aktiv?: boolean } | null;
-  if (!body?.id || typeof body.aktiv !== "boolean") {
-    return NextResponse.json({ error: "id und aktiv noetig" }, { status: 400 });
-  }
-
-  const db = createServerClient();
-  const { error } = await db
-    .from("doku_vorlagen_optionen")
-    .update({ aktiv: body.aktiv })
-    .eq("id", body.id)
-    .eq("praxis_id", PRAXIS_ID);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+// Compatibility adapter: all future hiding/restoring now creates immutable history.
+async function patchOption(request:NextRequest){
+ const actor=await workspaceActor();requireWriter(actor);
+ const body=await request.json().catch(()=>null);
+ if(!body?.id||typeof body.aktiv!=="boolean")throw new ScribeWorkspaceError("input_invalid");
+ const db=createServerClient();
+ const slot=await db.from("scribe_option_slots").select("template_id,option_key").eq("practice_option_id",body.id).eq("praxis_id",SCRIBE_PRACTICE).maybeSingle();
+ if(slot.error)storageError(slot.error);if(!slot.data)throw new ScribeWorkspaceError("option_not_found",404);
+ const latest=await db.from("scribe_option_changes").select("seq").eq("template_id",slot.data.template_id).eq("praxis_id",SCRIBE_PRACTICE).order("seq",{ascending:false}).limit(1);
+ if(latest.error)storageError(latest.error);
+ return NextResponse.json(await changeTemplate(actor.id!,{templateId:slot.data.template_id,optionKey:slot.data.option_key,requestId:body.requestId??randomUUID(),expectedRevision:body.expectedRevision??latest.data?.[0]?.seq??0,action:body.aktiv?"restore_practice":"hide"}));
 }
+export async function GET(){try{return await getOptions();}catch(e){return workspaceError(e);}}
+export async function POST(r:NextRequest){try{return await postOption(r);}catch(e){return workspaceError(e);}}
+export async function PATCH(r:NextRequest){try{return await patchOption(r);}catch(e){return workspaceError(e);}}

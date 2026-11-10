@@ -1,8 +1,8 @@
+import {workspaceActor} from "@/lib/scribe-workspace-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { getPracticeUpdateActor } from "@/lib/practice-update-auth";
 import {
-  canPublishPracticeUpdates,
   canReadPracticeUpdates,
   isVisiblePracticeUpdate,
   localizePracticeUpdate,
@@ -109,13 +109,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getPracticeUpdateActor().catch(() => null);
+  const user = await workspaceActor(request,true).catch(() => null);
   const language = request.nextUrl.searchParams.get("lang") === "en" ? "en" : "de";
   if (!user) {
     return NextResponse.json({ error: message(language, "Nicht autorisiert.", "Not authorized.") }, { status: 401, headers: noStore });
   }
-  if (!canPublishPracticeUpdates(user.role)) {
-    return NextResponse.json({ error: message(language, "Nur die Praxisleitung kann Neuerungen veröffentlichen.", "Only practice management can publish updates.") }, { status: 403, headers: noStore });
+  if (!user.developer) {
+    return NextResponse.json({ error: message(language, "Nur Entwickler können Neuerungen veröffentlichen.", "Only developers can publish updates.") }, { status: 403, headers: noStore });
   }
 
   const parsed = practiceUpdateCreateSchema.safeParse(await request.json().catch(() => null));

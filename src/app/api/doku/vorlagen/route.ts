@@ -1,3 +1,5 @@
+import {effectiveTemplates} from "@/lib/scribe-template-history-service";
+import {workspaceError,ScribeWorkspaceError} from "@/lib/scribe-workspace-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
@@ -37,7 +39,7 @@ type OptRow = {
   sort_index: number;
 };
 
-export async function GET(request: NextRequest) {
+async function getTemplates(request: NextRequest) {
   const headerToken = request.headers.get("x-praxis-pass-token");
   const urlToken = new URL(request.url).searchParams.get("token");
   const perToken = praxisPassTokenGueltig(headerToken) || praxisPassTokenGueltig(urlToken);
@@ -61,6 +63,10 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const vorlagen = (data ?? []) as VorlageRow[];
+  const historyRequested = request.nextUrl.searchParams.get("history") === "1";
+  const effective = historyRequested ? await effectiveTemplates(vorlagen) : null;
+  if(historyRequested && !effective) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
+  if(effective) return NextResponse.json({vorlagen:effective,capabilities:SCRIBE_CAPABILITIES,templateHistoryVersion:1},{headers:{"Cache-Control":"private, no-store"}});
 
   // Practice-added option texts (Weg B). Appended AFTER the seed opts of the
   // matching group, so seed indices stay stable (positionen.if and stored
@@ -90,3 +96,5 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ vorlagen, capabilities: SCRIBE_CAPABILITIES });
 }
+
+export async function GET(r:NextRequest){try{return await getTemplates(r);}catch(e){return workspaceError(e);}}

@@ -406,6 +406,54 @@
           "role": "authenticated"
         }
       ]
+    },
+    {
+      "file": "src/lib/scribe-template-history-service.ts",
+      "sha256": "a5918b70c09dd41c46ab28c8cc8d3b7b5f7996fcdc527be1553ab26d5921c1fe",
+      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "calls": [
+        {
+          "name": "scribe_template_change",
+          "signature": "public.scribe_template_change(p_actor uuid, p_practice text, p_request jsonb)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/scribe-inbox-store.ts",
+      "sha256": "8c2a76477624b45ec3bdcd8b9f70df444bd701a61be7dbeb2a43f65a20cce11f",
+      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "calls": [
+        {
+          "name": "scribe_inbox_commit",
+          "signature": "public.scribe_inbox_commit(p_entry jsonb, p_expected bigint, p_actor uuid, p_developer boolean, p_delete boolean)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/scribe-inbox-mail.ts",
+      "sha256": "75f2819baf785f8eebab9229ed32a222b996a7e823eee15064e56c2afe1fb068",
+      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "calls": [
+        {
+          "name": "scribe_claim_inbox_mail",
+          "signature": "public.scribe_claim_inbox_mail(p_entry uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/practice-notifications/route.ts",
+      "sha256": "faf43ee340b28a9dc9e6d0a9875d0acfc7ea414eee1581c34a8ea40a11394974",
+      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "calls": [
+        {
+          "name": "practice_mark_notifications",
+          "signature": "public.practice_mark_notifications(p_id uuid, p_before timestamp with time zone)",
+          "role": "authenticated"
+        }
+      ]
     }
   ],
   "proofs": [

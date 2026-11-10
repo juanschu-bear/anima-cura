@@ -25,7 +25,7 @@ export const scribeConsistencyTemplate = z.object({
     template: z.array(z.union([z.string(), z.object({ g: short })])),
     groups: z.record(z.object({
       type: z.enum(['single', 'multi']), req: z.boolean().optional(), explizit: z.boolean().optional(),
-      opts: z.array(z.object({ t: z.string(), id: z.string().optional() })),
+      opts: z.array(z.object({ t: z.string(), id: z.string().optional(), hidden: z.boolean().optional() })),
     })),
   }),
   positionen: z.array(rule),
@@ -128,7 +128,7 @@ export function assessScribeConsistency(raw: unknown, rawTemplates: unknown[]): 
     const rendered: string[] = [];
     for (const [name, indices] of Object.entries(selected)) {
       const group = groupNames.has(name) ? groups[name] : undefined;
-      if (!group || indices.some(i => i >= group.opts.length) || new Set(indices).size !== indices.length || (group.type === 'single' && indices.length > 1)) {
+      if (!group || indices.some(i => i >= group.opts.length || group.opts[i]?.hidden) || new Set(indices).size !== indices.length || (group.type === 'single' && indices.length > 1)) {
         add({code:'selection_invalid',scope:'selection',module:slug,group:name});
       }
     }

@@ -15,10 +15,12 @@ const visibleUpdate = {
   visible_until: "2026-12-01T00:00:00.000Z",
 };
 
-test("practice staff can read updates but only admins can publish them", () => {
+test("practice staff can read updates but only explicit developers can publish them", () => {
   for (const role of ["admin", "verwaltung", "lesezugriff"] as const) assert.equal(canReadPracticeUpdates(role), true);
   assert.equal(canReadPracticeUpdates("patient"), false);
-  assert.equal(canPublishPracticeUpdates("admin"), true);
+  assert.equal(canPublishPracticeUpdates("admin"), false);
+  assert.equal(canPublishPracticeUpdates("admin", true), true);
+  assert.equal(canPublishPracticeUpdates("patient", true), false);
   assert.equal(canPublishPracticeUpdates("verwaltung"), false);
 });
 

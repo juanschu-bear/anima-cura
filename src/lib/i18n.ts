@@ -9,6 +9,16 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
   ...referenceTranslations,
+  'scribe.workspace.unavailable': {de:'Die Änderung ist gerade nicht verfügbar. Bitte erneut versuchen.',en:'This change is currently unavailable. Please try again.'},
+  'scribe.workspace.forbidden': {de:'Für diese Änderung fehlt die Berechtigung.',en:'You do not have permission to make this change.'},
+  'scribe.workspace.protected': {de:'Dieser Baustein gehört zur Abrechnung oder zu einer Pflichtauswahl. Bitte als Wunsch an Juan melden.',en:'This building block affects billing or a required choice. Please send a request to Juan.'},
+  'scribe.workspace.stale': {de:'Der Stand wurde inzwischen geändert. Bitte neu laden und erneut prüfen.',en:'This has changed in the meantime. Please reload and review it again.'},
+  'scribe.workspace.invalid': {de:'Bitte die Angaben prüfen.',en:'Please check the details.'},
+  'scribe.workspace.missing': {de:'Der Eintrag ist nicht mehr verfügbar.',en:'This entry is no longer available.'},
+  'scribe.workspace.developer': {de:'Diesen Bearbeitungsstand setzt Juan oder die Entwicklungsautomatik.',en:'This progress status is set by Juan or the development automation.'},
+  'scribe.workspace.notReady': {de:'Die Umsetzung ist noch nicht zur Praxisprüfung bereitgestellt.',en:'This has not yet been delivered for practice review.'},
+  'scribe.bell.status': {de:'Neuer Stand zu deinem Eintrag',en:'Your request has a new status'},
+  'scribe.bell.reply': {de:'Neue Antwort auf deinen Eintrag',en:'New reply to your request'},
   'scribe.save.confirmBeforeLeaving': {de:'Die Änderungen sind noch nicht gespeichert. Bitte zuerst als neue Version oder Korrektur bestätigen. Der Text bleibt hier erhalten.',en:'Changes are not saved. Please confirm the new version or correction first. Your text remains here.'},
   'scribe.save.changedDuringSave': {de:'Während des Speicherns wurde der Text geändert. Bitte erneut speichern; der Patientenwechsel wurde angehalten.',en:'The text changed while saving. Please save again; switching patients was stopped.'},
   'scribe.save.failedRetained': {de:'Speichern ist gerade nicht möglich. Dein Text bleibt erhalten. Bitte erneut versuchen.',en:'Saving is currently unavailable. Your text is retained. Please try again.'},

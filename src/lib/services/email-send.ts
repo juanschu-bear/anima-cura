@@ -23,6 +23,8 @@ interface SendEmailParams {
   body: string;
   from?: string;
   context?: Record<string, string>;
+  idempotencyKey?: string;
+  track?: boolean;
 }
 
 function replaceTemplateVars(text: string, context: Record<string, string>): string {
@@ -91,7 +93,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ ok: boolean;
     const subject = replaceTemplateVars(params.subject, context);
     let body = replaceTemplateVars(params.body, context);
     const from = params.from || provider.from || DEFAULT_FROM;
-    const ledgerMessage = await safeCreateCommunicationMessage({
+    const ledgerMessage = params.track === false ? null : await safeCreateCommunicationMessage({
       patientId: params.context?.patient_id || null,
       campaignKey: params.context?.campaign_key || null,
       provider: provider.provider || "resend",
@@ -108,7 +110,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ ok: boolean;
       to: params.to,
       subject,
       html: body,
-    });
+    }, params.idempotencyKey ? {idempotencyKey:params.idempotencyKey} : undefined);
 
     if (response.error) {
       const error = response.error.message || "E-Mail-Versand fehlgeschlagen.";

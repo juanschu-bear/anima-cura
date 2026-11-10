@@ -1,6 +1,8 @@
+import {workspaceActor,workspaceError,ScribeWorkspaceError} from "@/lib/scribe-workspace-auth";
+import {readInbox,commitInbox,assertInboxStatus} from "@/lib/scribe-inbox-store";
+import {deliverInboxMail} from "@/lib/scribe-inbox-mail";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 
 export const runtime = "nodejs";
@@ -108,12 +110,13 @@ function faelligkeitAusPreset(preset: string | undefined): string {
 }
 
 async function ladeInbox(service: ReturnType<typeof createServerClient>): Promise<InboxEintrag[]> {
-  const { data } = await service
+  const { data, error } = await service
     .from("einstellungen")
     .select("value")
     .eq("key", "scribe_praxis_inbox")
     .maybeSingle<{ value: InboxEintrag[] }>();
 
+  if(error) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
   if (!data?.value || !Array.isArray(data.value)) return [];
   return data.value.map((eintrag) => normalizeInboxEintrag(eintrag));
 }
@@ -151,43 +154,6 @@ function normalizeInboxEintrag(eintrag: InboxEintrag): InboxEintrag {
   };
 }
 
-async function speichereInbox(service: ReturnType<typeof createServerClient>, inbox: InboxEintrag[]) {
-  return service
-    .from("einstellungen")
-    .upsert(
-      {
-        key: "scribe_praxis_inbox",
-        value: inbox,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "key" },
-    );
-}
-
-async function ladeUser() {
-  const supabase = createServerComponentClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { user: null, name: "", role: null };
-
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("display_name, role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const name =
-    profile?.display_name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.display_name ||
-    user.email ||
-    "Praxis";
-
-  return { user, name, role: profile?.role ?? null };
-}
-
 async function ladeTeam(service: ReturnType<typeof createServerClient>): Promise<TeamMitglied[]> {
   const { data } = await service
     .from("user_profiles")
@@ -208,13 +174,14 @@ function statusGewicht(status: InboxStatus): number {
   return ["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].indexOf(status);
 }
 
-export async function GET() {
-  const { user, name, role } = await ladeUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+async function getInbox() {
+  const actor = await workspaceActor();
+  const user = { id: actor.id! }; const {name,role} = actor;
 
   const service = createServerClient();
   const heute = isoHeute();
-  const [data, team] = await Promise.all([ladeInbox(service), ladeTeam(service)]);
+  const [stored, team] = await Promise.all([readInbox(), ladeTeam(service)]);
+  const data = stored ? stored.map(r => ({...normalizeInboxEintrag(r.entry),revision:r.revision})) : await ladeInbox(service);
 
   const eintraege = data
     .slice()
@@ -245,13 +212,15 @@ export async function GET() {
     unreadCount,
     team: teamMitFallback,
     currentUserId: user.id,
-    canManageTeam: role === "admin" || role === "verwaltung",
+    canManageTeam: actor.developer,
+    canSetDeveloperStatus: actor.developer,
+    storageReady: stored !== null,
   });
 }
 
-export async function POST(request: NextRequest) {
-  const { user, name } = await ladeUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+async function postInbox(request: NextRequest) {
+  const actor = await workspaceActor();
+  const user = {id:actor.id!}; const {name} = actor;
 
   const body = (await request.json().catch(() => null)) as InboxBody | null;
   if (!body) return NextResponse.json({ error: "Ungültiger Body" }, { status: 400 });
@@ -273,7 +242,6 @@ export async function POST(request: NextRequest) {
   const service = createServerClient();
   const team = await ladeTeam(service);
   const assignedPerson = assignedTo ? team.find((eintrag) => eintrag.id === assignedTo) ?? null : null;
-  const inbox = await ladeInbox(service);
   const eintrag: InboxEintrag = {
     id: randomUUID(),
     art: art as InboxArt,
@@ -305,17 +273,18 @@ export async function POST(request: NextRequest) {
     assigned_to_name: assignedPerson?.name ?? null,
     kommentare: [],
   };
-  const { error } = await speichereInbox(service, [eintrag, ...inbox]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, eintrag }, { status: 201 });
+  const saved = await commitInbox(eintrag,0,actor);
+  const mail = await deliverInboxMail(eintrag.id).catch(() => ({status:"pending"}));
+  return NextResponse.json({ ok: true, eintrag:{...eintrag,revision:saved.revision}, mail }, { status: 201 });
 }
 
-export async function PATCH(request: NextRequest) {
-  const { user, name } = await ladeUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+async function patchInbox(request: NextRequest) {
+  const actor = await workspaceActor(request,true);
+  const user = {id:actor.id}; const {name} = actor;
 
   const body = (await request.json().catch(() => null)) as {
     id?: string;
+    revision?: number;
     status?: string;
     kommentar_text?: string;
     mention_user_id?: string | null;
@@ -330,16 +299,16 @@ export async function PATCH(request: NextRequest) {
 
   const service = createServerClient();
   const team = await ladeTeam(service);
-  const inbox = await ladeInbox(service);
-  const index = inbox.findIndex((eintrag) => eintrag.id === body.id);
-  if (index === -1) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  const stored = await readInbox(body.id);
+  if(stored === null) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
+  const row = stored[0];
+  if(!row) throw new ScribeWorkspaceError("inbox_not_found",404);
+  if(body.revision !== undefined && body.revision !== row.revision) throw new ScribeWorkspaceError("inbox_revision_stale",409);
+  let aktualisiert: InboxEintrag = normalizeInboxEintrag(row.entry);
+  if ((body.assigned_to !== undefined || body.zwischenloesung !== undefined) && !actor.developer)
+    throw new ScribeWorkspaceError("inbox_developer_required",403);
 
-  let aktualisiert: InboxEintrag = {
-    ...inbox[index],
-    kommentare: Array.isArray(inbox[index].kommentare) ? inbox[index].kommentare : [],
-  };
-
-  if (body.status) {
+  if (body.status && body.status !== aktualisiert.status) {
     const status = String(body.status);
     if (!["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"].includes(status)) {
       return NextResponse.json({ error: "Status ist ungültig" }, { status: 400 });
@@ -349,6 +318,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Für die finale Praxisabnahme ist der Name der bestätigenden Person nötig" }, { status: 400 });
     }
     const previousStatus = aktualisiert.status;
+    assertInboxStatus(actor,previousStatus,status);
     const changedAt = new Date().toISOString();
     aktualisiert = {
       ...aktualisiert,
@@ -428,7 +398,7 @@ export async function PATCH(request: NextRequest) {
           erstellt_am: new Date().toISOString(),
           mention_user_id: mentionPerson?.id ?? null,
           mention_name: mentionPerson?.name ?? null,
-          gelesen_von: [user.id],
+          gelesen_von: user.id ? [user.id] : [],
         },
       ],
     };
@@ -438,35 +408,28 @@ export async function PATCH(request: NextRequest) {
     aktualisiert = {
       ...aktualisiert,
       kommentare: aktualisiert.kommentare.map((kommentar) =>
-        kommentar.mention_user_id === user.id && !kommentar.gelesen_von.includes(user.id)
-          ? { ...kommentar, gelesen_von: [...kommentar.gelesen_von, user.id] }
+        kommentar.mention_user_id === user.id && !!user.id && !kommentar.gelesen_von.includes(user.id)
+          ? { ...kommentar, gelesen_von: [...kommentar.gelesen_von, user.id!] }
           : kommentar
       ),
     };
   }
 
-  const neu = inbox.slice();
-  neu[index] = aktualisiert;
-
-  const { error } = await speichereInbox(service, neu);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, eintrag: aktualisiert });
+  const saved = await commitInbox(aktualisiert,row.revision,actor);
+  return NextResponse.json({ ok: true, eintrag:{...aktualisiert,revision:saved.revision} });
 }
 
-export async function DELETE(request: NextRequest) {
-  const { user } = await ladeUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
-
-  const body = (await request.json().catch(() => null)) as { id?: string } | null;
-  if (!body?.id) return NextResponse.json({ error: "id nötig" }, { status: 400 });
-
-  const service = createServerClient();
-  const inbox = await ladeInbox(service);
-  const neu = inbox.filter((eintrag) => eintrag.id !== body.id);
-  if (neu.length === inbox.length) {
-    return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
-  }
-  const { error } = await speichereInbox(service, neu);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+async function deleteInbox(request: NextRequest) {
+  const actor = await workspaceActor();
+  const body = await request.json().catch(() => null);
+  if(!body?.id) throw new ScribeWorkspaceError("input_invalid");
+  const rows = await readInbox(body.id);
+  if(rows===null) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
+  if(!rows[0]) throw new ScribeWorkspaceError("inbox_not_found",404);
+  await commitInbox(rows[0].entry,rows[0].revision,actor,true);
+  return NextResponse.json({ok:true});
 }
+export async function GET(){try{return await getInbox();}catch(e){return workspaceError(e);}}
+export async function POST(r:NextRequest){try{return await postInbox(r);}catch(e){return workspaceError(e);}}
+export async function PATCH(r:NextRequest){try{return await patchInbox(r);}catch(e){return workspaceError(e);}}
+export async function DELETE(r:NextRequest){try{return await deleteInbox(r);}catch(e){return workspaceError(e);}}

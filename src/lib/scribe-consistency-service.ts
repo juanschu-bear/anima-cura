@@ -1,3 +1,4 @@
+import {effectiveTemplates} from './scribe-template-history-service';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { t } from './i18n';
@@ -20,6 +21,9 @@ export async function checkScribeConsistency(db: Pick<SupabaseClient, 'from'>, r
     const templates = data.map(row => scribeConsistencyTemplate.safeParse(row));
     if (templates.some(row => !row.success)) return consistencyResult([{code:'template_invalid',scope:'template'}]);
     const rows = templates.flatMap(row => row.success ? [row.data] : []);
+    const effective = input.variablen.template_history_version === 1 ? await effectiveTemplates(data) : null;
+    if(input.variablen.template_history_version === 1 && !effective) return consistencyResult([{code:"practice_options_read_failed",scope:"source"}]);
+    if(effective) return assessScribeConsistency(input,effective);
     // Match /api/doku/vorlagen: seed options retain their indices; practice
     // additions follow sort_index and created_at, and all pages must be read.
     for (let from = 0; ; from += 500) {

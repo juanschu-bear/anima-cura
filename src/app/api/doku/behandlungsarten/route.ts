@@ -1,5 +1,5 @@
+import {workspaceActor,requireWriter} from "@/lib/scribe-workspace-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 
 export const runtime = "nodejs";
@@ -32,10 +32,12 @@ function istEigeneArt(value: unknown): value is EigeneArt {
   );
 }
 
-async function requireUser() {
-  const auth = createServerComponentClient();
-  const { data: { user } } = await auth.auth.getUser();
-  return user;
+async function requireUser(write = false) {
+  try {
+    const actor = await workspaceActor();
+    if (write) requireWriter(actor);
+    return { id: actor.id! };
+  } catch { return null; }
 }
 
 async function ladeEigeneArten(db: ReturnType<typeof createServerClient>) {
@@ -156,7 +158,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await requireUser();
+  const user = await requireUser(true);
   if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { name?: string; basis?: string } | null;
@@ -184,7 +186,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const user = await requireUser();
+  const user = await requireUser(true);
   if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { id?: string } | null;
@@ -199,7 +201,7 @@ export async function PATCH(request: NextRequest) {
     await speichereEigeneArten(db, next);
     if (entfernt) {
       await db.from("doku_vorlagen").update({ aktiv: false }).eq("behandlungsart", entfernt.key);
-      await db.from("doku_vorlagen_optionen").update({ aktiv: false }).eq("behandlungsart", entfernt.key);
+      // Keep option states/history intact. The inactive template hides the catalog.
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -29,8 +29,8 @@ export function canReadPracticeUpdates(role: AppRole): role is PracticeUpdateRol
   return role === "admin" || role === "verwaltung" || role === "lesezugriff";
 }
 
-export function canPublishPracticeUpdates(role: AppRole): boolean {
-  return role === "admin";
+export function canPublishPracticeUpdates(role: AppRole, developer = false): boolean {
+  return canReadPracticeUpdates(role) && developer;
 }
 
 export function isVisiblePracticeUpdate(
