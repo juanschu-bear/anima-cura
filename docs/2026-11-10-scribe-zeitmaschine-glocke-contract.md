@@ -150,4 +150,6 @@ Für UI-Abnahme: in freier Gruppe umbenennen → ausblenden → rückgängig →
 
 ## Rollout-Nachtrag 10.11.2026
 
-Production fehlt die Voraussetzung `praxis_updates` aus 072. Der freigegebene 078-Versuch wurde vollständig zurückgerollt. Ergänzende, noch freizugebende Datei: `079_scribe_updates_prerequisite.sql`, nur Schema/Rechte ohne historischen Update-Inhalt. Installationsreihenfolge: **079 vor unveränderter 078**, anschließend Backend-Deployment. Bis dahin ist dieser neue Vertrag noch nicht auf Production verfügbar. UI deshalb noch nicht aktivieren.
+Production: 079 als fehlende Schema-Voraussetzung und danach unveränderte 078 erfolgreich installiert und geprüft. Backend `d73be89` ist auf main und live. 8/8 Inbox-Einträge exakt übernommen, 2.243 Bausteinplätze, 200 archivierte Multiband-Praxistexte. Die UI kann auf diesem Vertrag aufbauen; Vorlagenmodus und Versionsmarkierung gemeinsam aktivieren.
+
+Juans persönlicher interner App-Zugang ist `juan@praxis-schubert.de`; `SCRIBE_DEVELOPER_USER_ID` ist auf dessen UUID `e5702286-8d03-4f4f-8220-92cefed44075` gesetzt. Es ist kein E-Mail-Postfach. Echte Mailhinweise warten noch auf `SCRIBE_INBOX_EMAIL_TO`. Kein bestehendes Teamkonto erhielt Entwicklerrechte.

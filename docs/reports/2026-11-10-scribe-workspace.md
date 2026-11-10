@@ -1,45 +1,50 @@
-# Scribe Schritt 1 — Backendstand 10.11.2026
+# Scribe Schritt 1 — Productionstand 10.11.2026
 
-## Code
+## Code und Bereitstellung
 
-Auf main-Stand `0429591` aufgebaut. Neues Backend für feste Bausteinschlüssel, unveränderliche Änderungshistorie, Undo/Redo und Zeitpunkt-Wiederherstellung; geschützte Abrechnungs-/Pflichtgruppen; relationale Inbox mit optimistischer Revision, Ersteller-Löschung und Entwicklerstatusrechten; empfängerbezogene Glocke mit RLS und persönlichen Leseständen; dauerhafte Mailaufträge über bestehenden Mailweg mit Provider-Idempotenz und Wiederholung. Keine .tsx/.css-Änderungen, keine Änderungen an Patientendokumentation oder Zahlungen.
+Backend umgesetzt in `fec16a5`, Installationsvoraussetzung und Regressionstest in `d73be89`. Beide auf main. Production-Deployment `dpl_HgXPf2gFPcPGDVy4quy8fHuZEwp4` ist READY und auf `scribe.animacura.io` sowie `animacura.io` aliasiert.
 
-Datenvertrag: `docs/2026-11-10-scribe-zeitmaschine-glocke-contract.md`.
+Feste Bausteinschlüssel, unveränderliche Änderungshistorie, Undo/Redo und Zeitpunkt-Wiederherstellung; geschützte Abrechnungs-/Pflichtgruppen; relationale Inbox mit Revision, Ersteller-Löschung und Entwicklerstatusrechten; empfängerbezogene Glocke mit RLS und persönlichen Leseständen; dauerhafte Mailaufträge mit Provider-Idempotenz. Keine .tsx/.css-Änderungen, keine Änderungen an Patientendokumentation oder Zahlungen.
 
-## Bestandsprüfung, nur lesend
+Claude-Vertrag: `docs/2026-11-10-scribe-zeitmaschine-glocke-contract.md`. Zeitmaschinenverwaltung, Glocke und neue Inbox-Berechtigungsanzeige bleiben UI-Aufgabe für Claude. Neuer Vorlagenmodus nur mit `history=1` und persistierter Versionsmarkierung; alter Cockpit-Modus bleibt kompatibel.
 
-- 8 Infobox-Einträge: 6 `bestaetigt`, 1 `fix_in_arbeit`, 1 `praxis_bestaetigt`.
-- 2 ausdrücklich gespeicherte Statusereignisse, 0 Kommentare.
-- 200 inaktive Multiband-Praxistexte. Die ungefähr 80 heute gelöschten Texte lassen sich aus diesen Bestandsdaten nicht eindeutig abgrenzen. Alle vorhandenen inaktiven Texte werden angeboten; keine automatische Wiederherstellung.
-- Die bisher bekannte Betreiber-ID gehört im Profil Dr. Maria Schubert. Kein Juan-Profil unter dem Namen Juan oder der bisher genannten Beispiel-Mailadresse gefunden. Juan hat ein neues separates Konto beauftragt. Adresse vorgeschlagen: `juan@animacura.io`; Benennung und Anmeldung in der Mailverwaltung noch offen. Keine Entwicklerrechte an das Konto Dr. Schuberts vergeben.
+## Kontrollierte SQL-Installation
 
-## Tests
+Der erste freigegebene 078-Versuch scheiterte an der fehlenden Voraussetzung `public.praxis_updates` aus 072 und wurde vollständig zurückgerollt. Vorherige Tests hatten diese Tabelle als Fixture vorausgesetzt. Der neue Regressionstest reproduziert den Fehler und Rollback.
 
-403 Tests im Gesamtlauf bestanden. Darin 4 neue PostgreSQL-/Domänentests mit zahlreichen Prüfungen für Migration, Indexstabilität, Archivtexte, Rückgängig/Wiederherstellen, Rechte, Status, Kommentare, Benachrichtigungen, Mail-Warteschlange und Wiederholung. Nach zusätzlichen Randfallprüfungen erneut 4/4 bestanden. Bestehende 65 Scribe-Tests bestanden. Abschließender Production-Build erfolgreich.
+Nach zusätzlicher ausdrücklicher Freigabe installiert: **079 → 078**, Prüfsummen jeweils unmittelbar vor Ausführung abgeglichen:
 
-`npm test` insgesamt noch nicht grün: abschließender Live-RPC-Audit meldet die vier noch nicht installierten Funktionen aus 078 sowie die zwei bereits vorher fehlenden Rechnungsdesign-Funktionen aus Leitstand-027. Keine Prüfung übersprungen oder gelockert. Source-/Rollenverträge der neuen RPC-Aufrufe sind geprüft und versioniert.
+- `079_scribe_updates_prerequisite.sql`: `2407b27127a6c5fdff96ba0652d8841859bd476a987eebfd44fb301489c58b7e` — zwei Update-Tabellen, RLS, explizite Serverrechte; keine historischen Update-Meldungen.
+- `078_scribe_time_machine_inbox_bell.sql`: `b3a7635e18533e3e6b403894cb49135cfe13b1b6e660eaefd92b2f79a312b600` — unverändert wie freigegeben.
 
-## SQL / Bereitstellung
+Beide SQL-Ausführungen erfolgreich. Nach 079 beide Tabellen mit RLS, ohne anonymen Lesezugriff und ohne direkte Schreibrechte für App-Konten; Serverrechte vorhanden. Nach 078 alle neun neuen Tabellen mit RLS, ohne anonymen Lesezugriff und ohne direkte UPDATE-Rechte für App-Konten.
 
-078 ausdrücklich freigegeben und mit übereinstimmender Prüfsumme ausgeführt; **Installation fehlgeschlagen und vollständig zurückgerollt**:
-`supabase/migrations/078_scribe_time_machine_inbox_bell.sql`
+## Bestandsprüfung
 
-SHA-256: `b3a7635e18533e3e6b403894cb49135cfe13b1b6e660eaefd92b2f79a312b600`
+- Vorher: 8 Infobox-Einträge, 2 ausdrücklich gespeicherte Statusereignisse, 0 Kommentare.
+- Nachher: 8 importierte Einträge; alle 8 ursprünglichen JSON-Backups exakt gleich.
+- 2.243 stabile Bausteinplätze angelegt.
+- 200 archivierte Multiband-Praxistexte. Die ungefähr 80 heute gelöschten Texte lassen sich mangels früherem Löschprotokoll nicht eindeutig abgrenzen. Keine automatische Wiederherstellung.
+- 0 wartende und 0 fehlgeschlagene Mailaufträge direkt nach Migration; keine historischen Benachrichtigungen erzeugt.
 
-Production-Fehler: `42P01: relation "public.praxis_updates" does not exist`. Die Voraussetzung aus 072 war nicht installiert. Der Test hatte diese Tabelle bisher als Fixture angelegt und dadurch den fehlenden Installationsschritt verdeckt. Lesende Nachprüfung nach Fehler: `scribe_inbox_entries`, `scribe_option_slots` und `praxis_updates` fehlen weiterhin; Legacy-Inbox unverändert 8 Einträge. Kein Backend-Deployment erfolgt.
+## Persönliches Juan-Konto
 
-Korrektur vorbereitet in `supabase/migrations/079_scribe_updates_prerequisite.sql`: ausschließlich das Schema der zwei Update-Tabellen aus 072, RLS und explizite Serverrechte; keine historische Ankündigung, keine Mail. Prüfsumme: `2407b27127a6c5fdff96ba0652d8841859bd476a987eebfd44fb301489c58b7e`. Nach separater Freigabe Reihenfolge **079 → unveränderte 078 → Nachprüfung → Deployment**. Die bestehende 078-Freigabe bleibt gültig.
+Auf ausdrücklichen Wunsch analog zu den vorhandenen internen Praxis-Anmeldeadressen angelegt: `juan@praxis-schubert.de`, Name Juan Manuel Schubert, Kürzel `js`, Rolle admin, keine Patientenzuordnung. Konto-ID `e5702286-8d03-4f4f-8220-92cefed44075`.
 
-Alle 5 gezielten Tests bestehen jetzt mit der echten Voraussetzung statt einer vereinfachten Update-Tabelle. Der zusätzliche Regressionstest reproduziert den Production-Fehler, prüft Rollback und Legacy-Erhalt und danach erfolgreiche Installation, Rechte und ausbleibende historische Benachrichtigungen.
+Productionvariable `SCRIBE_DEVELOPER_USER_ID` verweist ausschließlich auf dieses Konto. Kein bestehendes Praxisprofil verändert. Anmeldung per Passwort erfolgreich getestet; anschließend reale Anmeldung in Anima-Scribe im separaten Browser bestätigt. Die Inbox lädt. Kein Probeeintrag und keine klinische Dokumentation erzeugt.
 
- Die Migration übernimmt das alte Inbox-JSON, friert weitere Schreibzugriffe darauf ein und schränkt direkte Vorlagenänderungen ein; alle Änderungen gehen anschließend durch die API. Ein rückwärts laufendes altes Backend darf danach nicht mehr die JSON-Inbox schreiben. Deshalb SQL und Deployment unmittelbar hintereinander im kontrollierten Rollout, nicht getrennt über längere Zeit.
+Es handelt sich ausschließlich um einen App-Benutzernamen, nicht um ein Postfach. Kein Mailprovider eingerichtet. Zugangsdaten liegen lokal außerhalb des Repos in der dem Benutzer übergebenen Datei, mit Dateirechten 0600. Keine Passwörter im Repo oder Bericht.
 
-Lesende Nachprüfung vorbereitet in `scripts/verify-scribe-workspace.sql`: genaue Übernahme des Legacy-Backups, Objekt-/Funktionsrechte, RLS und Aggregate ohne medizinische Texte.
+## Tests und Grenzen
 
-Deployment auf Production wird bis zur Installation zurückgehalten, damit bestehende Inbox-Schreibwege nicht wegen fehlender Tabellen/Funktionen ausfallen. UI und Backend müssen für die Zeitmaschine `history=1` sowie die persistierte Versionsmarkierung gemeinsam verwenden. Details im Vertrag.
+403 Tests im vorherigen Gesamtlauf bestanden; nach ergänztem Regressionstest alle 5 Scribe-Workspace-Tests bestanden. Diese prüfen Migration/Übernahme, Rollback, echte Update-Tabellen, Indexstabilität, Undo/Redo/Zeitpunkt, Hausregel, Status-/Rollenrechte, persönliche Lesestände und Mailauslösung. Production-Build erfolgreich, zusätzlich Production-Deployment READY.
 
-## Konfiguration und Sichtbarkeit
+Live-RPC-Audit: 53 Aufrufstellen geprüft. Alle neuen Scribe-RPCs vorhanden und passend berechtigt. Zwei bereits vorher fehlende Rechnungsdesign-Funktionen aus Leitstand-027 bleiben als Fehler gemeldet: `patient_invoice_document_edition(document_id uuid, original_only boolean)` und `patient_invoice_document_editions()`. Deshalb `npm test` insgesamt weiterhin nicht vollständig grün; keine Tests übersprungen oder gelockert.
 
-`SCRIBE_INBOX_EMAIL_TO` setzt Juan für die Empfängeradresse. `SCRIBE_DEVELOPER_USER_ID` wird erst nach Benennung seines tatsächlichen Login-Kontos gesetzt. Optional eigener serverseitiger `SCRIBE_SYSTEM_TOKEN` für Entwicklerautomatik; Cron verwendet bestehenden `CRON_SECRET`. Ohne Mailadresse bleibt der Auftrag wartend, ohne erfolglose Versuche aufzubrauchen.
+Direkte Browsernavigation zur JSON-Inbox-API wurde vom eingebetteten Browser blockiert. Die bestehende Scribe-Oberfläche wurde mit Juans Sitzung erfolgreich geladen und die Inbox geöffnet; keine erfolgreichen schreibenden Production-API-Tests behauptet.
 
-Noch keine neue Praxisoberfläche ausgeliefert. Claude baut Zeitmaschinenverwaltung, Glocke und Infobox-Anpassung anhand des Vertrags. Keine echte Testmail verschickt. Nach dem zurückgerollten Installationsversuch bleiben die bisherigen Production-Funktionen unverändert. Die Anmeldung an der Hostinger-Verwaltung ist offen; ein bestehender Webmail-Zugang allein erlaubt keine neue Mailadresse.
+## Noch zu konfigurieren
+
+`SCRIBE_INBOX_EMAIL_TO`: echte Empfängeradresse für Juans gewünschte Mailhinweise, laut Auftrag von Juan zu setzen. Noch nicht gesetzt, kein echter Mailversand getestet. Ohne Empfänger bleiben neue Mailaufträge wartend, ohne Versuche aufzubrauchen. Die interne Anmeldeadresse darf dafür nicht verwendet werden.
+
+Optional `SCRIBE_SYSTEM_TOKEN` für Entwicklerautomatik; noch nicht gesetzt. Persönliche Entwicklerrechte sind bereits eingerichtet. Cron nutzt bestehenden `CRON_SECRET`.
