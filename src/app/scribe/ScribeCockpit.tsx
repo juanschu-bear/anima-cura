@@ -7,6 +7,9 @@ import { createBrowserClient } from "@/lib/db/supabase";
 import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error";
 import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
+import BausteineVerwaltung from "./BausteineVerwaltung";
+import ScribeGlocke from "./ScribeGlocke";
+import { aendereVorlage, ladeVerlauf, NEU_LADEN } from "./bausteine-api";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
 import {protectScribeDeparture} from '@/lib/scribe-departure';
@@ -15,7 +18,8 @@ import { scribeAppointmentTypeDisplayName } from '@/lib/scribe-appointment-type'
 import { ArtWahl, KarteBisher, OffeneTeile, TagFehler, TagesLeistungen, bisherAusTag, ergaenzeTag, gleicherTag, korrekturZiele, useRaumNamen, useTagesdatensatz, type BisherTeil, type DayDraftContent, type DayPreview, type EntscheidungErgebnis, type Kind as TagArt, type TargetOption } from './ScribeDayRecord';
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
-type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis" };
+// Felder aus /api/doku/vorlagen?history=1 (Zeitmaschine, Codex 10.11.2026): optionKey bleibt dauerhaft, hidden blendet aus, ohne Indizes zu verschieben.
+type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis"; optionKey?: string; origin?: "vorlage" | "praxis"; hidden?: boolean; lastChangeId?: string | null; editable?: boolean };
 // explizit: Pflichtgruppe ohne „keine Angabe“, es muss eine Option gewählt werden (z. B. „Kein Bogen OK“). Entscheidung Juan 04.11.2026.
 type Gruppe = { label: string; req: boolean; explizit?: boolean; type: "single" | "multi"; opts: Opt[] };
 type TemplateSeg = string | { g: string };
@@ -196,6 +200,35 @@ function bereinigeZusatztext(wert: string): string {
 function istPraxisOption(opt: Opt | undefined): boolean {
   return opt?.quelle === "praxis" && !!opt.id;
 }
+
+/** Aus einer alten Auswahl nur die festen Bausteine übernehmen. Liefert die bereinigte Auswahl und wie viele Markierungen fehlen. */
+function nurFesteBausteine(auswahl: Record<string, Record<string, number[]>>, vorlagenDerArt: Vorlage[]): { auswahl: Record<string, Record<string, number[]>>; entfernt: number } {
+  let entfernt = 0;
+  const neu: Record<string, Record<string, number[]>> = {};
+  Object.entries(auswahl).forEach(([terminTyp, gruppen]) => {
+    const v = vorlagenDerArt.find((x) => x.termin_typ === terminTyp);
+    neu[terminTyp] = {};
+    Object.entries(gruppen ?? {}).forEach(([g, idx]) => {
+      const opts = v?.struktur.groups[g]?.opts ?? [];
+      const fest = (idx ?? []).filter((i) => opts[i]?.origin === "vorlage" && !opts[i]?.hidden);
+      entfernt += (idx ?? []).length - fest.length;
+      neu[terminTyp][g] = fest;
+    });
+  });
+  return { auswahl: neu, entfernt };
+}
+
+type VorlagenAbruf = { ok: true; vorlagen: Vorlage[] } | { ok: false; message: string };
+/** Vorlagen mit Zeitmaschinen-Feldern (optionKey, hidden, editable). */
+async function holeVorlagen(): Promise<VorlagenAbruf> {
+  const res = await fetch("/api/doku/vorlagen?history=1", { cache: "no-store" });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !Array.isArray(json?.vorlagen)) return { ok: false, message: json?.message ?? "" };
+  return { ok: true, vorlagen: json.vorlagen as Vorlage[] };
+}
+
+/** Vorlagenstand mit Zeitmaschine. Geht mit jedem Entwurf, Speichern, Bestätigen und jeder Tageskorrektur mit, damit der Server dieselben Indizes prüft. */
+const TEMPLATE_HISTORY_VERSION = 1;
 
 /** Gruppen, deren Auswahl die Abrechnung steuert (Positionsregel hängt daran, oder Pflichtwahl wie „Kein Bogen OK“). Dort ersetzt ein eigener Text die Auswahl nicht. */
 function gruppeSteuertAbrechnung(v: Vorlage, g: string): boolean {
@@ -495,6 +528,14 @@ export default function ScribeCockpit({
   const [bausteinSuche, setBausteinSuche] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> Suchtext im "Weitere Varianten"-Dropdown
   const [gruppenFreitext, setGruppenFreitext] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> freier Text nur für diesen Eintrag
   const [optSpeichert, setOptSpeichert] = useState(false);
+  /** Offene Bausteine-Verwaltung (Zeitmaschine) für 1 Leistung, mit der Gruppe, aus der sie geöffnet wurde. */
+  const [verwaltung, setVerwaltung] = useState<{ vorlageId: string; gruppe: string } | null>(null);
+  /** Rückmeldung nach dem Ausblenden eines eigenen Textes, mit Rückgängig. */
+  const [bausteinHinweis, setBausteinHinweis] = useState<{ gruppe: string; text: string; undo?: { templateId: string; changeId: string; revision: number } } | null>(null);
+  /** Vorbelegung der Praxis-Inbox, zum Beispiel ein Wunsch an Juan aus der Bausteine-Verwaltung. */
+  const [inboxVorbelegung, setInboxVorbelegung] = useState<{ text: string; n: number } | null>(null);
+  /** Hinweis, wenn ein alter Entwurf eigene Bausteine enthielt, die neu ausgewählt werden müssen. */
+  const [entwurfHinweis, setEntwurfHinweis] = useState<string | null>(null);
 
   // --- Required-field changes: keine Angabe marker + current aligner number ---
   const [leer, setLeer] = useState<Record<string, boolean>>({}); // key `${termin_typ}:${gruppe}` marked "keine Angabe"
@@ -557,26 +598,35 @@ export default function ScribeCockpit({
     window.localStorage.setItem(SCRIBE_LISTEN_SUCHE_KEY, listenSuche);
   }, [listenSuche]);
 
+  /** Eigene Terminarten aus dem Praxis-Pass, damit ein Neuladen der Vorlagen sie behält. */
+  const passAntwortenRef = useRef<PraxisPassAntwort[]>([]);
+  /** Vorlagen im Zeitmaschinen-Modus laden, auch nach jeder Bausteinänderung. Kein Mischen mit dem alten Lesemodus. */
+  const ladeVorlagen = useCallback(async (vorab?: VorlagenAbruf): Promise<boolean> => {
+    const ergebnis = vorab ?? (await holeVorlagen());
+    if (!ergebnis.ok) {
+      setLadefehler(ergebnis.message || t("scribe.blocks.loadError"));
+      return false;
+    }
+    setLadefehler(null);
+    setVorlagen(mergeEigeneTerminarten(ergebnis.vorlagen, passAntwortenRef.current));
+    return true;
+  }, []);
+
   useEffect(() => {
     (async () => {
-      const [vorlagenRes, artenRes, passRes] = await Promise.all([
-        fetch("/api/doku/vorlagen"),
+      const [vorlagenAbruf, artenRes, passRes] = await Promise.all([
+        holeVorlagen(),
         fetch("/api/doku/behandlungsarten"),
         fetch("/api/praxis-pass"),
       ]);
-      if (!vorlagenRes.ok) {
-        setLadefehler("Vorlagen konnten nicht geladen werden. Seite neu laden.");
-        return;
-      }
-      const json = await vorlagenRes.json();
       const artenJson = await artenRes.json().catch(() => ({}));
       const passJson = await passRes.json().catch(() => ({}));
-      const liste: Vorlage[] = mergeEigeneTerminarten(json.vorlagen ?? [], passJson.antworten ?? []);
-      setVorlagen(liste);
+      passAntwortenRef.current = passJson.antworten ?? [];
+      if (!(await ladeVorlagen(vorlagenAbruf))) return;
       setEigeneArten((artenJson.arten ?? []).filter((eintrag: EigeneArt) => !!eintrag?.id && !!eintrag?.name && !!eintrag?.basis && !!eintrag?.key));
       await ladeHeute();
     })();
-  }, [ladeHeute]);
+  }, [ladeHeute, ladeVorlagen]);
 
   useEffect(() => {
     const fehlerEintraege = heute.filter(
@@ -782,7 +832,7 @@ export default function ScribeCockpit({
     vorlagen.forEach((vorlage) => {
       tokenisiereText(vorlage.name).forEach((wort) => woerter.add(wort));
       Object.values(vorlage.struktur?.groups ?? {}).forEach((gruppe) => {
-        gruppe.opts.forEach((opt) => tokenisiereText(opt.t).forEach((wort) => woerter.add(wort)));
+        gruppe.opts.forEach((opt) => { if (!opt.hidden) tokenisiereText(opt.t).forEach((wort) => woerter.add(wort)); });
       });
     });
     return Array.from(woerter);
@@ -815,6 +865,8 @@ export default function ScribeCockpit({
   }
 
   function resetSitzung(keepRoom = false) {
+    setEntwurfHinweis(null);
+    setBausteinHinweis(null);
     if (!keepRoom) setZimmerVersionId('');
     setBestaetigt(null);
     setDirty(false);
@@ -839,61 +891,37 @@ export default function ScribeCockpit({
     setTagHinweis(null);
   }
 
-  async function eigenenBausteinLoeschen(m: Vorlage, g: string, opt: Opt, index: number) {
-    if (!opt.id || !istPraxisOption(opt) || optSpeichert) return;
-    if (typeof window !== "undefined" && !window.confirm(`Diesen eigenen Textbaustein wirklich löschen?\n\n${opt.t}`)) return;
+  /** Eigenen Text ausblenden. Er bleibt auf seinem Platz und steht im Änderungsbuch, Rückgängig holt ihn zurück. */
+  async function eigenenBausteinAusblenden(m: Vorlage, g: string, opt: Opt) {
+    if (!opt.optionKey || optSpeichert) return;
+    const gruppe = `${m.termin_typ}:${g}`;
     setOptSpeichert(true);
+    setBausteinHinweis(null);
     try {
-      const vorher = m.struktur.groups[g]?.opts ?? [];
-      const markierteTexte = (auswahl[m.termin_typ]?.[g] ?? []).map((idx) => vorher[idx]?.t).filter(Boolean);
-      const res = await fetch("/api/doku/optionen", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: opt.id, aktiv: false }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        alert(json?.error ?? "Löschen fehlgeschlagen.");
+      const verlauf = await ladeVerlauf(m.id);
+      const r = await aendereVorlage({ templateId: m.id, expectedRevision: verlauf.revision, action: "hide", optionKey: opt.optionKey });
+      if (!r.ok) {
+        if (NEU_LADEN.has(r.code)) await ladeVorlagen();
+        setBausteinHinweis({ gruppe, text: r.code === "template_group_protected" ? t("scribe.blocks.protected") : NEU_LADEN.has(r.code) ? t("scribe.blocks.stale") : r.message || t("scribe.workspace.unavailable") });
         return;
       }
-      setVorlagen((alt) =>
-        alt.map((vorlage) => {
-          if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
-          const gruppe = vorlage.struktur?.groups?.[g];
-          if (!gruppe) return vorlage;
-          return {
-            ...vorlage,
-            struktur: {
-              ...vorlage.struktur,
-              groups: {
-                ...vorlage.struktur.groups,
-                [g]: {
-                  ...gruppe,
-                  opts: gruppe.opts.filter((_, idx) => idx !== index),
-                },
-              },
-            },
-          };
-        }),
-      );
-      bearbeitet();
-      setAuswahl((alt) => {
-        const neuerOpts = vorher.filter((_, idx) => idx !== index);
-        const neueIndizes = neuerOpts.reduce<number[]>((acc, eintrag, idx) => {
-          if (markierteTexte.includes(eintrag.t)) acc.push(idx);
-          return acc;
-        }, []);
-        return {
-          ...alt,
-          [m.termin_typ]: {
-            ...(alt[m.termin_typ] ?? {}),
-            [g]: neueIndizes,
-          },
-        };
-      });
+      await ladeVorlagen();
+      setBausteinHinweis({ gruppe, text: t("scribe.blocks.hiddenToast", "de", { text: opt.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…") }), undo: { templateId: m.id, changeId: r.changeIds[0], revision: r.revision } });
+    } catch (e) {
+      setBausteinHinweis({ gruppe, text: (e as Error).message || t("scribe.workspace.unavailable") });
     } finally {
       setOptSpeichert(false);
     }
+  }
+
+  async function ausblendenRueckgaengig() {
+    const hinweis = bausteinHinweis;
+    if (!hinweis?.undo || optSpeichert) return;
+    setOptSpeichert(true);
+    const r = await aendereVorlage({ templateId: hinweis.undo.templateId, expectedRevision: hinweis.undo.revision, action: "undo", changeId: hinweis.undo.changeId });
+    await ladeVorlagen();
+    setBausteinHinweis({ gruppe: hinweis.gruppe, text: r.ok ? t("scribe.blocks.undoneToast") : NEU_LADEN.has(r.code) ? t("scribe.blocks.stale") : r.message || t("scribe.workspace.unavailable") });
+    setOptSpeichert(false);
   }
 
   async function eigeneArtAnlegen() {
@@ -1067,6 +1095,29 @@ export default function ScribeCockpit({
     const korrigiert = korrigiereFreitext(sauber, bausteinWortschatz);
     setNtVorschlag(korrigiert !== sauber ? korrigiert : null);
   }
+
+  /* Ausgeblendete Bausteine sind nicht mehr wählbar: aus der aktuellen Auswahl nehmen. Die Plätze der übrigen bleiben gleich. */
+  useEffect(() => {
+    setAuswahl((alt) => {
+      let geaendert = false;
+      const neu: Record<string, Record<string, number[]>> = { ...alt };
+      module.forEach((m) => {
+        const modul = alt[m.termin_typ];
+        if (!modul) return;
+        const gefiltert: Record<string, number[]> = { ...modul };
+        Object.entries(modul).forEach(([g, idx]) => {
+          const opts = m.struktur.groups[g]?.opts ?? [];
+          const rest = idx.filter((i) => !opts[i]?.hidden);
+          if (rest.length !== idx.length) {
+            gefiltert[g] = rest;
+            geaendert = true;
+          }
+        });
+        neu[m.termin_typ] = gefiltert;
+      });
+      return geaendert ? neu : alt;
+    });
+  }, [module]);
 
   /* Defaults je gewähltem Modul setzen */
   useEffect(() => {
@@ -1344,6 +1395,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
+          template_history_version: TEMPLATE_HISTORY_VERSION,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1430,6 +1482,7 @@ export default function ScribeCockpit({
         naechster_termin: naechsterTermin.trim() || null,
         zahn_seiten: seiten,
         gruppen_freitext: gruppenFreitextAktiv,
+        template_history_version: TEMPLATE_HISTORY_VERSION,
         leistungen: module.map((m) => anzeigeName(m)),
       },
       selection: auswahl,
@@ -1579,6 +1632,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
+          template_history_version: TEMPLATE_HISTORY_VERSION,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1667,6 +1721,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
+          template_history_version: TEMPLATE_HISTORY_VERSION,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1706,7 +1761,12 @@ export default function ScribeCockpit({
       setArtAuswahlId(e.behandlungsart);
     }
     setGewaehlt(e.termin_typ ? e.termin_typ.split("+") : []);
-    setAuswahl(e.auswahl ?? {});
+    // Entwürfe ohne Versionsmarkierung stammen aus dem alten Vorlagenstand: feste Bausteine behalten ihren Platz,
+    // eigene Texte können anders liegen und werden neu ausgewählt (Datenvertrag Zeitmaschine, 10.11.2026).
+    const markiert = (e.variablen as Record<string, unknown> | null)?.template_history_version === TEMPLATE_HISTORY_VERSION;
+    const geladen = markiert ? { auswahl: e.auswahl ?? {}, entfernt: 0 } : nurFesteBausteine(e.auswahl ?? {}, vorlagen.filter((v) => v.behandlungsart === e.behandlungsart));
+    setAuswahl(geladen.auswahl);
+    setEntwurfHinweis(geladen.entfernt > 0 ? t("scribe.blocks.legacyDraft", "de", { n: geladen.entfernt }) : null);
     setZaehne((e.zaehne ?? []).map(Number).filter((n) => !Number.isNaN(n)));
     const v = (e.variablen ?? {}) as Record<string, unknown>;
     if (typeof v.schienen_von === "string") setSchienenVon(v.schienen_von);
@@ -1896,6 +1956,7 @@ export default function ScribeCockpit({
         </span>
         <span className="datum">{heuteDatum}</span>
         <span className="rechts">
+          <ScribeGlocke />
           <KnowledgeMenu />
           <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>
           <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
@@ -2373,9 +2434,11 @@ export default function ScribeCockpit({
           {module.map((m) => {
             const renderGruppe = (g: string, grp: (typeof m.struktur.groups)[string]) => {
               const TOP_N = 5;
-              const vieleOptionen = grp.opts.length > TOP_N;
+              // Ausgeblendete Bausteine werden nicht angeboten. Der Index i bleibt der Platz in der Vorlage.
+              const alleMitIndex = grp.opts.map((o, i) => ({ o, i })).filter(({ o }) => !o.hidden);
+              const vieleOptionen = alleMitIndex.length > TOP_N;
               const suche = (bausteinSuche[`${m.termin_typ}:${g}`] || "").trim().toLowerCase();
-              const alleMitIndex = grp.opts.map((o, i) => ({ o, i }));
+              const gruppenKey = `${m.termin_typ}:${g}`;
               const topOpts = vieleOptionen ? alleMitIndex.slice(0, TOP_N) : alleMitIndex;
               const restOpts = vieleOptionen ? alleMitIndex.slice(TOP_N) : [];
               const restGefiltert = suche
@@ -2384,9 +2447,16 @@ export default function ScribeCockpit({
 
               return (
                 <div className={`gruppe${pruefHinweise.some((h) => h.group === g && (!h.module || h.module === m.termin_typ)) ? " pruef-markiert" : ""}`} key={`${m.termin_typ}:${g}`} data-pruef-gruppe={`${m.termin_typ}:${g}`}>
-                  <div className="gname">
-                    {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
-                    {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
+                  <div className="gkopf">
+                    <div className="gname">
+                      {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
+                      {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
+                    </div>
+                    {!m.id.startsWith("eigen-") && !demo && (
+                      <button type="button" className="gruppe-aendern" onClick={() => setVerwaltung({ vorlageId: m.id, gruppe: g })} aria-label={t("scribe.blocks.openAria", "de", { gruppe: grp.label })}>
+                        {t("scribe.blocks.open")}
+                      </button>
+                    )}
                   </div>
                   {vieleOptionen && <div className="gunterlabel">Häufigste</div>}
                   <div className="wahlzeile">
@@ -2399,12 +2469,13 @@ export default function ScribeCockpit({
                         >
                           {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
                         </button>
-                        {istPraxisOption(o) && (
+                        {istPraxisOption(o) && o.optionKey && o.editable !== false && !demo && (
                           <button
                             type="button"
                             className="wahl-loeschen"
-                            aria-label="Eigenen Textbaustein löschen"
-                            onClick={() => void eigenenBausteinLoeschen(m, g, o, i)}
+                            aria-label={t("scribe.blocks.hideOwnAria")}
+                            title={t("scribe.blocks.hideOwnAria")}
+                            onClick={() => void eigenenBausteinAusblenden(m, g, o)}
                           >
                             ×
                           </button>
@@ -2446,12 +2517,13 @@ export default function ScribeCockpit({
                               >
                                 {o.t.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…").replace(/\.$/, "")}
                               </button>
-                              {istPraxisOption(o) && (
+                              {istPraxisOption(o) && o.optionKey && o.editable !== false && !demo && (
                                 <button
                                   type="button"
                                   className="wahl-loeschen"
-                                  aria-label="Eigenen Textbaustein löschen"
-                                  onClick={() => void eigenenBausteinLoeschen(m, g, o, i)}
+                                  aria-label={t("scribe.blocks.hideOwnAria")}
+                                  title={t("scribe.blocks.hideOwnAria")}
+                                  onClick={() => void eigenenBausteinAusblenden(m, g, o)}
                                 >
                                   ×
                                 </button>
@@ -2470,6 +2542,15 @@ export default function ScribeCockpit({
                         </div>
                       </div>
                     </details>
+                  )}
+                  {bausteinHinweis?.gruppe === gruppenKey && (
+                    <div className="baustein-toast" role="status">
+                      <span>{bausteinHinweis.text}</span>
+                      {bausteinHinweis.undo && (
+                        <button type="button" className="neben klein" disabled={optSpeichert} onClick={() => void ausblendenRueckgaengig()}>{t("scribe.blocks.undo")}</button>
+                      )}
+                      <button type="button" className="baustein-toast-zu" aria-label={t("scribe.blocks.close")} onClick={() => setBausteinHinweis(null)}>×</button>
+                    </div>
                   )}
                   {(() => {
                     const key = `${m.termin_typ}:${g}`;
@@ -2666,6 +2747,7 @@ export default function ScribeCockpit({
           {!nutzerKuerzel && (
             <span className="hinweis-fehlt">Gesperrt: Deinem persönlichen Mitarbeiterkonto fehlt ein Kürzel. Bitte Mitarbeiter wechseln oder das Kürzel in der Teamverwaltung hinterlegen.</span>
           )}
+          {entwurfHinweis && !bestaetigt && <span className="hinweis-fehlt">{entwurfHinweis}</span>}
           {entwurfId && !bestaetigt && !zwischenInfo && <span className="hinweis-ok">Gespeicherter Entwurf, wird beim Bestätigen final in die Akte eingetragen.</span>}
           {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
@@ -2851,7 +2933,21 @@ export default function ScribeCockpit({
           </div>
         )}
 
-        <PraxisInboxWidget />
+        <PraxisInboxWidget vorbelegung={inboxVorbelegung} />
+        {verwaltung && (() => {
+          const v = vorlagen.find((x) => x.id === verwaltung.vorlageId);
+          if (!v) return null;
+          return (
+            <BausteineVerwaltung
+              vorlage={v}
+              titel={`${behandlungsartName(v.behandlungsart) || v.behandlungsart} · ${anzeigeName(v)}`}
+              startGruppe={verwaltung.gruppe}
+              onClose={() => setVerwaltung(null)}
+              onGeaendert={async () => { await ladeVorlagen(); }}
+              onWunsch={(text) => { setVerwaltung(null); setInboxVorbelegung({ text, n: Date.now() }); }}
+            />
+          );
+        })()}
 
         {detail && (
           <div className="deckel" onClick={() => setDetail(null)}>

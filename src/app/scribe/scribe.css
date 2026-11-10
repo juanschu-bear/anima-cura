@@ -1288,3 +1288,118 @@
 .scribe .praxis-statusspur small{font-size:10px;opacity:.75}
 .scribe .praxis-statusspur-text{margin:6px 0 0;font-size:11.5px;opacity:.85}
 .scribe .praxis-inbox-ok{margin:8px 0 0;font-size:12.5px;color:#1f7a4d;background:#e6f5ec;border-radius:10px;padding:8px 12px}
+
+/* ===== Bausteine verwalten mit Zeitmaschine (10.11.2026) ===== */
+.scribe .gkopf{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:11px}
+.scribe .gkopf .gname{margin-bottom:0}
+.scribe .gruppe-aendern{flex:none;font-family:var(--display);font-size:12px;font-weight:600;cursor:pointer;color:var(--gedeckt);
+  background:transparent;border:1px solid var(--kante);border-radius:999px;padding:5px 11px;transition:all .15s ease}
+.scribe .gruppe-aendern:hover{color:var(--primaer);border-color:var(--primaer);background:var(--primaer-soft)}
+.scribe .gruppe-aendern:focus-visible,.scribe .bausteine-karte button:focus-visible,.scribe .glocke button:focus-visible{outline:2px solid var(--primaer);outline-offset:2px}
+.scribe .baustein-toast{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:9px 12px;border-radius:14px;
+  background:var(--primaer-soft);border:1px solid var(--kante-hover);font-size:13px}
+.scribe .baustein-toast span{flex:1 1 220px}
+.scribe .baustein-toast-zu{border:0;background:transparent;color:var(--gedeckt);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px}
+.scribe .haupt.klein{font-size:12.5px;padding:7px 14px;border-radius:12px}
+.scribe .bausteine-karte{max-width:720px}
+.scribe .bausteine-erklaerung{margin:0 0 12px;font-size:13.5px;color:var(--gedeckt);line-height:1.5}
+.scribe .bausteine-tabs{display:flex;gap:6px;margin:4px 0 14px;padding:4px;border-radius:14px;background:var(--flaeche-flach);border:1px solid var(--kante)}
+.scribe .bausteine-tabs button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;padding:9px 12px;
+  font-family:var(--display);font-size:13.5px;font-weight:600;color:var(--gedeckt);background:transparent;cursor:pointer}
+.scribe .bausteine-tabs button[aria-selected="true"]{background:var(--primaer-soft);color:var(--schrift);box-shadow:inset 0 0 0 1px var(--kante-hover)}
+.scribe .bausteine-zahl{min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;font-size:11px;background:var(--gold-soft);color:var(--gold-textton)}
+.scribe .bausteine-meldung{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border-radius:12px;font-size:13.5px}
+.scribe .bausteine-meldung span{flex:1 1 260px}
+.scribe .bausteine-meldung.ok{background:var(--primaer-soft);color:var(--schrift)}
+.scribe .bausteine-meldung.fehler{background:var(--rot-soft);color:var(--rot)}
+.scribe .bausteine-meldung.schutz{background:var(--gold-soft);color:var(--gold-textton)}
+.scribe .bausteine-gruppen{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.scribe .bausteine-gruppen button{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--schrift);
+  border:1px solid var(--kante);background:var(--flaeche-flach);border-radius:999px;padding:6px 12px}
+.scribe .bausteine-gruppen button[aria-pressed="true"]{border-color:var(--primaer);background:var(--primaer-soft)}
+.scribe .bausteine-schloss{color:var(--gold);font-size:9px}
+.scribe .bausteine-schutz{display:grid;gap:6px;justify-items:start;margin-bottom:12px;padding:12px 14px;border-radius:14px;background:var(--gold-soft);
+  border:1px solid rgba(242,181,68,.35);font-size:13.5px;color:var(--schrift)}
+.scribe .bausteine-schutz b{color:var(--gold-textton)}
+.scribe .bausteine-h{margin:14px 0 8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gedeckt);font-weight:700}
+.scribe .bausteine-leer{margin:0;font-size:13.5px;color:var(--gedeckt)}
+.scribe .bausteine-liste{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.scribe .baustein-zeile{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;border-radius:12px;
+  background:var(--flaeche-flach);border:1px solid var(--kante)}
+.scribe .baustein-zeile.aus .baustein-text{color:var(--gedeckt)}
+.scribe .baustein-text{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.scribe .baustein-text small{font-size:11.5px;color:var(--dunkler)}
+.scribe .baustein-knoepfe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.scribe .baustein-umbenennen{flex:1;display:grid;gap:8px}
+.scribe .baustein-umbenennen input,.scribe .bausteine-zeitpunkt input,.scribe .bausteine-suche{width:100%;font:inherit;font-size:14px;color:var(--schrift);
+  background:var(--eingabe);border:1px solid var(--kante-hover);border-radius:10px;padding:9px 11px}
+.scribe .bausteine-zeitpunkt input{width:auto;min-width:220px}
+.scribe .bausteine-suche{margin-bottom:8px}
+.scribe .bausteine-hinweis{margin:6px 0 0;font-size:12.5px;color:var(--gold-textton)}
+.scribe .bausteine-aus{margin-top:12px}
+.scribe .bausteine-aus summary{cursor:pointer;font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gedeckt);font-weight:700;margin-bottom:8px}
+.scribe .bausteine-buch{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.scribe .bausteine-buch li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 12px;border-radius:12px;background:var(--flaeche-flach);border:1px solid var(--kante)}
+.scribe .buch-zeit{font-family:var(--mono);font-size:12px;color:var(--gedeckt);padding-top:2px;white-space:nowrap}
+.scribe .buch-text{display:grid;gap:2px;font-size:13.5px;min-width:0;overflow-wrap:anywhere}
+.scribe .buch-was{color:var(--schrift)}
+.scribe .buch-was em{font-style:normal;margin-left:8px;font-size:12px;color:var(--gedeckt)}
+.scribe .buch-text small{font-size:11.5px;color:var(--dunkler)}
+.scribe .bausteine-zeitpunkt,.scribe .bausteine-geloescht{margin-top:18px;padding-top:4px;border-top:1px solid var(--kante)}
+.scribe .bausteine-frage{display:grid;gap:10px;margin-top:10px;padding:12px 14px;border-radius:14px;background:var(--gold-soft);font-size:13.5px}
+@media(max-width:620px){
+  .scribe .bausteine-buch li{grid-template-columns:minmax(0,1fr)}
+  .scribe .bausteine-zeitpunkt input{min-width:0;width:100%}
+}
+
+/* ===== Glocke ===== */
+.scribe .glocke{position:relative}
+.scribe .glocke-knopf{position:relative;width:36px;height:36px;display:grid;place-items:center;cursor:pointer;color:var(--schrift);
+  background:var(--flaeche-flach);border:1px solid var(--kante-hover);border-radius:999px;transition:all .15s ease}
+.scribe .glocke-knopf:hover{border-color:var(--primaer);background:var(--primaer-soft)}
+.scribe .glocke-zahl{position:absolute;top:-5px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;background:#E5512B;color:#fff;box-shadow:0 0 0 2px var(--grund)}
+.scribe .glocke-panel{position:absolute;right:0;top:calc(100% + 10px);z-index:70;width:min(380px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;
+  padding:12px;border-radius:20px;background:var(--flaeche-flach);border:1px solid var(--kante-hover);box-shadow:var(--schatten);backdrop-filter:blur(18px)}
+.scribe[data-thema="dunkel"] .glocke-panel{background:#131916}
+.scribe[data-thema="hell"] .glocke-panel{background:#FFFEF9}
+.scribe .glocke-kopf{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 4px 10px}
+.scribe .glocke-kopf b{font-family:var(--display);font-size:15px}
+.scribe .glocke-kopf button,.scribe .glocke-mehr,.scribe .glocke-zurueck{border:0;background:transparent;color:var(--primaer);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 6px}
+.scribe .glocke-mehr{display:block;margin:8px auto 0}
+.scribe .glocke-liste{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.scribe .glocke-eintrag{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr) 10px;gap:10px;align-items:start;text-align:left;cursor:pointer;
+  padding:10px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--schrift);font:inherit}
+.scribe .glocke-eintrag:hover{background:var(--primaer-soft)}
+.scribe .glocke-eintrag.neu{background:var(--primaer-soft);border-color:var(--kante)}
+.scribe .glocke-icon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--flaeche);color:var(--primaer);border:1px solid var(--kante)}
+.scribe .glocke-eintrag.art-wichtig .glocke-icon{color:var(--rot)}
+.scribe .glocke-eintrag.art-update .glocke-icon{color:var(--gold)}
+.scribe .glocke-inhalt{display:grid;gap:2px;min-width:0;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.scribe .glocke-inhalt b{font-size:13.5px}
+.scribe .glocke-bezug{color:var(--gedeckt)}
+.scribe .glocke-inhalt small{font-size:11.5px;color:var(--dunkler)}
+.scribe .glocke-punkt{width:9px;height:9px;margin-top:6px;border-radius:50%;background:#E5512B}
+.scribe .glocke-leer{margin:6px 4px 8px;font-size:13px;color:var(--gedeckt)}
+.scribe .glocke-neuerung{display:grid;gap:6px;padding:2px 4px 6px}
+.scribe .glocke-neuerung .glocke-zurueck{justify-self:start;padding-left:0}
+.scribe .glocke-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-textton)}
+.scribe .glocke-neuerung h4{margin:0;font-family:var(--display);font-size:17px}
+.scribe .glocke-neuerung small{font-size:11.5px;color:var(--dunkler)}
+.scribe .glocke-text{margin:4px 0 6px;font-size:13.5px;line-height:1.55;white-space:pre-line}
+.scribe .glocke-ok{margin:0;font-size:13px;color:var(--primaer)}
+
+/* ===== Infobox: Rechte und Stand ===== */
+.scribe .praxis-zwischenloesung p{margin:4px 0 6px;font-size:12.5px;line-height:1.5;color:#EAF2FD}
+.scribe .praxis-item-actions button.praxis-abhaken{border-color:rgba(124,196,255,.45);background:rgba(124,196,255,.14);font-weight:600}
+.scribe .praxis-inbox-mail{display:inline}
+.scribe .praxis-listenblock.ziel{border-color:rgba(124,196,255,.5);box-shadow:0 0 0 1px rgba(124,196,255,.25)}
+.scribe .praxis-listenblock-kopf .praxis-inbox-close.klein{width:28px;height:28px;font-size:18px;border-radius:10px}
+@media(prefers-reduced-motion:reduce){.scribe .gruppe-aendern,.scribe .glocke-knopf{transition:none}}
+@media(max-width:920px){
+  .scribe .glocke-panel{position:fixed;left:12px;right:12px;top:12px;width:auto;max-height:calc(100vh - 24px)}
+}
+.scribe .praxis-ziel-oben{margin-bottom:14px}
+.scribe .buch-titel{display:block}
+.scribe .praxis-zwischenloesung{margin-bottom:12px}
+.scribe .praxis-zwischenloesung .praxis-inbox-minihelp{display:block}

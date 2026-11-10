@@ -2,9 +2,10 @@
 
 import { Lightbulb, MessageCircleMore, Sparkles, CircleAlert, ListTodo, CheckCheck, Loader2, Trash2, ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useThema } from "./ScribeShell";
 import { t } from "@/lib/i18n";
+import { INBOX_OEFFNEN } from "./ScribeGlocke";
 
 type InboxStatus = "bestaetigt" | "untersucht" | "fix_in_arbeit" | "bereitgestellt" | "praxis_bestaetigt";
 type InboxArt = "anliegen" | "idee" | "aufgabe" | "frage" | "inspiration";
@@ -31,6 +32,9 @@ type InboxEintrag = {
     geaendert_am: string;
   }>;
   praxis_bestaetigt_von?: string | null;
+  /** Stand des Eintrags; geht bei jeder Änderung mit, damit nichts überschrieben wird. */
+  revision?: number;
+  erstellt_von?: string | null;
   zwischenloesung?: string | null;
   zwischenloesung_aktualisiert_am?: string | null;
   zwischenloesung_aktualisiert_von_name?: string | null;
@@ -56,6 +60,9 @@ type ApiAntwort = {
   currentUserId: string;
   team: Array<{ id: string; name: string; role: string | null }>;
   canManageTeam?: boolean;
+  /** Nur Juans Konto oder die Automatik setzen „Wird angeschaut“, „Wird umgesetzt“ und „Fertig, bitte prüfen“. */
+  canSetDeveloperStatus?: boolean;
+  storageReady?: boolean;
 };
 
 const ARTEN: Array<{ key: InboxArt; label: string; icon: typeof Lightbulb }> = [
@@ -186,7 +193,7 @@ function istPersonImTeam(name: string | null | undefined, team: Array<{ id: stri
   return team.some((person) => person.name.trim().toLocaleLowerCase("de-DE") === ziel);
 }
 
-export default function PraxisInboxWidget() {
+export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?: { text: string; n: number } | null }) {
   const { thema } = useThema();
   const [offen, setOffen] = useState(false);
   const [laedt, setLaedt] = useState(false);
@@ -199,6 +206,10 @@ export default function PraxisInboxWidget() {
   const [teamForm, setTeamForm] = useState({ lokal: "", name: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
   const [teamSpeichert, setTeamSpeichert] = useState(false);
   const [eingetragenUm, setEingetragenUm] = useState<string | null>(null);
+  const [mailStand, setMailStand] = useState<"sent" | "pending" | null>(null);
+  /** Eintrag, zu dem die Glocke oder ein Link geführt hat. */
+  const [ziel, setZiel] = useState<string | null>(null);
+  const zielRef = useRef<HTMLElement | null>(null);
 
   async function laden() {
     setLaedt(true);
@@ -206,7 +217,7 @@ export default function PraxisInboxWidget() {
     try {
       const res = await fetch("/api/scribe/inbox", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiAntwort | { error?: string } | null;
-      if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? "Praxis-Inbox konnte nicht geladen werden.");
+      if (!res.ok) throw new Error((json as { message?: string; error?: string } | null)?.message ?? (json as { error?: string } | null)?.error ?? "Praxis-Inbox konnte nicht geladen werden.");
       setDaten(json as ApiAntwort);
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Praxis-Inbox konnte nicht geladen werden.");
@@ -217,7 +228,34 @@ export default function PraxisInboxWidget() {
 
   useEffect(() => {
     void laden();
+    const ausLink = new URLSearchParams(window.location.search).get("inbox");
+    if (ausLink) {
+      setZiel(ausLink);
+      setOffen(true);
+    }
+    const ausGlocke = (ev: Event) => {
+      const id = (ev as CustomEvent<string>).detail;
+      if (!id) return;
+      setZiel(id);
+      setOffen(true);
+      void laden();
+    };
+    window.addEventListener(INBOX_OEFFNEN, ausGlocke);
+    return () => window.removeEventListener(INBOX_OEFFNEN, ausGlocke);
   }, []);
+
+  // Wunsch an Juan aus der Bausteine-Verwaltung: Inbox öffnen und den Text vorbelegen.
+  useEffect(() => {
+    if (!vorbelegung) return;
+    setOffen(true);
+    setEingetragenUm(null);
+    setMailStand(null);
+    setForm({ ...DEFAULT_FORM, art: "anliegen", text: vorbelegung.text, kategorie: "Wunsch", bereich: "Textbausteine" });
+  }, [vorbelegung]);
+
+  useEffect(() => {
+    if (offen && ziel && daten) zielRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [offen, ziel, daten]);
 
   async function speichern() {
     if (!form.text.trim()) {
@@ -227,6 +265,7 @@ export default function PraxisInboxWidget() {
     setSpeichert(true);
     setFehler(null);
     setEingetragenUm(null);
+    setMailStand(null);
     try {
       const res = await fetch("/api/scribe/inbox", {
         method: "POST",
@@ -234,9 +273,11 @@ export default function PraxisInboxWidget() {
         body: JSON.stringify(form),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Eintrag konnte nicht gespeichert werden.");
+      if (!res.ok) throw new Error(json?.message ?? json?.error ?? "Eintrag konnte nicht gespeichert werden.");
       setForm(DEFAULT_FORM);
       setEingetragenUm(new Date().toISOString());
+      // Gespeichert und Mail verschickt sind getrennte Zustände.
+      setMailStand(json?.mail?.status === "sent" ? "sent" : json?.mail?.status === "pending" ? "pending" : null);
       await laden();
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Eintrag konnte nicht gespeichert werden.");
@@ -245,80 +286,58 @@ export default function PraxisInboxWidget() {
     }
   }
 
-  async function statusSetzen(id: string, status: InboxStatus, praxisBestaetigtVon?: string) {
-    setFehler(null);
+  /** Jede Änderung schickt den Stand des Eintrags mit. Hat ihn inzwischen jemand geändert, wird neu geladen statt überschrieben. */
+  async function patchen(eintrag: InboxEintrag, body: Record<string, unknown>, fallback: string, still = false): Promise<boolean> {
+    if (!still) setFehler(null);
     try {
       const res = await fetch("/api/scribe/inbox", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status, praxis_bestaetigt_von: praxisBestaetigtVon }),
+        body: JSON.stringify({ id: eintrag.id, revision: eintrag.revision, ...body }),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Status konnte nicht aktualisiert werden.");
+      if (!res.ok) {
+        if (json?.code === "inbox_revision_stale") {
+          await laden();
+          if (!still) setFehler(t("scribe.inbox.stale"));
+          return false;
+        }
+        throw new Error(json?.message ?? json?.error ?? fallback);
+      }
       await laden();
+      return true;
     } catch (err) {
-      setFehler(err instanceof Error ? err.message : "Status konnte nicht aktualisiert werden.");
+      if (!still) setFehler(err instanceof Error ? err.message : fallback);
+      return false;
     }
   }
 
-  async function durchPraxisBestaetigen(id: string) {
+  async function statusSetzen(eintrag: InboxEintrag, status: InboxStatus, praxisBestaetigtVon?: string) {
+    await patchen(eintrag, { status, praxis_bestaetigt_von: praxisBestaetigtVon }, "Status konnte nicht aktualisiert werden.");
+  }
+
+  async function durchPraxisBestaetigen(eintrag: InboxEintrag) {
     const name = typeof window !== "undefined"
       ? window.prompt("Wer bestätigt die Bereitstellung für die Praxis? Bitte vollständigen Namen eintragen.")?.trim()
       : "";
     if (!name) return;
-    await statusSetzen(id, "praxis_bestaetigt", name);
+    await statusSetzen(eintrag, "praxis_bestaetigt", name);
   }
 
-  async function antwortSpeichern(id: string) {
-    const zustand = antworten[id];
+  async function antwortSpeichern(eintrag: InboxEintrag) {
+    const zustand = antworten[eintrag.id];
     if (!zustand?.text.trim()) return;
-    setFehler(null);
-    try {
-      const res = await fetch("/api/scribe/inbox", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, kommentar_text: zustand.text, mention_user_id: zustand.mentionUserId || null }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Antwort konnte nicht gespeichert werden.");
-      setAntworten((alt) => ({ ...alt, [id]: { text: "", mentionUserId: "" } }));
-      await laden();
-    } catch (err) {
-      setFehler(err instanceof Error ? err.message : "Antwort konnte nicht gespeichert werden.");
-    }
+    const ok = await patchen(eintrag, { kommentar_text: zustand.text, mention_user_id: zustand.mentionUserId || null }, "Antwort konnte nicht gespeichert werden.");
+    if (ok) setAntworten((alt) => ({ ...alt, [eintrag.id]: { text: "", mentionUserId: "" } }));
   }
 
   async function zwischenloesungSpeichern(eintrag: InboxEintrag) {
     const text = zwischenloesungen[eintrag.id] ?? eintrag.zwischenloesung ?? "";
-    setFehler(null);
-    try {
-      const res = await fetch("/api/scribe/inbox", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: eintrag.id, zwischenloesung: text }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Zwischenlösung konnte nicht gespeichert werden.");
-      await laden();
-    } catch (err) {
-      setFehler(err instanceof Error ? err.message : "Zwischenlösung konnte nicht gespeichert werden.");
-    }
+    await patchen(eintrag, { zwischenloesung: text }, "Zwischenlösung konnte nicht gespeichert werden.");
   }
 
-  async function zuweisen(id: string, assignedTo: string) {
-    setFehler(null);
-    try {
-      const res = await fetch("/api/scribe/inbox", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, assigned_to: assignedTo || null }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Zuweisung konnte nicht gespeichert werden.");
-      await laden();
-    } catch (err) {
-      setFehler(err instanceof Error ? err.message : "Zuweisung konnte nicht gespeichert werden.");
-    }
+  async function zuweisen(eintrag: InboxEintrag, assignedTo: string) {
+    await patchen(eintrag, { assigned_to: assignedTo || null }, "Zuweisung konnte nicht gespeichert werden.");
   }
 
   async function teammitgliedAnlegen() {
@@ -345,36 +364,32 @@ export default function PraxisInboxWidget() {
     }
   }
 
-  async function mentionsAlsGelesen(id: string, unreadMentions: number | undefined) {
-    if (!unreadMentions) return;
-    try {
-      await fetch("/api/scribe/inbox", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, mark_mentions_read: true }),
-      });
-      await laden();
-    } catch {
-      // still usable without surfacing a blocking error
-    }
+  async function mentionsAlsGelesen(eintrag: InboxEintrag) {
+    if (!eintrag.unread_mentions) return;
+    await patchen(eintrag, { mark_mentions_read: true }, "", true);
   }
 
-  async function loeschen(id: string) {
+  async function loeschen(eintrag: InboxEintrag) {
     setFehler(null);
     if (typeof window !== "undefined" && !window.confirm("Diesen Eintrag wirklich löschen?")) return;
     try {
       const res = await fetch("/api/scribe/inbox", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: eintrag.id }),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Eintrag konnte nicht gelöscht werden.");
+      if (!res.ok) throw new Error(json?.code === "inbox_delete_forbidden" ? t("scribe.inbox.deleteOwnOnly") : json?.message ?? json?.error ?? "Eintrag konnte nicht gelöscht werden.");
       await laden();
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Eintrag konnte nicht gelöscht werden.");
     }
   }
+
+  const entwickler = !!daten?.canSetDeveloperStatus;
+  /** Löschen darf nur, wer den Eintrag angelegt hat. */
+  const eigener = (eintrag: InboxEintrag) => !!daten?.currentUserId && eintrag.erstellt_von === daten.currentUserId;
+  const zielEintrag = ziel ? (daten?.eintraege ?? []).find((eintrag) => eintrag.id === ziel) ?? null : null;
 
   const heuteListe = useMemo(
     () => (daten?.eintraege ?? []).filter((eintrag) => eintrag.status === "bestaetigt" && eintrag.istHeute),
@@ -399,30 +414,40 @@ export default function PraxisInboxWidget() {
     const erstellerIstImTeam = istPersonImTeam(eintrag.erstellt_von_name, team);
     return (
       <div className="praxis-thread">
-        <div className="praxis-antwortbox">
-          <div className="praxis-thread-kopf"><span>Zwischenlösung für die Praxis</span></div>
-          <textarea
-            className="praxis-inbox-textarea klein"
-            rows={2}
-            placeholder="Was soll die Praxis bis zur endgültigen Lösung konkret tun?"
-            value={zwischenloesungen[eintrag.id] ?? eintrag.zwischenloesung ?? ""}
-            onChange={(event) => setZwischenloesungen((alt) => ({ ...alt, [eintrag.id]: event.target.value }))}
-          />
-          <div className="praxis-antwortzeile">
-            <span className="praxis-inbox-minihelp">
-              {eintrag.zwischenloesung_aktualisiert_am
-                ? `${eintrag.zwischenloesung_aktualisiert_von_name || "Praxis"} · ${formatZeitpunkt(eintrag.zwischenloesung_aktualisiert_am)}`
-                : "Noch keine Zwischenlösung dokumentiert"}
-            </span>
-            <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void zwischenloesungSpeichern(eintrag)}>
-              Zwischenlösung speichern
-            </button>
+        {entwickler ? (
+          <div className="praxis-antwortbox">
+            <div className="praxis-thread-kopf"><span>Zwischenlösung für die Praxis</span></div>
+            <textarea
+              className="praxis-inbox-textarea klein"
+              rows={2}
+              placeholder="Was soll die Praxis bis zur endgültigen Lösung konkret tun?"
+              value={zwischenloesungen[eintrag.id] ?? eintrag.zwischenloesung ?? ""}
+              onChange={(event) => setZwischenloesungen((alt) => ({ ...alt, [eintrag.id]: event.target.value }))}
+            />
+            <div className="praxis-antwortzeile">
+              <span className="praxis-inbox-minihelp">
+                {eintrag.zwischenloesung_aktualisiert_am
+                  ? `${eintrag.zwischenloesung_aktualisiert_von_name || "Praxis"} · ${formatZeitpunkt(eintrag.zwischenloesung_aktualisiert_am)}`
+                  : "Noch keine Zwischenlösung dokumentiert"}
+              </span>
+              <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void zwischenloesungSpeichern(eintrag)}>
+                Zwischenlösung speichern
+              </button>
+            </div>
           </div>
-        </div>
+        ) : eintrag.zwischenloesung ? (
+          <div className="praxis-antwortbox praxis-zwischenloesung">
+            <div className="praxis-thread-kopf"><span>Zwischenlösung für die Praxis</span></div>
+            <p>{eintrag.zwischenloesung}</p>
+            {eintrag.zwischenloesung_aktualisiert_am && (
+              <span className="praxis-inbox-minihelp">{eintrag.zwischenloesung_aktualisiert_von_name || "Juan"} · {formatZeitpunkt(eintrag.zwischenloesung_aktualisiert_am)}</span>
+            )}
+          </div>
+        ) : null}
         <div className="praxis-thread-kopf">
           <span>Antworten & Rückfragen</span>
           {eintrag.unread_mentions ? (
-            <button type="button" className="praxis-thread-unread" onClick={() => void mentionsAlsGelesen(eintrag.id, eintrag.unread_mentions)}>
+            <button type="button" className="praxis-thread-unread" onClick={() => void mentionsAlsGelesen(eintrag)}>
               {eintrag.unread_mentions} neu
             </button>
           ) : null}
@@ -465,11 +490,34 @@ export default function PraxisInboxWidget() {
               <option value="">{(daten?.team?.length ?? 0) > 0 ? "Niemand markieren" : "Noch kein Mitarbeiter hinterlegt"}</option>
               {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>@{person.name}</option>)}
             </select>
-            <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void antwortSpeichern(eintrag.id)}>
+            <button type="button" className="praxis-inbox-refresh antwort" onClick={() => void antwortSpeichern(eintrag)}>
               Antwort speichern
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  /** Knöpfe je Eintrag: Bearbeitungsstand nur für Juans Konto, das Abhaken am Ende für die Praxis, Löschen nur für eigene Einträge. */
+  function renderAktionen(eintrag: InboxEintrag) {
+    const naechster = STATUS_NEXT[eintrag.status];
+    return (
+      <div className="praxis-item-actions">
+        {entwickler && ["untersucht", "fix_in_arbeit", "bereitgestellt"].includes(eintrag.status) && (
+          <button type="button" onClick={() => void statusSetzen(eintrag, "bestaetigt")}>Zurück auf bestätigt</button>
+        )}
+        {naechster && eintrag.status === "bereitgestellt" && (
+          <button type="button" className="praxis-abhaken" onClick={() => void durchPraxisBestaetigen(eintrag)}>{STATUS_NEXT_LABEL.bereitgestellt}</button>
+        )}
+        {naechster && eintrag.status !== "bereitgestellt" && entwickler && (
+          <button type="button" onClick={() => void statusSetzen(eintrag, naechster)}>{STATUS_NEXT_LABEL[eintrag.status]}</button>
+        )}
+        {eigener(eintrag) && (
+          <button type="button" className="kritisch" onClick={() => void loeschen(eintrag)} aria-label="Eintrag löschen">
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     );
   }
@@ -489,6 +537,25 @@ export default function PraxisInboxWidget() {
             </button>
           </div>
 
+            {zielEintrag && (
+              <div className="praxis-listenblock ziel praxis-ziel-oben">
+                <div className="praxis-listenblock-kopf">
+                  <h4>{t("scribe.inbox.fromBell")}</h4>
+                  <button type="button" className="praxis-inbox-close klein" onClick={() => setZiel(null)} aria-label={t("scribe.blocks.close")}>×</button>
+                </div>
+                <article ref={(el) => { zielRef.current = el; }} className={`praxis-item prioritaet-${zielEintrag.prioritaet}`}>
+                  <InboxMeta eintrag={zielEintrag} />
+                  <strong>{zielEintrag.titel}</strong>
+                  <StatusSpur eintrag={zielEintrag} />
+                  {zielEintrag.text && <p>{zielEintrag.text}</p>}
+                  <div className="praxis-item-fuss">
+                    <span>{zielEintrag.erstellt_von_name || "Praxis"} · {formatZeitpunkt(zielEintrag.erstellt_am)}</span>
+                    {renderAktionen(zielEintrag)}
+                  </div>
+                  {renderKommentarbereich(zielEintrag)}
+                </article>
+              </div>
+            )}
           <div className="praxis-inbox-form">
             <div className="praxis-chip-row">
               {ARTEN.map(({ key, label, icon: Icon }) => (
@@ -651,7 +718,10 @@ export default function PraxisInboxWidget() {
             </div>
             {fehler && <p className="praxis-inbox-fehler">{fehler}</p>}
             {eingetragenUm && !fehler && (
-              <p className="praxis-inbox-ok" role="status">{t("scribe.inbox.saved", "de", { zeit: formatZeitpunkt(eingetragenUm) })}</p>
+              <p className="praxis-inbox-ok" role="status">
+                {t("scribe.inbox.saved", "de", { zeit: formatZeitpunkt(eingetragenUm) })}
+                {mailStand && <span className="praxis-inbox-mail">{t(mailStand === "sent" ? "scribe.inbox.mailSent" : "scribe.inbox.mailPending")}</span>}
+              </p>
             )}
           </div>
 
@@ -675,19 +745,16 @@ export default function PraxisInboxWidget() {
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
-                      <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "untersucht")}>Untersuchung starten</button>
-                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
-                          <Trash2 size={14} />
-                        </button>
+                      {renderAktionen(eintrag)}
+                    </div>
+                    {entwickler && (
+                      <div className="praxis-zuweisung">
+                        <select className="praxis-inbox-select klein" value={eintrag.assigned_to ?? ""} onChange={(e) => void zuweisen(eintrag, e.target.value)}>
+                          <option value="">{(daten?.team?.length ?? 0) > 0 ? "Zuständigkeit wählen" : "Noch kein Mitarbeiter hinterlegt"}</option>
+                          {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                        </select>
                       </div>
-                    </div>
-                    <div className="praxis-zuweisung">
-                      <select className="praxis-inbox-select klein" value={eintrag.assigned_to ?? ""} onChange={(e) => void zuweisen(eintrag.id, e.target.value)}>
-                        <option value="">{(daten?.team?.length ?? 0) > 0 ? "Zuständigkeit wählen" : "Noch kein Mitarbeiter hinterlegt"}</option>
-                        {(daten?.team ?? []).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
-                      </select>
-                    </div>
+                    )}
                     <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
                     {renderKommentarbereich(eintrag)}
                   </article>
@@ -713,22 +780,7 @@ export default function PraxisInboxWidget() {
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · {formatFaelligkeit(eintrag.faellig_am)}</span>
-                      <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "bestaetigt")}>Zurück auf bestätigt</button>
-                        {STATUS_NEXT[eintrag.status] && (
-                          <button
-                            type="button"
-                            onClick={() => eintrag.status === "bereitgestellt"
-                              ? void durchPraxisBestaetigen(eintrag.id)
-                              : void statusSetzen(eintrag.id, STATUS_NEXT[eintrag.status] as InboxStatus)}
-                          >
-                            {STATUS_NEXT_LABEL[eintrag.status]}
-                          </button>
-                        )}
-                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {renderAktionen(eintrag)}
                     </div>
                     <div className="praxis-item-zeiten">
                       Erstellt: {formatZeitpunkt(eintrag.erstellt_am)} · Aktueller Schritt: {formatZeitpunkt(eintrag.status_zeitpunkte?.[eintrag.status])}
@@ -759,12 +811,7 @@ export default function PraxisInboxWidget() {
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
                       <span>{eintrag.erstellt_von_name || "Praxis"} · fällig {formatFaelligkeit(eintrag.faellig_am)}</span>
-                      <div className="praxis-item-actions">
-                        <button type="button" onClick={() => void statusSetzen(eintrag.id, "untersucht")}>Untersuchung starten</button>
-                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)} aria-label="Eintrag löschen">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {renderAktionen(eintrag)}
                     </div>
                     <div className="praxis-item-zeiten">Erstellt: {formatZeitpunkt(eintrag.erstellt_am)}</div>
                     {renderKommentarbereich(eintrag)}
@@ -798,12 +845,14 @@ export default function PraxisInboxWidget() {
                     </div>
                     <div className="praxis-zustaendig">Abgenommen von: {eintrag.praxis_bestaetigt_von || "nicht dokumentiert (Alteintrag)"}</div>
                     {renderKommentarbereich(eintrag)}
-                    <div className="praxis-item-actions" style={{ marginTop: 10 }}>
-                      <button type="button" className="kritisch" onClick={() => void loeschen(eintrag.id)}>
-                        <Trash2 size={14} />
-                        Löschen
-                      </button>
-                    </div>
+                    {eigener(eintrag) && (
+                      <div className="praxis-item-actions" style={{ marginTop: 10 }}>
+                        <button type="button" className="kritisch" onClick={() => void loeschen(eintrag)}>
+                          <Trash2 size={14} />
+                          Löschen
+                        </button>
+                      </div>
+                    )}
                   </details>
                 ))}
               </div>
