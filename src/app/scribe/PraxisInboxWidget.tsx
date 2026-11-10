@@ -4,6 +4,7 @@ import { Lightbulb, MessageCircleMore, Sparkles, CircleAlert, ListTodo, CheckChe
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useThema } from "./ScribeShell";
+import { t } from "@/lib/i18n";
 
 type InboxStatus = "bestaetigt" | "untersucht" | "fix_in_arbeit" | "bereitgestellt" | "praxis_bestaetigt";
 type InboxArt = "anliegen" | "idee" | "aufgabe" | "frage" | "inspiration";
@@ -78,13 +79,15 @@ const ERINNERUNGEN = [
   { key: "diese_woche", label: "Diese Woche" },
 ] as const;
 
+// Stand eines Eintrags in Praxissprache (vorher Entwicklerwörter wie „Fix in Arbeit“, Rückmeldung der Praxis 10.11.2026).
 const STATUS_LABELS: Record<InboxStatus, string> = {
-  bestaetigt: "Bestätigt",
-  untersucht: "Untersucht",
-  fix_in_arbeit: "Fix in Arbeit",
-  bereitgestellt: "Bereitgestellt",
-  praxis_bestaetigt: "Durch Praxis bestätigt",
+  bestaetigt: t("scribe.inbox.status.recorded"),
+  untersucht: t("scribe.inbox.status.looking"),
+  fix_in_arbeit: t("scribe.inbox.status.working"),
+  bereitgestellt: t("scribe.inbox.status.ready"),
+  praxis_bestaetigt: t("scribe.inbox.status.done"),
 };
+const STATUS_REIHE: InboxStatus[] = ["bestaetigt", "untersucht", "fix_in_arbeit", "bereitgestellt", "praxis_bestaetigt"];
 
 const STATUS_NEXT: Partial<Record<InboxStatus, InboxStatus>> = {
   bestaetigt: "untersucht",
@@ -97,7 +100,7 @@ const STATUS_NEXT_LABEL: Partial<Record<InboxStatus, string>> = {
   bestaetigt: "Untersuchung starten",
   untersucht: "Fix starten",
   fix_in_arbeit: "Als bereitgestellt markieren",
-  bereitgestellt: "Durch Praxis bestätigen",
+  bereitgestellt: t("scribe.inbox.checkOff"),
 };
 
 const DEFAULT_FORM = {
@@ -150,6 +153,33 @@ function InboxMeta({ eintrag }: { eintrag: InboxEintrag }) {
   );
 }
 
+/** Zeigt an jedem Eintrag, wo er steht: eingetragen, angeschaut, in Arbeit, fertig, erledigt. Mit Zeitpunkt und wer den letzten Schritt gesetzt hat. */
+function StatusSpur({ eintrag }: { eintrag: InboxEintrag }) {
+  const aktuell = STATUS_REIHE.indexOf(eintrag.status);
+  const letzterWechsel = [...(eintrag.status_verlauf ?? [])].reverse().find((wechsel) => wechsel.zu === eintrag.status);
+  return (
+    <div className="praxis-statusspur-box">
+      <ol className="praxis-statusspur" aria-label={t("scribe.inbox.track")}>
+        {STATUS_REIHE.map((status, index) => {
+          const zustand = index < aktuell ? "fertig" : index === aktuell ? "jetzt" : "offen";
+          const zeit = eintrag.status_zeitpunkte?.[status] ?? (status === "bestaetigt" ? eintrag.erstellt_am : null);
+          return (
+            <li key={status} className={`spur-${zustand}`}>
+              <i aria-hidden="true">{zustand === "offen" ? "" : "✓"}</i>
+              <span>{STATUS_LABELS[status]}</span>
+              {zustand !== "offen" && <small>{formatZeitpunkt(zeit)}</small>}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="praxis-statusspur-text">
+        {t("scribe.inbox.now", "de", { stand: STATUS_LABELS[eintrag.status] })}
+        {letzterWechsel?.geaendert_von_name ? ` ${t("scribe.inbox.by", "de", { name: letzterWechsel.geaendert_von_name })}` : ""}
+      </p>
+    </div>
+  );
+}
+
 function istPersonImTeam(name: string | null | undefined, team: Array<{ id: string; name: string; role: string | null }>) {
   const ziel = (name ?? "").trim().toLocaleLowerCase("de-DE");
   if (!ziel) return false;
@@ -168,6 +198,7 @@ export default function PraxisInboxWidget() {
   const [zwischenloesungen, setZwischenloesungen] = useState<Record<string, string>>({});
   const [teamForm, setTeamForm] = useState({ lokal: "", name: "", rolle: "lesezugriff", kuerzel: "", passwort: "" });
   const [teamSpeichert, setTeamSpeichert] = useState(false);
+  const [eingetragenUm, setEingetragenUm] = useState<string | null>(null);
 
   async function laden() {
     setLaedt(true);
@@ -195,6 +226,7 @@ export default function PraxisInboxWidget() {
     }
     setSpeichert(true);
     setFehler(null);
+    setEingetragenUm(null);
     try {
       const res = await fetch("/api/scribe/inbox", {
         method: "POST",
@@ -204,6 +236,7 @@ export default function PraxisInboxWidget() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "Eintrag konnte nicht gespeichert werden.");
       setForm(DEFAULT_FORM);
+      setEingetragenUm(new Date().toISOString());
       await laden();
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Eintrag konnte nicht gespeichert werden.");
@@ -617,6 +650,9 @@ export default function PraxisInboxWidget() {
               </button>
             </div>
             {fehler && <p className="praxis-inbox-fehler">{fehler}</p>}
+            {eingetragenUm && !fehler && (
+              <p className="praxis-inbox-ok" role="status">{t("scribe.inbox.saved", "de", { zeit: formatZeitpunkt(eingetragenUm) })}</p>
+            )}
           </div>
 
           <div className="praxis-inbox-liste">
@@ -634,6 +670,7 @@ export default function PraxisInboxWidget() {
                   <article key={eintrag.id} className={`praxis-item prioritaet-${eintrag.prioritaet}`}>
                     <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
+                    <StatusSpur eintrag={eintrag} />
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
@@ -671,6 +708,7 @@ export default function PraxisInboxWidget() {
                     <InboxMeta eintrag={eintrag} />
                     <div className={`praxis-zustaendig status-${slugifyLabel(eintrag.status)}`}>{STATUS_LABELS[eintrag.status]}</div>
                     <strong>{eintrag.titel}</strong>
+                    <StatusSpur eintrag={eintrag} />
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
@@ -716,6 +754,7 @@ export default function PraxisInboxWidget() {
                   <article key={eintrag.id} className="praxis-item kompakt">
                     <InboxMeta eintrag={eintrag} />
                     <strong>{eintrag.titel}</strong>
+                    <StatusSpur eintrag={eintrag} />
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-fuss">
@@ -737,7 +776,7 @@ export default function PraxisInboxWidget() {
             {erledigtListe.length > 0 && (
               <div className="praxis-listenblock erledigt">
                 <div className="praxis-listenblock-kopf">
-                  <h4>Durch Praxis bestätigt</h4>
+                  <h4>{STATUS_LABELS.praxis_bestaetigt}</h4>
                   <CheckCheck size={15} />
                 </div>
                 {erledigtListe.map((eintrag) => (
@@ -751,6 +790,7 @@ export default function PraxisInboxWidget() {
                         <ChevronDown size={15} />
                       </span>
                     </summary>
+                    <StatusSpur eintrag={eintrag} />
                     {eintrag.text && <p>{eintrag.text}</p>}
                     {eintrag.assigned_to_name && <div className="praxis-zustaendig">Zuständig: {eintrag.assigned_to_name}</div>}
                     <div className="praxis-item-zeiten">

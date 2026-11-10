@@ -197,6 +197,18 @@ function istPraxisOption(opt: Opt | undefined): boolean {
   return opt?.quelle === "praxis" && !!opt.id;
 }
 
+/** Gruppen, deren Auswahl die Abrechnung steuert (Positionsregel hängt daran, oder Pflichtwahl wie „Kein Bogen OK“). Dort ersetzt ein eigener Text die Auswahl nicht. */
+function gruppeSteuertAbrechnung(v: Vorlage, g: string): boolean {
+  return !!v.struktur.groups[g]?.explizit || v.positionen.some((regel) => regel.if?.g === g);
+}
+
+/** Eigener Text endet wie die Bausteine mit einem Satzzeichen. */
+function freitextAlsSatz(wert: string): string {
+  const text = wert.trim();
+  if (!text) return "";
+  return /[.!?:;)]$/.test(text) ? text : `${text}.`;
+}
+
 function tokenisiereText(text: string): string[] {
   return text
     .toLowerCase()
@@ -453,6 +465,7 @@ export default function ScribeCockpit({
 
   const [suche, setSuche] = useState("");
   const [treffer, setTreffer] = useState<PatientTreffer[]>([]);
+  const [sucheOhneTreffer, setSucheOhneTreffer] = useState(false);
   const [patient, setPatient] = useState<PatientTreffer | null>(null);
 
   const [art, setArt] = useState<string>("aligner");
@@ -477,10 +490,10 @@ export default function ScribeCockpit({
   const [bogen, setBogen] = useState(BOGEN[2]);
   const [ausnahme, setAusnahme] = useState("");
 
-  // --- Self-service: practice-added option texts (Weg B) ---
-  const [optOffen, setOptOffen] = useState<string | null>(null); // key `${termin_typ}:${gruppe}` of the open editor
+  // --- Eigener Text je Gruppe: gilt nur für diesen Eintrag und wird nicht als Baustein gespeichert (Wunsch der Praxis 10.11.2026) ---
+  const [optOffen, setOptOffen] = useState<string | null>(null); // key `${termin_typ}:${gruppe}` des offenen Freitextfelds
   const [bausteinSuche, setBausteinSuche] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> Suchtext im "Weitere Varianten"-Dropdown
-  const [optText, setOptText] = useState("");
+  const [gruppenFreitext, setGruppenFreitext] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> freier Text nur für diesen Eintrag
   const [optSpeichert, setOptSpeichert] = useState(false);
 
   // --- Required-field changes: keine Angabe marker + current aligner number ---
@@ -593,13 +606,16 @@ export default function ScribeCockpit({
   useEffect(() => {
     if (suche.trim().length < 2 || patient) {
       setTreffer([]);
+      setSucheOhneTreffer(false);
       return;
     }
     const t = setTimeout(async () => {
       const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
       if (res.ok) {
         const json = await res.json();
-        setTreffer((json.results ?? []).map((r: { id: string; name: string; geburtsdatum?: string | null }) => ({ id: r.id, name: r.name, alter: berechneAlter(r.geburtsdatum ?? null) })));
+        const liste = (json.results ?? []).map((r: { id: string; name: string; geburtsdatum?: string | null }) => ({ id: r.id, name: r.name, alter: berechneAlter(r.geburtsdatum ?? null) }));
+        setTreffer(liste);
+        setSucheOhneTreffer(liste.length === 0);
       }
     }, 250);
     return () => clearTimeout(t);
@@ -634,6 +650,7 @@ export default function ScribeCockpit({
       let startPage = 0;
       let fetched = 0;
       let upserted = 0;
+      let zurueckgestellt = 0;
       // Safety cap: stop after 50 batches even if the route never reports done.
       for (let i = 0; i < 50; i++) {
         const res = await fetch(`/api/ivoris/patients/batch-sync?startPage=${startPage}`);
@@ -641,22 +658,27 @@ export default function ScribeCockpit({
         const json = await res.json();
         fetched += json.results?.fetched ?? 0;
         upserted += json.results?.upserted ?? 0;
+        zurueckgestellt += json.results?.deferred ?? 0;
         if (json.done || json.nextPage === null || json.nextPage === undefined) break;
         startPage = json.nextPage;
       }
-      setSyncInfo(`Fertig. ${fetched} Patienten geprüft, ${upserted} aktualisiert.`);
+      // Zurückgestellte Patienten (Geburtsdatum fehlt oder ist ungültig) offen nennen, sonst wirkt der Sync erfolgreich, obwohl der Name fehlt.
+      setSyncInfo(
+        t("scribe.sync.done", "de", { geprueft: fetched, aktualisiert: upserted }) +
+          (zurueckgestellt > 0 ? ` ${t("scribe.sync.deferred", "de", { anzahl: zurueckgestellt })}` : ""),
+      );
       // Aktuelle Suche erneut ausfuehren, damit ein frisch gezogener Patient sofort erscheint.
       if (suche.trim().length >= 2 && !patient) {
         const r = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
         if (r.ok) {
           const j = await r.json();
-          setTreffer(
-            (j.results ?? []).map((x: { id: string; name: string; geburtsdatum?: string | null }) => ({
-              id: x.id,
-              name: x.name,
-              alter: berechneAlter(x.geburtsdatum ?? null),
-            }))
-          );
+          const liste = (j.results ?? []).map((x: { id: string; name: string; geburtsdatum?: string | null }) => ({
+            id: x.id,
+            name: x.name,
+            alter: berechneAlter(x.geburtsdatum ?? null),
+          }));
+          setTreffer(liste);
+          setSucheOhneTreffer(liste.length === 0);
         }
       }
     } catch (e) {
@@ -766,71 +788,20 @@ export default function ScribeCockpit({
     return Array.from(woerter);
   }, [vorlagen]);
 
-  async function eigenenTextSpeichern(m: Vorlage, g: string) {
-    const text = optText.trim();
-    if (!text || optSpeichert) return;
-    setOptSpeichert(true);
-    try {
-      const res = await fetch("/api/doku/optionen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          behandlungsart: m.behandlungsart,
-          termin_typ: m.termin_typ,
-          gruppe: g,
-          text,
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const optionId = json?.option?.id as string | undefined;
-        const neuerIndex = m.struktur.groups[g]?.opts.length ?? -1;
-        setVorlagen((alt) =>
-          alt.map((vorlage) => {
-            if (vorlage.behandlungsart !== m.behandlungsart || vorlage.termin_typ !== m.termin_typ) return vorlage;
-            const gruppe = vorlage.struktur?.groups?.[g];
-            if (!gruppe || !Array.isArray(gruppe.opts)) return vorlage;
-            if (gruppe.opts.some((opt) => opt.t === text)) return vorlage;
-            return {
-              ...vorlage,
-              struktur: {
-                ...vorlage.struktur,
-                groups: {
-                  ...vorlage.struktur.groups,
-                  [g]: {
-                    ...gruppe,
-                    opts: [...gruppe.opts, { t: text, id: optionId, quelle: "praxis" }],
-                  },
-                },
-              },
-            };
-          }),
-        );
-        if (neuerIndex >= 0) {
-          bearbeitet();
-          setLeer((alt) => ({ ...alt, [`${m.termin_typ}:${g}`]: false }));
-          setAuswahl((alt) => {
-            const modul = alt[m.termin_typ] ?? {};
-            const aktuell = modul[g] ?? [];
-            if (aktuell.includes(neuerIndex)) return alt;
-            return {
-              ...alt,
-              [m.termin_typ]: {
-                ...modul,
-                [g]: [...aktuell, neuerIndex].sort((a, b) => a - b),
-              },
-            };
-          });
-        }
-        setOptOffen(null);
-        setOptText("");
-      } else {
-        const j = await res.json().catch(() => null);
-        alert(j?.error ?? "Speichern fehlgeschlagen.");
-      }
-    } finally {
-      setOptSpeichert(false);
-    }
+  // Eigener Text für eine Gruppe: steht nur in diesem Eintrag. Gespeichert wird er mit dem Eintrag, nie als neuer Baustein.
+  function gruppenFreitextSetzen(key: string, wert: string) {
+    bearbeitet();
+    setGruppenFreitext((alt) => ({ ...alt, [key]: wert }));
+  }
+
+  function gruppenFreitextEntfernen(key: string) {
+    bearbeitet();
+    setGruppenFreitext((alt) => {
+      const neu = { ...alt };
+      delete neu[key];
+      return neu;
+    });
+    setOptOffen(null);
   }
 
   function bearbeitet() {
@@ -854,6 +825,8 @@ export default function ScribeCockpit({
     setEntwurfId(null);
     setZwischenInfo(null);
     setLeer({});
+    setGruppenFreitext({});
+    setOptOffen(null);
     setSchieneAktuell("");
     setSchieneNotiz("");
     setNaechsterTermin("");
@@ -1227,15 +1200,20 @@ export default function ScribeCockpit({
         const grp = m.struktur.groups[seg.g];
         const sel = auswahl[m.termin_typ]?.[seg.g] ?? [];
         const istLeer = leer[`${m.termin_typ}:${seg.g}`] === true && !grp?.explizit;
+        // Eigener Text der Gruppe: steht direkt hinter der Auswahl. Bei Gruppen ohne Einfluss auf die Abrechnung reicht er auch ohne Auswahl.
+        const frei = freitextAlsSatz(gruppenFreitext[`${m.termin_typ}:${seg.g}`] ?? "");
         if (sel.length === 0) {
-          if (grp?.req && !istLeer) {
+          const freiGenuegt = !!frei && !gruppeSteuertAbrechnung(m, seg.g);
+          if (grp?.req && !istLeer && !freiGenuegt) {
             const label = module.length > 1 ? `${grp.label} (${anzeigeName(m)})` : grp.label;
             fehlt.push(label);
             segs.push({ art: "fehlt", text: `[ ${label} fehlt ]` });
           }
+          if (frei) segs.push({ art: "var", text: frei + " " });
           return; // "keine Angabe" -> nothing rendered, no block
         }
         sel.forEach((i) => segs.push({ art: "var", text: fuellen(grp.opts[i].t) + " " }));
+        if (frei) segs.push({ art: "var", text: frei + " " });
       });
     });
 
@@ -1261,7 +1239,28 @@ export default function ScribeCockpit({
     if (naechsterTermin.trim()) text += ` NT: ${naechsterTermin.trim()}.`;
     text = text.replace(/\s{2,}/g, " ").trim();
     return { segs, fehlt: Array.from(new Set(fehlt)), text };
-  }, [module, auswahl, leer, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz, naechsterTermin]);
+  }, [module, auswahl, leer, gruppenFreitext, zaehne, seiten, schienenVon, schienenBis, bogen, ausnahme, patient, schieneAktuell, schieneNotiz, naechsterTermin]);
+
+  /** Eigene Texte der aktuell gewählten Leistungen, so wie sie mit dem Eintrag gespeichert werden. */
+  const gruppenFreitextAktiv = useMemo(() => {
+    const erlaubt = new Set(module.flatMap((m) => Object.keys(m.struktur.groups).map((g) => `${m.termin_typ}:${g}`)));
+    return Object.fromEntries(
+      Object.entries(gruppenFreitext)
+        .map(([key, wert]) => [key, wert.trim()] as const)
+        .filter(([key, wert]) => wert.length > 0 && erlaubt.has(key)),
+    );
+  }, [gruppenFreitext, module]);
+
+  /** Texte der gewählten Bausteine, um Platzhalter wie {zaehne} zu erkennen. */
+  const gewaehlteBausteinTexte = useMemo(
+    () =>
+      module.flatMap((m) =>
+        Object.entries(auswahl[m.termin_typ] ?? {}).flatMap(([g, indizes]) =>
+          indizes.map((i) => m.struktur.groups[g]?.opts[i]?.t ?? ""),
+        ),
+      ),
+    [module, auswahl],
+  );
 
   /* Positionen über alle Module auflösen */
   const positionen = useMemo(() => {
@@ -1276,7 +1275,9 @@ export default function ScribeCockpit({
     return rows;
   }, [module, auswahl, zaehne]);
 
-  const brauchtZaehne = module.some((m) => m.struktur.vars.includes("zaehne"));
+  // Zahnschema zeigen, wenn die Leistung Zähne vorsieht oder ein gewählter Baustein eine Zahnangabe enthält (z. B. „Br … wieder geklebt“).
+  const zahnBausteinGewaehlt = gewaehlteBausteinTexte.some((text) => text.includes("{zaehne}"));
+  const brauchtZaehne = module.some((m) => m.struktur.vars.includes("zaehne")) || zahnBausteinGewaehlt;
   // Tagesdatensatz: Bestätigte Einträge dieses Patienten am gewählten Tag. Gibt es welche, wird ergänzt statt neu angelegt.
   const tagHeute = listenDatum === heutigesIsoDatum();
   const tagesBestand = useMemo(
@@ -1308,7 +1309,7 @@ export default function ScribeCockpit({
   // Eine geänderte, schon bestätigte Dokumentation wird erst mit Grund zur neuen Version. Ohne Hinweis wirkte der gesperrte Knopf wie ein Fehler.
   const grundFehlt = !!bestaetigt && dirty && !tagesModus && !aenderungsgrund.trim();
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
-  const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen"));
+  const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen")) || gewaehlteBausteinTexte.some((text) => text.includes("{bogen}"));
 
   async function neueVersion() {
     if (!bestaetigt || !aenderungsgrund.trim() || komposition.fehlt.length > 0) return;
@@ -1342,6 +1343,7 @@ export default function ScribeCockpit({
           bogen,
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
+          gruppen_freitext: gruppenFreitextAktiv,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1427,6 +1429,7 @@ export default function ScribeCockpit({
         bogen,
         naechster_termin: naechsterTermin.trim() || null,
         zahn_seiten: seiten,
+        gruppen_freitext: gruppenFreitextAktiv,
         leistungen: module.map((m) => anzeigeName(m)),
       },
       selection: auswahl,
@@ -1575,6 +1578,7 @@ export default function ScribeCockpit({
           bogen,
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
+          gruppen_freitext: gruppenFreitextAktiv,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1662,6 +1666,7 @@ export default function ScribeCockpit({
           bogen,
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
+          gruppen_freitext: gruppenFreitextAktiv,
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1711,6 +1716,12 @@ export default function ScribeCockpit({
     if (typeof v.bogen === "string") setBogen(v.bogen);
     if (typeof v.naechster_termin === "string") setNaechsterTermin(v.naechster_termin);
     if (v.zahn_seiten && typeof v.zahn_seiten === "object") setSeiten(v.zahn_seiten as Record<number, Seite>);
+    setGruppenFreitext(
+      v.gruppen_freitext && typeof v.gruppen_freitext === "object"
+        ? Object.fromEntries(Object.entries(v.gruppen_freitext as Record<string, unknown>).filter((eintrag): eintrag is [string, string] => typeof eintrag[1] === "string"))
+        : {},
+    );
+    setOptOffen(null);
     setAusnahme(bereinigeZusatztext(e.ausnahme_freitext ?? ""));
     setNtVorschlag(null);
     setEntwurfId(e.id);
@@ -2011,7 +2022,7 @@ export default function ScribeCockpit({
                 <>
                   <input
                     type="text"
-                    placeholder="Name suchen (mind. 2 Zeichen)"
+                    placeholder={t("scribe.search.placeholder")}
                     value={suche}
                     onChange={(e) => setSuche(e.target.value)}
                     aria-label="Patient suchen"
@@ -2024,6 +2035,9 @@ export default function ScribeCockpit({
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {sucheOhneTreffer && treffer.length === 0 && !syncLaeuft && (
+                    <p className="such-leer">{t("scribe.search.none")}</p>
                   )}
                   <div className="sync-zeile">
                     <button type="button" className="wahl sync" disabled={syncLaeuft} onClick={patientenSynchronisieren}>
@@ -2308,6 +2322,9 @@ export default function ScribeCockpit({
               <div className="gruppe">
                 <div className="kiefer-titel">Zahnschema · klickbares Kieferbild</div>
                 <p className="kiefer-hilfe">Zahn oder Zahl anklicken, beides geht, für die Attachment-Simulation. Das FDI-Raster darunter bleibt synchron.</p>
+                {zahnBausteinGewaehlt && zaehne.length === 0 && (
+                  <p className="kiefer-hilfe zahn-fehlt">{t("scribe.teeth.forBlock")}</p>
+                )}
                 <KieferSchema zaehne={zaehne} seiten={seiten} toggle={toggleZahn} />
                 <div className="zahnschema">
                   {FDI_OK.map((n) => (
@@ -2456,40 +2473,38 @@ export default function ScribeCockpit({
                   )}
                   {(() => {
                     const key = `${m.termin_typ}:${g}`;
-                    if (optOffen !== key) {
+                    const wert = gruppenFreitext[key] ?? "";
+                    if (optOffen !== key && !wert) {
                       return (
-                        <button className="wahl plus" onClick={() => { setOptOffen(key); setOptText(""); }}>
-                          + Eigener Text-Baustein
+                        <button className="wahl plus" onClick={() => setOptOffen(key)}>
+                          {t("scribe.freeText.add")}
                         </button>
                       );
                     }
+                    const ersetztAuswahl = !gruppeSteuertAbrechnung(m, g);
                     return (
                       <div className="eigen-editor">
                         <input
                           className="freitext"
                           type="text"
-                          placeholder="Neuen Baustein eingeben"
-                          value={optText}
-                          autoFocus
+                          placeholder={t("scribe.freeText.placeholder")}
+                          aria-label={t("scribe.freeText.aria", "de", { gruppe: grp.label })}
+                          value={wert}
+                          autoFocus={optOffen === key && !wert}
                           maxLength={400}
-                          onChange={(e) => setOptText(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") eigenenTextSpeichern(m, g); }}
+                          onChange={(e) => gruppenFreitextSetzen(key, e.target.value)}
+                          onBlur={() => { if (!wert.trim()) setOptOffen(null); }}
                         />
                         <p className="eigen-hinweis">
-                          Das ist kein freier Zusatztext, sondern ein neuer fester Auswahl-Baustein für diese Gruppe.
+                          {t(ersetztAuswahl ? "scribe.freeText.hintFree" : "scribe.freeText.hintBilling")}
                         </p>
-                        <div className="eigen-aktionen">
-                          <button
-                            className="wahl bernstein"
-                            disabled={optSpeichert || !optText.trim()}
-                            onClick={() => eigenenTextSpeichern(m, g)}
-                          >
-                            {optSpeichert ? "Speichert…" : "Speichern"}
-                          </button>
-                          <button className="wahl" onClick={() => { setOptOffen(null); setOptText(""); }}>
-                            Abbrechen
-                          </button>
-                        </div>
+                        {wert && (
+                          <div className="eigen-aktionen">
+                            <button className="wahl" onClick={() => gruppenFreitextEntfernen(key)}>
+                              {t("scribe.freeText.remove")}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
