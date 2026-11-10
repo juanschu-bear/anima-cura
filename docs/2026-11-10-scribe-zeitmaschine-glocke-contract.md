@@ -146,3 +146,8 @@ Inbox-Speicherung und Mailauftrag sind eine Transaktion. Der bestehende App-Mail
 Automatisierte PostgreSQL-Tests prüfen: alte/inaktive Texte, feste Indizes, Umbenennen, Aus-/Einblenden, Undo/Redo, Zeitpunkt-Restore, unveränderliche Historie, Revisions-/Idempotenzkonflikte, geschützte Gruppen, Patienten-/Leserechte, Legacy-Inbox-Erhalt, Entwicklerstatus, finale Praxisabnahme, Kommentare/Bells, eigenes Löschen, Mailaufträge/Lease und Rollenmeldungen mit getrennten Leseständen. Bestehende Scribe-Tests und vollständiger Build zusätzlich.
 
 Für UI-Abnahme: in freier Gruppe umbenennen → ausblenden → rückgängig → nach Zeitpunkt wiederherstellen; in Abrechnungsgruppe 403 korrekt als Wunsch anzeigen; Text eines alten bestätigten Eintrags bleibt unverändert; eigener/fremder Glocken-Lesestand; Praxis sieht Bearbeitungsstatus, kann ihn aber nicht als Entwickler setzen.
+
+
+## Rollout-Nachtrag 10.11.2026
+
+Production fehlt die Voraussetzung `praxis_updates` aus 072. Der freigegebene 078-Versuch wurde vollständig zurückgerollt. Ergänzende, noch freizugebende Datei: `079_scribe_updates_prerequisite.sql`, nur Schema/Rechte ohne historischen Update-Inhalt. Installationsreihenfolge: **079 vor unveränderter 078**, anschließend Backend-Deployment. Bis dahin ist dieser neue Vertrag noch nicht auf Production verfügbar. UI deshalb noch nicht aktivieren.

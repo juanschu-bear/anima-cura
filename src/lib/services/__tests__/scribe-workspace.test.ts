@@ -10,7 +10,7 @@ import {inboxMail} from '../../scribe-inbox-mail';
 const admin='10000000-0000-4000-8000-000000000001', staff='10000000-0000-4000-8000-000000000002', patient='10000000-0000-4000-8000-000000000003';
 const tid='20000000-0000-4000-8000-000000000001', opt='30000000-0000-4000-8000-000000000001', deleted='30000000-0000-4000-8000-000000000002';
 const structure={template:[{g:'free'},{g:'billing'},{g:'required'}],groups:{free:{type:'multi',opts:[{t:'A',on:true},{t:'B'}]},billing:{type:'multi',opts:[{t:'Bracket'}]},required:{type:'single',explizit:true,opts:[{t:'Yes'}]}}};
-async function setup(){
+async function setup(reproduceMissingPrerequisite=false){
  const pg=new PGlite();
  await pg.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;
  CREATE SCHEMA auth;GRANT USAGE ON SCHEMA auth TO authenticated;CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
@@ -18,13 +18,19 @@ async function setup(){
  CREATE TABLE doku_vorlagen(id uuid PRIMARY KEY,behandlungsart text,termin_typ text,aktiv boolean DEFAULT true,struktur jsonb,positionen jsonb);
  CREATE TABLE doku_vorlagen_optionen(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),praxis_id text,behandlungsart text,termin_typ text,gruppe text,text text,aktiv boolean DEFAULT true,sort_index int,created_at timestamptz DEFAULT now());
  CREATE TABLE einstellungen(key text PRIMARY KEY,value jsonb);
- CREATE TABLE praxis_updates(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),status text,audience_roles text[],category text,title_de text,summary_de text,visible_from timestamptz,visible_until timestamptz);
  GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`);
  await pg.query('INSERT INTO user_profiles VALUES($1,$2,$3,null,$4),($5,$6,$7,null,$8),($9,$10,$11,$9,$12)',[admin,'Juan','admin',{},staff,'Praxis','lesezugriff',{scribe_schreiben:true},patient,'Patient','patient',{}]);
  await pg.query('INSERT INTO doku_vorlagen VALUES($1,$2,$3,true,$4,$5)',[tid,'multiband','routine',structure,[{code:'126a',if:{g:'billing',i:0}}]]);
  await pg.query("INSERT INTO doku_vorlagen_optionen VALUES($1,'praxis-schubert','multiband','routine','free','Active',true,3,now()),($2,'praxis-schubert','multiband','routine','free','Deleted',false,0,now())",[opt,deleted]);
  const legacy={id:randomUUID(),status:'fix_in_arbeit',erstellt_am:'2026-11-01T12:00:00Z',erstellt_von:staff,status_zeitpunkte:{fix_in_arbeit:'2026-11-02T12:00:00Z'},status_verlauf:[{von:'bestaetigt',zu:'fix_in_arbeit',geaendert_von_name:'Juan'}],kommentare:[{id:randomUUID(),text:'Legacy',gelesen_von:[]}]};
  await pg.query("INSERT INTO einstellungen VALUES('scribe_praxis_inbox',$1)",[[legacy]]);
+ if(reproduceMissingPrerequisite){
+  await assert.rejects(()=>pg.exec(readFileSync('supabase/migrations/078_scribe_time_machine_inbox_bell.sql','utf8')),/praxis_updates.*does not exist/);
+  await pg.exec('ROLLBACK');
+  assert.equal((await pg.query<any>("SELECT to_regclass('public.scribe_inbox_entries') AS t")).rows[0].t,null);
+  assert.deepEqual((await pg.query<any>("SELECT value FROM einstellungen WHERE key='scribe_praxis_inbox'")).rows[0].value,[legacy]);
+ }
+ await pg.exec(readFileSync('supabase/migrations/079_scribe_updates_prerequisite.sql','utf8'));
  await pg.exec(readFileSync('supabase/migrations/078_scribe_time_machine_inbox_bell.sql','utf8'));
  return {pg,legacy};
 }
@@ -112,7 +118,7 @@ test('inbox import preserves history, atomic status/comments/bells, mail enqueue
 });
 test('shared bell RLS isolates accounts, role receipts, patients and future messages',async()=>{
  const {pg}=await setup();try{
- await pg.query("INSERT INTO praxis_updates(status,audience_roles,category,title_de,summary_de) VALUES('published',ARRAY['admin','lesezugriff'],'neuerung','New','Description')");
+ await pg.query("INSERT INTO praxis_updates(slug,status,audience_roles,category,title_de,summary_de,body_de,title_en,summary_en,body_en,published_at) VALUES('new-test','published',ARRAY['admin','lesezugriff'],'neuerung','New','Description','Body','New','Description','Body',now())");
  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications')).rows[0].n,2);
  await pg.query("INSERT INTO practice_notifications(recipient_id,kind,title,body,link,source_key) VALUES($1,'antwort','Private','Private','/scribe','private')",[admin]);
  await pg.query("INSERT INTO practice_notifications(recipient_role,kind,title,body,link,source_key,visible_from) VALUES('lesezugriff','update','Future','Future','/scribe','future',now()+interval '1 day')");
@@ -140,4 +146,20 @@ test('profile rights, developer statuses and private idempotent email contract',
  const mail=inboxMail('example','test@example.org')!;assert.equal(mail.track,false);assert.equal(mail.idempotencyKey,'scribe-inbox-example');assert.match(mail.body,/scribe.animacura.io/);
  assert.equal(inboxMail('example',undefined),null);
  assert.equal(templateChangeSchema.safeParse({}).success,false);
+});
+
+test('missing production prerequisite rolls back 078; schema-only 079 then 078 succeeds without publishing history',async()=>{
+ const {pg,legacy}=await setup(true);try{
+  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM praxis_updates')).rows[0].n,0);
+  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications')).rows[0].n,0);
+  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_inbox_mail_jobs')).rows[0].n,0);
+  assert.deepEqual((await pg.query<any>('SELECT legacy_payload FROM scribe_inbox_entries')).rows[0].legacy_payload,legacy);
+  const rights=(await pg.query<any>(`SELECT c.relrowsecurity AS rls,
+   has_table_privilege('anon',c.oid,'SELECT') AS anon_read,
+   has_table_privilege('authenticated',c.oid,'INSERT') AS client_write,
+   has_table_privilege('service_role',c.oid,'INSERT') AS server_write
+   FROM pg_class c WHERE c.oid IN ('public.praxis_updates'::regclass,'public.praxis_update_lesestaende'::regclass)`)).rows;
+  assert.equal(rights.length,2);
+  for(const r of rights)assert.deepEqual(r,{rls:true,anon_read:false,client_write:false,server_write:true});
+ }finally{await pg.close();}
 });

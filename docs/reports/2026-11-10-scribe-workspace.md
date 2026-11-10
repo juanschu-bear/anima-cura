@@ -11,7 +11,7 @@ Datenvertrag: `docs/2026-11-10-scribe-zeitmaschine-glocke-contract.md`.
 - 8 Infobox-Einträge: 6 `bestaetigt`, 1 `fix_in_arbeit`, 1 `praxis_bestaetigt`.
 - 2 ausdrücklich gespeicherte Statusereignisse, 0 Kommentare.
 - 200 inaktive Multiband-Praxistexte. Die ungefähr 80 heute gelöschten Texte lassen sich aus diesen Bestandsdaten nicht eindeutig abgrenzen. Alle vorhandenen inaktiven Texte werden angeboten; keine automatische Wiederherstellung.
-- Die bisher bekannte Betreiber-ID gehört im Profil Dr. Maria Schubert. Kein Juan-Profil unter dem Namen Juan oder der bisher genannten Beispiel-Mailadresse gefunden. Entwicklerkonto beim Benutzer nachgefragt; keine stillschweigende Freigabe für alle Admins.
+- Die bisher bekannte Betreiber-ID gehört im Profil Dr. Maria Schubert. Kein Juan-Profil unter dem Namen Juan oder der bisher genannten Beispiel-Mailadresse gefunden. Juan hat ein neues separates Konto beauftragt. Adresse vorgeschlagen: `juan@animacura.io`; Benennung und Anmeldung in der Mailverwaltung noch offen. Keine Entwicklerrechte an das Konto Dr. Schuberts vergeben.
 
 ## Tests
 
@@ -21,12 +21,18 @@ Datenvertrag: `docs/2026-11-10-scribe-zeitmaschine-glocke-contract.md`.
 
 ## SQL / Bereitstellung
 
-Vorbereitet, **nicht in Production installiert**:
+078 ausdrücklich freigegeben und mit übereinstimmender Prüfsumme ausgeführt; **Installation fehlgeschlagen und vollständig zurückgerollt**:
 `supabase/migrations/078_scribe_time_machine_inbox_bell.sql`
 
 SHA-256: `b3a7635e18533e3e6b403894cb49135cfe13b1b6e660eaefd92b2f79a312b600`
 
-Einspielen und Nachprüfung erst nach ausdrücklicher Prüfsummenfreigabe gemäß Auftrag. Die Migration übernimmt das alte Inbox-JSON, friert weitere Schreibzugriffe darauf ein und schränkt direkte Vorlagenänderungen ein; alle Änderungen gehen anschließend durch die API. Ein rückwärts laufendes altes Backend darf danach nicht mehr die JSON-Inbox schreiben. Deshalb SQL und Deployment unmittelbar hintereinander im kontrollierten Rollout, nicht getrennt über längere Zeit.
+Production-Fehler: `42P01: relation "public.praxis_updates" does not exist`. Die Voraussetzung aus 072 war nicht installiert. Der Test hatte diese Tabelle bisher als Fixture angelegt und dadurch den fehlenden Installationsschritt verdeckt. Lesende Nachprüfung nach Fehler: `scribe_inbox_entries`, `scribe_option_slots` und `praxis_updates` fehlen weiterhin; Legacy-Inbox unverändert 8 Einträge. Kein Backend-Deployment erfolgt.
+
+Korrektur vorbereitet in `supabase/migrations/079_scribe_updates_prerequisite.sql`: ausschließlich das Schema der zwei Update-Tabellen aus 072, RLS und explizite Serverrechte; keine historische Ankündigung, keine Mail. Prüfsumme: `2407b27127a6c5fdff96ba0652d8841859bd476a987eebfd44fb301489c58b7e`. Nach separater Freigabe Reihenfolge **079 → unveränderte 078 → Nachprüfung → Deployment**. Die bestehende 078-Freigabe bleibt gültig.
+
+Alle 5 gezielten Tests bestehen jetzt mit der echten Voraussetzung statt einer vereinfachten Update-Tabelle. Der zusätzliche Regressionstest reproduziert den Production-Fehler, prüft Rollback und Legacy-Erhalt und danach erfolgreiche Installation, Rechte und ausbleibende historische Benachrichtigungen.
+
+ Die Migration übernimmt das alte Inbox-JSON, friert weitere Schreibzugriffe darauf ein und schränkt direkte Vorlagenänderungen ein; alle Änderungen gehen anschließend durch die API. Ein rückwärts laufendes altes Backend darf danach nicht mehr die JSON-Inbox schreiben. Deshalb SQL und Deployment unmittelbar hintereinander im kontrollierten Rollout, nicht getrennt über längere Zeit.
 
 Lesende Nachprüfung vorbereitet in `scripts/verify-scribe-workspace.sql`: genaue Übernahme des Legacy-Backups, Objekt-/Funktionsrechte, RLS und Aggregate ohne medizinische Texte.
 
@@ -36,4 +42,4 @@ Deployment auf Production wird bis zur Installation zurückgehalten, damit beste
 
 `SCRIBE_INBOX_EMAIL_TO` setzt Juan für die Empfängeradresse. `SCRIBE_DEVELOPER_USER_ID` wird erst nach Benennung seines tatsächlichen Login-Kontos gesetzt. Optional eigener serverseitiger `SCRIBE_SYSTEM_TOKEN` für Entwicklerautomatik; Cron verwendet bestehenden `CRON_SECRET`. Ohne Mailadresse bleibt der Auftrag wartend, ohne erfolglose Versuche aufzubrauchen.
 
-Noch keine neue Praxisoberfläche ausgeliefert. Claude baut Zeitmaschinenverwaltung, Glocke und Infobox-Anpassung anhand des Vertrags. Keine echte Testmail verschickt. Bis zur SQL-Freigabe und Bereitstellung bleiben die bisherigen Production-Funktionen unverändert.
+Noch keine neue Praxisoberfläche ausgeliefert. Claude baut Zeitmaschinenverwaltung, Glocke und Infobox-Anpassung anhand des Vertrags. Keine echte Testmail verschickt. Nach dem zurückgerollten Installationsversuch bleiben die bisherigen Production-Funktionen unverändert. Die Anmeldung an der Hostinger-Verwaltung ist offen; ein bestehender Webmail-Zugang allein erlaubt keine neue Mailadresse.
