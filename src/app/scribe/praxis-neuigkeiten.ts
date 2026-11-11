@@ -6,6 +6,35 @@
 /** Entwurf einer Neuigkeit für die Praxis. Englisch ist optional; leer gelassen gilt der deutsche Text. */
 export type Entwurf = { titel: string; kurz: string; text: string; titelEn: string; kurzEn: string; textEn: string; art: "neuerung" | "wichtig" | "hinweis"; bestaetigen: boolean; slug?: string };
 export const LEERER_ENTWURF: Entwurf = { titel: "", kurz: "", text: "", titelEn: "", kurzEn: "", textEn: "", art: "neuerung", bestaetigen: false };
+const ZEITMASCHINE_ABSICHERUNG: Entwurf = {
+  slug: "2026-11-11-zeitmaschine-absicherung",
+  art: "hinweis",
+  bestaetigen: false,
+  titel: "Vorlagen und alte Einträge bleiben verlässlich",
+  kurz: "Eine Vorlage, die geprüft werden muss, blockiert nicht mehr alle anderen. Alte bestätigte Einträge behalten ihren damaligen Stand.",
+  text: [
+    "1. Eine einzelne Vorlage blockiert Scribe nicht mehr",
+    "Passt eine Vorlage einmal nicht zu ihrem gespeicherten Stand, bleiben alle anderen Vorlagen benutzbar. Nur die betroffene Vorlage wird zur Prüfung zurückgehalten.",
+    "",
+    "2. Alte bestätigte Einträge behalten ihren damaligen Stand",
+    "Wenn ein Baustein später umbenannt oder ausgeblendet wird, lassen sich die Positionen eines früher bestätigten Eintrags weiterhin verwenden. Für die Prüfung zählt der Stand bei der damaligen Bestätigung.",
+    "",
+    "3. Keine Glocke für die eigene Aktion",
+    "Wer den eigenen Eintrag kommentiert oder selbst abschließend bestätigt, bekommt dafür keine Benachrichtigung an sich selbst.",
+  ].join("\n"),
+  titelEn: "Templates and older entries remain reliable",
+  kurzEn: "One template that needs review no longer blocks all others. Older confirmed entries retain their original state.",
+  textEn: [
+    "1. One template no longer blocks Scribe",
+    "If a template does not match its saved state, all other templates remain available. Only the affected template is held for review.",
+    "",
+    "2. Older confirmed entries retain their original state",
+    "If a block is renamed or hidden later, the service lines from an earlier confirmed entry can still be used. The review uses the state at the time of confirmation.",
+    "",
+    "3. No bell notification for your own action",
+    "If you comment on your own entry or complete its final practice confirmation yourself, you do not receive a notification about your own action.",
+  ].join("\n"),
+};
 const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   slug: "2026-11-11-bausteine-selbst-aendern",
   art: "neuerung",
@@ -54,4 +83,4 @@ const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   ].join("\n"),
 };
 
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [BAUSTEINE_GLOCKE_INFOBOX];
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ZEITMASCHINE_ABSICHERUNG, BAUSTEINE_GLOCKE_INFOBOX];
