@@ -31,7 +31,7 @@ export function requireWriter(a:WorkspaceActor){if(!a.writer)throw new ScribeWor
 export function workspaceError(e:unknown){
   const known=e instanceof ScribeWorkspaceError;
   const code=known?e.code:'scribe_workspace_unavailable';
-  const key=code==='template_group_protected'?'protected':code==='inbox_developer_required'?'developer':
+  const key=code==='inbox_developer_required'?'developer':
     code==='inbox_not_ready'?'notReady':known&&e.status===403?'forbidden':known&&e.status===409?'stale':
     known&&e.status===404?'missing':known&&e.status===400?'invalid':'unavailable';
   const message=t(`scribe.workspace.${key}`,'de');
@@ -39,11 +39,11 @@ export function workspaceError(e:unknown){
 }
 export function storageError(error:{message?:string;code?:string}){
   const code=error.message??'';
-  const forbidden=['scribe_forbidden','practice_forbidden','template_group_protected','inbox_developer_required','inbox_delete_forbidden'];
-  const conflict=['template_revision_stale','inbox_revision_stale','change_superseded','idempotency_conflict','template_layout_changed','history_time_unavailable','inbox_not_ready'];
+  const forbidden=['scribe_forbidden','practice_forbidden','inbox_developer_required','inbox_delete_forbidden'];
+  const conflict=['template_revision_stale','inbox_revision_stale','change_superseded','idempotency_conflict','template_layout_changed','history_time_unavailable','inbox_not_ready','template_confirmation_required'];
   if(forbidden.includes(code))throw new ScribeWorkspaceError(code,403);
   if(conflict.includes(code))throw new ScribeWorkspaceError(code,409);
   if(['option_not_found','change_not_found','inbox_not_found'].includes(code))throw new ScribeWorkspaceError(code,404);
-  if(['input_invalid','not_practice_option'].includes(code))throw new ScribeWorkspaceError(code,400);
+  if(['input_invalid','not_practice_option','template_last_required_option'].includes(code))throw new ScribeWorkspaceError(code,400);
   throw new ScribeWorkspaceError('scribe_workspace_unavailable',503);
 }

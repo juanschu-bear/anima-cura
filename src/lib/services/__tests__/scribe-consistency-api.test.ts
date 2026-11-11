@@ -10,6 +10,7 @@ import * as billing from '../../billing-foundation';
 import * as i18n from '../../i18n';
 import * as dayGuard from '../../scribe-entry-day-guard';
 import * as monitor from '../../scribe-confirmation-monitor';
+import * as acknowledgement from '../../scribe-consistency-acknowledgement';
 
 // Execute the actual route with a session-bound synthetic DB. No live keys,
 // runtime import hacks in production, or writes to real patient data.
@@ -48,6 +49,7 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
   const imports:Record<string,unknown>={'next/server':{NextRequest,NextResponse},'@/lib/db/supabase-server':{createServerComponentClient:()=>db},
     '@/lib/db/supabase':{createServerClient:()=>monitorDb},'@/lib/scribe-confirmation-monitor':monitor,
     '@/lib/scribe-consistency-service':consistency,'@/lib/scribe-identity':identity,'@/lib/scribe-rooms':rooms,
+    '@/lib/scribe-consistency-acknowledgement':acknowledgement,
     '@/lib/scribe-entry-day-guard':dayGuard,'@/lib/scribe-room-api':{},'@/lib/billing-foundation':billing,'@/lib/i18n':i18n};
   const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   const mod={exports:{} as Record<string,(...args:any[])=>Promise<Response>>};
@@ -86,7 +88,7 @@ test('valid new version remains possible and old entry is not silently overwritt
 });
 test('historical confirmed entries with broken mappings cannot export positions',async()=>{
   const f=harness(exportPath,{broken:true});const response=await f.handle.GET(new Request('https://example.invalid/api/doku/eintrag/entry-test/billing-export'),{params:{id:'entry-test'}});
-  assert.equal(response.status,422);const json=await response.json();assert.equal(json.copy_text,undefined);assert.equal(f.writes.length,0);
+  assert.equal(response.status,200);const json=await response.json();assert.equal(json.status,'manual_transfer_required');assert.equal(json.consistencyWarnings.length>0,true);assert.match(json.confirmationLabel,/Trotz Hinweis/);assert.equal(f.writes.length,0);
 });
 test('consistent individual positions export as manual transfer only',async()=>{
   const f=harness(exportPath);const response=await f.handle.GET(new Request('https://example.invalid/api/doku/eintrag/entry-test/billing-export'),{params:{id:'entry-test'}});

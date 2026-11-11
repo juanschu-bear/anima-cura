@@ -227,6 +227,7 @@ export const decideDayPartRequestSchema = z.object({
   reason: z.string().trim().min(3).max(2000),
   correctsPartId: z.string().uuid().nullish(),
   previewToken: z.string().regex(/^[a-f0-9]{64}$/).nullish(),
+  consistencyAcknowledgement:z.object({fingerprint:z.string().regex(/^[a-f0-9]{64}$/)}).optional(),
 }).superRefine((value, context) => {
   if (value.decision === "korrektur" && !value.correctsPartId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["correctsPartId"], message: "Korrektur benötigt den ursprünglichen Teil." });

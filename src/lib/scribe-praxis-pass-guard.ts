@@ -21,3 +21,29 @@ export function findPraxisPassTemplateConflicts(passes:PassLike[],templates:Temp
  }
  return found;
 }
+
+export type PraxisPassOptionChange={templateId:string;group:string;action:'rename'|'hide'|'show'|'add';optionKey?:string;text?:string};
+
+/** Reconcile a Praxis-Pass list into stable slots. Existing places are renamed
+ * or hidden; additional texts append as practice slots, so indices never move. */
+export function planPraxisPassOptionChanges(passes:PassLike[],templates:TemplateLike[],slots:Array<{
+ template_id:string;gruppe:string;option_index:number;option_key:string;source:string;state:{text:string;hidden:boolean}
+}>):PraxisPassOptionChange[]{
+ const changes:PraxisPassOptionChange[]=[];
+ for(const pass of passes){
+  const template=templates.find(row=>row.behandlungsart===pass.behandlungsart&&row.termin_typ===pass.termin_typ);
+  if(!template||!pass.optionen_final||typeof pass.optionen_final!=='object')continue;
+  for(const [group,value] of Object.entries(pass.optionen_final as Record<string,unknown>)){
+   const proposed=texts(value);if(!proposed)continue;
+   const existing=slots.filter(slot=>slot.template_id===template.id&&slot.gruppe===group&&slot.source==='vorlage').sort((a,b)=>a.option_index-b.option_index);
+   proposed.forEach((text,index)=>{
+    const slot=existing[index];
+    if(!slot){changes.push({templateId:template.id,group,action:'add',text});return;}
+    if(slot.state.text!==text)changes.push({templateId:template.id,group,action:'rename',optionKey:slot.option_key,text});
+    if(slot.state.hidden)changes.push({templateId:template.id,group,action:'show',optionKey:slot.option_key});
+   });
+   existing.slice(proposed.length).filter(slot=>!slot.state.hidden).forEach(slot=>changes.push({templateId:template.id,group,action:'hide',optionKey:slot.option_key}));
+  }
+ }
+ return changes;
+}

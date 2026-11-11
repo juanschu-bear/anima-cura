@@ -1,16 +1,20 @@
 import { z } from 'zod';
 export const templateChangeSchema=z.object({
  templateId:z.string().uuid(),requestId:z.string().uuid(),expectedRevision:z.number().int().nonnegative(),
- action:z.enum(['hide','show','rename','restore_practice','undo','restore_at']),
+ action:z.enum(['hide','show','rename','restore_practice','undo','restore_at','add']),
  optionKey:z.string().min(1).max(300).optional(),text:z.string().trim().min(1).max(400).optional(),
  changeId:z.string().uuid().optional(),at:z.string().datetime({offset:true}).optional(),
+ group:z.string().min(1).max(200).optional(),confirmProtected:z.boolean().optional(),
+ confirmationFingerprint:z.string().regex(/^[a-f0-9]{64}$/).optional(),confirmedBy:z.string().trim().min(1).max(120).optional(),
 }).strict().superRefine((v,c)=>{
  if(['hide','show','rename','restore_practice'].includes(v.action)&&!v.optionKey)c.addIssue({code:'custom',message:'optionKey required'});
  if(v.action==='rename'&&!v.text)c.addIssue({code:'custom',message:'text required'});
  if(v.action==='undo'&&!v.changeId)c.addIssue({code:'custom',message:'changeId required'});
  if(v.action==='restore_at'&&!v.at)c.addIssue({code:'custom',message:'at required'});
+ if(v.action==='add'&&(!v.group||!v.text))c.addIssue({code:'custom',message:'group and text required'});
+ if(v.confirmProtected&&!v.confirmationFingerprint)c.addIssue({code:'custom',message:'confirmationFingerprint required'});
 });
-export type TemplateSlot={option_key:string;template_id:string;gruppe:string;option_index:number;source:'vorlage'|'praxis';practice_option_id:string|null;baseline:{text:string;hidden:boolean};state:{text:string;hidden:boolean};last_change_id:string|null;created_at:string};
+export type TemplateSlot={option_key:string;template_id:string;gruppe:string;option_index:number;source:'vorlage'|'praxis';practice_option_id:string|null;baseline:{text:string;hidden:boolean};state:{text:string;hidden:boolean};last_change_id:string|null;created_at:string;layout_text?:string};
 type Group={opts:Array<{t:string;on?:boolean;[k:string]:unknown}>;explizit?:boolean;[k:string]:unknown};
 export type HistoryTemplate={id:string;struktur:{groups:Record<string,Group>;[k:string]:unknown};positionen:unknown;[k:string]:unknown};
 export type TemplateProjectionError={templateId:string;code:'template_layout_changed'};
@@ -28,11 +32,11 @@ export function projectTemplate<T extends HistoryTemplate>(template:T,slots:Temp
   g.opts=[];
   for(const s of selected){
    if(s.option_index!==g.opts.length)throw Error('template_layout_changed');
-   if(s.source==='vorlage'&&seed[s.option_index]?.t!==s.baseline.text)throw Error('template_layout_changed');
+   if(s.source==='vorlage'&&seed[s.option_index]?.t!==(s.layout_text??s.baseline.text))throw Error('template_layout_changed');
    const original=s.source==='vorlage'?seed[s.option_index]:{};
    g.opts.push({...original,t:s.state.text,id:s.practice_option_id??undefined,quelle:s.source==='praxis'?'praxis':'seed',
      optionKey:s.option_key,origin:s.source,hidden:s.state.hidden,lastChangeId:s.last_change_id,
-     editable:!protectedGroup(out,key),...(s.state.hidden?{on:false}:{})});
+     editable:true,requiresConfirmation:protectedGroup(out,key),...(s.state.hidden?{on:false}:{})});
   }
  }
  return out;

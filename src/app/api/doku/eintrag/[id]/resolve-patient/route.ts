@@ -7,7 +7,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = createServerComponentClient();
   const { data: { user } } = await auth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await auth
     .from("user_profiles")
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const role = (profile?.role as string | undefined) ?? null;
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   if (!(permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role)))) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null) as { patientId?: unknown } | null;

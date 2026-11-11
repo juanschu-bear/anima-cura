@@ -6,6 +6,7 @@ import { roomInputError } from '@/lib/scribe-rooms';
 import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
 import { createServerClient } from '@/lib/db/supabase';
 import { makeScribeConfirmationAttempt, recordScribeConfirmationAttempt } from '@/lib/scribe-confirmation-monitor';
+import {consistencyAudit,isConsistencyAcknowledged,variablesWithConsistencyAudit,type ConsistencyAudit} from '@/lib/scribe-consistency-acknowledgement';
 export { GET, PATCH } from '@/lib/scribe-room-api';
 
 export const runtime = "nodejs";
@@ -27,6 +28,7 @@ type EintragBody = {
   ausnahme_freitext?: string | null;
   bestaetigen?: boolean; // true = direkt bestaetigen (Version 1), false = Entwurf
   entwurf_id?: string | null; // gesetzt = vorhandenen Entwurf aktualisieren/befoerdern
+  consistencyAcknowledgement?: {fingerprint:string};
 };
 
 // POST /api/doku/eintrag
@@ -38,11 +40,11 @@ export async function POST(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role, kuerzel, permissions")
+    .select("role, kuerzel, permissions, display_name")
     .eq("id", user.id)
     .single();
 
@@ -50,17 +52,17 @@ export async function POST(request: NextRequest) {
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   const scribeErlaubt = permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role));
   if (!scribeErlaubt) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
 
   let body: EintragBody;
   try {
     body = (await request.json()) as EintragBody;
   } catch {
-    return NextResponse.json({ error: "Ungueltiger JSON-Body" }, { status: 400 });
+    return NextResponse.json({ code:"invalid_json",error: "Ungueltiger JSON-Body" }, { status: 400 });
   }
 
-  if (!body.patient_id) return NextResponse.json({ error: "patient_id fehlt" }, { status: 400 });
+  if (!body.patient_id) return NextResponse.json({ code:"patient_id_required",error: "patient_id fehlt" }, { status: 400 });
   const roomError = roomInputError(body.zimmer_version_id, !body.entwurf_id);
   if (roomError) return NextResponse.json({ error: roomError }, { status: 422 });
 
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
   }
   // Ein Entwurf darf unvollstaendig sein. Erst beim Bestaetigen ist Text Pflicht.
   if (bestaetigen && (!body.text || !body.text.trim())) {
-    return NextResponse.json({ error: "text fehlt" }, { status: 400 });
+    return NextResponse.json({ code:"text_required",error: "text fehlt" }, { status: 400 });
   }
 
   const terminDatum =
@@ -81,15 +83,20 @@ export async function POST(request: NextRequest) {
 
   // Fail closed before either INSERT or draft promotion. Drafts remain savable;
   // a client-supplied status/review flag never bypasses the server check.
+  let confirmationAudit:ConsistencyAudit|null=null;
   if (bestaetigen) {
     const conflict = await existingDayConflict(supabase,body.patient_id,terminDatum,body.entwurf_id);
     if(conflict)return conflict;
     const check = await checkScribeConsistency(supabase, body);
     if (!check.canConfirm) {
-      const response = scribeConsistencyFailure(check, request.url);
-      if (response.status === 422) await recordScribeConfirmationAttempt(
+      if(isConsistencyAcknowledged(body,check)){
+        confirmationAudit=consistencyAudit(body,check,{id:user.id,name:profile?.display_name||mitarbeiterKuerzel||'Praxis'});
+      }else{
+       const response = scribeConsistencyFailure(check, request.url,body);
+       if (response.status === 422||response.status===503) await recordScribeConfirmationAttempt(
         createServerClient(), makeScribeConfirmationAttempt(body, 'rejected', check));
-      return response;
+       return response;
+      }
     }
   }
 
@@ -103,7 +110,7 @@ export async function POST(request: NextRequest) {
     termin_datum: terminDatum,
     text: (body.text ?? "").trim(),
     zaehne: body.zaehne ?? [],
-    variablen: body.variablen ?? {},
+    variablen: variablesWithConsistencyAudit(body.variablen,confirmationAudit),
     auswahl: body.auswahl ?? {},
     positionen: body.positionen ?? [],
     ausnahme_freitext: body.ausnahme_freitext?.trim() || null,
@@ -117,11 +124,11 @@ export async function POST(request: NextRequest) {
       .eq("id", body.entwurf_id)
       .single();
     if (ladeFehler || !vorhanden) {
-      return NextResponse.json({ error: "Entwurf nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ code:"draft_not_found",error: "Entwurf nicht gefunden" }, { status: 404 });
     }
     if(vorhanden.patient_id!==body.patient_id)return NextResponse.json({code:"draft_patient_mismatch"},{status:409});
     if (vorhanden.status !== "entwurf") {
-      return NextResponse.json({ error: "Nur Entwuerfe koennen weiterbearbeitet werden" }, { status: 409 });
+      return NextResponse.json({ code:"draft_not_editable",error: "Nur Entwuerfe koennen weiterbearbeitet werden" }, { status: 409 });
     }
     const update = {
       ...daten,
@@ -163,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
     if (bestaetigen) await recordScribeConfirmationAttempt(
       createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
-    return NextResponse.json({ eintrag }, { status: 200 });
+    return NextResponse.json({ eintrag,...(confirmationAudit?{confirmation:confirmationAudit}: {}) }, { status: 200 });
   }
 
   const insert = {
@@ -210,5 +217,5 @@ export async function POST(request: NextRequest) {
 
   if (bestaetigen) await recordScribeConfirmationAttempt(
     createServerClient(), makeScribeConfirmationAttempt(body, 'confirmed'));
-  return NextResponse.json({ eintrag }, { status: 201 });
+  return NextResponse.json({ eintrag,...(confirmationAudit?{confirmation:confirmationAudit}: {}) }, { status: 201 });
 }

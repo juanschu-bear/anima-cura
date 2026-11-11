@@ -58,14 +58,20 @@ test('time machine preserves indices, immutable history, restoration, CAS and ho
  assert.equal((await pg.query<any>('SELECT state FROM scribe_option_slots WHERE option_key=$1',[key('free')])).rows[0].state.text,'A');
  await change(pg,{action:'undo',changeId:undo.changeIds[0]});
  await assert.rejects(()=>change(pg,{action:'undo',changeId:first.changeIds[0]}),/change_superseded/);
- await change(pg,{action:'restore_at',at:time});
+ await change(pg,{action:'restore_at',at:time,confirmProtected:true,confirmationFingerprint:'e'.repeat(64)});
  slots=(await pg.query<any>('SELECT * FROM scribe_option_slots')).rows;
  const restored=projectTemplate({id:tid,struktur:structure,positionen:[]},slots);
 
  assert.equal(restored.struktur.groups.free.opts[0].t,'Renamed');assert.equal((restored.struktur.groups.free.opts[1] as any).hidden,false);
  await change(pg,{action:'restore_practice',optionKey:'practice:'+deleted});
  assert.equal((await pg.query<any>('SELECT aktiv FROM doku_vorlagen_optionen WHERE id=$1',[deleted])).rows[0].aktiv,true);
- for(const group of ['billing','required'])for(const action of ['rename','hide'])await assert.rejects(()=>change(pg,{action,optionKey:key(group),text:'Bad'}),/template_group_protected/);
+ for(const group of ['billing','required'])await assert.rejects(()=>change(pg,{action:'rename',optionKey:key(group),text:'Bad'}),/template_confirmation_required/);
+ const billingDecision=await change(pg,{action:'rename',optionKey:key('billing'),text:'Praxis entscheidet',confirmProtected:true,confirmationFingerprint:'a'.repeat(64)});
+ assert.equal(billingDecision.confirmationRecorded,true);
+ const decisionAudit=(await pg.query<any>('SELECT confirmation FROM scribe_option_changes WHERE id=$1',[billingDecision.changeIds[0]])).rows[0].confirmation;
+ assert.equal(decisionAudit.kind,'practice_second_confirmation');assert.equal(decisionAudit.confirmedBy,'Praxis');assert.equal(decisionAudit.positions[0].code,'126a');
+ await change(pg,{action:'rename',optionKey:key('required'),text:'Pflicht neu',confirmProtected:true,confirmationFingerprint:'b'.repeat(64)});
+ await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('required'),confirmProtected:true,confirmationFingerprint:'c'.repeat(64)}),/template_last_required_option/);
  await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')},patient),/scribe_forbidden/);
  await assert.rejects(()=>pg.exec('DELETE FROM scribe_option_changes'),/scribe_history_immutable/);
  const revision=(await pg.query<any>('SELECT max(seq)::int AS n FROM scribe_option_changes')).rows[0].n;
@@ -77,16 +83,17 @@ test('time machine preserves indices, immutable history, restoration, CAS and ho
  const later=randomUUID();
  await pg.query("INSERT INTO doku_vorlagen_optionen(id,praxis_id,behandlungsart,termin_typ,gruppe,text,sort_index) VALUES($1,'praxis-schubert','multiband','routine','free','Later',-10)",[later]);
  assert.equal((await pg.query<any>('SELECT option_index FROM scribe_option_slots WHERE practice_option_id=$1',[later])).rows[0].option_index,4);
- await change(pg,{action:'restore_at',at:time});
+ await change(pg,{action:'restore_at',at:time,confirmProtected:true,confirmationFingerprint:'f'.repeat(64)});
  assert.equal((await pg.query<any>('SELECT state FROM scribe_option_slots WHERE practice_option_id=$1',[later])).rows[0].state.hidden,true);
  const baselineTime=(await pg.query<any>('SELECT max(created_at)::text AS t FROM scribe_option_slots WHERE practice_option_id IS DISTINCT FROM $1',[later])).rows[0].t;
  await pg.query("UPDATE doku_vorlagen SET positionen=$1 WHERE id=$2",[[{if:{g:'free',i:0}}],tid]);
  const before=(await pg.query<any>('SELECT count(*)::int n FROM scribe_option_changes')).rows[0].n;
- await assert.rejects(()=>change(pg,{action:'restore_at',at:baselineTime}),/template_group_protected/);
+ await assert.rejects(()=>change(pg,{action:'restore_at',at:baselineTime}),/template_confirmation_required/);
  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_option_changes')).rows[0].n,before);
+ await change(pg,{action:'restore_at',at:baselineTime,confirmProtected:true,confirmationFingerprint:'d'.repeat(64)});
  // Runtime service role really has the needed narrow function/table rights.
  await pg.exec('SET ROLE service_role');
- await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')}),/template_group_protected/);
+ await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')}),/template_confirmation_required/);
  await pg.exec('RESET ROLE');
 
  }finally{await pg.close();}

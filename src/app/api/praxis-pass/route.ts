@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAppUser } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { normalizeScribeAppointmentTypeName } from "@/lib/scribe-appointment-type";
-import { findPraxisPassTemplateConflicts } from "@/lib/scribe-praxis-pass-guard";
+import { planPraxisPassOptionChanges } from "@/lib/scribe-praxis-pass-guard";
+import {changeTemplate,historySlots,templateChangeReview} from '@/lib/scribe-template-history-service';
+import {createHash,randomUUID} from 'node:crypto';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,15 +26,15 @@ function tokenGueltig(token: string | null): boolean {
   return !!erlaubt && !!token && token === erlaubt;
 }
 
-async function zugang(request: NextRequest): Promise<{ ok: boolean; wer: string }> {
+async function zugang(request: NextRequest): Promise<{ ok: boolean; wer: string; id:string|null; link:boolean }> {
+  const appUser = await getAuthenticatedAppUser();
+  if (appUser) return { ok: true, wer: appUser.fullName || appUser.email, id:appUser.id, link:false };
   const headerToken = request.headers.get("x-praxis-pass-token");
   const urlToken = new URL(request.url).searchParams.get("token");
   if (tokenGueltig(headerToken) || tokenGueltig(urlToken)) {
-    return { ok: true, wer: "Praxis (Link)" };
+    return { ok: true, wer: "Praxis (Link)", id:null, link:true };
   }
-  const appUser = await getAuthenticatedAppUser();
-  if (appUser) return { ok: true, wer: appUser.fullName || appUser.email };
-  return { ok: false, wer: "" };
+  return { ok: false, wer: "", id:null,link:false };
 }
 
 export async function GET(request: NextRequest) {
@@ -211,12 +213,17 @@ export async function POST(request: NextRequest) {
     const {data: bestehendeVorlagen,error:vorlagenErr}=await supabase.from("doku_vorlagen")
       .select("id,behandlungsart,termin_typ,struktur");
     if(vorlagenErr)return NextResponse.json({error:vorlagenErr.message},{status:500});
-    const conflicts=findPraxisPassTemplateConflicts(paesse??[],bestehendeVorlagen??[]);
-    if(conflicts.length)return NextResponse.json({
-      code:"template_structure_change_requires_history",
-      error:"Feste Bausteine bestehender Vorlagen werden über die Zeitmaschine geändert.",
-      templates:conflicts,
-    },{status:409,headers:{"Cache-Control":"private, no-store"}});
+    const slots=await historySlots((bestehendeVorlagen??[]).map(row=>row.id));
+    if(slots===null)return NextResponse.json({code:'scribe_workspace_unavailable',error:'Die Bausteine konnten gerade nicht abgeglichen werden.',suggestion:{kind:'retry'}},{status:503});
+    const optionChanges=planPraxisPassOptionChanges(paesse??[],bestehendeVorlagen??[],slots);
+    const reviews=await Promise.all(optionChanges.map(async change=>({change,review:await templateChangeReview(change)})));
+    const protectedReviews=reviews.filter(item=>item.review.requiresConfirmation);
+    const impossible=reviews.filter(item=>item.review.impossible).map(item=>({change:item.change,...item.review.impossible}));
+    const confirmationFingerprint=createHash('sha256').update(JSON.stringify(protectedReviews.map(item=>({change:item.change,impacts:item.review.impacts})))).digest('hex');
+    const supplied=(body.confirmation??{}) as {fingerprint?:string;confirmedBy?:string};
+    const protectedConfirmed=protectedReviews.length===0||supplied.fingerprint===confirmationFingerprint;
+    const confirmedBy=z.id?z.wer:String(supplied.confirmedBy??'').trim();
+    const canApplyProtected=protectedConfirmed&&(!z.link||!!confirmedBy);
 
     let uebernommen = 0;
     let neu = 0;
@@ -281,9 +288,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const revisions=new Map<string,number>();
+    const applied:Array<{change:unknown;changeIds:string[];confirmationRecorded:boolean}>=[];
+    for(const item of reviews){
+      if(item.review.impossible)continue;
+      if(item.review.requiresConfirmation&&!canApplyProtected)continue;
+      let revision=revisions.get(item.change.templateId);
+      if(revision===undefined){
+        const latest=await supabase.from('scribe_option_changes').select('seq').eq('template_id',item.change.templateId).order('seq',{ascending:false}).limit(1);
+        if(latest.error)return NextResponse.json({code:'template_history_read_failed',error:'Das Änderungsbuch konnte nicht gelesen werden.',suggestion:{kind:'retry'}},{status:503});
+        revision=Number(latest.data?.[0]?.seq??0);
+      }
+      const request={...item.change,requestId:randomUUID(),expectedRevision:revision,source:'praxis_pass',confirmedBy:confirmedBy||z.wer,
+        ...(item.review.requiresConfirmation?{confirmProtected:true,confirmationFingerprint:item.review.fingerprint}:{})};
+      const result=await changeTemplate(z.id,request) as {revision:number;changeIds:string[];confirmationRecorded?:boolean};
+      revisions.set(item.change.templateId,result.revision);
+      applied.push({change:item.change,changeIds:result.changeIds,confirmationRecorded:!!result.confirmationRecorded});
+    }
+
     const { error } = await supabase.from("praxis_pass").update({ status: "abgesendet" }).neq("status", "abgesendet");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, abgesendet: true, uebernommen, neu });
+    if(protectedReviews.length&&!canApplyProtected)return NextResponse.json({
+      ok:true,abgesendet:true,status:'confirmation_required',code:'template_change_confirmation_required',uebernommen,neu,applied,
+      confirmation:{required:true,fingerprint:confirmationFingerprint,confirmedByRequired:z.link,
+        changes:protectedReviews.flatMap(item=>item.review.impacts)},impossible,
+      suggestion:{kind:z.link?'enter_name_and_confirm_again':'confirm_again'},
+    },{headers:{'Cache-Control':'private, no-store'}});
+    return NextResponse.json({ok:true,abgesendet:true,status:impossible.length?'saved_with_suggestion':'completed',uebernommen,neu,applied,impossible,
+      suggestion:impossible.length?{kind:'keep_or_rename_last_required_option'}:null});
   }
 
   if (!body.behandlungsart || !body.termin_typ) {

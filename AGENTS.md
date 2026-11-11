@@ -44,3 +44,6 @@ github.com/juanschu-bear/anima-cura
 ## Neuigkeiten für die Praxis (Juans Entscheidung, 11.11.2026)
 - Jede Änderung, die die Praxis in Scribe bemerkt, bringt ihren Beitrag „Neu in Anima Cura“ in `src/app/scribe/praxis-neuigkeiten.ts` mit (neuer Eintrag oben, eigener slug, Alltagssprache, Deutsch und Englisch).
 - Juans Glocke zeigt jeden noch nicht veröffentlichten Beitrag als „bereit“. Veröffentlicht wird erst mit seinem Tipp.
+
+## Grundregel für Scribe (Juans Entscheidung, 11.11.2026)
+- Die Praxis kommt immer sofort selbst weiter und hängt nie an Juan. Stimmt etwas nicht, sagt Scribe der Praxis, was los ist, und macht einen Vorschlag. Will die Praxis es trotzdem so, bestätigt sie ein zweites Mal. Dann gilt ihre Entscheidung, festgehalten mit Name und Zeit. Was auf unserer Seite nicht stimmt, fängt das System automatisch ab. Was die Praxis eingetippt hat, geht nie verloren.

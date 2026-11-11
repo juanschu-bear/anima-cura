@@ -144,7 +144,7 @@ async function speichereEigeneArten(db: ReturnType<typeof createServerClient>, a
 
 export async function GET() {
   const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   try {
     const db = createServerClient();
@@ -159,7 +159,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const user = await requireUser(true);
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { name?: string; basis?: string } | null;
   const name = normalizeName(String(body?.name ?? ""));
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const user = await requireUser(true);
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { id?: string } | null;
   const id = String(body?.id ?? "").trim();

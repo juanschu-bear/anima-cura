@@ -191,3 +191,40 @@ Juans persönlicher interner App-Zugang ist `juan@praxis-schubert.de`; `SCRIBE_D
 ## Absicherungs-Nachtrag 11.11.2026
 
 Migration `080_scribe_time_machine_safeguards.sql` schützt feste Bausteinplätze auch vor direkten Strukturänderungen und unterdrückt Selbstbenachrichtigungen. Vor dem Production-Einspielen gelten erneut Prüfsummenfreigabe und kontrollierte Prüfung. Der Backend-Rollout folgt erst nach erfolgreicher Installation, weil der Praxis-Pass sonst noch nicht auf Datenbankebene abgesichert wäre.
+
+## Planänderung Juan 11.11.2026 — ersetzt die bisherigen Absicherungsregeln
+
+Die Praxis darf nicht an Juan hängen. Scribe speichert den eingegebenen Text immer zuerst, zeigt bei einem Prüfungsproblem den verständlichen Hinweis und einen Vorschlag und lässt die Praxis nach einer zweiten Bestätigung fortfahren. Die zweite Bestätigung wird mit Name und Zeit in der Akte festgehalten. Systemfehler werden automatisch abgefangen; der Praxistext wird nie verworfen.
+
+### Praxis-Pass und Bausteine
+
+`POST /api/praxis-pass` lehnt eine Praxis-Pass-Absendung wegen Bausteinen nicht mit 409 ab. Metadaten, Reihenfolge und neue Terminarten werden wie bisher gespeichert. Feste Bausteine werden über die Zeitmaschine mit stabilen `optionKey`-/Indexwerten übernommen. Bei einer Abrechnungskopplung antwortet der Server mit HTTP 200 und `code:'template_change_confirmation_required'`, damit die Oberfläche je Änderung zeigt:
+
+```ts
+{
+  templateId:string, optionKey:string, gruppe:string,
+  before:{text:string,hidden:boolean}, after:{text:string,hidden:boolean},
+  positions:Array<{code:string,text?:string,anzahl?:number}>,
+  confirmationFingerprint:string
+}
+```
+
+Der zweite Aufruf sendet `confirmProtected:true`, `confirmationFingerprint` und `confirmedBy` (Name aus der Sitzung, nicht aus dem Browser). Die Antwort enthält `confirmationRecorded:true`. Der Änderungsbucheintrag bewahrt vorherigen/neuen Text, Positionen, Name und Zeit. `POST /api/doku/vorlagen/changes` verwendet denselben Vertrag; `template_group_protected`/403 ist für diese Praxisänderung nicht mehr zulässig. Kann die letzte sichtbare Auswahl einer expliziten Pflichtgruppe nicht ausgeblendet werden, antwortet der Server mit HTTP 422, `code:'template_last_required_option'` und `suggestion:{kind:'rename_instead'}`. Eine nicht auflösbare Vorlage wird mit `code:'template_change_not_possible'` plus Vorschlag gemeldet, nicht still geändert.
+
+### Prüfungen beim Eintrag und Tagesdatensatz
+
+Die erste Bestätigung mit Prüfungsproblemen liefert HTTP 422 (bei nicht lesbarer Quelle HTTP 503), `code:'consistency_confirmation_required'`, `consistency:{required:true,fingerprint,issues,suggestions}`. Der erneute identische Auftrag ergänzt `consistencyAcknowledgement:{fingerprint}`. Bei Erfolg enthält die Antwort `confirmation` und `confirmationLabel:'Trotz Hinweis von <Name> bestätigt'`; der Audit steht in `variablen._consistencyConfirmation` bzw. im Tagesdatensatz. Das gilt auch für „Positionen kopieren“. Der Server wiederholt jede `*_read_failed`-Quelle genau einmal, bevor er 503 oder die Bestätigung anbietet. Ein technisch nicht speicherbarer Fall liefert `code` und den automatischen Alternativvorschlag.
+
+Der Abrechnungsexport bleibt nutzbar: Er liefert bei späteren Prüfproblemen HTTP 200 mit `consistencyWarnings`, `confirmation` und `confirmationLabel`, statt den bestätigten Eintrag zu verlieren.
+
+### Beschädigte Vorlagen
+
+`GET /api/doku/vorlagen?history=1` liefert jede `templateErrors`-Vorlage weiter nutzbar im bisherigen Modus: `usable:true`, `templateHistoryMode:'legacy_fallback'`, `sendTemplateHistoryVersion:false`. Sichere automatische Platznachführung erfolgt selbst; andernfalls bleiben die bisherigen Plätze und die Versionsmarkierung wird weggelassen. Es gibt keine Meldung an Juan. „Positionen kopieren“ bleibt möglich. Fehlerfreie Vorlagen tragen `templateHistoryMode:'versioned'`.
+
+### Stabile Antwortcodes
+
+Alle Scribe-Fehlerantworten behalten ihren deutschen Text, liefern aber einen stabilen `code`: `draft_not_found` („Entwurf nicht gefunden“), `draft_not_editable` („Nur Entwuerfe koennen weiterbearbeitet werden“), `patient_ivoris_id_missing` („Patient hat keine ivoris_id“), `text_required` („text fehlt“), `scribe_forbidden` („Keine Berechtigung“) und `not_authenticated` („Nicht autorisiert“). Neue Vorschläge sind zusätzliche Felder und ersetzen diese Sätze nicht.
+
+### Datenbank-/Rolloutstand
+
+080 wurde für diese Regeln angepasst und ist noch nicht in Production. Die neue SHA-256-Prüfsumme ist nach dem Branch-Push mitzuteilen; Production-Einspielen erfolgt erst nach Juans erneuter Freigabe.

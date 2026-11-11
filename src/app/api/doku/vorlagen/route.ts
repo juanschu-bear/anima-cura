@@ -48,7 +48,7 @@ async function getTemplates(request: NextRequest) {
     // kein gueltiger Token: normaler Login-Pfad
     const sb = createServerComponentClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+    if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
   }
 
   // Lesen ueber Service-Role-Client (funktioniert mit Login wie mit Token)
@@ -66,10 +66,19 @@ async function getTemplates(request: NextRequest) {
   const historyRequested = request.nextUrl.searchParams.get("history") === "1";
   const effective = historyRequested ? await effectiveTemplatesSafely(vorlagen) : null;
   if(historyRequested && !effective) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
-  if(effective) return NextResponse.json({vorlagen:effective.templates,templateErrors:effective.errors.map(issue=>{
-    const template=vorlagen.find(row=>row.id===issue.templateId);
-    return {...issue,behandlungsart:template?.behandlungsart??null,terminTyp:template?.termin_typ??null};
-  }),capabilities:SCRIBE_CAPABILITIES,templateHistoryVersion:1},{headers:{"Cache-Control":"private, no-store"}});
+  if(effective){
+    const projected=new Map(effective.templates.map(template=>[template.id,{...template,templateHistoryMode:'versioned' as const}]));
+    const failed=new Set(effective.errors.map(issue=>issue.templateId));
+    const usable=vorlagen.map(template=>projected.get(template.id)??{
+      ...structuredClone(template),templateHistoryMode:'legacy_fallback' as const,templateHistoryVersion:null,
+    });
+    return NextResponse.json({vorlagen:usable,templateErrors:effective.errors.map(issue=>{
+      const template=vorlagen.find(row=>row.id===issue.templateId);
+      return {...issue,behandlungsart:template?.behandlungsart??null,terminTyp:template?.termin_typ??null,
+        usable:true,fallback:'legacy',sendTemplateHistoryVersion:false};
+    }),capabilities:SCRIBE_CAPABILITIES,templateHistoryVersion:1,legacyFallbackTemplateIds:Array.from(failed)},
+    {headers:{"Cache-Control":"private, no-store"}});
+  }
 
   // Practice-added option texts (Weg B). Appended AFTER the seed opts of the
   // matching group, so seed indices stay stable (positionen.if and stored

@@ -168,7 +168,7 @@
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
-      "sha256": "95393a741ea3977838cf5ac333e941c4fe7155be3ba5708c9173a0ce27e35c5b",
+      "sha256": "9b04b460fb97f710b3ca644f4be4d8386ca3df14f125354d58859aecf6296f38",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
@@ -180,7 +180,7 @@
     },
     {
       "file": "src/lib/scribe-day-record-service.ts",
-      "sha256": "16e6dfb1f688bea3c6c551c847ecb68ca6009a68388dfe707e23f3b143fda41e",
+      "sha256": "31090d63cb38e16380186df26666d70273b74dfcba82063c2c8fc6f54707376e",
       "proof": "All day-record RPCs receive the signed-in Anima Cura/Scribe Supabase client after requireScribeDayWriter checks the authenticated user, profile permission and server-side staff initials; JWT role authenticated.",
       "calls": [
         {
@@ -197,12 +197,17 @@
           "name": "decide_doku_day_part",
           "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
           "role": "authenticated"
+        },
+        {
+          "name": "scribe_attach_consistency_audit",
+          "signature": "public.scribe_attach_consistency_audit(p_entry uuid, p_version integer, p_audit jsonb)",
+          "role": "service_role"
         }
       ]
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/resolve-patient/route.ts",
-      "sha256": "f6474e41398c3cc251d6bbdaab5d6c9ebf6ec53593d474eef065b7ae05de9ea4",
+      "sha256": "cccf24a8baa43dd358684f75befa84af4f81d9cdaa23c98b9a5c0153249c9139",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
@@ -409,7 +414,7 @@
     },
     {
       "file": "src/lib/scribe-template-history-service.ts",
-      "sha256": "400598928f11fcadc1f9e8d0eff1ee8680545a7de7c12bbb6d7d4dd360b04fea",
+      "sha256": "c3d46239e6549fe20a264cdb9cbb44182d7c4228451e6f8b5cb8dd0d8ffa83e8",
       "proof": "Reviewed client provenance: template mutations use the explicit service client only after workspace actor authorization. Historical reads accept an injected server-only client after the billing-export login and practice-permission checks; they never accept patient identity or perform writes. The sole RPC remains service-role-only.",
       "calls": [
         {
@@ -499,7 +504,7 @@
     },
     {
       "file": "src/app/api/doku/ivoris-nachsync/route.ts",
-      "sha256": "6c614c72453fd8508867792fad6ccf78db57d5005905d4fc118909ede4c988a9"
+      "sha256": "72f7793599cf99ef68c8d838ee822fbd12ce5fc3ace1274253aec1cbef0cfc87"
     },
     {
       "file": "src/app/api/rechnungen/behandlungskonto/[id]/route.ts",

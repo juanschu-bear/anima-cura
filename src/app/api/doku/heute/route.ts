@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const datumParam = request.nextUrl.searchParams.get("datum");
   const datum = datumParam && /^\d{4}-\d{2}-\d{2}$/.test(datumParam)
