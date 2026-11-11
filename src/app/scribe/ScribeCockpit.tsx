@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Moon, MoreHorizontal, Sun } from "lucide-react";
 import { createBrowserClient } from "@/lib/db/supabase";
 import { isAutomaticScribeIvorisRetry } from "@/lib/services/scribe-ivoris-error";
 import { useThema } from "./ScribeShell";
@@ -528,6 +528,8 @@ export default function ScribeCockpit({
   const [bausteinSuche, setBausteinSuche] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> Suchtext im "Weitere Varianten"-Dropdown
   const [gruppenFreitext, setGruppenFreitext] = useState<Record<string, string>>({}); // key `${termin_typ}:${gruppe}` -> freier Text nur für diesen Eintrag
   const [optSpeichert, setOptSpeichert] = useState(false);
+  /** Kürzel im Kopf: gespeichertes Kürzel, sonst die Anfangsbuchstaben aus Vor- und Nachname. */
+  const kopfKuerzel = (nutzerKuerzel || nutzerName.replace(/^(Dr\.|Prof\.)\s*/g, "").split(/\s+/).filter(Boolean).map((w) => w[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join("")).toUpperCase().slice(0, 2);
   /** Offene Bausteine-Verwaltung (Zeitmaschine) für 1 Leistung, mit der Gruppe, aus der sie geöffnet wurde. */
   const [verwaltung, setVerwaltung] = useState<{ vorlageId: string; gruppe: string } | null>(null);
   /** Rückmeldung nach dem Ausblenden eines eigenen Textes, mit Rückgängig. */
@@ -1952,20 +1954,43 @@ export default function ScribeCockpit({
         <span className="wortmarke">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="kopf-logo" src="/scribe-brand/icon-512.png" alt="" />
-          <span className="anima">Anima</span> Scribe
+          <span className="wortmarke-text">
+            <span className="wortmarke-name"><span className="anima">Anima</span> Scribe</span>
+            <span className="datum">{heuteDatum}</span>
+          </span>
         </span>
-        <span className="datum">{heuteDatum}</span>
         <span className="rechts">
           <ScribeGlocke />
           <KnowledgeMenu />
-          <button className="thema-toggle" onClick={() => { setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>Passwort</button>
-          <button className="thema-toggle" data-an={demo} onClick={() => { setDemo((d) => !d); resetSitzung(); }}>{demo ? "Demo: AN" : "Demo"}</button>
           <button className="thema-toggle" onClick={() => { setSpickSuche(""); setSpickBereich("alle"); setSpickOffen(true); }}>Spickzettel</button>
-          <button className="thema-toggle" onClick={wechseln}>
-            {thema === "dunkel" ? "☀ Hell" : "● Dunkel"}
+          <button
+            type="button"
+            className="kopf-rund"
+            onClick={wechseln}
+            aria-label={thema === "dunkel" ? t("scribe.header.light") : t("scribe.header.dark")}
+            title={thema === "dunkel" ? t("scribe.header.light") : t("scribe.header.dark")}
+          >
+            {thema === "dunkel" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-          <span className="nutzer">Bestätigt als {nutzerName}</span>
-          <button className="abmelden" onClick={abmelden}>Mitarbeiter wechseln</button>
+          <details className="kopf-mehr">
+            <summary className="kopf-rund" aria-label={t("scribe.header.more")} title={t("scribe.header.more")}>
+              <MoreHorizontal size={17} />
+              {demo && <i className="kopf-mehr-punkt" aria-hidden="true" />}
+            </summary>
+            <div className="kopf-mehr-menue">
+              <button type="button" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; setPw1(""); setPw2(""); setPwHinweis(null); setPwOffen(true); }}>
+                {t("scribe.header.password")}
+              </button>
+              <button type="button" onClick={(e) => { (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; setDemo((d) => !d); resetSitzung(); }}>
+                {demo ? t("scribe.header.demoOff") : t("scribe.header.demoOn")}
+              </button>
+            </div>
+          </details>
+          <span className="nutzer-chip">
+            <span className="nutzer-kuerzel" aria-hidden="true">{kopfKuerzel}</span>
+            <span className="nutzer"><small>{t("scribe.header.confirmedAs")}</small><span className="nutzer-name">{nutzerName}</span></span>
+            <button className="abmelden" onClick={abmelden} aria-label={t("scribe.header.switchAria")} title={t("scribe.header.switchAria")}>{t("scribe.header.switch")}</button>
+          </span>
         </span>
       </header>
       {demo && <div className="demo-banner">Demo-Modus · es wird nichts gespeichert, kein Datenbank-Eintrag, kein ivoris</div>}
