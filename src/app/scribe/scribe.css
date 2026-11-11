@@ -754,6 +754,17 @@
 .scribe .pp-hinweis{padding:12px 16px;border-radius:12px;font-size:14px;margin-bottom:16px}
 .scribe .pp-hinweis.ok{background:var(--primaer-soft);color:var(--primaer-tief);border:1px solid var(--primaer)}
 .scribe .pp-hinweis.fehler{background:var(--rot-soft);color:var(--rot);border:1px solid var(--rot)}
+.scribe .pp-rueckfrage{display:grid;gap:10px;margin:0 0 16px;padding:16px 18px;border-radius:14px;background:var(--gold-soft);border:1px solid var(--gold-textton);font-size:14px;line-height:1.45;text-align:left}
+.scribe .pp-rueckfrage > b{font-family:var(--display);font-size:16px;color:var(--gold-textton)}
+.scribe .pp-rueckfrage ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.scribe .pp-rueckfrage li{display:grid;gap:3px;padding:10px 12px;border-radius:12px;background:var(--flaeche-flach)}
+.scribe .pp-rueckfrage li small{font-size:12px;color:var(--gedeckt)}
+.scribe .pp-rueckfrage .pp-positionen{font-size:12.5px;color:var(--gedeckt)}
+.scribe .pp-rueckfrage .pp-name{display:grid;gap:6px;font-size:13px;font-weight:600}
+.scribe .pp-rueckfrage .pp-klein{font-size:12.5px;color:var(--gedeckt)}
+.scribe .pp-rueckfrage-knoepfe{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.scribe .pp-nicht-jetzt{font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;border-radius:12px;border:1px solid var(--kante-hover);background:transparent;color:var(--text);cursor:pointer}
+.scribe .pp-nicht-jetzt:hover:not(:disabled){border-color:var(--primaer)}
 .scribe .pp-laden{font-family:var(--mono);font-size:13px;color:var(--gedeckt);padding:30px 0}
 
 .scribe .pp-art{margin-bottom:30px}
@@ -1256,6 +1267,10 @@
 .scribe .pruef-hinweise ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.45}
 .scribe .pruef-hinweise .pruef-ort{margin-left:8px;padding:0;border:0;background:none;color:var(--primaer-tief);font:inherit;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer}
 .scribe .pruef-hinweise .pruef-fuss{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--gedeckt)}
+.scribe .pruef-hinweise .pruef-zweite{display:grid;gap:8px;padding:12px 14px;border-radius:12px;background:var(--gold-soft);border:1px solid var(--gold-textton);font-size:13.5px;line-height:1.45}
+.scribe .pruef-hinweise .pruef-zweite b{font-family:var(--display);font-size:14.5px;color:var(--gold-textton)}
+.scribe .pruef-hinweise .pruef-zweite-knoepfe{display:flex;flex-wrap:wrap;gap:10px}
+.scribe .hinweis-trotz{flex-basis:100%;font-size:13px;font-weight:600;color:var(--gold-textton)}
 .scribe .gruppe.pruef-markiert{outline:2px solid var(--rot);outline-offset:6px;border-radius:12px}
 
 /* ===== Tagesdatensatz: ein Eintrag je Patient und Tag, auf derselben Karteikarte weiterschreiben ===== */
@@ -1377,6 +1392,18 @@
 .scribe .buch-text small{font-size:11.5px;color:var(--dunkler)}
 .scribe .bausteine-zeitpunkt,.scribe .bausteine-geloescht{margin-top:18px;padding-top:4px;border-top:1px solid var(--kante)}
 .scribe .bausteine-frage{display:grid;gap:10px;margin-top:10px;padding:12px 14px;border-radius:14px;background:var(--gold-soft);font-size:13.5px}
+/* Zweite Bestätigung: Auswirkungen auf die Abrechnung, bevor die Praxis entscheidet */
+.scribe .bausteine-bestaetigen{margin:0 0 12px;border:1px solid var(--gold-textton)}
+.scribe .bausteine-bestaetigen > b{font-family:var(--display);font-size:14.5px;color:var(--gold-textton)}
+.scribe .bausteine-auswirkungen{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.scribe .bausteine-auswirkungen li{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:var(--flaeche-flach)}
+.scribe .auswirkung-was{display:grid;gap:2px;font-weight:600;color:var(--text)}
+.scribe .auswirkung-was small{font-weight:500;font-size:12px;color:var(--gedeckt)}
+.scribe .auswirkung-hinweis{font-size:12.5px;color:var(--gedeckt)}
+.scribe .auswirkung-positionen{display:flex;flex-wrap:wrap;gap:6px}
+.scribe .auswirkung-position{font-size:12.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--kante);color:var(--text)}
+.scribe .auswirkung-position b{font-family:var(--mono);color:var(--primaer)}
+.scribe .bausteine-schutz.abrechnung span{color:var(--text)}
 @media(max-width:620px){
   .scribe .bausteine-buch li{grid-template-columns:minmax(0,1fr)}
   .scribe .bausteine-zeitpunkt input{min-width:0;width:100%}

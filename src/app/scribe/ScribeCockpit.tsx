@@ -11,7 +11,7 @@ import BausteineVerwaltung from "./BausteineVerwaltung";
 import ScribeGlocke from "./ScribeGlocke";
 import AnmeldeFenster from "./AnmeldeFenster";
 import { jsonVon, scribeFetch } from "./verbindung";
-import { aendereVorlage, ladeVerlauf, NEU_LADEN } from "./bausteine-api";
+import { aendereVorlage, ladeVerlauf, NEU_LADEN, type Pruefung } from "./bausteine-api";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
 import {protectScribeDeparture} from '@/lib/scribe-departure';
@@ -21,7 +21,7 @@ import { ArtWahl, KarteBisher, OffeneTeile, TagFehler, TagesLeistungen, bisherAu
 
 /* ===== Typen (Form der doku_vorlagen.struktur / .positionen aus Seed 019b) ===== */
 // Felder aus /api/doku/vorlagen?history=1 (Zeitmaschine, Codex 10.11.2026): optionKey bleibt dauerhaft, hidden blendet aus, ohne Indizes zu verschieben.
-type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis"; optionKey?: string; origin?: "vorlage" | "praxis"; hidden?: boolean; lastChangeId?: string | null; editable?: boolean };
+type Opt = { t: string; on?: boolean; id?: string; quelle?: "seed" | "praxis"; optionKey?: string; origin?: "vorlage" | "praxis"; hidden?: boolean; lastChangeId?: string | null; editable?: boolean; requiresConfirmation?: boolean };
 // explizit: Pflichtgruppe ohne „keine Angabe“, es muss eine Option gewählt werden (z. B. „Kein Bogen OK“). Entscheidung Juan 04.11.2026.
 type Gruppe = { label: string; req: boolean; explizit?: boolean; type: "single" | "multi"; opts: Opt[] };
 type TemplateSeg = string | { g: string };
@@ -46,6 +46,8 @@ type Vorlage = {
   sort_index: number;
   struktur: Struktur;
   positionen: PositionsRegel[];
+  /** legacy_fallback: Diese Vorlage kommt ausnahmsweise im bisherigen Modus, Einträge daraus tragen keine Versionsmarkierung. */
+  templateHistoryMode?: "versioned" | "legacy_fallback";
 };
 type PatientTreffer = { id: string; name: string; alter: number | null };
 type TagesEintrag = {
@@ -556,7 +558,16 @@ export default function ScribeCockpit({
   /** Offene Bausteine-Verwaltung (Zeitmaschine) für 1 Leistung, mit der Gruppe, aus der sie geöffnet wurde. */
   const [verwaltung, setVerwaltung] = useState<{ vorlageId: string; gruppe: string } | null>(null);
   /** Rückmeldung nach dem Ausblenden eines eigenen Textes, mit Rückgängig. */
-  const [bausteinHinweis, setBausteinHinweis] = useState<{ gruppe: string; text: string; undo?: { templateId: string; changeId: string; revision: number } } | null>(null);
+  // Prüfung beim Bestätigen: Die Praxis kann nach dem Hinweis ein zweites Mal bestätigen (Juans Regel 11.11.2026).
+  const [pruefFreigabe, setPruefFreigabe] = useState<{ fingerprint: string; art: "neu" | "version"; frage: boolean } | null>(null);
+  const [trotzHinweis, setTrotzHinweis] = useState<string | null>(null);
+  const [bausteinHinweis, setBausteinHinweis] = useState<{
+    gruppe: string;
+    text: string;
+    undo?: { templateId: string; changeId: string; revision: number };
+    /** Wartet auf die zweite Bestätigung, weil an dem Baustein die Abrechnung hängt. */
+    bestaetigen?: { review: Pruefung; wiederholen: (review: Pruefung) => Promise<void> };
+  } | null>(null);
   /** Vorbelegung der Praxis-Inbox, zum Beispiel ein Wunsch an Juan aus der Bausteine-Verwaltung. */
   const [inboxVorbelegung, setInboxVorbelegung] = useState<{ text: string; n: number } | null>(null);
   /** Hinweis, wenn ein alter Entwurf eigene Bausteine enthielt, die neu ausgewählt werden müssen. */
@@ -793,6 +804,9 @@ export default function ScribeCockpit({
     () => gewaehlt.map(vorlageVon).filter((v): v is Vorlage => v !== null),
     [gewaehlt, vorlageVon]
   );
+  // Die Versionsmarkierung gilt nur, wenn alle gewählten Leistungen im neuen Modus kommen. Liefert der Server eine Vorlage
+  // ausnahmsweise im bisherigen Modus (legacy_fallback), prüft er den ganzen Eintrag im bisherigen Modus.
+  const markerSenden = vorlagenModus === "zeitmaschine" && module.every((m) => m.templateHistoryMode !== "legacy_fallback");
   const bogenkontrolleVorlage = useMemo(
     () => artVorlagen.find((v) => v.termin_typ === "kontrolle") ?? null,
     [artVorlagen]
@@ -895,6 +909,8 @@ export default function ScribeCockpit({
 
   function resetSitzung(keepRoom = false) {
     setEntwurfHinweis(null);
+    setPruefFreigabe(null);
+    setTrotzHinweis(null);
     setBausteinHinweis(null);
     if (!keepRoom) setZimmerVersionId('');
     setBestaetigt(null);
@@ -920,18 +936,35 @@ export default function ScribeCockpit({
     setTagHinweis(null);
   }
 
+  /** Text für die zweite Bestätigung im Hinweis unter der Gruppe: welche Positionen an diesem Baustein hängen. */
+  function bestaetigungsText(m: Vorlage, g: string, review: Pruefung, frage: string): string {
+    const index = m.struktur.groups[g]?.opts.findIndex((o) => review.impacts.some((w) => w.optionKey === o.optionKey)) ?? -1;
+    const codes = review.impacts.flatMap((w) => w.positions)
+      .filter((p) => p.optionIndex === null || index < 0 || p.optionIndex === index)
+      .map((p) => [p.code, p.text].filter(Boolean).join(" "))
+      .filter((wert, i, alle) => wert && alle.indexOf(wert) === i);
+    return t(codes.length ? "scribe.blocks.toastConfirm" : "scribe.blocks.toastConfirmGroup", "de", { positionen: codes.join(", "), frage });
+  }
+
   /** Eigenen Text ausblenden. Er bleibt auf seinem Platz und steht im Änderungsbuch, Rückgängig holt ihn zurück. */
-  async function eigenenBausteinAusblenden(m: Vorlage, g: string, opt: Opt) {
+  async function eigenenBausteinAusblenden(m: Vorlage, g: string, opt: Opt, bestaetigt?: Pruefung) {
     if (!opt.optionKey || optSpeichert) return;
     const gruppe = `${m.termin_typ}:${g}`;
     setOptSpeichert(true);
     setBausteinHinweis(null);
     try {
       const verlauf = await ladeVerlauf(m.id);
-      const r = await aendereVorlage({ templateId: m.id, expectedRevision: verlauf.revision, action: "hide", optionKey: opt.optionKey });
+      const r = await aendereVorlage({
+        templateId: m.id, expectedRevision: verlauf.revision, action: "hide", optionKey: opt.optionKey,
+        ...(bestaetigt ? { confirmProtected: true, confirmationFingerprint: bestaetigt.fingerprint } : {}),
+      });
       if (!r.ok) {
+        if (r.code === "template_change_confirmation_required" && r.review) {
+          setBausteinHinweis({ gruppe, text: bestaetigungsText(m, g, r.review, t("scribe.blocks.toastHideQuestion")), bestaetigen: { review: r.review, wiederholen: (review) => eigenenBausteinAusblenden(m, g, opt, review) } });
+          return;
+        }
         if (NEU_LADEN.has(r.code)) await ladeVorlagen();
-        setBausteinHinweis({ gruppe, text: r.code === "template_group_protected" ? t("scribe.blocks.protected") : NEU_LADEN.has(r.code) ? t("scribe.blocks.stale") : r.message || t("scribe.workspace.unavailable") });
+        setBausteinHinweis({ gruppe, text: r.code === "template_change_not_possible" ? t("scribe.blocks.lastRequired") : r.code === "template_group_protected" ? t("scribe.blocks.protected") : NEU_LADEN.has(r.code) ? t("scribe.blocks.stale") : r.message || t("scribe.workspace.unavailable") });
         return;
       }
       await ladeVorlagen();
@@ -943,11 +976,25 @@ export default function ScribeCockpit({
     }
   }
 
-  async function ausblendenRueckgaengig() {
-    const hinweis = bausteinHinweis;
+  async function ausblendenRueckgaengig(bestaetigt?: Pruefung, vorher?: NonNullable<typeof bausteinHinweis>) {
+    const hinweis = vorher ?? bausteinHinweis;
     if (!hinweis?.undo || optSpeichert) return;
     setOptSpeichert(true);
-    const r = await aendereVorlage({ templateId: hinweis.undo.templateId, expectedRevision: hinweis.undo.revision, action: "undo", changeId: hinweis.undo.changeId });
+    const r = await aendereVorlage({
+      templateId: hinweis.undo.templateId, expectedRevision: hinweis.undo.revision, action: "undo", changeId: hinweis.undo.changeId,
+      ...(bestaetigt ? { confirmProtected: true, confirmationFingerprint: bestaetigt.fingerprint } : {}),
+    });
+    if (!r.ok && r.code === "template_change_confirmation_required" && r.review) {
+      const m = vorlagen.find((v) => v.id === hinweis.undo!.templateId);
+      const g = hinweis.gruppe.split(":").slice(1).join(":");
+      setBausteinHinweis({
+        ...hinweis,
+        text: m ? bestaetigungsText(m, g, r.review, t("scribe.blocks.toastUndoQuestion")) : t("scribe.blocks.confirmIntro"),
+        bestaetigen: { review: r.review, wiederholen: (review) => ausblendenRueckgaengig(review, hinweis) },
+      });
+      setOptSpeichert(false);
+      return;
+    }
     await ladeVorlagen();
     setBausteinHinweis({ gruppe: hinweis.gruppe, text: r.ok ? t("scribe.blocks.undoneToast") : NEU_LADEN.has(r.code) ? t("scribe.blocks.stale") : r.message || t("scribe.workspace.unavailable") });
     setOptSpeichert(false);
@@ -1391,7 +1438,7 @@ export default function ScribeCockpit({
   const brauchtSchienen = module.some((m) => m.struktur.vars.includes("schienen"));
   const brauchtBogen = module.some((m) => m.struktur.vars.includes("bogen")) || gewaehlteBausteinTexte.some((text) => text.includes("{bogen}"));
 
-  async function neueVersion() {
+  async function neueVersion(freigabe?: string) {
     if (!bestaetigt || !aenderungsgrund.trim() || komposition.fehlt.length > 0) return;
     if (demo) {
       setBestaetigt({
@@ -1408,6 +1455,8 @@ export default function ScribeCockpit({
     }
     setSendet(true);
     setAktionsFehler(null);
+    setPruefHinweise([]);
+    setPruefFreigabe(null);
     const res = await scribeFetch(`/api/doku/eintrag/${bestaetigt.id}/version`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1424,7 +1473,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
+          ...(markerSenden ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1432,6 +1481,7 @@ export default function ScribeCockpit({
         ausnahme_freitext: ausnahme.trim() || null,
         termin_datum: listenDatum,
         aenderungsgrund: aenderungsgrund.trim(),
+        ...(freigabe ? { consistencyAcknowledgement: { fingerprint: freigabe } } : {}),
       }),
     });
     setSendet(false);
@@ -1444,9 +1494,11 @@ export default function ScribeCockpit({
       }
       setAktionsFehler(json.error ?? t("scribe.net.server"));
       setPruefHinweise(pruefHinweiseAus(json));
+      setPruefFreigabe(freigabeAus(json, "version"));
       return;
     }
     const json = await res.json();
+    trotzHinweisSetzen(json);
     setBestaetigt({
       id: json.eintrag.id,
       version: json.eintrag.version,
@@ -1511,7 +1563,7 @@ export default function ScribeCockpit({
         naechster_termin: naechsterTermin.trim() || null,
         zahn_seiten: seiten,
         gruppen_freitext: gruppenFreitextAktiv,
-        ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
+        ...(markerSenden ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
         leistungen: module.map((m) => anzeigeName(m)),
       },
       selection: auswahl,
@@ -1623,6 +1675,25 @@ export default function ScribeCockpit({
     await neuerEintrag();
   }
 
+  /** Bietet der Server nach dem Hinweis eine zweite Bestätigung an, merkt sich Scribe den Fingerabdruck der Prüfung. */
+  function freigabeAus(json: unknown, art: "neu" | "version") {
+    const fingerprint = (json as { confirmation?: { fingerprint?: unknown } })?.confirmation?.fingerprint;
+    return typeof fingerprint === "string" && fingerprint ? { fingerprint, art, frage: false } : null;
+  }
+
+  function trotzHinweisSetzen(json: unknown) {
+    const audit = (json as { confirmation?: { code?: string; confirmedBy?: { name?: string } } })?.confirmation;
+    setTrotzHinweis(audit?.code === "confirmed_despite_warning" ? t("scribe.consistency.ui.confirmedDespite", "de", { name: audit.confirmedBy?.name || nutzerName }) : null);
+  }
+
+  /** Zweite Bestätigung: derselbe Auftrag noch einmal, dazu der Fingerabdruck der gezeigten Hinweise. */
+  async function trotzdemEintragen() {
+    const freigabe = pruefFreigabe;
+    if (!freigabe) return;
+    if (freigabe.art === "version") await neueVersion(freigabe.fingerprint);
+    else await neuerEintrag(freigabe.fingerprint);
+  }
+
   /**
    * Nach einer unterwegs verlorenen Antwort: Ist genau diese Dokumentation schon bestätigt angekommen, gilt sie als bestätigt.
    * So wird sie nie ein zweites Mal als Nachtrag ergänzt.
@@ -1647,7 +1718,7 @@ export default function ScribeCockpit({
     return true;
   }
 
-  async function neuerEintrag() {
+  async function neuerEintrag(freigabe?: string) {
     if (!patient) return;
     if (demo) {
       setBestaetigt({
@@ -1665,6 +1736,7 @@ export default function ScribeCockpit({
     setSendet(true);
     setAktionsFehler(null);
     setPruefHinweise([]);
+    setPruefFreigabe(null);
     // Bestätigen darf bei Netz- oder Serverfehler 1 Mal automatisch wiederholt werden: Der Server legt je Patient und Tag
     // nur einen bestätigten Eintrag an, ein zweites Senden wird erkannt (siehe eigenenEintragUebernehmen).
     const koerper = {
@@ -1684,7 +1756,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
+          ...(markerSenden ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1693,6 +1765,7 @@ export default function ScribeCockpit({
         termin_datum: listenDatum,
         bestaetigen: true,
         entwurf_id: entwurfId,
+        ...(freigabe ? { consistencyAcknowledgement: { fingerprint: freigabe } } : {}),
     };
     const senden = (inhalt: typeof koerper) => scribeFetch("/api/doku/eintrag", {
       method: "POST",
@@ -1725,9 +1798,11 @@ export default function ScribeCockpit({
       }
       setAktionsFehler(json.error ?? t("scribe.net.server"));
       setPruefHinweise(pruefHinweiseAus(json));
+      setPruefFreigabe(freigabeAus(json, "neu"));
       return;
     }
     const json = await res.json();
+    trotzHinweisSetzen(json);
     setBestaetigt({
       id: json.eintrag.id,
       version: json.eintrag.version,
@@ -1749,7 +1824,11 @@ export default function ScribeCockpit({
       if (!response.ok) throw new Error(payload?.error ?? "Abrechnungspositionen konnten nicht geladen werden.");
       if (!payload?.copy_text) throw new Error("Der bestätigte Eintrag enthält keine Abrechnungspositionen.");
       await navigator.clipboard.writeText(payload.copy_text);
-      setBillingCopyInfo(`Positionen aus bestätigter Version ${payload.source_version} kopiert · manuell in IVORIS prüfen/eintragen`);
+      // Wurde der Eintrag trotz Hinweis bestätigt oder passt er nicht mehr zur heutigen Vorlage, bleibt Kopieren möglich und Scribe sagt es dazu.
+      const trotz = payload?.confirmation?.confirmedBy?.name
+        ? ` · ${t("scribe.billing.copiedDespite", "de", { name: String(payload.confirmation.confirmedBy.name) })}`
+        : "";
+      setBillingCopyInfo(`Positionen aus bestätigter Version ${payload.source_version} kopiert · manuell in IVORIS prüfen/eintragen${trotz}`);
     } catch (error) {
       setBillingCopyInfo(error instanceof Error ? error.message : "Kopieren fehlgeschlagen.");
     }
@@ -1788,7 +1867,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
+          ...(markerSenden ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1855,7 +1934,10 @@ export default function ScribeCockpit({
     // Entwürfe ohne Versionsmarkierung stammen aus dem alten Vorlagenstand: feste Bausteine behalten ihren Platz,
     // eigene Texte können anders liegen und werden neu ausgewählt (Datenvertrag Zeitmaschine, 10.11.2026).
     const markiert = (e.variablen as Record<string, unknown> | null)?.template_history_version === TEMPLATE_HISTORY_VERSION;
-    const passt = markiert === (vorlagenModus === "zeitmaschine");
+    const versioniert = vorlagenModus === "zeitmaschine" && vorlagen
+      .filter((v) => v.behandlungsart === e.behandlungsart && (e.termin_typ ?? "").split("+").includes(v.termin_typ))
+      .every((v) => v.templateHistoryMode !== "legacy_fallback");
+    const passt = markiert === versioniert;
     const geladen = passt ? { auswahl: e.auswahl ?? {}, entfernt: 0 } : nurFesteBausteine(e.auswahl ?? {}, vorlagen.filter((v) => v.behandlungsart === e.behandlungsart));
     setAuswahl(geladen.auswahl);
     setEntwurfHinweis(geladen.entfernt > 0 ? t("scribe.blocks.legacyDraft", "de", { n: geladen.entfernt }) : null);
@@ -2573,7 +2655,7 @@ export default function ScribeCockpit({
                       {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
                       {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
                     </div>
-                    {!m.id.startsWith("eigen-") && !demo && vorlagenModus === "zeitmaschine" && (
+                    {!m.id.startsWith("eigen-") && !demo && vorlagenModus === "zeitmaschine" && m.templateHistoryMode !== "legacy_fallback" && (
                       <button type="button" className="gruppe-aendern" onClick={() => setVerwaltung({ vorlageId: m.id, gruppe: g })} aria-label={t("scribe.blocks.openAria", "de", { gruppe: grp.label })}>
                         {t("scribe.blocks.open")}
                       </button>
@@ -2667,7 +2749,12 @@ export default function ScribeCockpit({
                   {bausteinHinweis?.gruppe === gruppenKey && (
                     <div className="baustein-toast" role="status">
                       <span>{bausteinHinweis.text}</span>
-                      {bausteinHinweis.undo && (
+                      {bausteinHinweis.bestaetigen ? (
+                        <>
+                          <button type="button" className="haupt klein" disabled={optSpeichert} onClick={() => { const b = bausteinHinweis.bestaetigen!; void b.wiederholen(b.review); }}>{t("scribe.blocks.confirmYes")}</button>
+                          <button type="button" className="neben klein" disabled={optSpeichert} onClick={() => setBausteinHinweis(null)}>{t("scribe.blocks.cancel")}</button>
+                        </>
+                      ) : bausteinHinweis.undo && (
                         <button type="button" className="neben klein" disabled={optSpeichert} onClick={() => void ausblendenRueckgaengig()}>{t("scribe.blocks.undo")}</button>
                       )}
                       <button type="button" className="baustein-toast-zu" aria-label={t("scribe.blocks.close")} onClick={() => setBausteinHinweis(null)}>×</button>
@@ -2897,12 +2984,29 @@ export default function ScribeCockpit({
                   );
                 })}
               </ul>
+              {pruefFreigabe && !pruefFreigabe.frage && (
+                <div className="pruef-fuss">
+                  <button type="button" className="neben" onClick={() => setPruefFreigabe({ ...pruefFreigabe, frage: true })} disabled={sendet}>{t("scribe.consistency.ui.anyway")}</button>
+                  <span>{t("scribe.consistency.ui.anywayText")}</span>
+                </div>
+              )}
+              {pruefFreigabe?.frage && (
+                <div className="pruef-zweite" role="alertdialog" aria-labelledby="pruef-zweite-titel">
+                  <b id="pruef-zweite-titel">{t("scribe.consistency.ui.secondTitle")}</b>
+                  <span>{t("scribe.consistency.ui.secondText", "de", { name: nutzerName })}</span>
+                  <div className="pruef-zweite-knoepfe">
+                    <button type="button" className="haupt" onClick={() => void trotzdemEintragen()} disabled={sendet}>{sendet ? t("scribe.consistency.ui.saving") : t("scribe.consistency.ui.secondYes")}</button>
+                    <button type="button" className="neben" onClick={() => setPruefFreigabe({ ...pruefFreigabe, frage: false })} disabled={sendet}>{t("scribe.consistency.ui.secondBack")}</button>
+                  </div>
+                </div>
+              )}
               <div className="pruef-fuss">
                 <button type="button" className="neben" onClick={zwischenspeichern} disabled={speichert}>{speichert ? t("scribe.consistency.ui.saving") : t("scribe.consistency.ui.saveDraft")}</button>
                 <span>{t("scribe.consistency.ui.draft")}</span>
               </div>
             </div>
           )}
+          {trotzHinweis && pruefHinweise.length === 0 && <span className="hinweis-trotz" role="status">{trotzHinweis}</span>}
         </div>
         {patient && !demo && <OffeneTeile record={tagRecord} patientName={patient.name} rooms={raumNamen} onChanged={(r) => { void teilEntschieden(r); }} />}
 

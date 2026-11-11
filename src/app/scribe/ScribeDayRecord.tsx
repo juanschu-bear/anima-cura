@@ -97,9 +97,23 @@ const teilName = (p: DayPart, rooms: Record<string, string>) =>
 const eintragName = (e: SameDayEntry) =>
   t("scribe.day.partLabel", "de", { zeit: zeit(e.bestaetigt_am || e.created_at), ort: e.zimmer_name || t("scribe.day.noRoom"), kuerzel: e.bestaetigt_kuerzel || "—" });
 
+/** Fehler einer Tages-Anfrage. Trägt die Antwort mit, damit die Oberfläche eine angebotene zweite Bestätigung zeigen kann. */
+export class AnfrageFehler extends Error {
+  constructor(message: string, readonly body: Record<string, unknown>) { super(message); }
+}
+type PruefAngebot = { fingerprint: string; hinweise: string[] };
+/** Bietet der Server nach einem Prüfhinweis eine zweite Bestätigung an? Dann mit den verständlichen Gründen. */
+export function pruefAngebotAus(e: unknown): PruefAngebot | null {
+  if (!(e instanceof AnfrageFehler)) return null;
+  const fingerprint = (e.body.confirmation as { fingerprint?: unknown } | undefined)?.fingerprint;
+  if (typeof fingerprint !== "string" || !fingerprint) return null;
+  const issues = ((e.body.consistency as { issues?: unknown } | undefined)?.issues ?? []) as Array<{ message?: unknown }>;
+  const hinweise = Array.from(new Set(issues.map((i) => (typeof i?.message === "string" ? i.message : "")).filter(Boolean)));
+  return { fingerprint, hinweise };
+}
 async function json<T>(res: Response): Promise<T> {
-  const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
-  if (!res.ok) throw new Error(body.message || body.error || t("scribe.day.error"));
+  const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string } & Record<string, unknown>;
+  if (!res.ok) throw new AnfrageFehler(body.message || body.error || t("scribe.day.error"), body);
   return body as T;
 }
 // Jeder Schritt im Tagesdatensatz trägt den erwarteten Stand mit (expectedVersion). Ein zweites Senden legt deshalb nie etwas doppelt an.
@@ -325,6 +339,8 @@ function Entscheidung({ tag, part, rooms, onCancel, onDone }: {
   const [grund, setGrund] = useState("");
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  // Prüfhinweis beim Bestätigen: Die Praxis kann ein zweites Mal bestätigen, dann gilt ihre Entscheidung (Juans Regel).
+  const [angebot, setAngebot] = useState<(PruefAngebot & { frage: boolean }) | null>(null);
   const ziele = geltendeTeile(tag);
 
   useEffect(() => {
@@ -337,17 +353,24 @@ function Entscheidung({ tag, part, rooms, onCancel, onDone }: {
     return () => { live = false; };
   }, [tag.record.id, part.id, decision, corrects]);
 
-  async function speichern() {
+  async function speichern(freigabe?: string) {
     const reason = grund.trim() || (decision === "verwerfen" ? "" : decision === "nachtrag" ? t("scribe.day.reasonNachtrag") : t("scribe.day.reasonKorrektur"));
     if (reason.length < 3) { setFehler(t("scribe.day.reasonMissing")); return; }
     setSendet(true);
     setFehler(null);
+    if (!freigabe) setAngebot(null);
     try {
       await post(`/api/doku/tagesdatensatz/${tag.record.id}/teile/${part.id}/entscheidung`, decision === "verwerfen"
         ? { expectedVersion: tag.record.version, decision, reason }
-        : { expectedVersion: preview?.basedOnVersion ?? tag.record.version, decision, reason, correctsPartId: decision === "korrektur" ? corrects : null, previewToken: preview?.previewToken ?? null });
+        : {
+          expectedVersion: preview?.basedOnVersion ?? tag.record.version, decision, reason, correctsPartId: decision === "korrektur" ? corrects : null, previewToken: preview?.previewToken ?? null,
+          ...(freigabe ? { consistencyAcknowledgement: { fingerprint: freigabe } } : {}),
+        });
       onDone({ partId: part.id, decision, preview: decision === "verwerfen" ? null : preview, canonicalEntryId: tag.record.canonical_entry_id });
     } catch (e) {
+      const neu = pruefAngebotAus(e);
+      if (neu) { setAngebot({ ...neu, frage: false }); return; }
+      setAngebot(null);
       setFehler(e instanceof Error ? e.message : t("scribe.day.error"));
     } finally {
       setSendet(false);
@@ -377,8 +400,29 @@ function Entscheidung({ tag, part, rooms, onCancel, onDone }: {
         )}
       <input className="freitext" placeholder={grundLabel} aria-label={grundLabel} value={grund} onChange={(e) => setGrund(e.target.value)} maxLength={2000} />
       {fehler && <span className="hinweis-fehlt" role="alert">{fehler}</span>}
+      {angebot && (
+        <div className="pruef-hinweise tag-pruefung" role="alert">
+          <strong>{t("scribe.consistency.ui.title")}</strong>
+          {angebot.hinweise.length > 0 && <ul>{angebot.hinweise.map((h) => <li key={h}>{h}</li>)}</ul>}
+          {!angebot.frage ? (
+            <div className="pruef-fuss">
+              <button type="button" className="neben" onClick={() => setAngebot({ ...angebot, frage: true })} disabled={sendet}>{t("scribe.consistency.ui.anyway")}</button>
+              <span>{t("scribe.consistency.ui.anywayText")}</span>
+            </div>
+          ) : (
+            <div className="pruef-zweite" role="alertdialog" aria-label={t("scribe.consistency.ui.secondTitle")}>
+              <b>{t("scribe.consistency.ui.secondTitle")}</b>
+              <span>{t("scribe.day.secondText")}</span>
+              <div className="pruef-zweite-knoepfe">
+                <button type="button" className="haupt" onClick={() => void speichern(angebot.fingerprint)} disabled={sendet}>{sendet ? t("scribe.day.saving") : t("scribe.consistency.ui.secondYes")}</button>
+                <button type="button" className="neben" onClick={() => setAngebot({ ...angebot, frage: false })} disabled={sendet}>{t("scribe.consistency.ui.secondBack")}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="tag-entwurf-aktion">
-        <button type="button" className="haupt" onClick={speichern} disabled={sendet || (decision !== "verwerfen" && !preview)}>
+        <button type="button" className="haupt" onClick={() => void speichern()} disabled={sendet || (decision !== "verwerfen" && !preview)}>
           {sendet ? t("scribe.day.saving") : decision === "verwerfen" ? t("scribe.day.discardConfirm") : t("scribe.day.decisionConfirm")}
         </button>
         <button type="button" className="neben" onClick={onCancel} disabled={sendet}>{t("scribe.day.cancel")}</button>

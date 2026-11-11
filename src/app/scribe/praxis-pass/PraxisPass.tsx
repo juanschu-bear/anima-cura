@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { t } from "@/lib/i18n";
 
 type Opt = { t: string; on?: boolean };
 type Group = { label: string; req?: boolean; type?: string; opts?: Opt[] };
@@ -39,6 +40,17 @@ const VAR_NAME: Record<string, string> = { zaehne: "Zahnangabe (FDI)", schienen:
 
 function schluessel(b: string, t: string) { return `${b}::${t}`; }
 
+/** Was das Absenden an Abrechnungs-Bausteinen ändern würde (Datenvertrag Planänderung 11.11.2026). */
+type PassAuswirkung = {
+  optionKey: string;
+  group: string;
+  previous: { text: string; hidden: boolean };
+  proposed: { text: string; hidden: boolean };
+  positions: Array<{ ruleIndex: number; code: string | null; text: string | null; optionIndex: number | null }>;
+};
+type Rueckfrage = { fingerprint: string; nameNoetig: boolean; aenderungen: PassAuswirkung[] };
+const lesbar = (text: string) => text.replace(/\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g, "…");
+
 export default function PraxisPass({ nutzerName, token }: { nutzerName: string; token?: string }) {
   const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
   const [antworten, setAntworten] = useState<Record<string, Antwort>>({});
@@ -47,6 +59,9 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
   const [offen, setOffen] = useState<string | null>(null);
   const [speichertK, setSpeichertK] = useState<string | null>(null);
   const [hinweis, setHinweis] = useState<{ ok: boolean; text: string } | null>(null);
+  // Hängt an geänderten Bausteinen die Abrechnung, fragt der Praxis-Pass ein zweites Mal nach. Alles andere ist dann schon übernommen.
+  const [rueckfrage, setRueckfrage] = useState<Rueckfrage | null>(null);
+  const [bestaetigerName, setBestaetigerName] = useState("");
   const [absendet, setAbsendet] = useState(false);
   const [eigene, setEigene] = useState<Vorlage[]>([]);
   const [neuArt, setNeuArt] = useState<string | null>(null); // welche Behandlungsart gerade ein Eingabefeld zeigt
@@ -272,15 +287,45 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       return;
     }
     setFehlerVorlagen({});
+    await absendenAnServer();
+  }
+
+  /** Sendet den Praxis-Pass. Mit `bestaetigung` ist es die zweite Bestätigung für Bausteine, an denen die Abrechnung hängt. */
+  async function absendenAnServer(bestaetigung?: { fingerprint: string; confirmedBy?: string }) {
     setAbsendet(true); setHinweis(null);
-    const res = await fetch(apiUrl("/api/praxis-pass"), {
-      method: "POST", headers: apiHeaders(), body: JSON.stringify({ absenden: true }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(apiUrl("/api/praxis-pass"), {
+        method: "POST", headers: apiHeaders(), body: JSON.stringify({ absenden: true, ...(bestaetigung ? { confirmation: bestaetigung } : {}) }),
+      });
+    } catch {
+      setAbsendet(false);
+      setHinweis({ ok: false, text: t("scribe.net.offline") });
+      return;
+    }
     const json = await res.json().catch(() => ({}));
     setAbsendet(false);
-    if (!res.ok) { setHinweis({ ok: false, text: json.error ?? "Absenden fehlgeschlagen." }); return; }
-    setHinweis({ ok: true, text: "Alles abgesendet. Vielen Dank, der Fachinhalt ist bei uns." });
+    if (!res.ok) { setHinweis({ ok: false, text: `${json.error ?? t("scribe.net.server")} ${t("scribe.pass.retry")}` }); return; }
+    const unmoeglich = Array.isArray(json.impossible) ? json.impossible.length : 0;
+    if (json.status === "confirmation_required" && json.confirmation?.fingerprint) {
+      setRueckfrage({
+        fingerprint: String(json.confirmation.fingerprint),
+        nameNoetig: !!json.confirmation.confirmedByRequired,
+        aenderungen: Array.isArray(json.confirmation.changes) ? json.confirmation.changes : [],
+      });
+      setHinweis({ ok: true, text: t("scribe.pass.savedPending", "de", { n: Array.isArray(json.confirmation.changes) ? json.confirmation.changes.length : 0 }) });
+    } else {
+      setRueckfrage(null);
+      setHinweis({ ok: true, text: `Alles abgesendet. Vielen Dank, der Fachinhalt ist bei uns.${unmoeglich ? ` ${t("scribe.pass.lastRequired", "de", { n: unmoeglich })}` : ""}` });
+    }
     laden();
+  }
+
+  /** Name der Vorlage und der Gruppe zu einem Baustein, damit die Praxis sieht, wo sich etwas ändert. */
+  function ortVon(a: PassAuswirkung): string {
+    const vorlage = vorlagen.find((v) => a.optionKey.startsWith(`${v.id}:`));
+    const gruppe = vorlage?.struktur.groups?.[a.group]?.label ?? a.group;
+    return [vorlage ? `${ART_NAME[vorlage.behandlungsart] ?? vorlage.behandlungsart} · ${vorlage.name}` : null, gruppe].filter(Boolean).join(" · ");
   }
 
   return (
@@ -478,9 +523,52 @@ export default function PraxisPass({ nutzerName, token }: { nutzerName: string; 
       {!ladend && (
         <footer className="pp-fuss">
           <p>Wenn alles passt, sende den gesamten Praxis-Pass ab. Du kannst vorher jede Art einzeln speichern und später weitermachen.</p>
-          <button className="pp-absenden" disabled={absendet} onClick={allesAbsenden}>
-            {absendet ? "Sende …" : "Praxis-Pass absenden"}
-          </button>
+          {rueckfrage && (
+            <div className="pp-rueckfrage" role="alertdialog" aria-labelledby="pp-rueckfrage-titel">
+              <b id="pp-rueckfrage-titel">{t("scribe.pass.confirmTitle")}</b>
+              <span>{t("scribe.pass.confirmIntro")}</span>
+              <ul>
+                {rueckfrage.aenderungen.map((a) => {
+                  const umbenannt = a.previous.text !== a.proposed.text;
+                  const was = umbenannt
+                    ? t("scribe.blocks.confirmRename", "de", { vorher: lesbar(a.previous.text) || "—", nachher: lesbar(a.proposed.text) })
+                    : a.proposed.hidden ? t("scribe.blocks.confirmHide", "de", { text: lesbar(a.previous.text) }) : t("scribe.blocks.confirmShow", "de", { text: lesbar(a.proposed.text) });
+                  const codes = a.positions.map((p) => [p.code, p.text].filter(Boolean).join(" ")).filter((w, i, alle) => w && alle.indexOf(w) === i);
+                  return (
+                    <li key={a.optionKey}>
+                      <small>{ortVon(a)}</small>
+                      <span>{was}</span>
+                      {codes.length > 0 && <span className="pp-positionen">{t("scribe.pass.positions", "de", { positionen: codes.join(", ") })}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+              {rueckfrage.nameNoetig && (
+                <label className="pp-name">
+                  {t("scribe.pass.nameLabel")}
+                  <input value={bestaetigerName} onChange={(e) => setBestaetigerName(e.target.value)} maxLength={120} autoComplete="name" />
+                </label>
+              )}
+              <span className="pp-klein">{t("scribe.pass.confirmName")}</span>
+              <div className="pp-rueckfrage-knoepfe">
+                <button
+                  className="pp-absenden"
+                  disabled={absendet || (rueckfrage.nameNoetig && !bestaetigerName.trim())}
+                  onClick={() => void absendenAnServer({ fingerprint: rueckfrage.fingerprint, ...(rueckfrage.nameNoetig ? { confirmedBy: bestaetigerName.trim() } : {}) })}
+                >
+                  {absendet ? "Sende …" : t("scribe.pass.confirmYes")}
+                </button>
+                <button className="pp-nicht-jetzt" disabled={absendet} onClick={() => { setRueckfrage(null); setHinweis({ ok: true, text: t("scribe.pass.confirmLater") }); }}>
+                  {t("scribe.pass.confirmNo")}
+                </button>
+              </div>
+            </div>
+          )}
+          {!rueckfrage && (
+            <button className="pp-absenden" disabled={absendet} onClick={allesAbsenden}>
+              {absendet ? "Sende …" : "Praxis-Pass absenden"}
+            </button>
+          )}
         </footer>
       )}
     </main>

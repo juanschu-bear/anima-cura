@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
-import { aendereVorlage, ladeVerlauf, NEU_LADEN, type BausteinAktion, type VorlagenAenderung, type VorlagenVerlauf } from "./bausteine-api";
+import { aendereVorlage, ladeVerlauf, NEU_LADEN, type BausteinAktion, type BuchAktion, type Pruefung, type VorlagenAenderung, type VorlagenVerlauf } from "./bausteine-api";
 
 /** Form einer Vorlage aus /api/doku/vorlagen?history=1, soweit die Verwaltung sie braucht. */
-export type VerwaltungsOpt = { t: string; optionKey?: string; origin?: "vorlage" | "praxis"; hidden?: boolean; lastChangeId?: string | null; editable?: boolean };
+export type VerwaltungsOpt = { t: string; optionKey?: string; origin?: "vorlage" | "praxis"; hidden?: boolean; lastChangeId?: string | null; editable?: boolean; requiresConfirmation?: boolean };
 export type VerwaltungsVorlage = {
   id: string;
   name: string;
   struktur: { groups: Record<string, { label: string; explizit?: boolean; opts: VerwaltungsOpt[] }> };
-  positionen: Array<{ if?: { g: string } }>;
+  positionen: Array<{ code?: string; text?: string; if?: { g: string; i?: number } }>;
 };
 
 const PLATZHALTER = /\{zaehne\}|\{von\}|\{bis\}|\{bogen\}/g;
@@ -31,7 +31,9 @@ function geschuetzt(v: VerwaltungsVorlage, g: string): boolean {
   return !!v.struktur.groups[g]?.explizit || v.positionen.some((regel) => regel.if?.g === g);
 }
 
-const AKTION_TEXT: Record<BausteinAktion, string> = {
+const AKTION_TEXT: Record<BuchAktion, string> = {
+  add: "scribe.blocks.log.add",
+  reconcile: "scribe.blocks.log.reconcile",
   hide: "scribe.blocks.log.hide",
   show: "scribe.blocks.log.show",
   rename: "scribe.blocks.log.rename",
@@ -40,12 +42,16 @@ const AKTION_TEXT: Record<BausteinAktion, string> = {
   restore_at: "scribe.blocks.log.restoreAt",
 };
 
-type Meldung = { art: "ok" | "fehler" | "schutz"; text: string };
+type Meldung = { art: "ok" | "fehler" | "schutz"; text: string; umbenennenStatt?: { key: string; text: string } };
+type Eingabe = { action: BausteinAktion; optionKey?: string; text?: string; changeId?: string; at?: string };
+/** Wartet auf die zweite Bestätigung der Praxis: dieselbe Änderung, dazu der Fingerabdruck der gezeigten Auswirkungen. */
+type Offen = { key: string; eingabe: Eingabe; erfolg: string; review: Pruefung };
 
 /**
  * Bausteine einer Leistung selbst verwalten: umbenennen, ausblenden, wieder einblenden, gelöschte eigene Texte
- * zurückholen. Jede Änderung steht im Änderungsbuch und lässt sich rückgängig machen. Gruppen, an denen die
- * Abrechnung hängt, bleiben gesperrt; dort führt der Weg über einen Wunsch an Juan.
+ * zurückholen. Jede Änderung steht im Änderungsbuch und lässt sich rückgängig machen. Hängt an einer Gruppe die
+ * Abrechnung, zeigt Scribe vorher die betroffenen Positionen und die Praxis bestätigt ein zweites Mal (Juans Regel:
+ * die Praxis entscheidet selbst). Mit einem älteren Server ohne zweite Bestätigung bleiben diese Gruppen gesperrt.
  */
 export default function BausteineVerwaltung({
   vorlage,
@@ -74,6 +80,11 @@ export default function BausteineVerwaltung({
   const [zeitpunkt, setZeitpunkt] = useState("");
   const [zurueckdrehenFragen, setZurueckdrehenFragen] = useState(false);
   const [geloeschtSuche, setGeloeschtSuche] = useState("");
+  const [offen, setOffen] = useState<Offen | null>(null);
+  const frageRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (offen) frageRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [offen]);
 
   const laden = useCallback(async () => {
     setLaedt(true);
@@ -98,7 +109,13 @@ export default function BausteineVerwaltung({
   }, [onClose]);
 
   const grp = vorlage.struktur.groups[gruppe];
-  const gesperrt = geschuetzt(vorlage, gruppe);
+  /** Der Server kennt die zweite Bestätigung, wenn er je Baustein requiresConfirmation mitschickt. */
+  const zweiteBestaetigung = useMemo(
+    () => Object.values(vorlage.struktur.groups).some((g) => g.opts.some((o) => typeof o.requiresConfirmation === "boolean")),
+    [vorlage],
+  );
+  const gesperrt = !zweiteBestaetigung && geschuetzt(vorlage, gruppe);
+  const mitAbrechnung = zweiteBestaetigung && geschuetzt(vorlage, gruppe);
   const optsMitIndex = useMemo(() => (grp?.opts ?? []).map((o, i) => ({ o, i })), [grp]);
   const angeboten = optsMitIndex.filter(({ o }) => !o.hidden);
   const ausgeblendet = optsMitIndex.filter(({ o }) => o.hidden);
@@ -116,17 +133,34 @@ export default function BausteineVerwaltung({
   }, [verlauf, geloeschtSuche, vorlage]);
   const eintraege = useMemo(() => [...(verlauf?.changes ?? []), ...aeltere], [verlauf, aeltere]);
 
-  async function ausfuehren(key: string, eingabe: { action: BausteinAktion; optionKey?: string; text?: string; changeId?: string; at?: string }, erfolg: string) {
+  async function ausfuehren(key: string, eingabe: Eingabe, erfolg: string, bestaetigt?: Pruefung) {
     if (!verlauf || beschaeftigt) return;
     setBeschaeftigt(key);
     setMeldung(null);
-    const ergebnis = await aendereVorlage({ templateId: vorlage.id, expectedRevision: verlauf.revision, ...eingabe });
+    const ergebnis = await aendereVorlage({
+      templateId: vorlage.id,
+      expectedRevision: verlauf.revision,
+      ...eingabe,
+      ...(bestaetigt ? { confirmProtected: true, confirmationFingerprint: bestaetigt.fingerprint } : {}),
+    });
     if (ergebnis.ok) {
+      setOffen(null);
       setUmbenennen(null);
       setZurueckdrehenFragen(false);
       await onGeaendert();
       await laden();
       setMeldung({ art: "ok", text: erfolg });
+    } else if (ergebnis.code === "template_change_confirmation_required" && ergebnis.review) {
+      // Erst die Auswirkungen zeigen, dann entscheidet die Praxis. Hat sich inzwischen etwas geändert, zeigt Scribe den neuen Stand.
+      setOffen({ key, eingabe, erfolg, review: ergebnis.review });
+    } else if (ergebnis.code === "template_change_not_possible" && ergebnis.review?.impossible) {
+      setOffen(null);
+      const vorschlag = ergebnis.review.impossible.suggestion;
+      setMeldung({
+        art: "fehler",
+        text: t("scribe.blocks.lastRequired"),
+        ...(vorschlag?.kind === "rename_instead" ? { umbenennenStatt: { key: vorschlag.optionKey, text: vorschlag.currentText } } : {}),
+      });
     } else if (ergebnis.code === "template_group_protected") {
       setMeldung({ art: "schutz", text: t("scribe.blocks.protected") });
     } else if (NEU_LADEN.has(ergebnis.code)) {
@@ -193,6 +227,70 @@ export default function BausteineVerwaltung({
             {meldung.art === "schutz" && (
               <button type="button" className="neben klein" onClick={() => onWunsch(wunschText)}>{t("scribe.blocks.wish")}</button>
             )}
+            {meldung.umbenennenStatt && (
+              <button
+                type="button"
+                className="neben klein"
+                onClick={() => {
+                  const ziel = meldung.umbenennenStatt!;
+                  const gruppeDesZiels = Object.keys(vorlage.struktur.groups).find((g) => vorlage.struktur.groups[g].opts.some((o) => o.optionKey === ziel.key));
+                  if (gruppeDesZiels) setGruppe(gruppeDesZiels);
+                  setTab("bausteine");
+                  setUmbenennen({ key: ziel.key, text: ziel.text, vorher: ziel.text });
+                  setMeldung(null);
+                }}
+              >
+                {t("scribe.blocks.renameInstead")}
+              </button>
+            )}
+          </div>
+        )}
+
+        {offen && (
+          <div className="bausteine-frage bausteine-bestaetigen" role="alertdialog" aria-labelledby="bestaetigen-titel" ref={frageRef}>
+            <b id="bestaetigen-titel">{t("scribe.blocks.confirmTitle")}</b>
+            <span>{t("scribe.blocks.confirmIntro")}</span>
+            <ul className="bausteine-auswirkungen">
+              {offen.review.impacts.map((wirkung) => {
+                const index = vorlage.struktur.groups[wirkung.group]?.opts.findIndex((o) => o.optionKey === wirkung.optionKey) ?? -1;
+                const positionen = wirkung.positions.filter((p) => p.optionIndex === null || index < 0 || p.optionIndex === index);
+                const umbenannt = wirkung.previous.text !== wirkung.proposed.text;
+                const aus = !wirkung.previous.hidden && wirkung.proposed.hidden;
+                const ein = wirkung.previous.hidden && !wirkung.proposed.hidden;
+                const art = aus ? "Hide" : ein ? "Show" : "Rename";
+                return (
+                  <li key={wirkung.optionKey}>
+                    <span className="auswirkung-was">
+                      <small>{vorlage.struktur.groups[wirkung.group]?.label ?? wirkung.group}</small>
+                      {umbenannt
+                        ? t("scribe.blocks.confirmRename", "de", { vorher: lesbar(wirkung.previous.text) || "—", nachher: lesbar(wirkung.proposed.text) })
+                        : aus
+                          ? t("scribe.blocks.confirmHide", "de", { text: lesbar(wirkung.previous.text) })
+                          : t("scribe.blocks.confirmShow", "de", { text: lesbar(wirkung.proposed.text) })}
+                    </span>
+                    {positionen.length > 0 ? (
+                      <>
+                        <span className="auswirkung-hinweis">{t(`scribe.blocks.confirmPositions${art}`)}</span>
+                        <span className="auswirkung-positionen">
+                          {positionen.map((p) => (
+                            <span key={p.ruleIndex} className="auswirkung-position"><b>{p.code ?? "—"}</b>{p.text ? ` ${p.text}` : ""}</span>
+                          ))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="auswirkung-hinweis">{t("scribe.blocks.confirmNoPositions")}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <span className="bausteine-hinweis">{t("scribe.blocks.confirmName")}</span>
+            <div className="baustein-knoepfe">
+              <button type="button" className="haupt klein" disabled={!!beschaeftigt} onClick={() => void ausfuehren(offen.key, offen.eingabe, offen.erfolg, offen.review)}>
+                {beschaeftigt ? "…" : t("scribe.blocks.confirmYes")}
+              </button>
+              <button type="button" className="neben klein" disabled={!!beschaeftigt} onClick={() => setOffen(null)}>{t("scribe.blocks.cancel")}</button>
+            </div>
           </div>
         )}
 
@@ -203,9 +301,16 @@ export default function BausteineVerwaltung({
                 {gruppen.map((g) => (
                   <button key={g} type="button" aria-pressed={g === gruppe} onClick={() => { setGruppe(g); setUmbenennen(null); }}>
                     {vorlage.struktur.groups[g].label}
-                    {geschuetzt(vorlage, g) && <span className="bausteine-schloss" aria-label={t("scribe.blocks.lockedShort")}>●</span>}
+                    {geschuetzt(vorlage, g) && <span className="bausteine-schloss" aria-label={t(zweiteBestaetigung ? "scribe.blocks.billingShort" : "scribe.blocks.lockedShort")} title={t(zweiteBestaetigung ? "scribe.blocks.billingShort" : "scribe.blocks.lockedShort")}>●</span>}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {mitAbrechnung && (
+              <div className="bausteine-schutz abrechnung">
+                <b>{t("scribe.blocks.billingTitle")}</b>
+                <span>{t("scribe.blocks.billingText")}</span>
               </div>
             )}
 
@@ -317,7 +422,11 @@ export default function BausteineVerwaltung({
                               {umbenannt ? <>„{lesbar(c.before_state.text)}“ → „{lesbar(c.after_state.text)}“</> : <>„{lesbar(c.after_state.text)}“</>}
                               {sichtbarWechsel && <em>{c.after_state.hidden ? t("scribe.blocks.nowHidden") : t("scribe.blocks.nowShown")}</em>}
                             </span>
-                            <small>{t("scribe.blocks.by", "de", { name: c.actor_name })}</small>
+                            <small>
+                              {t("scribe.blocks.by", "de", { name: c.actor_name })}
+                              {c.confirmation?.kind === "practice_second_confirmation" && <> · {t("scribe.blocks.confirmedBadge")}</>}
+                              {c.confirmation?.kind === "automatic_safe_reconciliation" && <> · {t("scribe.blocks.systemBadge")}</>}
+                            </small>
                           </span>
                           {letzteAenderung.has(c.id) && (
                             <button type="button" className="neben klein" disabled={!!beschaeftigt} onClick={() => void ausfuehren(`undo:${c.id}`, { action: "undo", changeId: c.id }, t("scribe.blocks.done.undo"))}>
