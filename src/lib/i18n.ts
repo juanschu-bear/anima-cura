@@ -19,6 +19,7 @@ const translations: Record<string, { de: string; en: string }> = {
   'scribe.workspace.notReady': {de:'Die Umsetzung ist noch nicht zur Praxisprüfung bereitgestellt.',en:'This has not yet been delivered for practice review.'},
   'scribe.bell.status': {de:'Neuer Stand zu deinem Eintrag',en:'Your request has a new status'},
   'scribe.bell.reply': {de:'Neue Antwort auf deinen Eintrag',en:'New reply to your request'},
+  'scribe.blocks.fallback': { de: '„✎ Bausteine“ ist gerade kurz aus. Dokumentieren geht wie gewohnt.', en: '"✎ Blocks" is briefly unavailable. Documenting works as usual.' },
   'scribe.bell.write.open': { de: 'Neuigkeit für die Praxis schreiben', en: 'Write news for the practice' },
   'scribe.bell.write.eyebrow': { de: 'Neu in Anima Cura', en: 'New in Anima Cura' },
   'scribe.bell.write.help': { de: 'Nur du siehst diesen Bereich. Nach dem Veröffentlichen sieht jedes Praxiskonto die Neuigkeit in der Glocke.', en: 'Only you see this area. Once published, every practice account sees the news in the bell.' },

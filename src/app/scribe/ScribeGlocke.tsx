@@ -33,6 +33,9 @@ const ERSTER_BEITRAG: Entwurf = {
     "",
     "5. Infobox mit klarem Stand",
     "Jeder Eintrag zeigt seinen Weg: Eingetragen, Wird angeschaut, Wird umgesetzt, Fertig bitte prüfen, Von der Praxis abgehakt. Steht er auf „Fertig, bitte prüfen“, hakt ihr ihn mit „Abhaken, passt so“ ab.",
+    "",
+    "6. Neue Kopfzeile",
+    "„Passwort“ und „Demo“ findet ihr jetzt oben rechts unter „⋯“. Aus „Mitarbeiter wechseln“ ist „Wechseln“ geworden, direkt neben eurem Namen. Hell und Dunkel schaltet ihr über das Sonnen- oder Mond-Symbol.",
   ].join("\n"),
   titelEn: "Edit text blocks yourself, with undo",
   kurzEn: "You can now rename and hide text blocks yourself. Every change can be undone. Also new: this bell and a clear status in the inbox.",
@@ -51,6 +54,9 @@ const ERSTER_BEITRAG: Entwurf = {
     "",
     "5. Inbox with a clear status",
     "Each entry shows its path: Submitted, Being reviewed, Being implemented, Done please check, Checked off by the practice. When it says \"Done, please check\", check it off with \"Check off, all good\".",
+    "",
+    "6. New header",
+    "\"Password\" and \"Demo\" are now under \"⋯\" at the top right. \"Switch staff member\" is now \"Switch\", right next to your name. Light and dark are toggled with the sun or moon icon.",
   ].join("\n"),
 };
 const umlaute: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };

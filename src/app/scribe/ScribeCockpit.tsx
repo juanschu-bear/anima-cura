@@ -210,7 +210,7 @@ function nurFesteBausteine(auswahl: Record<string, Record<string, number[]>>, vo
     neu[terminTyp] = {};
     Object.entries(gruppen ?? {}).forEach(([g, idx]) => {
       const opts = v?.struktur.groups[g]?.opts ?? [];
-      const fest = (idx ?? []).filter((i) => opts[i]?.origin === "vorlage" && !opts[i]?.hidden);
+      const fest = (idx ?? []).filter((i) => istFesterBaustein(opts[i]) && !opts[i]?.hidden);
       entfernt += (idx ?? []).length - fest.length;
       neu[terminTyp][g] = fest;
     });
@@ -218,13 +218,34 @@ function nurFesteBausteine(auswahl: Record<string, Record<string, number[]>>, vo
   return { auswahl: neu, entfernt };
 }
 
-type VorlagenAbruf = { ok: true; vorlagen: Vorlage[] } | { ok: false; message: string };
-/** Vorlagen mit Zeitmaschinen-Feldern (optionKey, hidden, editable). */
+type VorlagenModus = "zeitmaschine" | "alt";
+type VorlagenAbruf = { ok: true; vorlagen: Vorlage[]; modus: VorlagenModus } | { ok: false; message: string };
+/**
+ * Vorlagen mit Zeitmaschinen-Feldern (optionKey, hidden, editable). Klappt das nicht, lädt Scribe den bisherigen
+ * Stand, damit die Praxis weiter dokumentieren kann (Juans Entscheidung, 11.11.2026). Im alten Modus geht die
+ * Versionsmarkierung nicht mit und die Bausteine-Verwaltung ist aus; der Server prüft dann im alten Modus.
+ */
 async function holeVorlagen(): Promise<VorlagenAbruf> {
-  const res = await fetch("/api/doku/vorlagen?history=1", { cache: "no-store" });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !Array.isArray(json?.vorlagen)) return { ok: false, message: json?.message ?? "" };
-  return { ok: true, vorlagen: json.vorlagen as Vorlage[] };
+  const versuch = async (url: string) => {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      return res.ok && Array.isArray(json?.vorlagen) ? { ok: true as const, vorlagen: json.vorlagen as Vorlage[] } : { ok: false as const, message: (json?.message as string | undefined) ?? "" };
+    } catch {
+      return { ok: false as const, message: "" };
+    }
+  };
+  const neu = await versuch("/api/doku/vorlagen?history=1");
+  if (neu.ok) return { ...neu, modus: "zeitmaschine" };
+  const alt = await versuch("/api/doku/vorlagen");
+  if (alt.ok) return { ...alt, modus: "alt" };
+  return { ok: false, message: neu.message || alt.message };
+}
+
+/** Fester Baustein aus der Vorlage, in beiden Lesemodi. */
+function istFesterBaustein(o: Opt | undefined): boolean {
+  if (!o) return false;
+  return o.origin ? o.origin === "vorlage" : o.quelle !== "praxis" && !o.id;
 }
 
 /** Vorlagenstand mit Zeitmaschine. Geht mit jedem Entwurf, Speichern, Bestätigen und jeder Tageskorrektur mit, damit der Server dieselben Indizes prüft. */
@@ -600,6 +621,8 @@ export default function ScribeCockpit({
     window.localStorage.setItem(SCRIBE_LISTEN_SUCHE_KEY, listenSuche);
   }, [listenSuche]);
 
+  /** Lesemodus der Vorlagen: Zeitmaschine oder, als Absicherung, der bisherige Stand. */
+  const [vorlagenModus, setVorlagenModus] = useState<VorlagenModus>("zeitmaschine");
   /** Eigene Terminarten aus dem Praxis-Pass, damit ein Neuladen der Vorlagen sie behält. */
   const passAntwortenRef = useRef<PraxisPassAntwort[]>([]);
   /** Vorlagen im Zeitmaschinen-Modus laden, auch nach jeder Bausteinänderung. Kein Mischen mit dem alten Lesemodus. */
@@ -610,6 +633,7 @@ export default function ScribeCockpit({
       return false;
     }
     setLadefehler(null);
+    setVorlagenModus(ergebnis.modus);
     setVorlagen(mergeEigeneTerminarten(ergebnis.vorlagen, passAntwortenRef.current));
     return true;
   }, []);
@@ -1397,7 +1421,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          template_history_version: TEMPLATE_HISTORY_VERSION,
+          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1484,7 +1508,7 @@ export default function ScribeCockpit({
         naechster_termin: naechsterTermin.trim() || null,
         zahn_seiten: seiten,
         gruppen_freitext: gruppenFreitextAktiv,
-        template_history_version: TEMPLATE_HISTORY_VERSION,
+        ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
         leistungen: module.map((m) => anzeigeName(m)),
       },
       selection: auswahl,
@@ -1634,7 +1658,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          template_history_version: TEMPLATE_HISTORY_VERSION,
+          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1723,7 +1747,7 @@ export default function ScribeCockpit({
           naechster_termin: naechsterTermin.trim() || null,
           zahn_seiten: seiten,
           gruppen_freitext: gruppenFreitextAktiv,
-          template_history_version: TEMPLATE_HISTORY_VERSION,
+          ...(vorlagenModus === "zeitmaschine" ? { template_history_version: TEMPLATE_HISTORY_VERSION } : {}),
           leistungen: module.map((m) => anzeigeName(m)),
         },
         auswahl,
@@ -1766,7 +1790,8 @@ export default function ScribeCockpit({
     // Entwürfe ohne Versionsmarkierung stammen aus dem alten Vorlagenstand: feste Bausteine behalten ihren Platz,
     // eigene Texte können anders liegen und werden neu ausgewählt (Datenvertrag Zeitmaschine, 10.11.2026).
     const markiert = (e.variablen as Record<string, unknown> | null)?.template_history_version === TEMPLATE_HISTORY_VERSION;
-    const geladen = markiert ? { auswahl: e.auswahl ?? {}, entfernt: 0 } : nurFesteBausteine(e.auswahl ?? {}, vorlagen.filter((v) => v.behandlungsart === e.behandlungsart));
+    const passt = markiert === (vorlagenModus === "zeitmaschine");
+    const geladen = passt ? { auswahl: e.auswahl ?? {}, entfernt: 0 } : nurFesteBausteine(e.auswahl ?? {}, vorlagen.filter((v) => v.behandlungsart === e.behandlungsart));
     setAuswahl(geladen.auswahl);
     setEntwurfHinweis(geladen.entfernt > 0 ? t("scribe.blocks.legacyDraft", "de", { n: geladen.entfernt }) : null);
     setZaehne((e.zaehne ?? []).map(Number).filter((n) => !Number.isNaN(n)));
@@ -2477,7 +2502,7 @@ export default function ScribeCockpit({
                       {module.length > 1 && <span className="modul">{anzeigeName(m)} · </span>}
                       {grp.label} {grp.req && <span className="pflicht">· Pflicht</span>}
                     </div>
-                    {!m.id.startsWith("eigen-") && !demo && (
+                    {!m.id.startsWith("eigen-") && !demo && vorlagenModus === "zeitmaschine" && (
                       <button type="button" className="gruppe-aendern" onClick={() => setVerwaltung({ vorlageId: m.id, gruppe: g })} aria-label={t("scribe.blocks.openAria", "de", { gruppe: grp.label })}>
                         {t("scribe.blocks.open")}
                       </button>
@@ -2773,6 +2798,7 @@ export default function ScribeCockpit({
             <span className="hinweis-fehlt">Gesperrt: Deinem persönlichen Mitarbeiterkonto fehlt ein Kürzel. Bitte Mitarbeiter wechseln oder das Kürzel in der Teamverwaltung hinterlegen.</span>
           )}
           {entwurfHinweis && !bestaetigt && <span className="hinweis-fehlt">{entwurfHinweis}</span>}
+          {vorlagenModus === "alt" && module.length > 0 && <span className="hinweis-fehlt">{t("scribe.blocks.fallback")}</span>}
           {entwurfId && !bestaetigt && !zwischenInfo && <span className="hinweis-ok">Gespeicherter Entwurf, wird beim Bestätigen final in die Akte eingetragen.</span>}
           {zwischenInfo && !bestaetigt && <span className="hinweis-ok">Zwischengespeichert um {zwischenInfo} · Entwurf, noch nicht in der Akte</span>}
           {pushStatus === "gepusht" && pushInfo && <span className="hinweis-ok">{pushInfo === "demo" ? "Demo · kein echter ivoris-Push" : `ivoris-Eintrag ${pushInfo.slice(0, 8)}…`}</span>}
