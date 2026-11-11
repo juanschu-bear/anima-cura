@@ -63,6 +63,26 @@ async function getTemplates(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const vorlagen = (data ?? []) as VorlageRow[];
+  const { data: optData } = await supabase
+    .from("doku_vorlagen_optionen")
+    .select("id, behandlungsart, termin_typ, gruppe, text, sort_index")
+    .eq("praxis_id", PRAXIS_ID)
+    .eq("aktiv", true)
+    .order("sort_index", { ascending: true })
+    .order("created_at", { ascending: true });
+  const optionen = (optData ?? []) as OptRow[];
+  const appendPracticeOptions = (template: VorlageRow): VorlageRow => {
+    const copy = structuredClone(template);
+    const groups = copy.struktur?.groups;
+    if (!groups) return copy;
+    for (const o of optionen) {
+      if (o.behandlungsart !== copy.behandlungsart || o.termin_typ !== copy.termin_typ) continue;
+      const g = groups[o.gruppe];
+      if (!g || !Array.isArray(g.opts)) continue;
+      g.opts.push({ t: o.text, id: o.id, quelle: "praxis" });
+    }
+    return copy;
+  };
   const historyRequested = request.nextUrl.searchParams.get("history") === "1";
   const effective = historyRequested ? await effectiveTemplatesSafely(vorlagen) : null;
   if(historyRequested && !effective) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
@@ -70,7 +90,7 @@ async function getTemplates(request: NextRequest) {
     const projected=new Map(effective.templates.map(template=>[template.id,{...template,templateHistoryMode:'versioned' as const}]));
     const failed=new Set(effective.errors.map(issue=>issue.templateId));
     const usable=vorlagen.map(template=>projected.get(template.id)??{
-      ...structuredClone(template),templateHistoryMode:'legacy_fallback' as const,templateHistoryVersion:null,
+      ...appendPracticeOptions(template),templateHistoryMode:'legacy_fallback' as const,templateHistoryVersion:null,
     });
     return NextResponse.json({vorlagen:usable,templateErrors:effective.errors.map(issue=>{
       const template=vorlagen.find(row=>row.id===issue.templateId);
@@ -83,30 +103,9 @@ async function getTemplates(request: NextRequest) {
   // Practice-added option texts (Weg B). Appended AFTER the seed opts of the
   // matching group, so seed indices stay stable (positionen.if and stored
   // auswahl keep working). Only groups that already exist in the seed get extras.
-  const { data: optData } = await supabase
-    .from("doku_vorlagen_optionen")
-    .select("id, behandlungsart, termin_typ, gruppe, text, sort_index")
-    .eq("praxis_id", PRAXIS_ID)
-    .eq("aktiv", true)
-    .order("sort_index", { ascending: true })
-    .order("created_at", { ascending: true });
+  const withPracticeOptions = vorlagen.map(appendPracticeOptions);
 
-  const optionen = (optData ?? []) as OptRow[];
-
-  if (optionen.length > 0) {
-    for (const v of vorlagen) {
-      const groups = v.struktur?.groups;
-      if (!groups) continue;
-      for (const o of optionen) {
-        if (o.behandlungsart !== v.behandlungsart || o.termin_typ !== v.termin_typ) continue;
-        const g = groups[o.gruppe];
-        if (!g || !Array.isArray(g.opts)) continue; // group must exist in the seed
-        g.opts.push({ t: o.text, id: o.id, quelle: "praxis" });
-      }
-    }
-  }
-
-  return NextResponse.json({ vorlagen, capabilities: SCRIBE_CAPABILITIES });
+  return NextResponse.json({ vorlagen: withPracticeOptions, capabilities: SCRIBE_CAPABILITIES });
 }
 
 export async function GET(r:NextRequest){try{return await getTemplates(r);}catch(e){return workspaceError(e);}}

@@ -113,13 +113,17 @@ Claude verweist dann auf die Zeitmaschine. Direkte spätere Datenänderungen an 
   at?: string         // restore_at, ISO-Zeitpunkt mit Zeitzone
 }
 // -> {ok:true,revision:number,changeIds:string[]}
+// Bei nötiger zweiter Bestätigung antwortet der Server mit HTTP 409 und
+// `code:'template_change_confirmation_required'`; die Oberfläche zeigt den
+// vorgeschlagenen neuen Text und sendet danach dieselbe Anfrage mit
+// `confirmProtected:true`, `confirmationFingerprint` und `confirmedBy` erneut.
 ```
 
 - Eine Nutzeraktion bekommt eine UUID `requestId`; bei Netzfehlern **identische** Anfrage erneut senden. Andere Daten mit derselben UUID: `409 idempotency_conflict`.
 - Veraltete Revision: `409 template_revision_stale`. Neu laden, nicht still übergehen.
 - Rückgängig macht einen **neuen** Verlaufseintrag. Nur die letzte Änderung des betroffenen Bausteins kann einzeln rückgängig gemacht werden; sonst `409 change_superseded`. Auch ein Rückgängigmachen kann wieder rückgängig gemacht werden.
 - Zeitpunkt wiederherstellen setzt alle Plätze der Vorlage in einer Transaktion zurück und erzeugt neue Einträge. Nach dem Zeitpunkt neu hinzugekommene Texte werden ausgeblendet, nicht gelöscht. Vor dem ersten gesicherten Stand: `409 history_time_unavailable`.
-- Gruppen mit irgendeiner `positionen[].if.g`-Regel sowie `explizit:true`: **weder ausblenden noch umbenennen**, auch nicht über Undo/Wiederherstellen. `403 template_group_protected` als „Wunsch an Juan“ anzeigen. Unverändertes Wiedereinblenden eines vorhandenen Praxistextes ist zulässig.
+- Gruppen mit irgendeiner `positionen[].if.g`-Regel sowie `explizit:true`: Änderung ist nach zweiter Bestätigung zulässig. Die 409-Antwort enthält je betroffenem Baustein bisherigen/neuen Text und angehängte Positionen; die Bestätigung wird im Änderungsbuch mit Name und Zeit festgehalten. Ist eine Änderung technisch unmöglich, antwortet der Server mit `422 template_last_required_option` bzw. `template_change_not_possible` und einem Vorschlag. `403 template_group_protected` ist für diese Praxisänderung nicht mehr zulässig. Unverändertes Wiedereinblenden eines vorhandenen Praxistextes ist zulässig.
 - Weitere Codes: `input_invalid` (400), `option_not_found`, `change_not_found` (404), `not_practice_option` (400), `template_layout_changed` (409), `scribe_workspace_unavailable` (503).
 - Alle Aktionen verlangen Schreibrecht in Scribe: Nicht-Patientenrolle plus `permissions.scribe_schreiben`, sonst Rollenstandard admin/verwaltung. Gleiche Rechte für Undo und Wiederherstellung.
 
