@@ -19,6 +19,7 @@ const translations: Record<string, { de: string; en: string }> = {
   'scribe.workspace.notReady': {de:'Die Umsetzung ist noch nicht zur Praxisprüfung bereitgestellt.',en:'This has not yet been delivered for practice review.'},
   'scribe.bell.status': {de:'Neuer Stand zu deinem Eintrag',en:'Your request has a new status'},
   'scribe.bell.reply': {de:'Neue Antwort auf deinen Eintrag',en:'New reply to your request'},
+  'scribe.bell.newCount': { de: '{n} neu', en: '{n} new' },
   'scribe.header.light': { de: 'Helles Design', en: 'Light theme' },
   'scribe.header.dark': { de: 'Dunkles Design', en: 'Dark theme' },
   'scribe.header.more': { de: 'Weitere Einstellungen', en: 'More settings' },

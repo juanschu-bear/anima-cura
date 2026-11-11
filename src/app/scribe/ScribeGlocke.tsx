@@ -129,18 +129,25 @@ export default function ScribeGlocke() {
   }
 
   const ungelesen = liste?.unreadCount ?? 0;
+  // Kommt etwas Neues dazu, wackelt die Glocke 1 Mal. Der Schlüssel startet die Bewegung neu.
+  const [wackeln, setWackeln] = useState(0);
+  const vorher = useRef(0);
+  useEffect(() => {
+    if (ungelesen > vorher.current) setWackeln((w) => w + 1);
+    vorher.current = ungelesen;
+  }, [ungelesen]);
 
   return (
     <div className="glocke" ref={box}>
       <button
         type="button"
-        className="glocke-knopf"
+        className={`glocke-knopf${ungelesen > 0 ? " hat-neu" : ""}`}
         aria-expanded={offen}
         aria-label={ungelesen > 0 ? t("scribe.bell.ariaUnread", "de", { n: ungelesen }) : t("scribe.bell.aria")}
         onClick={() => { setOffen((o) => !o); setNeuerung(null); if (!offen) void laden(); }}
       >
-        <Bell size={17} />
-        {ungelesen > 0 && <span className="glocke-zahl">{ungelesen > 99 ? "99+" : ungelesen}</span>}
+        <span key={wackeln} className={wackeln > 0 ? "glocke-symbol wackelt" : "glocke-symbol"}><Bell size={17} /></span>
+        {ungelesen > 0 && <span className="glocke-neu-text">{t("scribe.bell.newCount", "de", { n: ungelesen > 99 ? "99+" : ungelesen })}</span>}
       </button>
       {offen && (
         <div className="glocke-panel" role="dialog" aria-label={t("scribe.bell.title")}>

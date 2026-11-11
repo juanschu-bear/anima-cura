@@ -1430,3 +1430,22 @@
 .scribe .kopf .nutzer-chip{padding:3px}
 .scribe .kopf .nutzer-chip .abmelden{min-height:38px}
 .scribe .kopf .nutzer-kuerzel{width:38px;height:38px}
+/* Glocke mit ungelesenen Meldungen: nicht zu übersehen */
+.scribe .glocke-symbol{display:grid;place-items:center}
+.scribe .kopf .glocke-knopf.hat-neu,.scribe .glocke-knopf.hat-neu{width:auto;display:inline-flex;align-items:center;gap:8px;padding:0 16px 0 13px;
+  color:#fff;border-color:transparent;background:linear-gradient(135deg,#E5512B,#F0883E);
+  box-shadow:0 8px 22px -8px rgba(229,81,43,.85),0 0 0 1px rgba(255,255,255,.12) inset}
+.scribe .glocke-knopf.hat-neu:hover{background:linear-gradient(135deg,#EF5E37,#F59A52);border-color:transparent}
+.scribe .glocke-neu-text{font-family:var(--display);font-size:13.5px;font-weight:700;white-space:nowrap}
+.scribe .glocke-knopf.hat-neu::after{content:"";position:absolute;inset:-4px;border-radius:999px;border:2px solid rgba(240,136,62,.55);
+  animation:glocke-halo 2.6s ease-out infinite;pointer-events:none}
+@keyframes glocke-halo{0%{opacity:.9;transform:scale(.96)}70%,100%{opacity:0;transform:scale(1.18)}}
+.scribe .glocke-symbol.wackelt{animation:glocke-wackeln 900ms ease-in-out 1;transform-origin:50% 8%}
+@keyframes glocke-wackeln{0%,100%{transform:rotate(0)}15%{transform:rotate(16deg)}30%{transform:rotate(-14deg)}45%{transform:rotate(10deg)}60%{transform:rotate(-6deg)}75%{transform:rotate(3deg)}}
+@media(prefers-reduced-motion:reduce){.scribe .glocke-knopf.hat-neu::after,.scribe .glocke-symbol.wackelt{animation:none}}
+@media(max-width:480px){
+  /* Handy: „Menü“ nur als Symbol, damit alle Knöpfe in 1 Zeile passen */
+  .scribe .kopf .rechts > details:not(.kopf-mehr) > summary.thema-toggle{font-size:0;gap:0 !important;padding:0;width:44px;justify-content:center}
+  .scribe .kopf .thema-toggle{padding:7px 13px}
+  .scribe .kopf .rechts{gap:6px}
+}
