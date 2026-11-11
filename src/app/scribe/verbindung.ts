@@ -48,11 +48,11 @@ function antwort(status: number, body: Record<string, unknown>): Response {
 
 /**
  * Servertexte, die für die Praxis keinen nächsten Schritt enthalten, mit ihrem Ersatz.
- * `code` wird ergänzt, wenn der Server keinen liefert, damit das Cockpit selbst weiterhelfen kann
- * (Codex liefert diese Codes künftig direkt, dann greift die Tabelle nicht mehr).
+ * `code` wird ergänzt, wenn der Server keinen liefert, damit das Cockpit selbst weiterhelfen kann.
+ * Die Namen sind dieselben stabilen Codes, die der Server künftig selbst mitschickt (Datenvertrag).
  */
 const TECHNISCHE_TEXTE: Record<string, { key: string; code?: string }> = {
-  "Nicht autorisiert": { key: "scribe.net.loggedOut", code: "abgemeldet" },
+  "Nicht autorisiert": { key: "scribe.net.loggedOut", code: "not_authenticated" },
   "Keine Berechtigung": { key: "scribe.net.forbidden" },
   "Ungueltiger JSON-Body": { key: "scribe.net.invalid" },
   "Ungueltiger Body": { key: "scribe.net.invalid" },
@@ -70,9 +70,9 @@ const TECHNISCHE_TEXTE: Record<string, { key: string; code?: string }> = {
   "Basis ungültig.": { key: "scribe.net.noBase" },
   "basis_termin_typ fehlt für die direkte Übernahme.": { key: "scribe.net.noBase" },
   "Basisvorlage für die neue Terminart wurde nicht gefunden.": { key: "scribe.net.noBase" },
-  "Entwurf nicht gefunden": { key: "scribe.net.draftGone", code: "entwurf_weg" },
-  "Eintrag nicht gefunden": { key: "scribe.net.entryGone", code: "eintrag_weg" },
-  "Nur Entwuerfe koennen weiterbearbeitet werden": { key: "scribe.net.alreadyConfirmed", code: "schon_bestaetigt" },
+  "Entwurf nicht gefunden": { key: "scribe.net.draftGone", code: "draft_not_found" },
+  "Eintrag nicht gefunden": { key: "scribe.net.entryGone", code: "entry_not_found" },
+  "Nur Entwuerfe koennen weiterbearbeitet werden": { key: "scribe.net.alreadyConfirmed", code: "draft_not_editable" },
 };
 
 /** Antworten, die nur einen Code und keinen Satz haben. */
@@ -132,7 +132,7 @@ export async function scribeFetch(url: string, init: RequestInit = {}, optionen:
         neuAngemeldet = true;
         continue;
       }
-      return antwort(401, { code: "abgemeldet", error: t("scribe.net.loggedOut"), message: t("scribe.net.loggedOut") });
+      return antwort(401, { code: "not_authenticated", error: t("scribe.net.loggedOut"), message: t("scribe.net.loggedOut") });
     }
     if (res.status >= 500 && sicher && !wiederholt && !optionen.still) {
       wiederholt = true;

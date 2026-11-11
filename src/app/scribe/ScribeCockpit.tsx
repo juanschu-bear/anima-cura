@@ -1702,7 +1702,7 @@ export default function ScribeCockpit({
     let res = await senden(koerper);
     if (!res.ok && koerper.entwurf_id) {
       const pruef = await jsonVon<{ code?: string }>(res.clone());
-      if (pruef.code === "entwurf_weg") {
+      if (pruef.code === "draft_not_found") {
         // Der Entwurf wurde inzwischen verworfen: Alles wird ohne erneutes Tippen als neuer Eintrag gespeichert.
         setEntwurfId(null);
         res = await senden({ ...koerper, entwurf_id: null });
@@ -1711,11 +1711,11 @@ export default function ScribeCockpit({
     setSendet(false);
     if (!res.ok) {
       const json = await jsonVon<{ code?: string; error?: string }>(res);
-      if (res.status === 409 && (json.code === "day_record_exists" || json.code === "schon_bestaetigt")) {
+      if (res.status === 409 && (json.code === "day_record_exists" || json.code === "draft_not_editable")) {
         // Kam die eigene Bestätigung schon an (Antwort unterwegs verloren), gilt sie als bestätigt. Sonst hat jemand anderes
         // inzwischen eingetragen: Das Cockpit zeigt den Eintrag und ergänzt beim nächsten Klick.
         if (await eigenenEintragUebernehmen(koerper.entwurf_id)) return;
-        if (json.code === "schon_bestaetigt") {
+        if (json.code === "draft_not_editable") {
           setAktionsFehler(json.error ?? null);
           return;
         }
@@ -1807,7 +1807,7 @@ export default function ScribeCockpit({
     let res = await senden(koerper);
     if (!res.ok && koerper.entwurf_id) {
       const pruef = await jsonVon<{ code?: string }>(res.clone());
-      if (pruef.code === "entwurf_weg") {
+      if (pruef.code === "draft_not_found") {
         // Der Entwurf wurde inzwischen verworfen: Alles wird ohne erneutes Tippen als neuer Entwurf gespeichert.
         setEntwurfId(null);
         res = await senden({ ...koerper, entwurf_id: null });
@@ -1972,7 +1972,7 @@ export default function ScribeCockpit({
     const json = await jsonVon<{ code?: string; error?: string }>(res);
     setDetailLaeuft(false);
     if (!res.ok) {
-      if (json.code === "eintrag_weg") {
+      if (json.code === "entry_not_found") {
         // Schon verworfen, das Ziel ist erreicht.
         setDetail(null);
         await ladeHeute();
