@@ -135,7 +135,7 @@ export default function BausteineVerwaltung({
       setMeldung({ art: "fehler", text: t("scribe.blocks.stale") });
     } else if (ergebnis.code === "history_time_unavailable") {
       setMeldung({ art: "fehler", text: t("scribe.blocks.timeUnavailable", "de", { zeit: verlauf.historyAvailableFrom ? zeit(verlauf.historyAvailableFrom) : "—" }) });
-    } else if (ergebnis.code === "network") {
+    } else if (ergebnis.code === "netz_weg") {
       setMeldung({ art: "fehler", text: t("scribe.blocks.network") });
     } else {
       setMeldung({ art: "fehler", text: ergebnis.message || t("scribe.workspace.unavailable") });

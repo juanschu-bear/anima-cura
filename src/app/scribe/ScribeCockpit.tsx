@@ -9,6 +9,8 @@ import { useThema } from "./ScribeShell";
 import PraxisInboxWidget from "./PraxisInboxWidget";
 import BausteineVerwaltung from "./BausteineVerwaltung";
 import ScribeGlocke from "./ScribeGlocke";
+import AnmeldeFenster from "./AnmeldeFenster";
+import { jsonVon, scribeFetch } from "./verbindung";
 import { aendereVorlage, ladeVerlauf, NEU_LADEN } from "./bausteine-api";
 import ScribeRoomPicker from '@/components/ScribeRoomPicker';
 import KnowledgeMenu from './KnowledgeMenu';
@@ -228,7 +230,7 @@ type VorlagenAbruf = { ok: true; vorlagen: Vorlage[]; modus: VorlagenModus } | {
 async function holeVorlagen(): Promise<VorlagenAbruf> {
   const versuch = async (url: string) => {
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await scribeFetch(url, { cache: "no-store" });
       const json = await res.json().catch(() => null);
       return res.ok && Array.isArray(json?.vorlagen) ? { ok: true as const, vorlagen: json.vorlagen as Vorlage[] } : { ok: false as const, message: (json?.message as string | undefined) ?? "" };
     } catch {
@@ -604,9 +606,9 @@ export default function ScribeCockpit({
   const [tagReload, setTagReload] = useState(0);
 
   const ladeHeute = useCallback(async (): Promise<TagesEintrag[] | null> => {
-    const res = await fetch(`/api/doku/heute?datum=${listenDatum}`);
+    const res = await scribeFetch(`/api/doku/heute?datum=${listenDatum}`);
     if (res.ok) {
-      const json = await res.json();
+      const json = await jsonVon<{ eintraege?: TagesEintrag[] }>(res);
       setHeute(json.eintraege ?? []);
       return json.eintraege ?? [];
     }
@@ -642,8 +644,8 @@ export default function ScribeCockpit({
     (async () => {
       const [vorlagenAbruf, artenRes, passRes] = await Promise.all([
         holeVorlagen(),
-        fetch("/api/doku/behandlungsarten"),
-        fetch("/api/praxis-pass"),
+        scribeFetch("/api/doku/behandlungsarten"),
+        scribeFetch("/api/praxis-pass"),
       ]);
       const artenJson = await artenRes.json().catch(() => ({}));
       const passJson = await passRes.json().catch(() => ({}));
@@ -665,11 +667,11 @@ export default function ScribeCockpit({
     ivorisNachsyncRef.current = key;
 
     void (async () => {
-      const res = await fetch("/api/doku/ivoris-nachsync", {
+      const res = await scribeFetch("/api/doku/ivoris-nachsync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ datum: listenDatum, limit: 20 }),
-      });
+      }, { still: true });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) return;
       if ((json.recovered ?? 0) > 0) {
@@ -686,9 +688,9 @@ export default function ScribeCockpit({
       return;
     }
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
+      const res = await scribeFetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
       if (res.ok) {
-        const json = await res.json();
+        const json = await jsonVon<{ results?: { id: string; name: string; geburtsdatum?: string | null }[] }>(res);
         const liste = (json.results ?? []).map((r: { id: string; name: string; geburtsdatum?: string | null }) => ({ id: r.id, name: r.name, alter: berechneAlter(r.geburtsdatum ?? null) }));
         setTreffer(liste);
         setSucheOhneTreffer(liste.length === 0);
@@ -703,9 +705,9 @@ export default function ScribeCockpit({
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await fetch(`/api/praxis/search?q=${encodeURIComponent(detailPatientSuche.trim())}`);
+      const res = await scribeFetch(`/api/praxis/search?q=${encodeURIComponent(detailPatientSuche.trim())}`);
       if (!res.ok) return;
-      const json = await res.json();
+      const json = await jsonVon<{ results?: { id: string; name: string; geburtsdatum?: string | null }[] }>(res);
       setDetailPatientTreffer((json.results ?? []).map((entry: { id: string; name: string; geburtsdatum?: string | null }) => ({
         id: entry.id,
         name: entry.name,
@@ -729,9 +731,9 @@ export default function ScribeCockpit({
       let zurueckgestellt = 0;
       // Safety cap: stop after 50 batches even if the route never reports done.
       for (let i = 0; i < 50; i++) {
-        const res = await fetch(`/api/ivoris/patients/batch-sync?startPage=${startPage}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+        const res = await scribeFetch(`/api/ivoris/patients/batch-sync?startPage=${startPage}`);
+        const json = await jsonVon<{ error?: string; done?: boolean; nextPage?: number | null; results?: { fetched?: number; upserted?: number; deferred?: number } }>(res);
+        if (!res.ok) throw new Error(json.error ?? t("scribe.net.server"));
         fetched += json.results?.fetched ?? 0;
         upserted += json.results?.upserted ?? 0;
         zurueckgestellt += json.results?.deferred ?? 0;
@@ -745,9 +747,9 @@ export default function ScribeCockpit({
       );
       // Aktuelle Suche erneut ausfuehren, damit ein frisch gezogener Patient sofort erscheint.
       if (suche.trim().length >= 2 && !patient) {
-        const r = await fetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
+        const r = await scribeFetch(`/api/praxis/search?q=${encodeURIComponent(suche.trim())}`);
         if (r.ok) {
-          const j = await r.json();
+          const j = await jsonVon<{ results?: { id: string; name: string; geburtsdatum?: string | null }[] }>(r);
           const liste = (j.results ?? []).map((x: { id: string; name: string; geburtsdatum?: string | null }) => ({
             id: x.id,
             name: x.name,
@@ -758,7 +760,8 @@ export default function ScribeCockpit({
         }
       }
     } catch (e) {
-      setSyncInfo(`Sync fehlgeschlagen: ${String(e)}`);
+      // Der Grund kommt schon verständlich aus der Anfrage-Schicht. Die Suche bleibt nutzbar.
+      setSyncInfo(t("scribe.sync.failed", "de", { grund: e instanceof Error ? e.message : t("scribe.net.server") }));
     } finally {
       setSyncLaeuft(false);
     }
@@ -956,7 +959,7 @@ export default function ScribeCockpit({
     setArtenSpeichert(true);
     setManagerHinweis(null);
     try {
-      const res = await fetch("/api/doku/behandlungsarten", {
+      const res = await scribeFetch("/api/doku/behandlungsarten", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, basis: neueArtBasis }),
@@ -981,11 +984,11 @@ export default function ScribeCockpit({
     setArtenSpeichert(true);
     setManagerHinweis(null);
     try {
-      const res = await fetch("/api/doku/behandlungsarten", {
+      const res = await scribeFetch("/api/doku/behandlungsarten", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: eintrag.id }),
-      });
+      }, { wiederholbar: true });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setManagerHinweis(json.error ?? "Behandlungsart konnte nicht gelöscht werden.");
@@ -1019,7 +1022,7 @@ export default function ScribeCockpit({
     setArtenSpeichert(true);
     setManagerHinweis(null);
     try {
-      const res = await fetch("/api/praxis-pass", {
+      const res = await scribeFetch("/api/praxis-pass", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1032,7 +1035,7 @@ export default function ScribeCockpit({
             sofort_aktivieren: true,
           },
         }),
-      });
+      }, { wiederholbar: true });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setManagerHinweis(json.error ?? "Terminart konnte nicht angelegt werden.");
@@ -1054,11 +1057,11 @@ export default function ScribeCockpit({
     setArtenSpeichert(true);
     setManagerHinweis(null);
     try {
-      const res = await fetch("/api/praxis-pass", {
+      const res = await scribeFetch("/api/praxis-pass", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loeschen: { behandlungsart: v.behandlungsart, termin_typ: v.termin_typ } }),
-      });
+      }, { wiederholbar: true });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setManagerHinweis(json.error ?? "Terminart konnte nicht gelöscht werden.");
@@ -1083,7 +1086,7 @@ export default function ScribeCockpit({
     setArtenSpeichert(true);
     setManagerHinweis(null);
     try {
-      const res = await fetch("/api/praxis-pass", {
+      const res = await scribeFetch("/api/praxis-pass", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1094,7 +1097,7 @@ export default function ScribeCockpit({
             sofort_aktivieren: true,
           },
         }),
-      });
+      }, { wiederholbar: true });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setManagerHinweis(json.error ?? "Terminart konnte nicht bearbeitet werden.");
@@ -1405,7 +1408,7 @@ export default function ScribeCockpit({
     }
     setSendet(true);
     setAktionsFehler(null);
-    const res = await fetch(`/api/doku/eintrag/${bestaetigt.id}/version`, {
+    const res = await scribeFetch(`/api/doku/eintrag/${bestaetigt.id}/version`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1439,7 +1442,7 @@ export default function ScribeCockpit({
         await tagEintragen("korrektur", { key: `entry:${bestaetigt.id}`, target: { entry: bestaetigt.id }, label: "", zeit: "" }, null, aenderungsgrund.trim());
         return;
       }
-      setAktionsFehler(json.error ?? "Neue Version konnte nicht gespeichert werden.");
+      setAktionsFehler(json.error ?? t("scribe.net.server"));
       setPruefHinweise(pruefHinweiseAus(json));
       return;
     }
@@ -1519,7 +1522,7 @@ export default function ScribeCockpit({
   /** Nach dem Eintragen in den Tagesdatensatz: Das Cockpit zeigt den heutigen Eintrag als bestätigt, mit dem neuen Teil. */
   async function ergaenzungFertig(result: { canonicalEntryId: string; partId: string; preview: DayPreview | null }, kind: TagArt, bisher: BisherTeil[], bezug: string | null, ersetzt: string | null) {
     // Ein zwischengespeicherter Entwurf dieser Sitzung ist durch die Ergänzung erledigt und darf nicht als zweiter Eintrag stehen bleiben.
-    if (entwurfId) await fetch(`/api/doku/eintrag/${entwurfId}/verwerfen`, { method: "POST" }).catch(() => null);
+    if (entwurfId) await scribeFetch(`/api/doku/eintrag/${entwurfId}/verwerfen`, { method: "POST" }, { wiederholbar: true });
     setEntwurfId(null);
     setZwischenInfo(null);
     setTagesModus({ partId: result.partId, kind, preview: result.preview, bisher, bezug, ersetzt });
@@ -1620,6 +1623,30 @@ export default function ScribeCockpit({
     await neuerEintrag();
   }
 
+  /**
+   * Nach einer unterwegs verlorenen Antwort: Ist genau diese Dokumentation schon bestätigt angekommen, gilt sie als bestätigt.
+   * So wird sie nie ein zweites Mal als Nachtrag ergänzt.
+   */
+  async function eigenenEintragUebernehmen(entwurf: string | null): Promise<boolean> {
+    if (!patient) return false;
+    const liste = await ladeHeute();
+    const meiner = liste?.find((e) =>
+      e.status === "bestaetigt" && e.patient_id === patient.id && e.text === komposition.text && (!entwurf || e.id === entwurf));
+    if (!meiner) return false;
+    setBestaetigt({
+      id: meiner.id,
+      version: meiner.version,
+      am: new Date(meiner.bestaetigt_am ?? Date.now()).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }),
+      terminDatum: listenDatum,
+    });
+    setEntwurfId(null);
+    setZwischenInfo(null);
+    setPushStatus("offen");
+    setAktionsFehler(null);
+    setTagHinweis(null);
+    return true;
+  }
+
   async function neuerEintrag() {
     if (!patient) return;
     if (demo) {
@@ -1638,10 +1665,9 @@ export default function ScribeCockpit({
     setSendet(true);
     setAktionsFehler(null);
     setPruefHinweise([]);
-    const res = await fetch("/api/doku/eintrag", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    // Bestätigen darf bei Netz- oder Serverfehler 1 Mal automatisch wiederholt werden: Der Server legt je Patient und Tag
+    // nur einen bestätigten Eintrag an, ein zweites Senden wird erkannt (siehe eigenenEintragUebernehmen).
+    const koerper = {
         patient_id: patient.id,
         zimmer_version_id: zimmerVersionId || null,
         vorlage_id: module[0].id,
@@ -1667,19 +1693,37 @@ export default function ScribeCockpit({
         termin_datum: listenDatum,
         bestaetigen: true,
         entwurf_id: entwurfId,
-      }),
-    });
+    };
+    const senden = (inhalt: typeof koerper) => scribeFetch("/api/doku/eintrag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(inhalt),
+    }, { wiederholbar: true });
+    let res = await senden(koerper);
+    if (!res.ok && koerper.entwurf_id) {
+      const pruef = await jsonVon<{ code?: string }>(res.clone());
+      if (pruef.code === "entwurf_weg") {
+        // Der Entwurf wurde inzwischen verworfen: Alles wird ohne erneutes Tippen als neuer Eintrag gespeichert.
+        setEntwurfId(null);
+        res = await senden({ ...koerper, entwurf_id: null });
+      }
+    }
     setSendet(false);
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      if (res.status === 409 && json.code === "day_record_exists") {
-        // Für diesen Patienten ist der Tag schon bestätigt: Das Cockpit zeigt den Eintrag und ergänzt beim nächsten Klick.
-        await ladeHeute();
+      const json = await jsonVon<{ code?: string; error?: string }>(res);
+      if (res.status === 409 && (json.code === "day_record_exists" || json.code === "schon_bestaetigt")) {
+        // Kam die eigene Bestätigung schon an (Antwort unterwegs verloren), gilt sie als bestätigt. Sonst hat jemand anderes
+        // inzwischen eingetragen: Das Cockpit zeigt den Eintrag und ergänzt beim nächsten Klick.
+        if (await eigenenEintragUebernehmen(koerper.entwurf_id)) return;
+        if (json.code === "schon_bestaetigt") {
+          setAktionsFehler(json.error ?? null);
+          return;
+        }
         setAktionsFehler(null);
         setTagHinweis(t("scribe.day.raceHint", "de", { name: patient.name }));
         return;
       }
-      setAktionsFehler(json.error ?? "Eintrag konnte nicht gespeichert werden.");
+      setAktionsFehler(json.error ?? t("scribe.net.server"));
       setPruefHinweise(pruefHinweiseAus(json));
       return;
     }
@@ -1700,7 +1744,7 @@ export default function ScribeCockpit({
   async function bestaetigtePositionenKopieren(entryId: string) {
     setBillingCopyInfo(null);
     try {
-      const response = await fetch(`/api/doku/eintrag/${entryId}/billing-export`, { cache: "no-store" });
+      const response = await scribeFetch(`/api/doku/eintrag/${entryId}/billing-export`, { cache: "no-store" });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error ?? "Abrechnungspositionen konnten nicht geladen werden.");
       if (!payload?.copy_text) throw new Error("Der bestätigte Eintrag enthält keine Abrechnungspositionen.");
@@ -1727,10 +1771,7 @@ export default function ScribeCockpit({
     setSpeichert(true);
     setAktionsFehler(null);
     try {
-    const res = await fetch("/api/doku/eintrag", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const koerper = {
         patient_id: patient.id,
         zimmer_version_id: zimmerVersionId || null,
         vorlage_id: module[0].id,
@@ -1756,11 +1797,35 @@ export default function ScribeCockpit({
         termin_datum: listenDatum,
         bestaetigen: false,
         entwurf_id: entwurfId,
-      }),
-    });
+    };
+    // Einen vorhandenen Entwurf zu aktualisieren ist gefahrlos wiederholbar. Ein erster Entwurf nicht, er könnte sonst doppelt entstehen.
+    const senden = (inhalt: typeof koerper) => scribeFetch("/api/doku/eintrag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(inhalt),
+    }, { wiederholbar: !!inhalt.entwurf_id });
+    let res = await senden(koerper);
+    if (!res.ok && koerper.entwurf_id) {
+      const pruef = await jsonVon<{ code?: string }>(res.clone());
+      if (pruef.code === "entwurf_weg") {
+        // Der Entwurf wurde inzwischen verworfen: Alles wird ohne erneutes Tippen als neuer Entwurf gespeichert.
+        setEntwurfId(null);
+        res = await senden({ ...koerper, entwurf_id: null });
+      }
+    }
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      setAktionsFehler(json.error ?? "Zwischenspeichern fehlgeschlagen.");
+      const json = await jsonVon<{ code?: string; error?: string }>(res);
+      if (json.code === "netz_weg" || json.code === "server") {
+        // Ist der erste Entwurf trotz verlorener Antwort angekommen, wird er übernommen statt beim nächsten Tippen doppelt angelegt.
+        const liste = await ladeHeute();
+        const angekommen = liste?.find((e) => e.status === "entwurf" && e.patient_id === patient.id && e.text === komposition.text);
+        if (angekommen) {
+          setEntwurfId(angekommen.id);
+          setZwischenInfo(new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
+          return true;
+        }
+      }
+      setAktionsFehler(json.error ?? t("scribe.save.failedRetained"));
       return false;
     }
     const json = await res.json();
@@ -1832,7 +1897,7 @@ export default function ScribeCockpit({
     }
     setPushStatus("laeuft");
     setPushInfo(null);
-    const res = await fetch(`/api/doku/eintrag/${bestaetigt.id}/ivoris-push`, { method: "POST" });
+    const res = await scribeFetch(`/api/doku/eintrag/${bestaetigt.id}/ivoris-push`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       setPushStatus("fehler");
@@ -1849,11 +1914,11 @@ export default function ScribeCockpit({
     if (pw1.length < 8) { setPwHinweis({ ok: false, text: "Mindestens 8 Zeichen." }); return; }
     if (pw1 !== pw2) { setPwHinweis({ ok: false, text: "Die Passwörter stimmen nicht überein." }); return; }
     setPwLaeuft(true);
-    const res = await fetch("/api/konto/passwort", {
+    const res = await scribeFetch("/api/konto/passwort", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passwort: pw1 }),
-    });
+    }, { wiederholbar: true });
     const json = await res.json().catch(() => ({}));
     setPwLaeuft(false);
     if (!res.ok) { setPwHinweis({ ok: false, text: json.error ?? "Speichern fehlgeschlagen." }); return; }
@@ -1903,11 +1968,17 @@ export default function ScribeCockpit({
     if (!window.confirm("Eintrag wirklich verwerfen? Er verschwindet aus der Tagesliste, bleibt aber in der Historie nachvollziehbar.")) return;
     setDetailLaeuft(true);
     setDetailFehler(null);
-    const res = await fetch(`/api/doku/eintrag/${detail.id}/verwerfen`, { method: "POST" });
-    const json = await res.json().catch(() => ({}));
+    const res = await scribeFetch(`/api/doku/eintrag/${detail.id}/verwerfen`, { method: "POST" }, { wiederholbar: true });
+    const json = await jsonVon<{ code?: string; error?: string }>(res);
     setDetailLaeuft(false);
     if (!res.ok) {
-      setDetailFehler(json.error ?? "Verwerfen fehlgeschlagen.");
+      if (json.code === "eintrag_weg") {
+        // Schon verworfen, das Ziel ist erreicht.
+        setDetail(null);
+        await ladeHeute();
+        return;
+      }
+      setDetailFehler(json.error ?? t("scribe.net.server"));
       return;
     }
     setDetail(null);
@@ -1918,7 +1989,7 @@ export default function ScribeCockpit({
     if (!detail) return;
     setDetailLaeuft(true);
     setDetailFehler(null);
-    const res = await fetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
+    const res = await scribeFetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
     setDetailLaeuft(false);
     if (!res.ok) {
@@ -1934,11 +2005,11 @@ export default function ScribeCockpit({
     if (!detail) return;
     setDetailLaeuft(true);
     setDetailFehler(null);
-    const resolveRes = await fetch(`/api/doku/eintrag/${detail.id}/resolve-patient`, {
+    const resolveRes = await scribeFetch(`/api/doku/eintrag/${detail.id}/resolve-patient`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ patientId }),
-    });
+    }, { wiederholbar: true });
     const resolveJson = await resolveRes.json().catch(() => ({}));
     if (!resolveRes.ok) {
       setDetailLaeuft(false);
@@ -1946,7 +2017,7 @@ export default function ScribeCockpit({
       return;
     }
 
-    const pushRes = await fetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
+    const pushRes = await scribeFetch(`/api/doku/eintrag/${detail.id}/ivoris-push`, { method: "POST" });
     const pushJson = await pushRes.json().catch(() => ({}));
     setDetailLaeuft(false);
     if (!pushRes.ok) {
@@ -2919,6 +2990,8 @@ export default function ScribeCockpit({
         </div>
 
       </main>
+
+        <AnmeldeFenster />
 
         {pwOffen && (
           <div className="deckel" onClick={() => setPwOffen(false)}>

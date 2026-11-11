@@ -6,6 +6,41 @@
 /** Entwurf einer Neuigkeit für die Praxis. Englisch ist optional; leer gelassen gilt der deutsche Text. */
 export type Entwurf = { titel: string; kurz: string; text: string; titelEn: string; kurzEn: string; textEn: string; art: "neuerung" | "wichtig" | "hinweis"; bestaetigen: boolean; slug?: string };
 export const LEERER_ENTWURF: Entwurf = { titel: "", kurz: "", text: "", titelEn: "", kurzEn: "", textEn: "", art: "neuerung", bestaetigen: false };
+const NICHTS_GEHT_VERLOREN: Entwurf = {
+  slug: "2026-11-11-nichts-geht-verloren",
+  art: "neuerung",
+  bestaetigen: false,
+  titel: "Nichts geht mehr verloren",
+  kurz: "Fällt das Netz kurz aus oder läuft die Anmeldung ab, bleibt alles stehen, und Scribe sagt sofort, wie es weitergeht.",
+  text: [
+    "1. Netz kurz weg",
+    "Scribe versucht es automatisch noch einmal. Klappt es trotzdem nicht, steht dort in einem Satz, was zu tun ist. Alles Eingetippte bleibt stehen, und kein Knopf bleibt hängen.",
+    "",
+    "2. Anmeldung abgelaufen",
+    "Ein Anmeldefenster legt sich über die offene Seite. Nach der Anmeldung geht es genau dort weiter, wo du warst.",
+    "",
+    "3. Klare Hinweise statt Technik",
+    "Statt technischer Meldungen sagt Scribe, was los ist und was du jetzt selbst tun kannst.",
+    "",
+    "4. Kein doppelter Eintrag",
+    "Ist eine Bestätigung angekommen, obwohl das Netz kurz weg war, erkennt Scribe das und zeigt den Eintrag als eingetragen. Er wird nicht noch einmal als Nachtrag ergänzt.",
+  ].join("\n"),
+  titelEn: "Nothing gets lost anymore",
+  kurzEn: "If the connection drops or your sign-in expires, everything stays in place and Scribe tells you right away how to continue.",
+  textEn: [
+    "1. Connection briefly gone",
+    "Scribe tries again automatically. If it still does not work, one sentence tells you what to do. Everything you typed stays in place and no button gets stuck.",
+    "",
+    "2. Sign-in expired",
+    "A sign-in window appears over the open page. After signing in, you continue exactly where you were.",
+    "",
+    "3. Clear hints instead of technical messages",
+    "Instead of technical messages, Scribe says what is going on and what you can do yourself right now.",
+    "",
+    "4. No duplicate entry",
+    "If a confirmation arrived even though the connection was briefly gone, Scribe recognizes it and shows the entry as recorded. It is not added again as a supplement.",
+  ].join("\n"),
+};
 const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   slug: "2026-11-11-bausteine-selbst-aendern",
   art: "neuerung",
@@ -54,4 +89,4 @@ const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   ].join("\n"),
 };
 
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [BAUSTEINE_GLOCKE_INFOBOX];
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

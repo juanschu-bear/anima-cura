@@ -427,6 +427,15 @@
 .scribe .detailkarte .ohead{display:flex;align-items:center;justify-content:space-between;gap:10px;
   margin-bottom:10px;flex-wrap:wrap}
 .scribe .detailkarte .otitel{font-family:var(--display);font-size:15px;font-weight:700}
+
+/* ===== Neu anmelden über der offenen Seite (Eingaben bleiben stehen) ===== */
+.scribe .anmelde-deckel{z-index:90}
+.scribe .anmelde-karte{max-width:420px;display:flex;flex-direction:column}
+.scribe .anmelde-karte .anmelde-text{margin:2px 0 14px;line-height:1.5;font-family:var(--schrift-text),system-ui,sans-serif;font-size:14px}
+.scribe .anmelde-label{font-size:12.5px;font-weight:600;color:var(--gedeckt);margin:8px 0 6px}
+.scribe .anmelde-karte input[type="email"]{width:100%}
+.scribe .anmelde-fehler{margin-top:10px}
+.scribe .anmelde-aktionen{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
 .scribe .detailtext{background:#FBF7EE;color:#23201A;border-radius:12px;padding:13px 15px;
   font-size:14px;line-height:1.6;margin:10px 0}
 .scribe .detailmeta{font-family:var(--mono);font-size:11px;color:var(--gedeckt)}

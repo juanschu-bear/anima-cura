@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
+import { scribeFetch } from "./verbindung";
 
 /*
  * Tagesdatensatz im Scribe-Cockpit (Vertrag: anima-leitstand/docs/2026-11-05-tagesdatensatz-klaerfaelle.md).
@@ -101,19 +102,20 @@ async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(body.message || body.error || t("scribe.day.error"));
   return body as T;
 }
+// Jeder Schritt im Tagesdatensatz trägt den erwarteten Stand mit (expectedVersion). Ein zweites Senden legt deshalb nie etwas doppelt an.
 const post = <T,>(url: string, body: unknown, headers: Record<string, string> = {}) =>
-  fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }).then((r) => json<T>(r));
+  scribeFetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }, { wiederholbar: true }).then((r) => json<T>(r));
 
 /** Tagesdatensatz lesen. Fehlt er, ist das kein Fehler: dann gibt es heute höchstens den ersten Eintrag. */
 export async function findeTag(patientId: string, datum: string): Promise<DayRecord | null> {
-  const res = await fetch(`/api/doku/tagesdatensatz?patient_id=${encodeURIComponent(patientId)}&termin_datum=${datum}`, { cache: "no-store" });
+  const res = await scribeFetch(`/api/doku/tagesdatensatz?patient_id=${encodeURIComponent(patientId)}&termin_datum=${datum}`, { cache: "no-store" });
   if (res.status === 404) return null;
   return json<DayRecord>(res);
 }
 
 /** Bestätigte Einträge desselben Patienten am selben Tag, frisch vom Server. Der eigene Entwurf zählt nicht. */
 export async function gleicherTag(patientId: string, datum: string, eigenerEntwurf: string | null): Promise<SameDayEntry[]> {
-  const res = await fetch(`/api/doku/heute?datum=${datum}`, { cache: "no-store" });
+  const res = await scribeFetch(`/api/doku/heute?datum=${datum}`, { cache: "no-store" });
   const body = await json<{ eintraege?: (SameDayEntry & { patient_id: string; status: string })[] }>(res);
   return (body.eintraege ?? [])
     .filter((e) => e.patient_id === patientId && e.status === "bestaetigt" && e.id !== eigenerEntwurf)
@@ -161,7 +163,7 @@ export function useRaumNamen(aktiv: boolean) {
   useEffect(() => {
     if (!aktiv) return;
     let live = true;
-    fetch("/api/doku/eintrag", { cache: "no-store" })
+    scribeFetch("/api/doku/eintrag", { cache: "no-store" }, { still: true })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { versions?: { id: string; name: string }[] } | null) => {
         if (live && j?.versions) setNamen(Object.fromEntries(j.versions.map((v) => [v.id, v.name])));

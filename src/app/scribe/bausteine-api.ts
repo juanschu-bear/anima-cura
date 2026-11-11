@@ -1,8 +1,11 @@
 /**
  * Anbindung an die Zeitmaschine der Vorlagen (Datenvertrag docs/2026-11-10-scribe-zeitmaschine-glocke-contract.md).
  * Jede Aktion bekommt eine eigene requestId. Bei einem Netzfehler wird genau dieselbe Anfrage 1 Mal wiederholt,
- * der Server erkennt sie an der requestId und führt sie nicht doppelt aus.
+ * der Server erkennt sie an der requestId und führt sie nicht doppelt aus. Das Wiederholen und das Anmeldefenster
+ * übernimmt die gemeinsame Anfrage-Schicht (verbindung.ts).
  */
+import { scribeFetch } from "./verbindung";
+
 export type BausteinZustand = { text: string; hidden: boolean };
 export type BausteinAktion = "hide" | "show" | "rename" | "restore_practice" | "undo" | "restore_at";
 export type VorlagenAenderung = {
@@ -53,7 +56,7 @@ async function alsFehler(res: Response): Promise<ZeitmaschinenFehler> {
 export async function ladeVerlauf(templateId: string, beforeSeq?: number | null): Promise<VorlagenVerlauf> {
   const query = new URLSearchParams({ templateId });
   if (beforeSeq) query.set("beforeSeq", String(beforeSeq));
-  const res = await fetch(`/api/doku/vorlagen/changes?${query}`, { cache: "no-store" });
+  const res = await scribeFetch(`/api/doku/vorlagen/changes?${query}`, { cache: "no-store" });
   if (!res.ok) throw await alsFehler(res);
   return (await res.json()) as VorlagenVerlauf;
 }
@@ -69,17 +72,7 @@ export async function aendereVorlage(input: {
   at?: string;
 }): Promise<AenderungsErgebnis> {
   const body = JSON.stringify({ ...input, requestId: crypto.randomUUID() });
-  const senden = () => fetch("/api/doku/vorlagen/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body });
-  let res: Response;
-  try {
-    res = await senden();
-  } catch {
-    try {
-      res = await senden();
-    } catch {
-      return { ok: false, code: "network", message: "" };
-    }
-  }
+  const res = await scribeFetch("/api/doku/vorlagen/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body }, { wiederholbar: true });
   if (!res.ok) {
     const fehler = await alsFehler(res);
     return { ok: false, code: fehler.code, message: fehler.message };

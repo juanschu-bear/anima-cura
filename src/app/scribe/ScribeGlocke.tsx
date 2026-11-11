@@ -4,6 +4,7 @@ import { AlertTriangle, Bell, CheckCircle2, MessageCircle, Sparkles } from "luci
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { LEERER_ENTWURF, VORBEREITETE_NEUIGKEITEN, type Entwurf } from "./praxis-neuigkeiten";
+import { scribeFetch } from "./verbindung";
 
 type Meldung = { id: string; kind: "wunsch_status" | "antwort" | "update" | "wichtig"; title: string; text: string; link: string; createdAt: string; readAt: string | null };
 type Liste = { notifications: Meldung[]; unreadCount: number; total: number; nextOffset: number | null };
@@ -62,17 +63,18 @@ export default function ScribeGlocke() {
 
   const laden = useCallback(async () => {
     try {
-      const res = await fetch("/api/practice-notifications?offset=0&lang=de", { cache: "no-store" });
+      // Hintergrundabfrage: öffnet nie ein Anmeldefenster, das übernimmt die nächste Aktion der Praxis.
+      const res = await scribeFetch("/api/practice-notifications?offset=0&lang=de", { cache: "no-store" }, { still: true });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.message ?? t("scribe.bell.unavailable"));
       setListe(json as Liste);
       setFehler(null);
-      const inbox = await fetch("/api/scribe/inbox", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const inbox = await scribeFetch("/api/scribe/inbox", { cache: "no-store" }, { still: true }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (inbox?.eintraege) setTitel(Object.fromEntries((inbox.eintraege as Array<{ id: string; titel: string }>).map((e) => [e.id, e.titel])));
       const istEntwickler = !!inbox?.canSetDeveloperStatus;
       setEntwickler(istEntwickler);
       if (istEntwickler) {
-        const neu = await fetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const neu = await scribeFetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }, { still: true }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         if (neu?.updates) {
           const veroeffentlicht = new Set((neu.updates as Array<{ slug?: string }>).map((u) => u.slug));
           setBereit(VORBEREITETE_NEUIGKEITEN.filter((n) => n.slug && !veroeffentlicht.has(n.slug)));
@@ -88,11 +90,11 @@ export default function ScribeGlocke() {
   const neuerungZeigen = useCallback(async (id: string) => {
     setOffen(true);
     setNeuerung("laedt");
-    const json = await fetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const json = await scribeFetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const gefunden = (json?.updates as Neuerung[] | undefined)?.find((u) => u.id === id) ?? null;
     setNeuerung(gefunden ?? "fehlt");
     if (gefunden && !gefunden.readAt && !gefunden.requiresAcknowledgement) {
-      void fetch(`/api/praxis-updates/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read" }) });
+      void scribeFetch(`/api/praxis-updates/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read" }) }, { wiederholbar: true, still: true });
     }
   }, []);
 
@@ -118,19 +120,19 @@ export default function ScribeGlocke() {
 
   async function gelesen(id: string) {
     setListe((l) => (l ? { ...l, unreadCount: Math.max(0, l.unreadCount - 1), notifications: l.notifications.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)) } : l));
-    await fetch("/api/practice-notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read", id }) }).catch(() => null);
+    await scribeFetch("/api/practice-notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read", id }) }, { wiederholbar: true });
   }
 
   async function alleGelesen() {
     const stichtag = liste?.notifications[0]?.createdAt ?? new Date().toISOString();
     setListe((l) => (l ? { ...l, unreadCount: 0, notifications: l.notifications.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) } : l));
-    await fetch("/api/practice-notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read_all", createdBefore: new Date(Date.parse(stichtag) + 1).toISOString() }) }).catch(() => null);
+    await scribeFetch("/api/practice-notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "read_all", createdBefore: new Date(Date.parse(stichtag) + 1).toISOString() }) }, { wiederholbar: true });
     void laden();
   }
 
   async function mehrLaden() {
     if (!liste?.nextOffset) return;
-    const json = await fetch(`/api/practice-notifications?offset=${liste.nextOffset}&lang=de`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const json = await scribeFetch(`/api/practice-notifications?offset=${liste.nextOffset}&lang=de`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (json) setListe((l) => (l ? { ...json, notifications: [...l.notifications, ...json.notifications] } : json));
   }
 
@@ -162,7 +164,7 @@ export default function ScribeGlocke() {
     }
     setSendet(true);
     setHinweis(null);
-    const res = await fetch("/api/praxis-updates?lang=de", {
+    const res = await scribeFetch("/api/praxis-updates?lang=de", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -193,7 +195,7 @@ export default function ScribeGlocke() {
   }
 
   async function bestaetigen(id: string) {
-    const res = await fetch(`/api/praxis-updates/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "acknowledge" }) }).catch(() => null);
+    const res = await scribeFetch(`/api/praxis-updates/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "acknowledge" }) }, { wiederholbar: true });
     if (res?.ok) setNeuerung((alt) => (alt && typeof alt === "object" ? { ...alt, acknowledgedAt: new Date().toISOString(), readAt: alt.readAt ?? new Date().toISOString() } : alt));
   }
 

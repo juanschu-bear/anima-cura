@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useThema } from "./ScribeShell";
 import { t } from "@/lib/i18n";
 import { INBOX_OEFFNEN } from "./ScribeGlocke";
+import { scribeFetch } from "./verbindung";
 
 type InboxStatus = "bestaetigt" | "untersucht" | "fix_in_arbeit" | "bereitgestellt" | "praxis_bestaetigt";
 type InboxArt = "anliegen" | "idee" | "aufgabe" | "frage" | "inspiration";
@@ -215,7 +216,7 @@ export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?
     setLaedt(true);
     setFehler(null);
     try {
-      const res = await fetch("/api/scribe/inbox", { cache: "no-store" });
+      const res = await scribeFetch("/api/scribe/inbox", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiAntwort | { error?: string } | null;
       if (!res.ok) throw new Error((json as { message?: string; error?: string } | null)?.message ?? (json as { error?: string } | null)?.error ?? "Praxis-Inbox konnte nicht geladen werden.");
       setDaten(json as ApiAntwort);
@@ -267,7 +268,8 @@ export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?
     setEingetragenUm(null);
     setMailStand(null);
     try {
-      const res = await fetch("/api/scribe/inbox", {
+      // Kein automatisches Wiederholen: Ein neuer Eintrag könnte sonst doppelt entstehen.
+      const res = await scribeFetch("/api/scribe/inbox", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -290,11 +292,12 @@ export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?
   async function patchen(eintrag: InboxEintrag, body: Record<string, unknown>, fallback: string, still = false): Promise<boolean> {
     if (!still) setFehler(null);
     try {
-      const res = await fetch("/api/scribe/inbox", {
+      // Gefahrlos wiederholbar: Der mitgeschickte Stand verhindert, dass etwas doppelt gespeichert wird.
+      const res = await scribeFetch("/api/scribe/inbox", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: eintrag.id, revision: eintrag.revision, ...body }),
-      });
+      }, { wiederholbar: true, still });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         if (json?.code === "inbox_revision_stale") {
@@ -348,7 +351,7 @@ export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?
     setTeamSpeichert(true);
     setFehler(null);
     try {
-      const res = await fetch("/api/team", {
+      const res = await scribeFetch("/api/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(teamForm),
@@ -373,12 +376,17 @@ export default function PraxisInboxWidget({ vorbelegung = null }: { vorbelegung?
     setFehler(null);
     if (typeof window !== "undefined" && !window.confirm("Diesen Eintrag wirklich löschen?")) return;
     try {
-      const res = await fetch("/api/scribe/inbox", {
+      const res = await scribeFetch("/api/scribe/inbox", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: eintrag.id }),
-      });
+      }, { wiederholbar: true });
       const json = await res.json().catch(() => null);
+      // Schon gelöscht, das Ziel ist erreicht.
+      if (!res.ok && json?.code === "inbox_not_found") {
+        await laden();
+        return;
+      }
       if (!res.ok) throw new Error(json?.code === "inbox_delete_forbidden" ? t("scribe.inbox.deleteOwnOnly") : json?.message ?? json?.error ?? "Eintrag konnte nicht gelöscht werden.");
       await laden();
     } catch (err) {
