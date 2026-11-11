@@ -20,7 +20,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -32,7 +32,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   const scribeErlaubt = permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role));
   if (!scribeErlaubt) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
 
   const { data: eintrag, error: loadError } = await supabase
@@ -41,7 +41,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     .eq("id", params.id)
     .single();
 
-  if (loadError || !eintrag) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (loadError || !eintrag) return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
 
   if (eintrag.status !== "bestaetigt") {
     return NextResponse.json({ error: "Nur bestaetigte Eintraege werden gepusht" }, { status: 409 });
@@ -79,7 +79,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
       .from("doku_eintraege")
       .update(buildScribeRetryFailurePatch("Patient hat keine ivoris_id", eintrag.ivoris_retry_count))
       .eq("id", eintrag.id);
-    return NextResponse.json({ error: "Patient hat keine ivoris_id" }, { status: 422 });
+    return NextResponse.json({ code:"patient_ivoris_id_missing",error: "Patient hat keine ivoris_id",suggestion:{kind:'resolve_patient_link'} }, { status: 422 });
   }
 
   // A confirmed day-part is append-only in IVORIS. Only its delta is sent;

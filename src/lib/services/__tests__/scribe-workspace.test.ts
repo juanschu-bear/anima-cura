@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {projectTemplate,protectedGroup,templateChangeSchema} from '../../scribe-template-history';
+import {projectTemplate,projectTemplatesSafely,protectedGroup,slotsAt,templateChangeSchema,type TemplateSlot} from '../../scribe-template-history';
+import {findPraxisPassTemplateConflicts} from '../../scribe-praxis-pass-guard';
 import {canWriteScribe,isPracticeProfile,isDeveloper} from '../../scribe-workspace-auth';
 import {assertInboxStatus} from '../../scribe-inbox-store';
 import {inboxMail} from '../../scribe-inbox-mail';
@@ -32,6 +33,7 @@ async function setup(reproduceMissingPrerequisite=false){
  }
  await pg.exec(readFileSync('supabase/migrations/079_scribe_updates_prerequisite.sql','utf8'));
  await pg.exec(readFileSync('supabase/migrations/078_scribe_time_machine_inbox_bell.sql','utf8'));
+ await pg.exec(readFileSync('supabase/migrations/080_scribe_time_machine_safeguards.sql','utf8'));
  return {pg,legacy};
 }
 async function change(pg:PGlite,p:Record<string,unknown>,actor=staff){
@@ -56,14 +58,20 @@ test('time machine preserves indices, immutable history, restoration, CAS and ho
  assert.equal((await pg.query<any>('SELECT state FROM scribe_option_slots WHERE option_key=$1',[key('free')])).rows[0].state.text,'A');
  await change(pg,{action:'undo',changeId:undo.changeIds[0]});
  await assert.rejects(()=>change(pg,{action:'undo',changeId:first.changeIds[0]}),/change_superseded/);
- await change(pg,{action:'restore_at',at:time});
+ await change(pg,{action:'restore_at',at:time,confirmProtected:true,confirmationFingerprint:'e'.repeat(64)});
  slots=(await pg.query<any>('SELECT * FROM scribe_option_slots')).rows;
  const restored=projectTemplate({id:tid,struktur:structure,positionen:[]},slots);
 
  assert.equal(restored.struktur.groups.free.opts[0].t,'Renamed');assert.equal((restored.struktur.groups.free.opts[1] as any).hidden,false);
  await change(pg,{action:'restore_practice',optionKey:'practice:'+deleted});
  assert.equal((await pg.query<any>('SELECT aktiv FROM doku_vorlagen_optionen WHERE id=$1',[deleted])).rows[0].aktiv,true);
- for(const group of ['billing','required'])for(const action of ['rename','hide'])await assert.rejects(()=>change(pg,{action,optionKey:key(group),text:'Bad'}),/template_group_protected/);
+ for(const group of ['billing','required'])await assert.rejects(()=>change(pg,{action:'rename',optionKey:key(group),text:'Bad'}),/template_confirmation_required/);
+ const billingDecision=await change(pg,{action:'rename',optionKey:key('billing'),text:'Praxis entscheidet',confirmProtected:true,confirmationFingerprint:'a'.repeat(64)});
+ assert.equal(billingDecision.confirmationRecorded,true);
+ const decisionAudit=(await pg.query<any>('SELECT confirmation FROM scribe_option_changes WHERE id=$1',[billingDecision.changeIds[0]])).rows[0].confirmation;
+ assert.equal(decisionAudit.kind,'practice_second_confirmation');assert.equal(decisionAudit.confirmedBy,'Praxis');assert.equal(decisionAudit.positions[0].code,'126a');
+ await change(pg,{action:'rename',optionKey:key('required'),text:'Pflicht neu',confirmProtected:true,confirmationFingerprint:'b'.repeat(64)});
+ await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('required'),confirmProtected:true,confirmationFingerprint:'c'.repeat(64)}),/template_last_required_option/);
  await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')},patient),/scribe_forbidden/);
  await assert.rejects(()=>pg.exec('DELETE FROM scribe_option_changes'),/scribe_history_immutable/);
  const revision=(await pg.query<any>('SELECT max(seq)::int AS n FROM scribe_option_changes')).rows[0].n;
@@ -75,18 +83,53 @@ test('time machine preserves indices, immutable history, restoration, CAS and ho
  const later=randomUUID();
  await pg.query("INSERT INTO doku_vorlagen_optionen(id,praxis_id,behandlungsart,termin_typ,gruppe,text,sort_index) VALUES($1,'praxis-schubert','multiband','routine','free','Later',-10)",[later]);
  assert.equal((await pg.query<any>('SELECT option_index FROM scribe_option_slots WHERE practice_option_id=$1',[later])).rows[0].option_index,4);
- await change(pg,{action:'restore_at',at:time});
+ await change(pg,{action:'restore_at',at:time,confirmProtected:true,confirmationFingerprint:'f'.repeat(64)});
  assert.equal((await pg.query<any>('SELECT state FROM scribe_option_slots WHERE practice_option_id=$1',[later])).rows[0].state.hidden,true);
  const baselineTime=(await pg.query<any>('SELECT max(created_at)::text AS t FROM scribe_option_slots WHERE practice_option_id IS DISTINCT FROM $1',[later])).rows[0].t;
  await pg.query("UPDATE doku_vorlagen SET positionen=$1 WHERE id=$2",[[{if:{g:'free',i:0}}],tid]);
  const before=(await pg.query<any>('SELECT count(*)::int n FROM scribe_option_changes')).rows[0].n;
- await assert.rejects(()=>change(pg,{action:'restore_at',at:baselineTime}),/template_group_protected/);
+ await assert.rejects(()=>change(pg,{action:'restore_at',at:baselineTime}),/template_confirmation_required/);
  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_option_changes')).rows[0].n,before);
+ await change(pg,{action:'restore_at',at:baselineTime,confirmProtected:true,confirmationFingerprint:'d'.repeat(64)});
  // Runtime service role really has the needed narrow function/table rights.
  await pg.exec('SET ROLE service_role');
- await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')}),/template_group_protected/);
+ await assert.rejects(()=>change(pg,{action:'hide',optionKey:key('free')}),/template_confirmation_required/);
  await pg.exec('RESET ROLE');
 
+ }finally{await pg.close();}
+});
+test('one malformed template is isolated and historical states work with or without a version marker',()=>{
+ const good={id:tid,struktur:structure,positionen:[]};const broken={...structuredClone(good),id:'20000000-0000-4000-8000-000000000002'};
+ const base='2026-11-10T08:00:00.000Z';
+ const slots:TemplateSlot[]=Object.entries(structure.groups).flatMap(([gruppe,group])=>group.opts.map((option,index)=>({
+  option_key:`${tid}:praxis-schubert:${gruppe}:seed:${index}`,template_id:tid,gruppe,option_index:index,source:'vorlage' as const,
+  practice_option_id:null,baseline:{text:option.t,hidden:false},state:{text:index===0?'Renamed':option.t,hidden:index===1},last_change_id:'later',created_at:base,
+ })));
+ const isolated=projectTemplatesSafely([good,broken],slots);
+ assert.deepEqual(isolated.templates.map(row=>row.id),[tid]);
+ assert.deepEqual(isolated.errors,[{templateId:broken.id,code:'template_layout_changed'}]);
+ const changes=[
+  {id:'40000000-0000-4000-8000-000000000001',option_key:slots[0].option_key,after_state:{text:'Renamed',hidden:false},created_at:'2026-11-10T09:00:00.000Z',seq:1},
+  {id:'40000000-0000-4000-8000-000000000002',option_key:slots[1].option_key,after_state:{text:slots[1].baseline.text,hidden:true},created_at:'2026-11-10T10:00:00.000Z',seq:2},
+ ];
+ for(const marker of [undefined,1]){
+  const atConfirmation=projectTemplate(good,slotsAt(slots,changes,'2026-11-10T08:30:00.000Z'));
+  assert.equal(atConfirmation.struktur.groups.free.opts[0].t,'A');
+  assert.equal(atConfirmation.struktur.groups.free.opts[1].hidden,false);
+  assert.equal(marker===1||marker===undefined,true);
+ }
+});
+test('Praxis-Pass submission after the migration keeps seed indices and accepts metadata',async()=>{
+ const {pg}=await setup();try{
+  const template={id:tid,behandlungsart:'multiband',termin_typ:'routine',struktur:structure};
+  const unchanged={behandlungsart:'multiband',termin_typ:'routine',optionen_final:{free:['A','B']}};
+  assert.deepEqual(findPraxisPassTemplateConflicts([unchanged],[template]),[]);
+  await pg.query("UPDATE doku_vorlagen SET struktur=struktur||$1::jsonb WHERE id=$2",[{praxis_muster:'Neu',quelle:'praxis'},tid]);
+  const stored=(await pg.query<any>('SELECT struktur FROM doku_vorlagen WHERE id=$1',[tid])).rows[0].struktur;
+  assert.equal(stored.praxis_muster,'Neu');assert.deepEqual(stored.groups.free.opts,structure.groups.free.opts);
+  assert.deepEqual(findPraxisPassTemplateConflicts([{...unchanged,optionen_final:{free:['Changed','B']}}],[template]),[
+   {templateId:tid,behandlungsart:'multiband',terminTyp:'routine',code:'template_structure_change_requires_history'},
+  ]);
  }finally{await pg.close();}
 });
 test('inbox import preserves history, atomic status/comments/bells, mail enqueue and owner deletion',async()=>{
@@ -107,13 +150,28 @@ test('inbox import preserves history, atomic status/comments/bells, mail enqueue
  const comment={id:randomUUID(),text:'Answer',erstellt_von:admin,gelesen_von:[admin]};
  const reply={...updated,kommentare:[comment]};await commit(reply,2,admin,true);
  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
- await assert.rejects(()=>commit(reply,3,admin,true,true),/inbox_delete_forbidden/);
- await commit(reply,3,staff,false,true);
- assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_inbox_comments')).rows[0].n,2);
+ const selfComment={id:randomUUID(),text:'Own note',erstellt_von:staff,gelesen_von:[staff]};
+ const ownReply={...reply,kommentare:[comment,selfComment]};await commit(ownReply,3,staff,false);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
+ const accepted={...ownReply,status:'praxis_bestaetigt',status_verlauf:[...ownReply.status_verlauf,{von:'bereitgestellt',zu:'praxis_bestaetigt',geaendert_von_name:'Praxis'}]};
+ await commit(accepted,4,staff,false);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
+ await assert.rejects(()=>commit(accepted,5,admin,true,true),/inbox_delete_forbidden/);
+ await commit(accepted,5,staff,false,true);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_inbox_comments')).rows[0].n,3);
  const jobs=(await pg.query<any>('SELECT * FROM scribe_claim_inbox_mail(null)')).rows;assert.equal(jobs.length,1);
  assert.equal((await pg.query('SELECT * FROM scribe_claim_inbox_mail(null)')).rows.length,0);
  await pg.exec("UPDATE scribe_inbox_mail_jobs SET lease_until=now()-interval '1 minute'");
  assert.equal((await pg.query('SELECT * FROM scribe_claim_inbox_mail(null)')).rows.length,1);
+ }finally{await pg.close();}
+});
+test('seed option arrays are immutable while metadata and new templates remain possible',async()=>{
+ const {pg}=await setup();try{
+  await pg.query("UPDATE doku_vorlagen SET struktur=jsonb_set(struktur,'{kontext}',to_jsonb('Hinweis'::text),true) WHERE id=$1",[tid]);
+  const changed=structuredClone(structure);changed.groups.free.opts[0].t='Direct rewrite';
+  await assert.rejects(()=>pg.query('UPDATE doku_vorlagen SET struktur=$1 WHERE id=$2',[changed,tid]),/template_structure_change_requires_history/);
+  assert.equal((await pg.query<any>('SELECT struktur FROM doku_vorlagen WHERE id=$1',[tid])).rows[0].struktur.groups.free.opts[0].t,'A');
+  await pg.query("INSERT INTO doku_vorlagen(id,behandlungsart,termin_typ,struktur,positionen) VALUES(gen_random_uuid(),'multiband','new-type',$1,'[]')",[changed]);
  }finally{await pg.close();}
 });
 test('shared bell RLS isolates accounts, role receipts, patients and future messages',async()=>{
@@ -162,4 +220,49 @@ test('missing production prerequisite rolls back 078; schema-only 079 then 078 s
   assert.equal(rights.length,2);
   for(const r of rights)assert.deepEqual(r,{rls:true,anon_read:false,client_write:false,server_write:true});
  }finally{await pg.close();}
+});
+
+test('service_role canonical day decision stores the audit atomically under the 076 guard',async()=>{
+ const {pg}=await setup();
+ try {
+  const entry=randomUUID(),day=randomUUID(),part=randomUUID(),patient=randomUUID();
+  await pg.exec(`
+   CREATE TABLE doku_eintraege(
+    id uuid PRIMARY KEY, patient_id uuid, termin_datum date, status text, text text,
+    positionen jsonb, zaehne text[], variablen jsonb, auswahl jsonb, version integer,
+    created_at timestamptz DEFAULT now()
+   );
+   CREATE TABLE doku_tagesdatensaetze(id uuid PRIMARY KEY, canonical_entry_id uuid);
+   CREATE TABLE doku_eintrag_versionen(
+    eintrag_id uuid, version integer, text text, zaehne text[], variablen jsonb,
+    auswahl jsonb, positionen jsonb, ausnahme_freitext text, aenderungsgrund text,
+    erstellt_von uuid
+   );
+   CREATE OR REPLACE FUNCTION decide_doku_day_part(
+    p_day_id uuid,p_part_id uuid,p_expected_version integer,p_decision text,p_reason text,
+    p_corrects_part_id uuid,p_resulting_text text,p_resulting_positions jsonb,
+    p_conflicts jsonb,p_ivoris_delta_text text
+   ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $stub$
+   DECLARE eid uuid; v integer;
+   BEGIN
+    SELECT canonical_entry_id INTO eid FROM doku_tagesdatensaetze WHERE id=p_day_id;
+    SELECT version+1 INTO v FROM doku_eintraege WHERE id=eid;
+    UPDATE doku_eintraege SET text=p_resulting_text,positionen=p_resulting_positions,version=v WHERE id=eid;
+    INSERT INTO doku_eintrag_versionen(eintrag_id,version,text,zaehne,variablen,auswahl,positionen)
+      SELECT id,version,text,zaehne,variablen,auswahl,positionen FROM doku_eintraege WHERE id=eid;
+    RETURN jsonb_build_object('entryVersion',v,'dayRecordId',p_day_id);
+   END $stub$;
+  `);
+  await pg.exec(readFileSync('supabase/migrations/076_scribe_day_entry_guards.sql','utf8'));
+  await pg.query('INSERT INTO doku_eintraege(id,patient_id,termin_datum,status,text,positionen,zaehne,variablen,auswahl,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,1)',[entry,patient,'2026-11-11','bestaetigt','old',[],[],{},{}]);
+  await pg.query('INSERT INTO doku_tagesdatensaetze(id,canonical_entry_id) VALUES($1,$2)',[day,entry]);
+  await pg.exec('SET ROLE service_role');
+  const audit={code:'confirmed_despite_warning',confirmedBy:{id:staff,name:'Praxis'},confirmedAt:'2026-11-11T12:00:00Z',issues:[]};
+  await pg.query('SELECT decide_doku_day_part($1,$2,1,$3,$4,NULL,$5,$6,$7,$8,$9)',[day,part,'nachtrag','Hinweis bestätigt','new text',[],[], 'delta',audit]);
+  await pg.exec('RESET ROLE');
+  const row=(await pg.query<any>('SELECT variablen FROM doku_eintraege WHERE id=$1',[entry])).rows[0];
+  const history=(await pg.query<any>('SELECT variablen FROM doku_eintrag_versionen WHERE eintrag_id=$1 AND version=2',[entry])).rows[0];
+  assert.equal(row.variablen._consistencyConfirmation.code,'confirmed_despite_warning');
+  assert.equal(history.variablen._consistencyConfirmation.confirmedBy.name,'Praxis');
+ } finally { await pg.close(); }
 });

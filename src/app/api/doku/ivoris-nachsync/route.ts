@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   const scribeErlaubt = permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role));
   if (!scribeErlaubt) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as NachsyncBody;

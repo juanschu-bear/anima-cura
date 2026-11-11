@@ -7,7 +7,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = createServerComponentClient();
   const { data: { user } } = await auth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await auth
     .from("user_profiles")
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const role = (profile?.role as string | undefined) ?? null;
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   if (!(permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role)))) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null) as { patientId?: unknown } | null;
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     db.from("doku_eintraege").select("id,status,ivoris_push_status,ivoris_error_class").eq("id", params.id).maybeSingle(),
     db.from("patients").select("id,ivoris_id").eq("id", patientId).maybeSingle(),
   ]);
-  if (entryError || !entry) return NextResponse.json({ error: "Scribe-Eintrag nicht gefunden" }, { status: 404 });
+  if (entryError || !entry) return NextResponse.json({ code:"entry_not_found",error: "Scribe-Eintrag nicht gefunden" }, { status: 404 });
   if (patientError || !patient) return NextResponse.json({ error: "Patient nicht gefunden" }, { status: 404 });
   if (entry.status !== "bestaetigt" || entry.ivoris_push_status === "gepusht") {
     return NextResponse.json({ error: "Nur ein bestätigter, noch nicht übertragener Eintrag kann neu zugeordnet werden" }, { status: 409 });

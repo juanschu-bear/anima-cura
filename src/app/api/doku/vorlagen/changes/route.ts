@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {createServerClient} from '@/lib/db/supabase';
 import {workspaceActor,requireWriter,workspaceError,storageError,ScribeWorkspaceError} from '@/lib/scribe-workspace-auth';
 import {templateChangeSchema} from '@/lib/scribe-template-history';
-import {changeTemplate,historySlots,SCRIBE_PRACTICE} from '@/lib/scribe-template-history-service';
+import {changeTemplate,historySlots,SCRIBE_PRACTICE,templateChangeReview} from '@/lib/scribe-template-history-service';
 export const dynamic='force-dynamic';
 export async function GET(req:NextRequest){try{
  requireWriter(await workspaceActor());
@@ -24,5 +24,10 @@ export async function GET(req:NextRequest){try{
 export async function POST(req:NextRequest){try{
  const actor=await workspaceActor();requireWriter(actor);
  const p=templateChangeSchema.safeParse(await req.json().catch(()=>null));if(!p.success)throw new ScribeWorkspaceError('input_invalid');
- return NextResponse.json(await changeTemplate(actor.id!,p.data));
+ const review=await templateChangeReview(p.data);
+ if(review.impossible)return NextResponse.json({code:'template_change_not_possible',message:'Diese Änderung würde die letzte Pflichtauswahl entfernen.',review},{status:422,headers:{'Cache-Control':'private, no-store'}});
+ if(review.requiresConfirmation&&(!p.data.confirmProtected||p.data.confirmationFingerprint!==review.fingerprint))return NextResponse.json({
+  code:'template_change_confirmation_required',message:'Diese Änderung wirkt sich auf die Abrechnung aus. Bitte Auswirkungen prüfen und noch einmal bestätigen.',review,
+ },{status:409,headers:{'Cache-Control':'private, no-store'}});
+ return NextResponse.json(await changeTemplate(actor.id!,{...p.data,confirmedBy:actor.name}));
 }catch(e){return workspaceError(e);}}

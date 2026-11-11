@@ -18,7 +18,7 @@ Neue Fehlerantworten: `{code, error, message}`. `code` ist stabil maschinenlesba
 
 ## 1. Vorlagen laden und feste Indizes erhalten
 
-**Neue Oberfläche:** `GET /api/doku/vorlagen?history=1` (normaler Login; bestehender Praxispass-Token weiterhin nur zum Lesen). Antwort `{vorlagen, capabilities, templateHistoryVersion:1}`. Bestehende Felder bleiben erhalten. Jede `struktur.groups[g].opts[i]` enthält zusätzlich:
+**Neue Oberfläche:** `GET /api/doku/vorlagen?history=1` (normaler Login; bestehender Praxispass-Token weiterhin nur zum Lesen). Antwort `{vorlagen, templateErrors, capabilities, templateHistoryVersion:1}`. Bestehende Felder bleiben erhalten. Jede `struktur.groups[g].opts[i]` enthält zusätzlich:
 
 ```ts
 {
@@ -34,6 +34,19 @@ Neue Fehlerantworten: `{code, error, message}`. `code` ist stabil maschinenlesba
 }
 ```
 
+`templateErrors` isoliert beschädigte Vorlagen, statt Scribe insgesamt zu blockieren:
+
+```ts
+Array<{
+  templateId: string,
+  code: 'template_layout_changed',
+  behandlungsart: string | null,
+  terminTyp: string | null
+}>
+```
+
+Die betroffene Vorlage fehlt in `vorlagen`; alle übrigen bleiben benutzbar. Claude zeigt für jede betroffene Vorlage eine nicht verwerfende Meldung „Vorlage muss geprüft werden“ und bietet sie nicht zur Dokumentation an. Die Oberfläche darf den Fehler nicht als globalen Ladefehler behandeln.
+
 **Array niemals filtern oder umsortieren, bevor Auswahlindizes gebildet werden.** In der Darstellung `opts.map((opt,i) => opt.hidden ? null : …)`. Keine Vorauswahl ausgeblendeter Optionen; sie kommen mit `on:false`. Gespeicherte Auswahlindizes und Positionsbedingungen beziehen sich auf die ursprünglichen Plätze. Feste Optionen behalten ihren Seed-Index. Beim Start behalten aktive Praxistexte ihre bisherige Reihenfolge; bisher ausgeblendete Texte bekommen dahinter feste Plätze. Neue Praxistexte werden nur hinten angefügt.
 
 Bei jedem neuen Entwurf, Speichern, Bestätigen und jeder Tagesdatensatz-Korrektur aus diesem Vorlagenstand **`variablen.template_history_version = 1`** mitschicken bzw. im Tagesdatensatz `variables.template_history_version = 1`. Das wird mit dem Eintrag gespeichert und sorgt dafür, dass die serverseitige Konsistenzprüfung denselben Stand und dieselben Indizes verwendet. Bereits vorhandene Einträge behalten ihre Texte unverändert. Bei historischen Entwürfen ohne diese Versionsmarkierung nicht einfach die bisherigen Praxis-Indizes auf den neuen Katalog anwenden; neu auswählen oder im bisherigen Modus fertigstellen.
@@ -41,6 +54,25 @@ Bei jedem neuen Entwurf, Speichern, Bestätigen und jeder Tagesdatensatz-Korrekt
 Ohne `history=1` bleibt der bisherige API-Modus für das aktuell ausgelieferte Cockpit erhalten. Dadurch tauchen die 200 bisher ausgeblendeten Multiband-Texte nicht plötzlich in alten Cockpits auf. **Zeitmaschinen-Verwaltung und der neue Lesemodus gemeinsam ausrollen.** Alte offene Cockpits danach neu laden; sie kennen geänderte feste Texte noch nicht. Neue Funktionen nicht mit dem Legacy-Lesemodus mischen.
 
 Vorlagenstand zu Beginn jeder Bearbeitung laden. Ändert die Praxis einen Text während jemand dokumentiert, kann dessen Bestätigung wegen Text-/Auswahlkonflikt blockieren. Text nicht verwerfen; neu laden, vergleichen und bewusst übernehmen. Keine nachträgliche Änderung bestätigter Dokumentationen durch die Zeitmaschine.
+
+Bestätigte Einträge werden beim Abrechnungsexport unabhängig von der Versionsmarkierung gegen den Vorlagenstand zu `bestaetigt_am` geprüft. Spätere Umbenennungen und Ausblendungen ändern deshalb keinen bereits bestätigten Beleg. Neue Entwürfe und Bestätigungen verwenden weiter den aktuellen Stand.
+
+Der Praxis-Pass darf bei bestehenden Vorlagen nur Metadaten und Reihenfolge übernehmen. Weichen feste Bausteine ab, antwortet `POST /api/praxis-pass` mit `409`:
+
+```ts
+{
+  code: 'template_structure_change_requires_history',
+  error: string,
+  templates: Array<{
+    templateId:string,
+    behandlungsart:string,
+    terminTyp:string,
+    code:'template_structure_change_requires_history'
+  }>
+}
+```
+
+Claude verweist dann auf die Zeitmaschine. Direkte spätere Datenänderungen an den festen Optionsarrays werden zusätzlich in der Datenbank abgelehnt. Dadurch können `positionen[].if.i` und gespeicherte Auswahlindizes nicht still auf andere Bausteine rutschen. Neue eigene Terminvorlagen dürfen weiterhin vollständig angelegt werden.
 
 ## 2. Zeitmaschine-Endpunkte
 
@@ -135,6 +167,8 @@ Datenbankvertrag für Leitstand (gleiche Konten/Anmeldung):
 
 Automatische Meldungen: Statuswechsel und Kommentare an den ursprünglichen Ersteller, auch mehrere Ereignisse in einer Anfrage getrennt. Updates aus `/api/praxis-updates` beim erstmaligen Veröffentlichen an die angegebenen Praxisrollen (Standard alle drei); keine Meldung für Entwürfe, zukünftige Sichtbarkeit wird beachtet. POST dort jetzt nur Entwickler/System. Der bestehende Update-Lese-/Bestätigungsstand bleibt unabhängig vom Lesen der Glocke.
 
+Der handelnde Nutzer erhält keine Meldung über den eigenen Kommentar oder die eigene finale Praxisbestätigung. Andere berechtigte Empfänger und bestehende Lesestände bleiben unverändert.
+
 ## 5. Mail-Auslöser
 
 Inbox-Speicherung und Mailauftrag sind eine Transaktion. Der bestehende App-Mailweg wird danach aufgerufen; eine Lease verhindert parallelen Versand. Ein stabiler Provider-Idempotenzschlüssel verhindert Doppelversand bei Wiederholung. Keine wechselnden Tracking-Links in diesen Mails. Die Mail enthält nur den Hinweis und den authentifizierten Link, keine medizinischen Freitexte.
@@ -153,3 +187,44 @@ Für UI-Abnahme: in freier Gruppe umbenennen → ausblenden → rückgängig →
 Production: 079 als fehlende Schema-Voraussetzung und danach unveränderte 078 erfolgreich installiert und geprüft. Backend `d73be89` ist auf main und live. 8/8 Inbox-Einträge exakt übernommen, 2.243 Bausteinplätze, 200 archivierte Multiband-Praxistexte. Die UI kann auf diesem Vertrag aufbauen; Vorlagenmodus und Versionsmarkierung gemeinsam aktivieren.
 
 Juans persönlicher interner App-Zugang ist `juan@praxis-schubert.de`; `SCRIBE_DEVELOPER_USER_ID` ist auf dessen UUID `e5702286-8d03-4f4f-8220-92cefed44075` gesetzt. Es ist kein E-Mail-Postfach. Echte Mailhinweise warten noch auf `SCRIBE_INBOX_EMAIL_TO`. Kein bestehendes Teamkonto erhielt Entwicklerrechte.
+
+## Absicherungs-Nachtrag 11.11.2026
+
+Migration `080_scribe_time_machine_safeguards.sql` schützt feste Bausteinplätze auch vor direkten Strukturänderungen und unterdrückt Selbstbenachrichtigungen. Vor dem Production-Einspielen gelten erneut Prüfsummenfreigabe und kontrollierte Prüfung. Der Backend-Rollout folgt erst nach erfolgreicher Installation, weil der Praxis-Pass sonst noch nicht auf Datenbankebene abgesichert wäre.
+
+## Planänderung Juan 11.11.2026 — ersetzt die bisherigen Absicherungsregeln
+
+Die Praxis darf nicht an Juan hängen. Scribe speichert den eingegebenen Text immer zuerst, zeigt bei einem Prüfungsproblem den verständlichen Hinweis und einen Vorschlag und lässt die Praxis nach einer zweiten Bestätigung fortfahren. Die zweite Bestätigung wird mit Name und Zeit in der Akte festgehalten. Systemfehler werden automatisch abgefangen; der Praxistext wird nie verworfen.
+
+### Praxis-Pass und Bausteine
+
+`POST /api/praxis-pass` lehnt eine Praxis-Pass-Absendung wegen Bausteinen nicht mit 409 ab. Metadaten, Reihenfolge und neue Terminarten werden wie bisher gespeichert. Feste Bausteine werden über die Zeitmaschine mit stabilen `optionKey`-/Indexwerten übernommen. Bei einer Abrechnungskopplung antwortet der Server mit HTTP 200 und `code:'template_change_confirmation_required'`, damit die Oberfläche je Änderung zeigt:
+
+```ts
+{
+  templateId:string, optionKey:string, gruppe:string,
+  before:{text:string,hidden:boolean}, after:{text:string,hidden:boolean},
+  positions:Array<{code:string,text?:string,anzahl?:number}>,
+  confirmationFingerprint:string
+}
+```
+
+Der zweite Aufruf sendet `confirmProtected:true`, `confirmationFingerprint` und `confirmedBy` (Name aus der Sitzung, nicht aus dem Browser). Die Antwort enthält `confirmationRecorded:true`. Der Änderungsbucheintrag bewahrt vorherigen/neuen Text, Positionen, Name und Zeit. `POST /api/doku/vorlagen/changes` verwendet denselben Vertrag; `template_group_protected`/403 ist für diese Praxisänderung nicht mehr zulässig. Kann die letzte sichtbare Auswahl einer expliziten Pflichtgruppe nicht ausgeblendet werden, antwortet der Server mit HTTP 422, `code:'template_last_required_option'` und `suggestion:{kind:'rename_instead'}`. Eine nicht auflösbare Vorlage wird mit `code:'template_change_not_possible'` plus Vorschlag gemeldet, nicht still geändert.
+
+### Prüfungen beim Eintrag und Tagesdatensatz
+
+Die erste Bestätigung mit Prüfungsproblemen liefert HTTP 422 (bei nicht lesbarer Quelle HTTP 503), `code:'consistency_confirmation_required'`, `consistency:{required:true,fingerprint,issues,suggestions}`. Der erneute identische Auftrag ergänzt `consistencyAcknowledgement:{fingerprint}`. Bei Erfolg enthält die Antwort `confirmation` und `confirmationLabel:'Trotz Hinweis von <Name> bestätigt'`; der Audit steht in `variablen._consistencyConfirmation` bzw. im Tagesdatensatz. Das gilt auch für „Positionen kopieren“. Bei Tagesdatensatz-Entscheidungen wird der Audit als `p_consistency_audit jsonb` an `decide_doku_day_part` übergeben und in derselben SECURITY-DEFINER-Transaktion wie der kanonische Text und die Version gespeichert. Es gibt keinen nachgelagerten service_role-UPDATE mehr, der den 076-Kanonwächter auslösen könnte. Der Server wiederholt jede `*_read_failed`-Quelle genau einmal, bevor er 503 oder die Bestätigung anbietet. Ein technisch nicht speicherbarer Fall liefert `code` und den automatischen Alternativvorschlag.
+
+Der Abrechnungsexport bleibt nutzbar: Er liefert bei späteren Prüfproblemen HTTP 200 mit `consistencyWarnings`, `confirmation` und `confirmationLabel`, statt den bestätigten Eintrag zu verlieren.
+
+### Beschädigte Vorlagen
+
+`GET /api/doku/vorlagen?history=1` liefert jede `templateErrors`-Vorlage weiter nutzbar im bisherigen Modus: `usable:true`, `templateHistoryMode:'legacy_fallback'`, `sendTemplateHistoryVersion:false`. Sichere automatische Platznachführung erfolgt selbst; andernfalls bleiben die bisherigen Plätze und die Versionsmarkierung wird weggelassen. Es gibt keine Meldung an Juan. „Positionen kopieren“ bleibt möglich. Fehlerfreie Vorlagen tragen `templateHistoryMode:'versioned'`.
+
+### Stabile Antwortcodes
+
+Alle Scribe-Fehlerantworten behalten ihren deutschen Text, liefern aber einen stabilen `code`: `draft_not_found` („Entwurf nicht gefunden“), `draft_not_editable` („Nur Entwuerfe koennen weiterbearbeitet werden“), `patient_ivoris_id_missing` („Patient hat keine ivoris_id“), `text_required` („text fehlt“), `scribe_forbidden` („Keine Berechtigung“) und `not_authenticated` („Nicht autorisiert“). Neue Vorschläge sind zusätzliche Felder und ersetzen diese Sätze nicht.
+
+### Datenbank-/Rolloutstand
+
+080 wurde für diese Regeln angepasst und ist noch nicht in Production. Die neue SHA-256-Prüfsumme ist nach dem Branch-Push mitzuteilen; Production-Einspielen erfolgt erst nach Juans erneuter Freigabe.

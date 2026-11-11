@@ -7,7 +7,7 @@ export async function requireScribeDayWriter(db: SupabaseClient) {
   const { data: { user } } = await db.auth.getUser();
   if (!user) throw new DayRecordError("not_authenticated", 401, "Nicht autorisiert.");
   const { data: profile, error } = await db.from("user_profiles")
-    .select("role,kuerzel,permissions")
+    .select("role,kuerzel,permissions,display_name")
     .eq("id", user.id)
     .single();
   if (error || !profile) throw new DayRecordError("profile_unavailable", 503, "Mitarbeiterprofil ist nicht verfügbar.");

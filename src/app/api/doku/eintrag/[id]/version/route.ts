@@ -6,6 +6,7 @@ import { roomInputError } from '@/lib/scribe-rooms';
 import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
 import { createServerClient } from '@/lib/db/supabase';
 import { makeScribeConfirmationAttempt, recordScribeConfirmationAttempt } from '@/lib/scribe-confirmation-monitor';
+import {consistencyAudit,isConsistencyAcknowledged,variablesWithConsistencyAudit,type ConsistencyAudit} from '@/lib/scribe-consistency-acknowledgement';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ type VersionBody = {
   positionen?: unknown[];
   ausnahme_freitext?: string | null;
   aenderungsgrund: string; // Pflicht ab Version 2 (§ 630f: Aenderungen nachvollziehbar)
+  consistencyAcknowledgement?: {fingerprint:string};
 };
 
 // POST /api/doku/eintrag/[id]/version
@@ -30,11 +32,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  if (!user) return NextResponse.json({ code:"not_authenticated",error: "Nicht autorisiert" }, { status: 401 });
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role, kuerzel, permissions")
+    .select("role, kuerzel, permissions, display_name")
     .eq("id", user.id)
     .single();
 
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const permissions = (profile?.permissions ?? {}) as { scribe_schreiben?: boolean };
   const scribeErlaubt = permissions.scribe_schreiben ?? (!!role && ["admin", "verwaltung"].includes(role));
   if (!scribeErlaubt) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    return NextResponse.json({ code:"scribe_forbidden",error: "Keine Berechtigung" }, { status: 403 });
   }
   const mitarbeiterKuerzel = normalizeStaffInitials(profile?.kuerzel);
   if (!mitarbeiterKuerzel) {
@@ -53,11 +55,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     body = (await request.json()) as VersionBody;
   } catch {
-    return NextResponse.json({ error: "Ungueltiger JSON-Body" }, { status: 400 });
+    return NextResponse.json({ code:"invalid_json",error: "Ungueltiger JSON-Body" }, { status: 400 });
   }
 
   if (!body.text || !body.text.trim()) {
-    return NextResponse.json({ error: "text fehlt" }, { status: 400 });
+    return NextResponse.json({ code:"text_required",error: "text fehlt" }, { status: 400 });
   }
   if (!body.aenderungsgrund || !body.aenderungsgrund.trim()) {
     return NextResponse.json({ error: "aenderungsgrund ist Pflicht" }, { status: 400 });
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .eq("id", params.id)
     .single();
 
-  if (loadError || !alt) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (loadError || !alt) return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
 
   const dayConflict=await canonicalDayConflict(supabase,params.id);
   if(dayConflict)return dayConflict;
@@ -78,11 +80,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const roomError = roomInputError(body.zimmer_version_id, false);
   if (roomError) return NextResponse.json({ error: roomError }, { status: 422 });
 
+  let confirmationAudit:ConsistencyAudit|null=null;
+  const baseVariables=variablesWithConsistencyAudit(body.variablen ?? alt.variablen,null);
   const update = {
     ...(body.zimmer_version_id !== undefined ? { zimmer_version_id: body.zimmer_version_id || null } : {}),
     text: body.text.trim(),
     zaehne: body.zaehne ?? alt.zaehne,
-    variablen: body.variablen ?? alt.variablen,
+    variablen: baseVariables,
     auswahl: body.auswahl ?? alt.auswahl,
     positionen: body.positionen ?? alt.positionen,
     ausnahme_freitext: body.ausnahme_freitext?.trim() || alt.ausnahme_freitext,
@@ -98,12 +102,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   // Validate the exact merged payload which will become this version, including
   // retained positions/selection when a correction changed only the text.
-  const check = await checkScribeConsistency(supabase, { ...alt, ...update });
+  const candidate={...alt,...update,consistencyAcknowledgement:body.consistencyAcknowledgement};
+  const check = await checkScribeConsistency(supabase,candidate);
   if (!check.canConfirm) {
-    const response = scribeConsistencyFailure(check, request.url);
-    if (response.status === 422) await recordScribeConfirmationAttempt(
+    if(isConsistencyAcknowledged(candidate,check)){
+      confirmationAudit=consistencyAudit(candidate,check,{id:user.id,name:profile?.display_name||mitarbeiterKuerzel||'Praxis'});
+      update.variablen=variablesWithConsistencyAudit(baseVariables,confirmationAudit);
+    }else{
+     const response = scribeConsistencyFailure(check, request.url,candidate);
+     if (response.status === 422||response.status===503) await recordScribeConfirmationAttempt(
       createServerClient(), makeScribeConfirmationAttempt(alt, 'rejected', check));
-    return response;
+     return response;
+    }
   }
 
   const { data: eintrag, error: updError } = await supabase
@@ -140,5 +150,5 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   await recordScribeConfirmationAttempt(
     createServerClient(), makeScribeConfirmationAttempt(alt, 'confirmed'));
-  return NextResponse.json({ eintrag });
+  return NextResponse.json({ eintrag,...(confirmationAudit?{confirmation:confirmationAudit}:{}) });
 }

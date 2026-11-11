@@ -168,7 +168,7 @@
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
-      "sha256": "95393a741ea3977838cf5ac333e941c4fe7155be3ba5708c9173a0ce27e35c5b",
+      "sha256": "9b6c57b98c0e028fa939acca826477b861784162dbaee20980589a1a5003ecb9",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
@@ -180,7 +180,7 @@
     },
     {
       "file": "src/lib/scribe-day-record-service.ts",
-      "sha256": "16e6dfb1f688bea3c6c551c847ecb68ca6009a68388dfe707e23f3b143fda41e",
+      "sha256": "9625489805b94f9ffcb78ef17cd904c05b3f8e8b7f5ba78ace6a9ea6752d3655",
       "proof": "All day-record RPCs receive the signed-in Anima Cura/Scribe Supabase client after requireScribeDayWriter checks the authenticated user, profile permission and server-side staff initials; JWT role authenticated.",
       "calls": [
         {
@@ -190,19 +190,19 @@
         },
         {
           "name": "decide_doku_day_part",
-          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text, p_consistency_audit jsonb)",
           "role": "authenticated"
         },
         {
           "name": "decide_doku_day_part",
-          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text, p_consistency_audit jsonb)",
           "role": "authenticated"
         }
       ]
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/resolve-patient/route.ts",
-      "sha256": "f6474e41398c3cc251d6bbdaab5d6c9ebf6ec53593d474eef065b7ae05de9ea4",
+      "sha256": "e2ea271f44b01156d5ee3d25dadb7d3114dd57e4ebe6d4b622c21eec7a12f861",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
@@ -409,8 +409,8 @@
     },
     {
       "file": "src/lib/scribe-template-history-service.ts",
-      "sha256": "a5918b70c09dd41c46ab28c8cc8d3b7b5f7996fcdc527be1553ab26d5921c1fe",
-      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "sha256": "c3d46239e6549fe20a264cdb9cbb44182d7c4228451e6f8b5cb8dd0d8ffa83e8",
+      "proof": "Reviewed client provenance: template mutations use the explicit service client only after workspace actor authorization. Historical reads accept an injected server-only client after the billing-export login and practice-permission checks; they never accept patient identity or perform writes. The sole RPC remains service-role-only.",
       "calls": [
         {
           "name": "scribe_template_change",
@@ -499,7 +499,7 @@
     },
     {
       "file": "src/app/api/doku/ivoris-nachsync/route.ts",
-      "sha256": "6c614c72453fd8508867792fad6ccf78db57d5005905d4fc118909ede4c988a9"
+      "sha256": "72f7793599cf99ef68c8d838ee822fbd12ce5fc3ace1274253aec1cbef0cfc87"
     },
     {
       "file": "src/app/api/rechnungen/behandlungskonto/[id]/route.ts",

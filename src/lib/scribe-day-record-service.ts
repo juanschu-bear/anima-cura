@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { checkScribeConsistency } from "@/lib/scribe-consistency-service";
+import {consistencyAudit,consistencyConfirmation,isConsistencyAcknowledged,type ConsistencyAudit} from '@/lib/scribe-consistency-acknowledgement';
+import {createServerClient} from '@/lib/db/supabase';
 import {
   addDayPartRequestSchema,
   buildDayPreviewToken,
@@ -305,7 +307,7 @@ export async function previewStoredDayPart(db: Db, id: string, partId: string, r
   return previewValue(record, parts.filter(value => value.id !== partId), proposed);
 }
 
-export async function decideStoredDayPart(db: Db, id: string, partId: string, raw: unknown) {
+export async function decideStoredDayPart(db: Db, id: string, partId: string, raw: unknown,actor?:{id:string;name:string}) {
   const parsed = decideDayPartRequestSchema.safeParse(raw);
   if (!parsed.success) throw new DayRecordError("day_part_decision_invalid", 422, parsed.error.issues[0]?.message ?? "Entscheidung ist ungültig.");
   const input: DecideDayPartRequest = parsed.data;
@@ -326,14 +328,16 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
       p_resulting_positions: [],
       p_conflicts: [],
       p_ivoris_delta_text: null,
+      p_consistency_audit: null,
     });
     if (error) dbError(error, "Entwurfsteil konnte nicht verworfen werden.");
     return data;
   }
 
   const proposed = decisionPart(part, parts, input);
+  let acknowledgement:ConsistencyAudit|null=null;
   if (part.template_id && part.treatment_type && part.appointment_type) {
-    const consistency = await checkScribeConsistency(db, {
+    const consistencyInput={
       vorlage_id: part.template_id,
       behandlungsart: part.treatment_type,
       termin_typ: part.appointment_type,
@@ -345,12 +349,17 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
         const position = rawPosition as Record<string, unknown>;
         return { code: position.code, text: position.text, anzahl: position.anzahl ?? position.quantity };
       }),
-    });
+      consistencyAcknowledgement:input.consistencyAcknowledgement,
+    };
+    const consistency = await checkScribeConsistency(db,consistencyInput);
     if (!consistency.canConfirm) {
-      const unavailable = consistency.issues.some(issue => issue.scope === "source");
-      throw new DayRecordError("needs_consistency_review", unavailable ? 503 : 422,
-        unavailable ? "Prüfgrundlage ist derzeit nicht verfügbar." : "Der Entwurfsteil muss vor dem Bestätigen geprüft werden.",
-        { consistency });
+      if(actor&&isConsistencyAcknowledged(consistencyInput,consistency))acknowledgement=consistencyAudit(consistencyInput,consistency,actor);
+      else{
+       const unavailable = consistency.issues.some(issue => issue.scope === "source");
+       throw new DayRecordError("consistency_confirmation_required", unavailable ? 503 : 422,
+         unavailable ? "Prüfgrundlage ist derzeit nicht verfügbar." : "Der Entwurfsteil muss vor dem Bestätigen geprüft werden.",
+         {consistency,confirmation:consistencyConfirmation(consistencyInput,consistency)});
+      }
     }
   }
   const preview = previewValue(record, parts.filter(value => value.id !== partId), proposed);
@@ -376,7 +385,11 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
     })),
     p_conflicts: preview.conflicts,
     p_ivoris_delta_text: part.text,
+    // The audit travels through the same SECURITY DEFINER decision as the
+    // canonical content update. A second service-role write would trip 076.
+    p_consistency_audit: acknowledgement,
   });
   if (error) dbError(error, "Entwurfsteil konnte nicht bestätigt werden.");
-  return { result: data, preview };
+  const auditStored=!!acknowledgement;
+  return {result:data,preview,...(acknowledgement?{confirmation:acknowledgement,confirmationLabel:`Trotz Hinweis von ${acknowledgement.confirmedBy.name} bestätigt`,auditStored}: {})};
 }

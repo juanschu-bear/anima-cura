@@ -6,6 +6,47 @@
 /** Entwurf einer Neuigkeit für die Praxis. Englisch ist optional; leer gelassen gilt der deutsche Text. */
 export type Entwurf = { titel: string; kurz: string; text: string; titelEn: string; kurzEn: string; textEn: string; art: "neuerung" | "wichtig" | "hinweis"; bestaetigen: boolean; slug?: string };
 export const LEERER_ENTWURF: Entwurf = { titel: "", kurz: "", text: "", titelEn: "", kurzEn: "", textEn: "", art: "neuerung", bestaetigen: false };
+const ZEITMASCHINE_ABSICHERUNG: Entwurf = {
+  slug: "2026-11-11-zeitmaschine-absicherung",
+  art: "hinweis",
+  bestaetigen: false,
+  titel: "Scribe lässt euch immer weiterarbeiten",
+  kurz: "Bei einem Hinweis seht ihr sofort, was los ist und könnt nach einer zweiten Bestätigung trotzdem speichern.",
+  text: [
+    "1. Ihr kommt immer weiter",
+    "Passt etwas nicht, sagt Scribe, was los ist, und macht einen Vorschlag. Ihr entscheidet selbst: Nach einer zweiten Bestätigung wird eure Eingabe gespeichert.",
+    "",
+    "2. Eure Eingabe geht nie verloren",
+    "Warnungen und Entscheidungen werden mit eurem Namen und der Zeit in der Akte festgehalten. Alte bestätigte Einträge behalten ihren damaligen Stand.",
+    "",
+    "3. Bausteine mit Abrechnung",
+    "Auch feste Bausteine könnt ihr nach einer zweiten Bestätigung ändern. Scribe zeigt vorher den alten und neuen Text sowie die daran hängenden Positionen. Alles bleibt im Änderungsbuch rückgängig machbar.",
+    "",
+    "4. Eine einzelne Vorlage hält euch nicht auf",
+    "Muss eine Vorlage geprüft werden, bleiben alle anderen benutzbar. Die betroffene Vorlage bietet Scribe in ihrer Grundfassung weiter an.",
+    "",
+    "5. Keine Glocke für die eigene Aktion",
+    "Wer den eigenen Eintrag kommentiert oder selbst abschließend bestätigt, bekommt dafür keine Benachrichtigung an sich selbst.",
+  ].join("\n"),
+  titelEn: "Scribe always lets you continue",
+  kurzEn: "When something needs checking, you see why and can save after a second confirmation.",
+  textEn: [
+    "1. You can always continue",
+    "Scribe explains the issue and suggests a next step. After a second confirmation, your decision is saved.",
+    "",
+    "2. Your input is never lost",
+    "Warnings and decisions are recorded with your name and time. Older confirmed entries retain their original state.",
+    "",
+    "3. Billing-linked blocks",
+    "You can change fixed blocks after a second confirmation. Scribe shows the old and new text and attached positions first; every change can be undone.",
+    "",
+    "4. One template does not hold you up",
+    "If a template needs review, the other templates remain available. The affected template remains usable in its previous mode.",
+    "",
+    "5. No bell notification for your own action",
+    "If you comment on your own entry or complete its final practice confirmation yourself, you do not receive a notification about your own action.",
+  ].join("\n"),
+};
 const NICHTS_GEHT_VERLOREN: Entwurf = {
   slug: "2026-11-11-nichts-geht-verloren",
   art: "neuerung",
@@ -89,4 +130,4 @@ const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   ].join("\n"),
 };
 
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
