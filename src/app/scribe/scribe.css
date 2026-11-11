@@ -1449,3 +1449,22 @@
   .scribe .kopf .thema-toggle{padding:7px 13px}
   .scribe .kopf .rechts{gap:6px}
 }
+/* Kopf größer, damit er zur großen Überschrift passt (Juan, 11.11.2026). Ab 1200px, darunter bleibt er kompakt in 1 Zeile. */
+@media(min-width:1200px){
+  .scribe .kopf{padding:13px 14px 13px 16px;border-radius:28px;gap:12px 20px}
+  .scribe .wortmarke{font-size:27px;gap:14px}
+  .scribe .kopf-logo{width:52px;height:52px;border-radius:14px}
+  .scribe .kopf .datum{font-size:14px}
+  .scribe .kopf .rechts{gap:10px}
+  .scribe .kopf .thema-toggle,.scribe .kopf .abmelden{min-height:50px;font-size:15px;padding:0 20px}
+  .scribe .kopf .kopf-rund,.scribe .kopf .glocke-knopf{width:50px;height:50px}
+  .scribe .kopf .glocke-knopf.hat-neu{height:50px;padding:0 18px 0 15px}
+  .scribe .kopf .glocke-neu-text{font-size:15px}
+  .scribe .kopf .kopf-rund svg,.scribe .kopf .glocke-symbol svg{width:20px;height:20px}
+  .scribe .kopf .rechts > details:not(.kopf-mehr) > summary.thema-toggle svg{width:20px;height:20px}
+  .scribe .kopf .nutzer-chip{padding:4px}
+  .scribe .kopf .nutzer-kuerzel{width:42px;height:42px;font-size:13px}
+  .scribe .kopf .nutzer{font-size:15px;max-width:260px}
+  .scribe .kopf .nutzer small{font-size:11.5px}
+  .scribe .kopf .nutzer-chip .abmelden{min-height:42px;padding:0 16px}
+}
