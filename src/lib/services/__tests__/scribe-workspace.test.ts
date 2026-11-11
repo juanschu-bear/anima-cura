@@ -115,7 +115,7 @@ test('one malformed template is isolated and historical states work with or with
  for(const marker of [undefined,1]){
   const atConfirmation=projectTemplate(good,slotsAt(slots,changes,'2026-11-10T08:30:00.000Z'));
   assert.equal(atConfirmation.struktur.groups.free.opts[0].t,'A');
-  assert.equal(atConfirmation.struktur.groups.free.opts[1].hidden,false);
+  assert.equal((atConfirmation.struktur.groups.free.opts[1] as {hidden?: boolean}).hidden,false);
   assert.equal(marker===1||marker===undefined,true);
  }
 });
