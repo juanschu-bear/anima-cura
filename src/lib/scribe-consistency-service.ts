@@ -1,4 +1,4 @@
-import {effectiveTemplates} from './scribe-template-history-service';
+import {effectiveTemplates,effectiveTemplatesAt} from './scribe-template-history-service';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { t } from './i18n';
@@ -6,7 +6,10 @@ import { assessScribeConsistency, consistencyResult, scribeConsistencyInput, scr
 
 // Caller authenticates/authorizes first. Use that same session-bound client;
 // never upgrade to the service key to make inaccessible evidence look valid.
-export async function checkScribeConsistency(db: Pick<SupabaseClient, 'from'>, raw: unknown): Promise<ScribeConsistencyResult> {
+export async function checkScribeConsistency(db: Pick<SupabaseClient, 'from'>, raw: unknown, options?:{
+  confirmedAt?:string;
+  historyDb?:Pick<SupabaseClient,'from'>;
+}): Promise<ScribeConsistencyResult> {
   const parsed = scribeConsistencyInput.safeParse(raw);
   if (!parsed.success) return consistencyResult([{code:'input_invalid',scope:'input'}]);
   const input = parsed.data;
@@ -21,8 +24,12 @@ export async function checkScribeConsistency(db: Pick<SupabaseClient, 'from'>, r
     const templates = data.map(row => scribeConsistencyTemplate.safeParse(row));
     if (templates.some(row => !row.success)) return consistencyResult([{code:'template_invalid',scope:'template'}]);
     const rows = templates.flatMap(row => row.success ? [row.data] : []);
-    const effective = input.variablen.template_history_version === 1 ? await effectiveTemplates(data) : null;
-    if(input.variablen.template_history_version === 1 && !effective) return consistencyResult([{code:"practice_options_read_failed",scope:"source"}]);
+    // Confirmed entries are immutable evidence. Validate them against the option
+    // state at confirmation, regardless of whether an older client persisted the
+    // history-version marker. New drafts/confirmations still use the current state.
+    const effective = options?.confirmedAt ? await effectiveTemplatesAt(data,options.confirmedAt,options.historyDb)
+      : input.variablen.template_history_version === 1 ? await effectiveTemplates(data) : null;
+    if((options?.confirmedAt||input.variablen.template_history_version === 1) && !effective) return consistencyResult([{code:"practice_options_read_failed",scope:"source"}]);
     if(effective) return assessScribeConsistency(input,effective);
     // Match /api/doku/vorlagen: seed options retain their indices; practice
     // additions follow sort_index and created_at, and all pages must be read.

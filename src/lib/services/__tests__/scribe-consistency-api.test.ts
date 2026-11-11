@@ -13,7 +13,7 @@ import * as monitor from '../../scribe-confirmation-monitor';
 
 // Execute the actual route with a session-bound synthetic DB. No live keys,
 // runtime import hacks in production, or writes to real patient data.
-function harness(path: string, options:{broken?:boolean;authenticated?:boolean;allowed?:boolean;sourceFails?:boolean;existingDay?:boolean;canonicalDay?:boolean}={}) {
+function harness(path: string, options:{broken?:boolean;authenticated?:boolean;allowed?:boolean;sourceFails?:boolean;existingDay?:boolean;canonicalDay?:boolean;historyChanged?:boolean;historyMarker?:boolean}={}) {
   const template={id:'template-test',behandlungsart:'multiband',termin_typ:'kontrolle',
     struktur:{template:['MB-Kontrolle. ',{g:'bogen_ok'}],groups:{bogen_ok:{type:'single',opts:[{t:'Bogenwechsel OK 016.'}]}}},
     positionen:[{code:'BEMA 128a',text:'Belegte Bogenleistung',if:{g:options.broken?'bogen':'bogen_ok',i:0}}]};
@@ -21,7 +21,7 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
     zimmer_version_id:'11111111-1111-4111-8111-111111111111',text:'MB-Kontrolle. Bogenwechsel OK 016.',
     auswahl:{kontrolle:{bogen_ok:[0]}},variablen:{},zaehne:[],positionen:[{code:'BEMA 128a',text:'Belegte Bogenleistung',anzahl:1}]};
   const writes:unknown[]=[];const reads:string[]=[];
-  const stored={...body,id:'entry-test',status:'bestaetigt',version:1,bestaetigt_am:'2026-10-31T12:00:00Z'};
+  const stored={...body,variablen:options.historyMarker?{template_history_version:1}:{},id:'entry-test',status:'bestaetigt',version:1,bestaetigt_am:'2026-10-31T12:00:00Z'};
   const db={auth:{getUser:async()=>({data:{user:options.authenticated===false?null:{id:'staff-test'}}})},from(table:string){
     reads.push(table);let listed=false;let changes:Record<string,unknown>={};
     const result=()=>({error:options.sourceFails&&table==='doku_vorlagen'?{message:'secret'}:null,
@@ -33,7 +33,18 @@ function harness(path: string, options:{broken?:boolean;authenticated?:boolean;a
       then(resolve:(v:unknown)=>unknown){return Promise.resolve(result()).then(resolve);}};
     return q;
   }};
-  const monitorDb={from(table:string){return {insert:async()=>({data:null,error:null})};}};
+  const templateSlots=Object.entries(template.struktur.groups).flatMap(([gruppe,group])=>group.opts.map((option,index)=>({
+    option_key:`${template.id}:praxis-schubert:${gruppe}:seed:${index}`,template_id:template.id,gruppe,option_index:index,
+    source:'vorlage',practice_option_id:null,baseline:{text:option.t,hidden:false},
+    state:options.historyChanged&&gruppe==='bogen_ok'&&index===0?{text:'Später umbenannt',hidden:true}:{text:option.t,hidden:false},
+    last_change_id:null,created_at:'2026-10-01T00:00:00Z',
+  })));
+  const monitorDb={from(table:string){
+    const result=()=>({data:table==='scribe_option_slots'?templateSlots:table==='scribe_option_changes'?[]:null,error:null});
+    const q={select(){return q;},eq(){return q;},in(){return q;},lte(){return q;},order(){return q;},
+      range(){return Promise.resolve(result());},insert:async()=>({data:null,error:null})};
+    return q;
+  }};
   const imports:Record<string,unknown>={'next/server':{NextRequest,NextResponse},'@/lib/db/supabase-server':{createServerComponentClient:()=>db},
     '@/lib/db/supabase':{createServerClient:()=>monitorDb},'@/lib/scribe-confirmation-monitor':monitor,
     '@/lib/scribe-consistency-service':consistency,'@/lib/scribe-identity':identity,'@/lib/scribe-rooms':rooms,
@@ -80,6 +91,14 @@ test('historical confirmed entries with broken mappings cannot export positions'
 test('consistent individual positions export as manual transfer only',async()=>{
   const f=harness(exportPath);const response=await f.handle.GET(new Request('https://example.invalid/api/doku/eintrag/entry-test/billing-export'),{params:{id:'entry-test'}});
   assert.equal(response.status,200);assert.equal((await response.json()).status,'manual_transfer_required');assert.equal(f.writes.length,0);
+});
+test('confirmed export uses the confirmation state after later rename/hide, with and without a history marker',async()=>{
+  for(const historyMarker of [false,true]){
+    const f=harness(exportPath,{historyChanged:true,historyMarker});
+    const response=await f.handle.GET(new Request('https://example.invalid/api/doku/eintrag/entry-test/billing-export'),{params:{id:'entry-test'}});
+    assert.equal(response.status,200);assert.equal((await response.json()).status,'manual_transfer_required');
+    assert.equal(f.writes.length,0);
+  }
 });
 test('all guarded routes enforce login and permission before loading template data',async()=>{
   for(const path of [entry,version,exportPath])for(const denied of [{authenticated:false},{allowed:false}]){

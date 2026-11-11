@@ -3,6 +3,7 @@ import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { prepareScribeBillingExport } from "@/lib/billing-foundation";
 import { t } from "@/lib/i18n";
 import { checkScribeConsistency, scribeConsistencyFailure } from '@/lib/scribe-consistency-service';
+import { createServerClient } from '@/lib/db/supabase';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const locale = new URL(_request.url).searchParams.get("lang") === "en" ? "en" : "de";
   // Existing confirmed entries also need a current consistency check. Reading
   // them never repairs history or re-confirms a financial entitlement.
-  const check = await checkScribeConsistency(supabase, entry);
+  const check = await checkScribeConsistency(supabase, entry, {
+    confirmedAt: entry.bestaetigt_am,
+    // The immutable option ledger is server-only. Authentication and the
+    // practice permission check above always happen before this read.
+    historyDb: createServerClient(),
+  });
   if (!check.canConfirm) return scribeConsistencyFailure(check, _request.url);
   const prepared = prepareScribeBillingExport(entry.positionen);
   if (!prepared.ok) return NextResponse.json({

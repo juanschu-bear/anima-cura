@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAppUser } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
 import { normalizeScribeAppointmentTypeName } from "@/lib/scribe-appointment-type";
+import { findPraxisPassTemplateConflicts } from "@/lib/scribe-praxis-pass-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -207,6 +208,16 @@ export async function POST(request: NextRequest) {
     const { data: paesse, error: ladeErr } = await supabase.from("praxis_pass").select("*");
     if (ladeErr) return NextResponse.json({ error: ladeErr.message }, { status: 500 });
 
+    const {data: bestehendeVorlagen,error:vorlagenErr}=await supabase.from("doku_vorlagen")
+      .select("id,behandlungsart,termin_typ,struktur");
+    if(vorlagenErr)return NextResponse.json({error:vorlagenErr.message},{status:500});
+    const conflicts=findPraxisPassTemplateConflicts(paesse??[],bestehendeVorlagen??[]);
+    if(conflicts.length)return NextResponse.json({
+      code:"template_structure_change_requires_history",
+      error:"Feste Bausteine bestehender Vorlagen werden über die Zeitmaschine geändert.",
+      templates:conflicts,
+    },{status:409,headers:{"Cache-Control":"private, no-store"}});
+
     let uebernommen = 0;
     let neu = 0;
     for (const p of paesse ?? []) {
@@ -223,15 +234,9 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (vorlage) {
-        // Bestehende Vorlage: bearbeitete Options-Gruppen ersetzen, Beispieltext + Abrechnung als Referenz mitfuehren.
+        // Bestehende Vorlage: nur Metadaten übernehmen. Feste Optionsfelder sind
+        // indexgebunden und werden ausschließlich über die Zeitmaschine geändert.
         const struktur = { ...((vorlage.struktur ?? {}) as Record<string, unknown>) };
-        const groups = { ...((struktur.groups ?? {}) as Record<string, Record<string, unknown>>) };
-        for (const [gk, liste] of Object.entries(final)) {
-          if (groups[gk] && Array.isArray(liste)) {
-            groups[gk] = { ...groups[gk], opts: liste.map((t, i) => (i === 0 ? { t, on: true } : { t })) };
-          }
-        }
-        struktur.groups = groups;
         if (p.verlaufstext && String(p.verlaufstext).trim()) struktur.praxis_muster = p.verlaufstext;
         if (abrechnung) struktur.praxis_abrechnung = abrechnung;
         struktur.quelle = "praxis";

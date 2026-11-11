@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {projectTemplate,protectedGroup,templateChangeSchema} from '../../scribe-template-history';
+import {projectTemplate,projectTemplatesSafely,protectedGroup,slotsAt,templateChangeSchema,type TemplateSlot} from '../../scribe-template-history';
+import {findPraxisPassTemplateConflicts} from '../../scribe-praxis-pass-guard';
 import {canWriteScribe,isPracticeProfile,isDeveloper} from '../../scribe-workspace-auth';
 import {assertInboxStatus} from '../../scribe-inbox-store';
 import {inboxMail} from '../../scribe-inbox-mail';
@@ -32,6 +33,7 @@ async function setup(reproduceMissingPrerequisite=false){
  }
  await pg.exec(readFileSync('supabase/migrations/079_scribe_updates_prerequisite.sql','utf8'));
  await pg.exec(readFileSync('supabase/migrations/078_scribe_time_machine_inbox_bell.sql','utf8'));
+ await pg.exec(readFileSync('supabase/migrations/080_scribe_time_machine_safeguards.sql','utf8'));
  return {pg,legacy};
 }
 async function change(pg:PGlite,p:Record<string,unknown>,actor=staff){
@@ -89,6 +91,40 @@ test('time machine preserves indices, immutable history, restoration, CAS and ho
 
  }finally{await pg.close();}
 });
+test('one malformed template is isolated and historical states work with or without a version marker',()=>{
+ const good={id:tid,struktur:structure,positionen:[]};const broken={...structuredClone(good),id:'20000000-0000-4000-8000-000000000002'};
+ const base='2026-11-10T08:00:00.000Z';
+ const slots:TemplateSlot[]=Object.entries(structure.groups).flatMap(([gruppe,group])=>group.opts.map((option,index)=>({
+  option_key:`${tid}:praxis-schubert:${gruppe}:seed:${index}`,template_id:tid,gruppe,option_index:index,source:'vorlage' as const,
+  practice_option_id:null,baseline:{text:option.t,hidden:false},state:{text:index===0?'Renamed':option.t,hidden:index===1},last_change_id:'later',created_at:base,
+ })));
+ const isolated=projectTemplatesSafely([good,broken],slots);
+ assert.deepEqual(isolated.templates.map(row=>row.id),[tid]);
+ assert.deepEqual(isolated.errors,[{templateId:broken.id,code:'template_layout_changed'}]);
+ const changes=[
+  {id:'40000000-0000-4000-8000-000000000001',option_key:slots[0].option_key,after_state:{text:'Renamed',hidden:false},created_at:'2026-11-10T09:00:00.000Z',seq:1},
+  {id:'40000000-0000-4000-8000-000000000002',option_key:slots[1].option_key,after_state:{text:slots[1].baseline.text,hidden:true},created_at:'2026-11-10T10:00:00.000Z',seq:2},
+ ];
+ for(const marker of [undefined,1]){
+  const atConfirmation=projectTemplate(good,slotsAt(slots,changes,'2026-11-10T08:30:00.000Z'));
+  assert.equal(atConfirmation.struktur.groups.free.opts[0].t,'A');
+  assert.equal(atConfirmation.struktur.groups.free.opts[1].hidden,false);
+  assert.equal(marker===1||marker===undefined,true);
+ }
+});
+test('Praxis-Pass submission after the migration keeps seed indices and accepts metadata',async()=>{
+ const {pg}=await setup();try{
+  const template={id:tid,behandlungsart:'multiband',termin_typ:'routine',struktur:structure};
+  const unchanged={behandlungsart:'multiband',termin_typ:'routine',optionen_final:{free:['A','B']}};
+  assert.deepEqual(findPraxisPassTemplateConflicts([unchanged],[template]),[]);
+  await pg.query("UPDATE doku_vorlagen SET struktur=struktur||$1::jsonb WHERE id=$2",[{praxis_muster:'Neu',quelle:'praxis'},tid]);
+  const stored=(await pg.query<any>('SELECT struktur FROM doku_vorlagen WHERE id=$1',[tid])).rows[0].struktur;
+  assert.equal(stored.praxis_muster,'Neu');assert.deepEqual(stored.groups.free.opts,structure.groups.free.opts);
+  assert.deepEqual(findPraxisPassTemplateConflicts([{...unchanged,optionen_final:{free:['Changed','B']}}],[template]),[
+   {templateId:tid,behandlungsart:'multiband',terminTyp:'routine',code:'template_structure_change_requires_history'},
+  ]);
+ }finally{await pg.close();}
+});
 test('inbox import preserves history, atomic status/comments/bells, mail enqueue and owner deletion',async()=>{
  const {pg,legacy}=await setup();try{
  assert.deepEqual((await pg.query<any>('SELECT legacy_payload FROM scribe_inbox_entries')).rows[0].legacy_payload,legacy);
@@ -107,13 +143,28 @@ test('inbox import preserves history, atomic status/comments/bells, mail enqueue
  const comment={id:randomUUID(),text:'Answer',erstellt_von:admin,gelesen_von:[admin]};
  const reply={...updated,kommentare:[comment]};await commit(reply,2,admin,true);
  assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
- await assert.rejects(()=>commit(reply,3,admin,true,true),/inbox_delete_forbidden/);
- await commit(reply,3,staff,false,true);
- assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_inbox_comments')).rows[0].n,2);
+ const selfComment={id:randomUUID(),text:'Own note',erstellt_von:staff,gelesen_von:[staff]};
+ const ownReply={...reply,kommentare:[comment,selfComment]};await commit(ownReply,3,staff,false);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
+ const accepted={...ownReply,status:'praxis_bestaetigt',status_verlauf:[...ownReply.status_verlauf,{von:'bereitgestellt',zu:'praxis_bestaetigt',geaendert_von_name:'Praxis'}]};
+ await commit(accepted,4,staff,false);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM practice_notifications WHERE recipient_id=$1',[staff])).rows[0].n,2);
+ await assert.rejects(()=>commit(accepted,5,admin,true,true),/inbox_delete_forbidden/);
+ await commit(accepted,5,staff,false,true);
+ assert.equal((await pg.query<any>('SELECT count(*)::int n FROM scribe_inbox_comments')).rows[0].n,3);
  const jobs=(await pg.query<any>('SELECT * FROM scribe_claim_inbox_mail(null)')).rows;assert.equal(jobs.length,1);
  assert.equal((await pg.query('SELECT * FROM scribe_claim_inbox_mail(null)')).rows.length,0);
  await pg.exec("UPDATE scribe_inbox_mail_jobs SET lease_until=now()-interval '1 minute'");
  assert.equal((await pg.query('SELECT * FROM scribe_claim_inbox_mail(null)')).rows.length,1);
+ }finally{await pg.close();}
+});
+test('seed option arrays are immutable while metadata and new templates remain possible',async()=>{
+ const {pg}=await setup();try{
+  await pg.query("UPDATE doku_vorlagen SET struktur=jsonb_set(struktur,'{kontext}',to_jsonb('Hinweis'::text),true) WHERE id=$1",[tid]);
+  const changed=structuredClone(structure);changed.groups.free.opts[0].t='Direct rewrite';
+  await assert.rejects(()=>pg.query('UPDATE doku_vorlagen SET struktur=$1 WHERE id=$2',[changed,tid]),/template_structure_change_requires_history/);
+  assert.equal((await pg.query<any>('SELECT struktur FROM doku_vorlagen WHERE id=$1',[tid])).rows[0].struktur.groups.free.opts[0].t,'A');
+  await pg.query("INSERT INTO doku_vorlagen(id,behandlungsart,termin_typ,struktur,positionen) VALUES(gen_random_uuid(),'multiband','new-type',$1,'[]')",[changed]);
  }finally{await pg.close();}
 });
 test('shared bell RLS isolates accounts, role receipts, patients and future messages',async()=>{

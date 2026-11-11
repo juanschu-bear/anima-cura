@@ -1,4 +1,4 @@
-import {effectiveTemplates} from "@/lib/scribe-template-history-service";
+import {effectiveTemplatesSafely} from "@/lib/scribe-template-history-service";
 import {workspaceError,ScribeWorkspaceError} from "@/lib/scribe-workspace-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
@@ -64,9 +64,12 @@ async function getTemplates(request: NextRequest) {
 
   const vorlagen = (data ?? []) as VorlageRow[];
   const historyRequested = request.nextUrl.searchParams.get("history") === "1";
-  const effective = historyRequested ? await effectiveTemplates(vorlagen) : null;
+  const effective = historyRequested ? await effectiveTemplatesSafely(vorlagen) : null;
   if(historyRequested && !effective) throw new ScribeWorkspaceError("scribe_workspace_unavailable",503);
-  if(effective) return NextResponse.json({vorlagen:effective,capabilities:SCRIBE_CAPABILITIES,templateHistoryVersion:1},{headers:{"Cache-Control":"private, no-store"}});
+  if(effective) return NextResponse.json({vorlagen:effective.templates,templateErrors:effective.errors.map(issue=>{
+    const template=vorlagen.find(row=>row.id===issue.templateId);
+    return {...issue,behandlungsart:template?.behandlungsart??null,terminTyp:template?.termin_typ??null};
+  }),capabilities:SCRIBE_CAPABILITIES,templateHistoryVersion:1},{headers:{"Cache-Control":"private, no-store"}});
 
   // Practice-added option texts (Weg B). Appended AFTER the seed opts of the
   // matching group, so seed indices stay stable (positionen.if and stored

@@ -409,8 +409,8 @@
     },
     {
       "file": "src/lib/scribe-template-history-service.ts",
-      "sha256": "a5918b70c09dd41c46ab28c8cc8d3b7b5f7996fcdc527be1553ab26d5921c1fe",
-      "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
+      "sha256": "400598928f11fcadc1f9e8d0eff1ee8680545a7de7c12bbb6d7d4dd360b04fea",
+      "proof": "Reviewed client provenance: template mutations use the explicit service client only after workspace actor authorization. Historical reads accept an injected server-only client after the billing-export login and practice-permission checks; they never accept patient identity or perform writes. The sole RPC remains service-role-only.",
       "calls": [
         {
           "name": "scribe_template_change",
