@@ -3,62 +3,12 @@
 import { AlertTriangle, Bell, CheckCircle2, MessageCircle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
+import { LEERER_ENTWURF, VORBEREITETE_NEUIGKEITEN, type Entwurf } from "./praxis-neuigkeiten";
 
 type Meldung = { id: string; kind: "wunsch_status" | "antwort" | "update" | "wichtig"; title: string; text: string; link: string; createdAt: string; readAt: string | null };
 type Liste = { notifications: Meldung[]; unreadCount: number; total: number; nextOffset: number | null };
 type Neuerung = { id: string; title: string; summary?: string; body: string; publishedAt: string | null; requiresAcknowledgement: boolean; acknowledgedAt: string | null; readAt: string | null };
 
-/** Entwurf einer Neuigkeit für die Praxis. Englisch ist optional; leer gelassen gilt der deutsche Text. */
-type Entwurf = { titel: string; kurz: string; text: string; titelEn: string; kurzEn: string; textEn: string; art: "neuerung" | "wichtig" | "hinweis"; bestaetigen: boolean; slug?: string };
-const LEERER_ENTWURF: Entwurf = { titel: "", kurz: "", text: "", titelEn: "", kurzEn: "", textEn: "", art: "neuerung", bestaetigen: false };
-/** Erster Beitrag zum Livegang vom 10.11.2026. Wird nur vorgeschlagen, solange er noch nicht veröffentlicht ist. */
-const ERSTER_BEITRAG: Entwurf = {
-  slug: "2026-11-11-bausteine-selbst-aendern",
-  art: "neuerung",
-  bestaetigen: false,
-  titel: "Bausteine selbst ändern, mit Rückgängig",
-  kurz: "Ihr könnt Bausteine jetzt selbst umbenennen und ausblenden. Jede Änderung lässt sich rückgängig machen. Dazu neu: diese Glocke und ein klarer Stand in der Infobox.",
-  text: [
-    "1. Bausteine selbst ändern",
-    "An jeder Gruppe steht oben rechts „✎ Bausteine“. Dort könnt ihr Bausteine umbenennen, ausblenden und wieder einblenden, auch feste Bausteine wie „Br … wieder geklebt“. Gespeicherte Einträge bleiben dabei, wie sie sind.",
-    "",
-    "2. Alles lässt sich rückgängig machen",
-    "Im Änderungsbuch steht jede Änderung mit Zeit und Name. Ein Tipp auf „Rückgängig“ holt den alten Stand zurück. Das × an euren eigenen Texten blendet sie jetzt nur aus, direkt danach erscheint „Rückgängig“. Früher gelöschte eigene Texte findet ihr im Änderungsbuch unter „Gelöschte eigene Texte“ und holt sie mit „Zurückholen“ wieder.",
-    "",
-    "3. Gruppen mit Abrechnung bleiben geschützt",
-    "Bei Gruppen, an denen die Abrechnung hängt, geht Ändern nur über „Wunsch an Juan“. Der Knopf öffnet die Infobox mit vorbereitetem Text.",
-    "",
-    "4. Die Glocke",
-    "Hier oben seht ihr, wenn sich bei euren Einträgen in der Infobox etwas tut oder es Neues in Anima Cura gibt. Ist etwas Neues da, wird die Glocke orange.",
-    "",
-    "5. Infobox mit klarem Stand",
-    "Jeder Eintrag zeigt seinen Weg: Eingetragen, Wird angeschaut, Wird umgesetzt, Fertig bitte prüfen, Von der Praxis abgehakt. Steht er auf „Fertig, bitte prüfen“, hakt ihr ihn mit „Abhaken, passt so“ ab.",
-    "",
-    "6. Neue Kopfzeile",
-    "„Passwort“ und „Demo“ findet ihr jetzt oben rechts unter „⋯“. Aus „Mitarbeiter wechseln“ ist „Wechseln“ geworden, direkt neben eurem Namen. Hell und Dunkel schaltet ihr über das Sonnen- oder Mond-Symbol.",
-  ].join("\n"),
-  titelEn: "Edit text blocks yourself, with undo",
-  kurzEn: "You can now rename and hide text blocks yourself. Every change can be undone. Also new: this bell and a clear status in the inbox.",
-  textEn: [
-    "1. Edit text blocks yourself",
-    "Each group has a \"✎ Blocks\" button at the top right. There you can rename, hide and show text blocks again, including fixed blocks. Saved entries stay as they are.",
-    "",
-    "2. Everything can be undone",
-    "The change log lists every change with time and name. \"Undo\" brings back the previous state. The × on your own texts now only hides them, with \"Undo\" right after. Previously deleted own texts are listed in the change log under \"Deleted own texts\" and come back with \"Restore\".",
-    "",
-    "3. Groups tied to billing stay protected",
-    "For groups that drive billing, changes go through \"Request to Juan\". The button opens the inbox with a prepared text.",
-    "",
-    "4. The bell",
-    "Up here you see when something happens with your inbox entries or when there is news in Anima Cura. When something is new, the bell turns orange.",
-    "",
-    "5. Inbox with a clear status",
-    "Each entry shows its path: Submitted, Being reviewed, Being implemented, Done please check, Checked off by the practice. When it says \"Done, please check\", check it off with \"Check off, all good\".",
-    "",
-    "6. New header",
-    "\"Password\" and \"Demo\" are now under \"⋯\" at the top right. \"Switch staff member\" is now \"Switch\", right next to your name. Light and dark are toggled with the sun or moon icon.",
-  ].join("\n"),
-};
 const umlaute: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
 function slugAus(titel: string): string {
   const tag = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
@@ -103,6 +53,8 @@ export default function ScribeGlocke() {
   const [neuerung, setNeuerung] = useState<Neuerung | null | "laedt" | "fehlt">(null);
   /** Nur Juans Konto (Entwickler) schreibt Neuigkeiten für die Praxis. */
   const [entwickler, setEntwickler] = useState(false);
+  /** Vorbereitete Beiträge, die noch nicht veröffentlicht sind (nur für Juans Konto). */
+  const [bereit, setBereit] = useState<Entwurf[]>([]);
   const [schreiben, setSchreiben] = useState<Entwurf | null>(null);
   const [sendet, setSendet] = useState(false);
   const [hinweis, setHinweis] = useState<{ art: "ok" | "fehler"; text: string } | null>(null);
@@ -117,7 +69,17 @@ export default function ScribeGlocke() {
       setFehler(null);
       const inbox = await fetch("/api/scribe/inbox", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (inbox?.eintraege) setTitel(Object.fromEntries((inbox.eintraege as Array<{ id: string; titel: string }>).map((e) => [e.id, e.titel])));
-      setEntwickler(!!inbox?.canSetDeveloperStatus);
+      const istEntwickler = !!inbox?.canSetDeveloperStatus;
+      setEntwickler(istEntwickler);
+      if (istEntwickler) {
+        const neu = await fetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (neu?.updates) {
+          const veroeffentlicht = new Set((neu.updates as Array<{ slug?: string }>).map((u) => u.slug));
+          setBereit(VORBEREITETE_NEUIGKEITEN.filter((n) => n.slug && !veroeffentlicht.has(n.slug)));
+        }
+      } else {
+        setBereit([]);
+      }
     } catch (e) {
       setFehler((e as Error).message || t("scribe.bell.unavailable"));
     }
@@ -185,12 +147,10 @@ export default function ScribeGlocke() {
     }
   }
 
-  async function schreibenOeffnen() {
+  function schreibenOeffnen(vorlage?: Entwurf) {
     setHinweis(null);
     setNeuerung(null);
-    const json = await fetch("/api/praxis-updates?lang=de&limit=100", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const ersterSchonDa = (json?.updates as Array<{ slug?: string }> | undefined)?.some((u) => u.slug === ERSTER_BEITRAG.slug);
-    setSchreiben(ersterSchonDa ? { ...LEERER_ENTWURF } : { ...ERSTER_BEITRAG });
+    setSchreiben({ ...(vorlage ?? LEERER_ENTWURF) });
   }
 
   async function veroeffentlichen() {
@@ -218,6 +178,12 @@ export default function ScribeGlocke() {
     const json = await res?.json().catch(() => null);
     setSendet(false);
     if (!res?.ok) {
+      if (res?.status === 409 && e.slug) {
+        setSchreiben(null);
+        setHinweis({ art: "ok", text: t("scribe.bell.write.already") });
+        void laden();
+        return;
+      }
       setHinweis({ art: "fehler", text: json?.error ?? t("scribe.bell.write.failed") });
       return;
     }
@@ -232,6 +198,8 @@ export default function ScribeGlocke() {
   }
 
   const ungelesen = liste?.unreadCount ?? 0;
+  const bereitZahl = entwickler ? bereit.length : 0;
+  const auffaellig = ungelesen > 0 || bereitZahl > 0;
   // Kommt etwas Neues dazu, wackelt die Glocke 1 Mal. Der Schlüssel startet die Bewegung neu.
   const [wackeln, setWackeln] = useState(0);
   const vorher = useRef(0);
@@ -244,13 +212,14 @@ export default function ScribeGlocke() {
     <div className="glocke" ref={box}>
       <button
         type="button"
-        className={`glocke-knopf${ungelesen > 0 ? " hat-neu" : ""}`}
+        className={`glocke-knopf${auffaellig ? " hat-neu" : ""}`}
         aria-expanded={offen}
-        aria-label={ungelesen > 0 ? t("scribe.bell.ariaUnread", "de", { n: ungelesen }) : t("scribe.bell.aria")}
+        aria-label={ungelesen > 0 ? t("scribe.bell.ariaUnread", "de", { n: ungelesen }) : bereitZahl > 0 ? t("scribe.bell.readyCount", "de", { n: bereitZahl }) : t("scribe.bell.aria")}
         onClick={() => { setOffen((o) => !o); setNeuerung(null); if (!offen) void laden(); }}
       >
         <span key={wackeln} className={wackeln > 0 ? "glocke-symbol wackelt" : "glocke-symbol"}><Bell size={17} /></span>
         {ungelesen > 0 && <span className="glocke-neu-text">{t("scribe.bell.newCount", "de", { n: ungelesen > 99 ? "99+" : ungelesen })}</span>}
+        {ungelesen === 0 && bereitZahl > 0 && <span className="glocke-neu-text">{t("scribe.bell.readyCount", "de", { n: bereitZahl })}</span>}
       </button>
       {offen && (
         <div className={`glocke-panel${schreiben ? " schreibt" : ""}`} role="dialog" aria-label={t("scribe.bell.title")}>
@@ -317,6 +286,18 @@ export default function ScribeGlocke() {
             </div>
           ) : (
             <>
+              {bereitZahl > 0 && (
+                <div className="glocke-bereit">
+                  <span className="glocke-eyebrow">{t("scribe.bell.readyTitle")}</span>
+                  {bereit.map((n) => (
+                    <button key={n.slug} type="button" className="glocke-bereit-eintrag" onClick={() => schreibenOeffnen(n)}>
+                      <b>{n.titel}</b>
+                      <span>{n.kurz}</span>
+                      <em>{t("scribe.bell.readyOpen")} ›</em>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="glocke-kopf">
                 <b>{t("scribe.bell.title")}</b>
                 {ungelesen > 0 && <button type="button" onClick={() => void alleGelesen()}>{t("scribe.bell.readAll")}</button>}
@@ -352,7 +333,7 @@ export default function ScribeGlocke() {
               {liste?.nextOffset && <button type="button" className="glocke-mehr" onClick={() => void mehrLaden()}>{t("scribe.bell.more")}</button>}
               {hinweis && <p className={`glocke-hinweis ${hinweis.art}`} role={hinweis.art === "ok" ? "status" : "alert"}>{hinweis.text}</p>}
               {entwickler && (
-                <button type="button" className="glocke-schreiben-knopf" onClick={() => void schreibenOeffnen()}>✎ {t("scribe.bell.write.open")}</button>
+                <button type="button" className="glocke-schreiben-knopf" onClick={() => schreibenOeffnen()}>✎ {t("scribe.bell.write.open")}</button>
               )}
             </>
           )}

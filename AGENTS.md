@@ -40,3 +40,7 @@ github.com/juanschu-bear/anima-cura
 - Branch: main (push directly)
 - Commit messages: imperative mood, concise
 - Do not force-push
+
+## Neuigkeiten für die Praxis (Juans Entscheidung, 11.11.2026)
+- Jede Änderung, die die Praxis in Scribe bemerkt, bringt ihren Beitrag „Neu in Anima Cura“ in `src/app/scribe/praxis-neuigkeiten.ts` mit (neuer Eintrag oben, eigener slug, Alltagssprache, Deutsch und Englisch).
+- Juans Glocke zeigt jeden noch nicht veröffentlichten Beitrag als „bereit“. Veröffentlicht wird erst mit seinem Tipp.

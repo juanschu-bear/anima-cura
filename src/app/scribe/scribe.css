@@ -1490,3 +1490,11 @@
 .scribe .glocke-hinweis{margin:8px 4px 0;font-size:13px;line-height:1.45}
 .scribe .glocke-hinweis.ok{color:var(--primaer)}
 .scribe .glocke-hinweis.fehler{color:var(--rot)}
+/* Glocke: vorbereitete Neuigkeiten für Juan */
+.scribe .glocke-bereit{display:grid;gap:6px;margin:0 0 10px;padding:10px;border-radius:16px;background:var(--gold-soft);border:1px solid rgba(242,181,68,.35)}
+.scribe .glocke-bereit-eintrag{display:grid;gap:3px;text-align:left;cursor:pointer;font:inherit;color:var(--schrift);padding:10px 12px;border-radius:12px;
+  background:var(--flaeche-flach);border:1px solid var(--kante)}
+.scribe .glocke-bereit-eintrag:hover{border-color:var(--gold)}
+.scribe .glocke-bereit-eintrag b{font-size:13.5px}
+.scribe .glocke-bereit-eintrag span{font-size:12.5px;color:var(--gedeckt);line-height:1.4}
+.scribe .glocke-bereit-eintrag em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--gold-textton)}
