@@ -221,3 +221,48 @@ test('missing production prerequisite rolls back 078; schema-only 079 then 078 s
   for(const r of rights)assert.deepEqual(r,{rls:true,anon_read:false,client_write:false,server_write:true});
  }finally{await pg.close();}
 });
+
+test('service_role canonical day decision stores the audit atomically under the 076 guard',async()=>{
+ const {pg}=await setup();
+ try {
+  const entry=randomUUID(),day=randomUUID(),part=randomUUID(),patient=randomUUID();
+  await pg.exec(`
+   CREATE TABLE doku_eintraege(
+    id uuid PRIMARY KEY, patient_id uuid, termin_datum date, status text, text text,
+    positionen jsonb, zaehne text[], variablen jsonb, auswahl jsonb, version integer,
+    created_at timestamptz DEFAULT now()
+   );
+   CREATE TABLE doku_tagesdatensaetze(id uuid PRIMARY KEY, canonical_entry_id uuid);
+   CREATE TABLE doku_eintrag_versionen(
+    eintrag_id uuid, version integer, text text, zaehne text[], variablen jsonb,
+    auswahl jsonb, positionen jsonb, ausnahme_freitext text, aenderungsgrund text,
+    erstellt_von uuid
+   );
+   CREATE OR REPLACE FUNCTION decide_doku_day_part(
+    p_day_id uuid,p_part_id uuid,p_expected_version integer,p_decision text,p_reason text,
+    p_corrects_part_id uuid,p_resulting_text text,p_resulting_positions jsonb,
+    p_conflicts jsonb,p_ivoris_delta_text text
+   ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $stub$
+   DECLARE eid uuid; v integer;
+   BEGIN
+    SELECT canonical_entry_id INTO eid FROM doku_tagesdatensaetze WHERE id=p_day_id;
+    SELECT version+1 INTO v FROM doku_eintraege WHERE id=eid;
+    UPDATE doku_eintraege SET text=p_resulting_text,positionen=p_resulting_positions,version=v WHERE id=eid;
+    INSERT INTO doku_eintrag_versionen(eintrag_id,version,text,zaehne,variablen,auswahl,positionen)
+      SELECT id,version,text,zaehne,variablen,auswahl,positionen FROM doku_eintraege WHERE id=eid;
+    RETURN jsonb_build_object('entryVersion',v,'dayRecordId',p_day_id);
+   END $stub$;
+  `);
+  await pg.exec(readFileSync('supabase/migrations/076_scribe_day_entry_guards.sql','utf8'));
+  await pg.query('INSERT INTO doku_eintraege(id,patient_id,termin_datum,status,text,positionen,zaehne,variablen,auswahl,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,1)',[entry,patient,'2026-11-11','bestaetigt','old',[],[],{},{}]);
+  await pg.query('INSERT INTO doku_tagesdatensaetze(id,canonical_entry_id) VALUES($1,$2)',[day,entry]);
+  await pg.exec('SET ROLE service_role');
+  const audit={code:'confirmed_despite_warning',confirmedBy:{id:staff,name:'Praxis'},confirmedAt:'2026-11-11T12:00:00Z',issues:[]};
+  await pg.query('SELECT decide_doku_day_part($1,$2,1,$3,$4,NULL,$5,$6,$7,$8,$9)',[day,part,'nachtrag','Hinweis bestätigt','new text',[],[], 'delta',audit]);
+  await pg.exec('RESET ROLE');
+  const row=(await pg.query<any>('SELECT variablen FROM doku_eintraege WHERE id=$1',[entry])).rows[0];
+  const history=(await pg.query<any>('SELECT variablen FROM doku_eintrag_versionen WHERE eintrag_id=$1 AND version=2',[entry])).rows[0];
+  assert.equal(row.variablen._consistencyConfirmation.code,'confirmed_despite_warning');
+  assert.equal(history.variablen._consistencyConfirmation.confirmedBy.name,'Praxis');
+ } finally { await pg.close(); }
+});

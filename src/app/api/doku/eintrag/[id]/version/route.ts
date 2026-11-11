@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .eq("id", params.id)
     .single();
 
-  if (loadError || !alt) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (loadError || !alt) return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
 
   const dayConflict=await canonicalDayConflict(supabase,params.id);
   if(dayConflict)return dayConflict;

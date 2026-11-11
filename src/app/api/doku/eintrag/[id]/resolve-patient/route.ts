@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     db.from("doku_eintraege").select("id,status,ivoris_push_status,ivoris_error_class").eq("id", params.id).maybeSingle(),
     db.from("patients").select("id,ivoris_id").eq("id", patientId).maybeSingle(),
   ]);
-  if (entryError || !entry) return NextResponse.json({ error: "Scribe-Eintrag nicht gefunden" }, { status: 404 });
+  if (entryError || !entry) return NextResponse.json({ code:"entry_not_found",error: "Scribe-Eintrag nicht gefunden" }, { status: 404 });
   if (patientError || !patient) return NextResponse.json({ error: "Patient nicht gefunden" }, { status: 404 });
   if (entry.status !== "bestaetigt" || entry.ivoris_push_status === "gepusht") {
     return NextResponse.json({ error: "Nur ein bestätigter, noch nicht übertragener Eintrag kann neu zugeordnet werden" }, { status: 409 });

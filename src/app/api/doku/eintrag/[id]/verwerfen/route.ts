@@ -35,7 +35,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     .single();
 
   if (ladeFehler || !eintrag) {
-    return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+    return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
   }
   if (eintrag.ivoris_push_status === "gepusht") {
     return NextResponse.json(

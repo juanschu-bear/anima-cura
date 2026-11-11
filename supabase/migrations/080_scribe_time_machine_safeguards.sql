@@ -165,19 +165,50 @@ BEGIN
  RETURN out_result;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.scribe_attach_consistency_audit(p_entry uuid,p_version integer,p_audit jsonb) RETURNS void
- LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+-- Canonical day decisions and their second-confirmation audit must be one
+-- SECURITY DEFINER transaction. A follow-up service_role UPDATE would be
+-- rejected by guard_scribe_canonical_content from migration 076.
+CREATE FUNCTION public.decide_doku_day_part(
+  p_day_id uuid,
+  p_part_id uuid,
+  p_expected_version integer,
+  p_decision text,
+  p_reason text,
+  p_corrects_part_id uuid,
+  p_resulting_text text,
+  p_resulting_positions jsonb,
+  p_conflicts jsonb,
+  p_ivoris_delta_text text,
+  p_consistency_audit jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp
+AS $function$
+DECLARE result jsonb; entry_id uuid; entry_version integer;
 BEGIN
- IF p_audit->>'code'<>'confirmed_despite_warning' OR coalesce(p_audit->'confirmedBy'->>'name','')='' THEN
-  RAISE EXCEPTION 'input_invalid';
- END IF;
- UPDATE public.doku_eintraege SET variablen=jsonb_set(coalesce(variablen,'{}'::jsonb),'{_consistencyConfirmation}',p_audit,true)
-  WHERE id=p_entry AND version=p_version;
- IF NOT FOUND THEN RAISE EXCEPTION 'entry_version_stale'; END IF;
- UPDATE public.doku_eintrag_versionen SET variablen=jsonb_set(coalesce(variablen,'{}'::jsonb),'{_consistencyConfirmation}',p_audit,true)
-  WHERE eintrag_id=p_entry AND version=p_version;
- IF NOT FOUND THEN RAISE EXCEPTION 'entry_history_missing'; END IF;
-END $$;
+  result := public.decide_doku_day_part(
+    p_day_id,p_part_id,p_expected_version,p_decision,p_reason,p_corrects_part_id,
+    p_resulting_text,p_resulting_positions,p_conflicts,p_ivoris_delta_text
+  );
+  IF p_consistency_audit IS NULL THEN RETURN result; END IF;
+  IF p_consistency_audit->>'code' <> 'confirmed_despite_warning'
+     OR coalesce(p_consistency_audit->'confirmedBy'->>'name','')='' THEN
+    RAISE EXCEPTION 'input_invalid';
+  END IF;
+  SELECT d.canonical_entry_id INTO entry_id
+    FROM public.doku_tagesdatensaetze d WHERE d.id=p_day_id;
+  entry_version := (result->>'entryVersion')::integer;
+  UPDATE public.doku_eintraege
+    SET variablen=jsonb_set(coalesce(variablen,'{}'::jsonb),'{_consistencyConfirmation}',p_consistency_audit,true)
+    WHERE id=entry_id AND version=entry_version;
+  IF NOT FOUND THEN RAISE EXCEPTION 'entry_version_stale'; END IF;
+  UPDATE public.doku_eintrag_versionen
+    SET variablen=jsonb_set(coalesce(variablen,'{}'::jsonb),'{_consistencyConfirmation}',p_consistency_audit,true)
+    WHERE eintrag_id=entry_id AND version=entry_version;
+  IF NOT FOUND THEN RAISE EXCEPTION 'entry_history_missing'; END IF;
+  RETURN result || jsonb_build_object('auditStored',true);
+END $function$;
 
 -- Same atomic inbox contract as 078. The only behavioral change is that the
 -- actor never receives a bell for their own status event or comment.
@@ -237,7 +268,8 @@ BEGIN
  RETURN jsonb_build_object('ok',true,'revision',newrev);
 END $$;
 
-REVOKE ALL ON FUNCTION public.scribe_seed_option_layout(jsonb),public.scribe_protect_seed_option_layout(),public.scribe_attach_consistency_audit(uuid,integer,jsonb),public.scribe_inbox_commit(jsonb,bigint,uuid,boolean,boolean) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.scribe_attach_consistency_audit(uuid,integer,jsonb),public.scribe_inbox_commit(jsonb,bigint,uuid,boolean,boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.scribe_seed_option_layout(jsonb),public.scribe_protect_seed_option_layout(),public.decide_doku_day_part(uuid,uuid,integer,text,text,uuid,text,jsonb,jsonb,text,jsonb),public.scribe_inbox_commit(jsonb,bigint,uuid,boolean,boolean) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.decide_doku_day_part(uuid,uuid,integer,text,text,uuid,text,jsonb,jsonb,text,jsonb) TO authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.scribe_inbox_commit(jsonb,bigint,uuid,boolean,boolean) TO service_role;
 
 COMMIT;

@@ -28,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     .select("id, version, status, bestaetigt_am, bestaetigt_kuerzel, positionen, vorlage_id, behandlungsart, termin_typ, text, auswahl, variablen, zaehne")
     .eq("id", params.id)
     .single();
-  if (error || !entry) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (error || !entry) return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
   if (entry.status !== "bestaetigt" || !entry.bestaetigt_am) {
     return NextResponse.json({ error: "Nur bestätigte, versionierte Einträge dürfen exportiert werden" }, { status: 409 });
   }

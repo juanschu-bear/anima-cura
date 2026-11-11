@@ -328,6 +328,7 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
       p_resulting_positions: [],
       p_conflicts: [],
       p_ivoris_delta_text: null,
+      p_consistency_audit: null,
     });
     if (error) dbError(error, "Entwurfsteil konnte nicht verworfen werden.");
     return data;
@@ -384,14 +385,11 @@ export async function decideStoredDayPart(db: Db, id: string, partId: string, ra
     })),
     p_conflicts: preview.conflicts,
     p_ivoris_delta_text: part.text,
+    // The audit travels through the same SECURITY DEFINER decision as the
+    // canonical content update. A second service-role write would trip 076.
+    p_consistency_audit: acknowledgement,
   });
   if (error) dbError(error, "Entwurfsteil konnte nicht bestätigt werden.");
-  let auditStored=true;
-  if(acknowledgement){
-    const write=()=>createServerClient().rpc('scribe_attach_consistency_audit',{
-      p_entry:record.canonical_entry_id,p_version:Number((data as {entryVersion?:unknown})?.entryVersion),p_audit:acknowledgement,
-    });
-    let stored=await write();if(stored.error)stored=await write();auditStored=!stored.error;
-  }
+  const auditStored=!!acknowledgement;
   return {result:data,preview,...(acknowledgement?{confirmation:acknowledgement,confirmationLabel:`Trotz Hinweis von ${acknowledgement.confirmedBy.name} bestätigt`,auditStored}: {})};
 }

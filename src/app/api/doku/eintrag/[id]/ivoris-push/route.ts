@@ -41,7 +41,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     .eq("id", params.id)
     .single();
 
-  if (loadError || !eintrag) return NextResponse.json({ error: "Eintrag nicht gefunden" }, { status: 404 });
+  if (loadError || !eintrag) return NextResponse.json({ code:"entry_not_found",error: "Eintrag nicht gefunden" }, { status: 404 });
 
   if (eintrag.status !== "bestaetigt") {
     return NextResponse.json({ error: "Nur bestaetigte Eintraege werden gepusht" }, { status: 409 });

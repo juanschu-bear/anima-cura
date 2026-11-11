@@ -168,7 +168,7 @@
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
-      "sha256": "9b04b460fb97f710b3ca644f4be4d8386ca3df14f125354d58859aecf6296f38",
+      "sha256": "9b6c57b98c0e028fa939acca826477b861784162dbaee20980589a1a5003ecb9",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
@@ -180,7 +180,7 @@
     },
     {
       "file": "src/lib/scribe-day-record-service.ts",
-      "sha256": "31090d63cb38e16380186df26666d70273b74dfcba82063c2c8fc6f54707376e",
+      "sha256": "9625489805b94f9ffcb78ef17cd904c05b3f8e8b7f5ba78ace6a9ea6752d3655",
       "proof": "All day-record RPCs receive the signed-in Anima Cura/Scribe Supabase client after requireScribeDayWriter checks the authenticated user, profile permission and server-side staff initials; JWT role authenticated.",
       "calls": [
         {
@@ -190,24 +190,19 @@
         },
         {
           "name": "decide_doku_day_part",
-          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text, p_consistency_audit jsonb)",
           "role": "authenticated"
         },
         {
           "name": "decide_doku_day_part",
-          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text)",
+          "signature": "public.decide_doku_day_part(p_day_id uuid, p_part_id uuid, p_expected_version integer, p_decision text, p_reason text, p_corrects_part_id uuid, p_resulting_text text, p_resulting_positions jsonb, p_conflicts jsonb, p_ivoris_delta_text text, p_consistency_audit jsonb)",
           "role": "authenticated"
-        },
-        {
-          "name": "scribe_attach_consistency_audit",
-          "signature": "public.scribe_attach_consistency_audit(p_entry uuid, p_version integer, p_audit jsonb)",
-          "role": "service_role"
         }
       ]
     },
     {
       "file": "src/app/api/doku/eintrag/[id]/resolve-patient/route.ts",
-      "sha256": "cccf24a8baa43dd358684f75befa84af4f81d9cdaa23c98b9a5c0153249c9139",
+      "sha256": "e2ea271f44b01156d5ee3d25dadb7d3114dd57e4ebe6d4b622c21eec7a12f861",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",
       "calls": [
         {
