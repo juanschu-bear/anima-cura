@@ -34,7 +34,7 @@ interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am:
 interface BelegPosition { datum: string | null; nr: string | null; text: string; region: string | null; anzahl: number; anzahlText: string; punkte: number | null; faktor: number | null; eur: number | null; abschnitt: string; tarif: string; begruendungen: string[] }
 /** Originalrechnung aus der Praxisabrechnung (Vertrag: Leitstand docs/2026-11-06-invoice-startbestand-contract.md). */
 interface Beleg { id: string; quartal: string; art: "BEMA" | "GOZ"; pdf: true; pdfUrl: string; positionen: BelegPosition[]; begruendungen: { key: string; text: string }[] }
-interface Rechnung { id: string; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
+interface Rechnung { id: string; patientId?: string | null; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
@@ -96,6 +96,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [offenerBeleg, setOffenerBeleg] = useState<string | null>(null);
   const [rechnungSeite, setRechnungSeite] = useState(0);
+  // Mehrere Kinder an einem Zugang (Codex, 12.11.2026): Rechnungen tragen patientId, die Auswahl passiert hier in der Oberfläche.
+  const [kinder, setKinder] = useState<{ patientId: string; firstName: string }[]>([]);
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [payingRate, setPayingRate] = useState<{ betrag: number; verwendungszweck: string; rateNummer: number; art?: "rate" | "rechnung" } | null>(null);
@@ -255,6 +258,17 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    let aktiv = true;
+    fetch("/api/patient/invoice-access/children", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (aktiv && j && Array.isArray(j.children)) setKinder((j.children as { patientId?: unknown; firstName?: unknown }[]).filter(k => typeof k.patientId === "string").map(k => ({ patientId: String(k.patientId), firstName: typeof k.firstName === "string" ? k.firstName : "" }))); })
+      .catch(() => undefined);
+    return () => { aktiv = false; };
+  }, []);
+  const mehrereKinder = kinder.length > 1;
+  const kindName = (id?: string | null) => (id ? kinder.find(k => k.patientId === id)?.firstName || "" : "");
+  const sichtbareRechnungen = kindFilter ? rechnungen.filter(r => r.patientId === kindFilter) : rechnungen;
   useEffect(() => {
     if (loading || deepLinkHandledRef.current) return;
     const documentId = searchParams.get("document");
@@ -1322,9 +1336,25 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
               {lang === "en" ? "Invoices & claims" : lang === "es" ? "Facturas y cargos" : "Rechnungen & Forderungen"}
             </p>
+            {mehrereKinder && (
+              <div role="group" aria-label={lang === "en" ? "Show invoices for" : lang === "es" ? "Mostrar facturas de" : "Rechnungen zeigen für"} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                {[{ patientId: null as string | null, firstName: lang === "en" ? "All" : lang === "es" ? "Todos" : "Alle" }, ...kinder].map(k => {
+                  const an = kindFilter === k.patientId;
+                  return (
+                    <button key={k.patientId ?? "alle"} type="button" aria-pressed={an} onClick={() => { setKindFilter(k.patientId); setRechnungSeite(0); setOffenerBeleg(null); hapticLight(); }}
+                      style={{ minHeight: 40, padding: "8px 16px", borderRadius: 999, border: "1px solid " + (an ? grn : border), background: an ? (dk ? "rgba(74,222,128,0.14)" : "rgba(22,163,74,0.1)") : "transparent", color: an ? (dk ? "#bbf7d0" : "#166534") : fg, fontWeight: 700, fontSize: 14, fontFamily: "inherit", cursor: "pointer" }}>
+                      {k.firstName || "—"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
-            {rechnungen.slice(rechnungSeite * 6, rechnungSeite * 6 + 6).map((r, i) => {
+            {sichtbareRechnungen.length === 0 && (
+              <p style={{ margin: "14px 0", color: muted, fontSize: 14 }}>{lang === "en" ? "No invoices for this child yet." : lang === "es" ? "Aún no hay facturas para este niño." : "Für dieses Kind gibt es noch keine Rechnung."}</p>
+            )}
+            {sichtbareRechnungen.slice(rechnungSeite * 6, rechnungSeite * 6 + 6).map((r, i) => {
               const settledByCredit = r.zahlungsmodus === "credit";
               const isDirectDebit = r.zahlungsmodus === "direct_debit";
               const isBeleg = r.status === "beleg";
@@ -1351,6 +1381,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                   {...(r.beleg ? { role: "button", tabIndex: 0, "aria-expanded": offen, onClick: () => setOffenerBeleg(offen ? null : r.id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOffenerBeleg(offen ? null : r.id); } } } : {})}
                   style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", cursor: r.beleg ? "pointer" : "default" }}>
                   <div style={{ minWidth: 0 }}>
+                    {mehrereKinder && !kindFilter && kindName(r.patientId) && (
+                      <span style={{ display: "inline-block", marginBottom: 6, padding: "2px 10px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", color: fg, fontSize: 12, fontWeight: 700 }}>{kindName(r.patientId)}</span>
+                    )}
                     {r.beleg ? (() => {
                       const q = r.beleg.quartal.match(/^(\d{4})-Q([1-4])$/);
                       const art = r.beleg.art === "GOZ" ? (lang === "en" ? "private" : lang === "es" ? "privada" : "privat") : (lang === "en" ? "health insurance" : lang === "es" ? "seguro público" : "Krankenkasse");
@@ -1426,8 +1459,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                 </div>
               );
             })}
-            {rechnungen.length > 6 && (() => {
-              const seiten = Math.ceil(rechnungen.length / 6);
+            {sichtbareRechnungen.length > 6 && (() => {
+              const seiten = Math.ceil(sichtbareRechnungen.length / 6);
               const geh = (n: number) => { setRechnungSeite(n); setOffenerBeleg(null); hapticLight(); document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
               const pb = (aktiv: boolean): React.CSSProperties => ({ minWidth: 92, padding: "10px 14px", borderRadius: 999, border: "1px solid " + border, background: "transparent", color: aktiv ? fg : muted, opacity: aktiv ? 1 : 0.4, fontSize: 13, fontWeight: 700, cursor: aktiv ? "pointer" : "default", fontFamily: "inherit" });
               return (
