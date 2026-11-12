@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS public.invoice_access_links (
 );
 CREATE INDEX IF NOT EXISTS invoice_access_links_lookup ON public.invoice_access_links(token_hash, expires_at) WHERE consumed_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS public.invoice_access_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  link_id uuid NOT NULL REFERENCES public.invoice_access_links(id) ON DELETE CASCADE,
+  attempted_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS invoice_access_attempts_link_time ON public.invoice_access_attempts(link_id, attempted_at DESC);
+
 CREATE TABLE IF NOT EXISTS public.invoice_access_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id uuid NOT NULL REFERENCES public.invoice_access_contacts(id) ON DELETE CASCADE,
@@ -82,7 +89,6 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_documents_for_access() OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_documents_for_access() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_documents_for_access() TO authenticated;
 
@@ -101,7 +107,6 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_document_pdf_for_access(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) TO authenticated;
 
@@ -122,8 +127,31 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_document_pdf(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.patient_invoice_document_editions()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE result jsonb;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'patient') THEN
+    RAISE EXCEPTION 'patient_invoice_forbidden' USING ERRCODE = '42501';
+  END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'id', d.id, 'patientId', d.patient_id,
+    'typesetAvailable', v.part_id IS NOT NULL,
+    'delivered', CASE WHEN v.part_id IS NOT NULL AND coalesce(s.enabled,false) THEN 'typeset' ELSE 'original' END
+  ) ORDER BY d.fields->>'date' DESC, d.id), '[]'::jsonb) INTO result
+  FROM abrechnung.active_patient_invoice_documents d
+  LEFT JOIN abrechnung.verified_invoice_editions v ON v.part_id = d.id
+  LEFT JOIN LATERAL (SELECT enabled FROM abrechnung.invoice_edition_settings ORDER BY revision DESC LIMIT 1) s ON true
+  WHERE d.patient_id IN (
+    SELECT m.patient_id FROM public.patient_access_memberships m WHERE m.user_id = auth.uid()
+    UNION SELECT p.patient_id FROM public.user_profiles p WHERE p.id = auth.uid() AND p.role = 'patient' AND p.patient_id IS NOT NULL
+  );
+  RETURN result;
+END $$;
+REVOKE ALL ON FUNCTION public.patient_invoice_document_editions() FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.patient_invoice_document_editions() TO authenticated;
 
 COMMIT;

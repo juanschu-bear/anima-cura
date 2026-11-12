@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!input.success) return NextResponse.json({ code: "invalid_request" }, { status: 400 });
   try {
     const result = await confirmInvoiceAccess(input.data);
-    if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "access_unavailable" ? 503 : 400 });
+    if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "access_unavailable" ? 503 : result.code === "rate_limited" ? 429 : 400 });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("invoice access confirm failed", error);

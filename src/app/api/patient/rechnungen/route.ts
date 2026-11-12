@@ -16,23 +16,24 @@ export async function GET() {
 
   const supabase = createServerClient();
 
+  const { data: memberships } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
+  const patientIds = Array.from(new Set([patient.patientId, ...(memberships ?? []).map(row => row.patient_id)]));
   const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult] = await Promise.all([
     supabase
       .from("offene_posten")
-      .select("id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
-      .eq("patient_id", patient.patientId)
+      .select("id, patient_id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
+      .in("patient_id", patientIds)
       .or("nicht_mahnen.is.null,nicht_mahnen.eq.false")
       .order("rechnung_datum", { ascending: false })
       .limit(200),
     supabase
       .from("patients")
-      .select("guthaben")
-      .eq("id", patient.patientId)
-      .single(),
+      .select("id,guthaben")
+      .in("id", patientIds),
     supabase
       .from("ratenplaene")
       .select("id")
-      .eq("patient_id", patient.patientId)
+      .in("patient_id", patientIds)
       .eq("status", "aktiv")
       .eq("sepa_mandat", true)
       .limit(1),
@@ -48,6 +49,7 @@ export async function GET() {
   }
 
   const normalized = (posten ?? []).map((item) => ({
+      patientId: item.patient_id,
       id: item.id,
       typ: item.typ,
       rechnung_datum: item.rechnung_datum,
@@ -60,7 +62,7 @@ export async function GET() {
       bezahlt_am: item.bezahlt_am,
       mahnung_datum: item.mahnung_datum,
     }));
-  const availableCredit = Number(patientResult.data?.guthaben ?? 0);
+  const availableCredit = (patientResult.data ?? []).reduce((sum, row) => sum + Number(row.guthaben ?? 0), 0);
   const hasActiveDirectDebit = (directDebitResult.data?.length ?? 0) > 0;
 
   const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
