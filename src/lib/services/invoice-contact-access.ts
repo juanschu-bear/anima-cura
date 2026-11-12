@@ -12,10 +12,20 @@ const locale = (value: unknown): "de" | "en" | "es" => value === "en" || value =
 
 type ContactPatient = { id: string; vorname: string; nachname: string; geburtsdatum: string; email: string | null };
 
+// LIKE-Platzhalter in der Adresse wörtlich nehmen (ein „_“ in einer Mailadresse ist kein Joker).
+export const likeLiteral = (value: string) => value.replace(/[\\%_]/g, char => `\\${char}`);
+
+/**
+ * Patienten zu einer Mailadresse. Gleiche Regel wie die Empfängerliste im Leitstand: Groß-/Kleinschreibung und
+ * Leerzeichen, Tabs oder geschützte Leerzeichen vor und nach der Adresse zählen nicht. Die Datenbank sucht grob
+ * (enthält die Adresse), der genaue Vergleich passiert danach hier.
+ */
+export const contactEmailMatches = (stored: string | null | undefined, normalized: string) => normalizeContactEmail(stored ?? "") === normalized;
+
 async function contactPatients(db: ReturnType<typeof createServerClient>, email: string) {
-  const { data, error } = await db.from("patients").select("id,vorname,nachname,geburtsdatum,email").ilike("email", email);
+  const { data, error } = await db.from("patients").select("id,vorname,nachname,geburtsdatum,email").ilike("email", `%${likeLiteral(email)}%`);
   if (error) throw new Error("invoice_access_patient_lookup_failed");
-  return (data ?? []) as ContactPatient[];
+  return ((data ?? []) as ContactPatient[]).filter(patient => contactEmailMatches(patient.email, email));
 }
 
 async function findExistingUser(db: ReturnType<typeof createServerClient>, email: string) {
