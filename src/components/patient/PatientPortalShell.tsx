@@ -269,6 +269,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       // Quartalsrechnungen mit Positionen: Liste im Bereich Fortschritt (Link aus der Mail „Deine Rechnungen sind da“).
       setBalanceView(false); setTab("progress");
       window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+      // Tracking „In der App gelesen“ (Codex' Vertrag 12.11.2026): die Rechnungen wurden über Mail, Push oder App-Hinweis geöffnet.
+      void fetch("/api/patient/invoice-access/event", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ event: "app_read" }) }).catch(() => undefined);
     }
     deepLinkHandledRef.current = true;
   }, [docs, loading, searchParams]);
