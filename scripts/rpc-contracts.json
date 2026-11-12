@@ -392,7 +392,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "8d95a399f24667e963463e12101db12c84671c20539d4386c1f062cc2f3d84ec",
+      "sha256": "294739e1e6f022acc1501259510925e974d2aa832571dcd0730e7f755ee915c2",
       "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The access RPC executes as a SECURITY DEFINER function, checks auth.uid() and verified patient memberships, and never accepts a patient ID. Edition RPC uses the same authenticated patient session and the same membership scope. No privileged retry.",
       "calls": [
         {
