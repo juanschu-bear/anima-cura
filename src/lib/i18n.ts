@@ -904,7 +904,7 @@ const translations: Record<string, { de: string; en: string }> = {
   "invoiceAccess.existsSubmit": { de: "Anmelden und Rechnungen öffnen", en: "Sign in and open invoices" },
   "invoiceAccess.signingIn": { de: "Wird angemeldet …", en: "Signing in …" },
   "invoiceAccess.signInFailed": { de: "Mailadresse oder Passwort stimmt nicht. Bitte prüfe beides.", en: "The email address or password is wrong. Please check both." },
-  "invoiceAccess.mergeOtherEmail": { de: "Dieser Zugang gehört zu einer anderen Mailadresse. Bitte melde dich mit der Adresse an, an die unsere Mail ging.", en: "This access belongs to a different email address. Please sign in with the address our email was sent to." },
+  "invoiceAccess.mergeOtherEmail": { de: "Dieser Zugang gehört zu einer anderen Anmeldeadresse, deshalb verbinden wir ihn nicht automatisch. Melde dich mit der Adresse an, an die unsere Mail ging. Klappt das nicht, antworte einfach auf unsere Mail.", en: "This access belongs to a different sign-in address, so we don't connect it automatically. Sign in with the address our email was sent to. If that doesn't work, simply reply to our email." },
   "invoiceAccess.forgotPassword": { de: "Passwort vergessen?", en: "Forgot your password?" },
   "invoiceAccess.mailSubject": { de: "Dein neuer Link zu deinen Rechnungen", en: "Your new link to your invoices" },
   "invoiceAccess.mailTitle": { de: "Hier ist dein neuer Link", en: "Here's your new link" },
