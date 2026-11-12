@@ -72,10 +72,16 @@ export async function confirmInvoiceAccess(input: { token: string; birthDate: st
   if (!matching) return { ok: false as const, code: "birth_date_mismatch" };
   const contact = (await db.from("invoice_access_contacts").select("email,auth_user_id").eq("id", link.contact_id).single()).data as { email: string; auth_user_id: string | null };
   let userId = contact.auth_user_id;
+  let createdUser = false;
   if (!userId) {
     const created = await findOrCreateUser(db, contact.email);
     userId = created.user.id;
+    createdUser = created.created;
     await db.from("invoice_access_contacts").update({ auth_user_id: userId, updated_at: new Date().toISOString() }).eq("id", link.contact_id);
+  }
+  if (!createdUser) {
+    const existingMembership = await db.from("patient_access_memberships").select("patient_id").eq("user_id", userId).limit(1);
+    if ((existingMembership.data ?? []).length || contact.auth_user_id) return { ok: false as const, code: "access_exists" };
   }
   const updated = await db.auth.admin.updateUserById(userId, { password: input.password, email_confirm: true, user_metadata: { role: "patient", invoice_contact_access: true } });
   if (updated.error) return { ok: false as const, code: "access_unavailable" };
@@ -93,4 +99,19 @@ export async function accessChildren(userId: string) {
   const db = createServerClient();
   const rows = (await db.from("patient_access_memberships").select("patient_id,patients(id,vorname,nachname)").eq("user_id", userId)).data ?? [];
   return rows.map((row: any) => ({ patientId: row.patient_id, firstName: row.patients?.vorname ?? "", lastName: row.patients?.nachname ?? "" }));
+}
+
+export async function mergeInvoiceAccess(input: { token: string; birthDate: string; userId: string }) {
+  const db = createServerClient();
+  const link = (await db.from("invoice_access_links").select("id,contact_id,expires_at,consumed_at").eq("token_hash", hashToken(input.token)).maybeSingle()).data as { id: string; contact_id: string; expires_at: string; consumed_at: string | null } | null;
+  if (!link || link.consumed_at || Date.parse(link.expires_at) <= Date.now()) return { ok: false as const, code: "access_link_expired" };
+  const contact = (await db.from("invoice_access_contacts").select("email").eq("id", link.contact_id).single()).data as { email: string } | null;
+  const users = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const user = users.data?.users.find(candidate => candidate.id === input.userId);
+  if (!contact || !user || user.email?.toLowerCase() !== contact.email.toLowerCase()) return { ok: false as const, code: "access_merge_requires_same_email" };
+  const members = (await db.from("invoice_access_contact_patients").select("patient_id,patients(geburtsdatum)").eq("contact_id", link.contact_id)).data ?? [];
+  if (!(members as any[]).some(row => row.patients?.geburtsdatum === input.birthDate || row.patients?.[0]?.geburtsdatum === input.birthDate)) return { ok: false as const, code: "birth_date_mismatch" };
+  await db.from("patient_access_memberships").upsert((members as any[]).map(row => ({ user_id: input.userId, patient_id: row.patient_id, contact_id: link.contact_id })), { onConflict: "user_id,patient_id" });
+  await db.from("invoice_access_links").update({ consumed_at: new Date().toISOString(), consumed_user_id: input.userId }).eq("id", link.id).is("consumed_at", null);
+  return { ok: true as const, children: await accessChildren(input.userId), redirect: NEXT };
 }
