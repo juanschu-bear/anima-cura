@@ -1,0 +1,2 @@
+-- Already applied in the hosted database on 2026-10-08.
+-- Local marker only; do not execute or alter production objects.
