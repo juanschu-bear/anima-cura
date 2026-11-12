@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (!input.success) return NextResponse.json({ ok: true, expiresInDays: 14 }, { headers: { "Cache-Control": "no-store" } });
   try {
     const worker = Boolean(process.env.INVOICE_ACCESS_WORKER_SECRET && request.headers.get("x-invoice-worker-secret") === process.env.INVOICE_ACCESS_WORKER_SECRET);
-    const result = await requestInvoiceAccess({ ...input.data, ip: request.headers.get("x-forwarded-for") ?? undefined, deliver: !worker });
+    const result = await requestInvoiceAccess({ ...input.data, ip: request.headers.get("x-forwarded-for") ?? undefined, deliver: !worker, trustedWorker: worker });
     // Only the authenticated Leitstand worker may receive the opaque token.
     return NextResponse.json(worker ? result : { ok: true, expiresInDays: result.expiresInDays }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

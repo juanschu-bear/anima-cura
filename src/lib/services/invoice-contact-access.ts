@@ -44,11 +44,11 @@ async function createContactUser(db: ReturnType<typeof createServerClient>, emai
   return { user: created.data.user, created: true };
 }
 
-export async function requestInvoiceAccess(input: { email: string; next?: string; language?: string; ip?: string; deliver?: boolean }) {
+export async function requestInvoiceAccess(input: { email: string; next?: string; language?: string; ip?: string; deliver?: boolean; trustedWorker?: boolean }) {
   const db = createServerClient();
   const email = normalizeContactEmail(input.email);
   const ipHash = input.ip ? hashToken(input.ip.split(",")[0].trim()) : null;
-  if (ipHash) {
+  if (ipHash && !input.trustedWorker) {
     const recentIp = await db.from("invoice_access_request_log").select("id", { count: "exact", head: true }).eq("ip_hash", ipHash).gt("requested_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
     if ((recentIp.count ?? 0) >= 20) return { ok: true, expiresInDays: TTL_DAYS, rateLimited: true };
     await db.from("invoice_access_request_log").insert({ ip_hash: ipHash });
@@ -63,8 +63,8 @@ export async function requestInvoiceAccess(input: { email: string; next?: string
     if (inserted.error || !inserted.data) throw new Error("invoice_access_contact_create_failed");
     contact = inserted.data;
   }
-  const recent = await db.from("invoice_access_links").select("id", { count: "exact", head: true }).eq("contact_id", contact.id).gt("requested_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
-  if ((recent.count ?? 0) >= 3) return { ok: true, expiresInDays: TTL_DAYS, rateLimited: true };
+  const recent = input.trustedWorker ? null : await db.from("invoice_access_links").select("id", { count: "exact", head: true }).eq("contact_id", contact.id).gt("requested_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+  if ((recent?.count ?? 0) >= 3) return { ok: true, expiresInDays: TTL_DAYS, rateLimited: true };
   await db.from("invoice_access_contact_patients").upsert(patients.map(patient => ({ contact_id: contact!.id, patient_id: patient.id })), { onConflict: "contact_id,patient_id" });
   const token = randomBytes(32).toString("base64url");
   await db.from("invoice_access_links").insert({ contact_id: contact.id, token_hash: hashToken(token), next_path: input.next === NEXT ? NEXT : NEXT, locale: locale(input.language), expires_at: new Date(Date.now() + TTL_DAYS * 86400000).toISOString() });
