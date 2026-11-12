@@ -32,7 +32,7 @@ export async function GET() {
       .in("id", patientIds),
     supabase
       .from("ratenplaene")
-      .select("id")
+      .select("id,patient_id")
       .in("patient_id", patientIds)
       .eq("status", "aktiv")
       .eq("sepa_mandat", true)
@@ -62,17 +62,22 @@ export async function GET() {
       bezahlt_am: item.bezahlt_am,
       mahnung_datum: item.mahnung_datum,
     }));
-  const availableCredit = (patientResult.data ?? []).reduce((sum, row) => sum + Number(row.guthaben ?? 0), 0);
-  const hasActiveDirectDebit = (directDebitResult.data?.length ?? 0) > 0;
+  const credits = new Map((patientResult.data ?? []).map(row => [row.id, Number(row.guthaben ?? 0)]));
+  const directDebitPatients = new Set((directDebitResult.data ?? []).map(row => row.patient_id));
+  const guided = patientIds.flatMap(patientId => projectInvoicePaymentGuidance(
+    normalized.filter(item => item.patientId === patientId),
+    credits.get(patientId) ?? 0,
+    directDebitPatients.has(patientId),
+  ));
 
   const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
   const documents:PatientInvoiceDocument[]=documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)}));
   return NextResponse.json({
-    rechnungen: attachPatientInvoiceDocuments(projectInvoicePaymentGuidance(normalized, availableCredit, hasActiveDirectDebit), documents),
+    rechnungen: attachPatientInvoiceDocuments(guided, documents),
     belegeStatus: documentsResult.error ? "unavailable" : "available",
     zahlungsprofil: {
-      guthaben: Math.max(0, availableCredit),
-      lastschrift_aktiv: hasActiveDirectDebit,
+      guthaben: Math.max(0, credits.get(patient.patientId) ?? 0),
+      lastschrift_aktiv: directDebitPatients.has(patient.patientId),
     },
   }, {headers: {"Cache-Control":"private, no-store", "Vary":"Cookie", "X-Content-Type-Options":"nosniff"}});
 }

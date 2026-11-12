@@ -1,6 +1,30 @@
 -- Invoice access by private contact address. No patient or financial data is changed.
 BEGIN;
 
+-- Installation runs as the database installer. Runtime functions must be owned
+-- by the restricted billing role, while the installer receives only temporary
+-- SET membership for the owner transition.
+DO $$ BEGIN
+  IF current_user <> 'postgres'
+  OR NOT EXISTS (
+    SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid
+    WHERE r.rolname = 'abrechnung_runtime'
+      AND m.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+      AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option
+      AND m.grantor <> m.member
+  )
+  OR EXISTS (
+    SELECT 1 FROM pg_auth_members m WHERE m.roleid = (SELECT oid FROM pg_roles WHERE rolname = 'abrechnung_runtime')
+      AND m.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+      AND (m.set_option OR m.inherit_option OR m.grantor = m.member)
+  )
+  OR has_schema_privilege('abrechnung_runtime', 'public', 'CREATE')
+  THEN RAISE EXCEPTION 'invoice_access_installer_precondition_failed'; END IF;
+END $$;
+GRANT abrechnung_runtime TO CURRENT_USER WITH SET TRUE;
+GRANT abrechnung_runtime TO CURRENT_USER WITH INHERIT FALSE;
+GRANT CREATE ON SCHEMA public TO abrechnung_runtime;
+
 CREATE TABLE IF NOT EXISTS public.invoice_access_contacts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
@@ -75,6 +99,7 @@ ALTER TABLE public.invoice_access_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_access_request_log ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON public.invoice_access_contacts, public.invoice_access_contact_patients, public.invoice_access_links, public.invoice_access_events, public.patient_access_memberships, public.invoice_access_attempts, public.invoice_access_request_log FROM anon, authenticated;
+GRANT SELECT ON public.invoice_access_contacts, public.invoice_access_contact_patients, public.invoice_access_events, public.patient_access_memberships TO abrechnung_runtime;
 
 CREATE OR REPLACE FUNCTION public.patient_invoice_documents_for_access()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
@@ -98,6 +123,7 @@ BEGIN
   );
   RETURN result;
 END $$;
+ALTER FUNCTION public.patient_invoice_documents_for_access() OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_documents_for_access() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_documents_for_access() TO authenticated;
 
@@ -116,6 +142,7 @@ BEGIN
   );
   RETURN result;
 END $$;
+ALTER FUNCTION public.patient_invoice_document_pdf_for_access(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) TO authenticated;
 
@@ -136,6 +163,7 @@ BEGIN
   );
   RETURN result;
 END $$;
+ALTER FUNCTION public.patient_invoice_document_pdf(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf(uuid) TO authenticated;
 
@@ -160,7 +188,27 @@ BEGIN
   );
   RETURN result;
 END $$;
+ALTER FUNCTION public.patient_invoice_document_editions() OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_editions() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_editions() TO authenticated;
+
+REVOKE CREATE ON SCHEMA public FROM abrechnung_runtime;
+REVOKE abrechnung_runtime FROM CURRENT_USER GRANTED BY CURRENT_USER;
+DO $$ BEGIN
+  IF has_schema_privilege('abrechnung_runtime', 'public', 'CREATE')
+  OR EXISTS (
+    SELECT 1 FROM pg_auth_members m WHERE m.roleid = (SELECT oid FROM pg_roles WHERE rolname = 'abrechnung_runtime')
+      AND m.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+      AND (m.set_option OR m.inherit_option OR m.grantor = m.member)
+  )
+  OR EXISTS (
+    SELECT 1 FROM pg_proc WHERE oid IN (
+      'public.patient_invoice_documents_for_access()'::regprocedure,
+      'public.patient_invoice_document_pdf_for_access(uuid)'::regprocedure,
+      'public.patient_invoice_document_pdf(uuid)'::regprocedure,
+      'public.patient_invoice_document_editions()'::regprocedure
+    ) AND pg_get_userbyid(proowner) <> 'abrechnung_runtime'
+  ) THEN RAISE EXCEPTION 'invoice_access_installer_postcondition_failed'; END IF;
+END $$;
 
 COMMIT;
