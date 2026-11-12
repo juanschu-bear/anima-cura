@@ -590,6 +590,7 @@ export default function PatientLoginForm() {
                   <span>{t("patientActivation.open")}</span>
                 </button>
                 <p>{t("patientActivation.openHint")}</p>
+                <a className="acl-recovery-help" href={`/patient/invoice-access/continue?next=${encodeURIComponent(target)}`}>{t("invoiceAccess.loginEntry")}</a>
               </div>
             </form> : activationStep === "identify" ? (
               <form onSubmit={requestActivationCode} noValidate>
