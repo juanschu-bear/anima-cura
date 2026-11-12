@@ -123,9 +123,9 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_documents_for_access() OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_documents_for_access() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_documents_for_access() TO authenticated;
+ALTER FUNCTION public.patient_invoice_documents_for_access() OWNER TO abrechnung_runtime;
 
 CREATE OR REPLACE FUNCTION public.patient_invoice_document_pdf_for_access(document_id uuid)
 RETURNS text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
@@ -142,12 +142,13 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_document_pdf_for_access(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf_for_access(uuid) TO authenticated;
+ALTER FUNCTION public.patient_invoice_document_pdf_for_access(uuid) OWNER TO abrechnung_runtime;
 
 -- Keep the established client contract while extending its authorization to the
 -- contact's verified patient memberships.
+SET LOCAL ROLE abrechnung_runtime;
 CREATE OR REPLACE FUNCTION public.patient_invoice_document_pdf(document_id uuid)
 RETURNS text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE result text;
@@ -163,10 +164,11 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_document_pdf(uuid) OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_pdf(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_pdf(uuid) TO authenticated;
+RESET ROLE;
 
+SET LOCAL ROLE abrechnung_runtime;
 CREATE OR REPLACE FUNCTION public.patient_invoice_document_editions()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE result jsonb;
@@ -188,9 +190,9 @@ BEGIN
   );
   RETURN result;
 END $$;
-ALTER FUNCTION public.patient_invoice_document_editions() OWNER TO abrechnung_runtime;
 REVOKE ALL ON FUNCTION public.patient_invoice_document_editions() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.patient_invoice_document_editions() TO authenticated;
+RESET ROLE;
 
 REVOKE CREATE ON SCHEMA public FROM abrechnung_runtime;
 REVOKE abrechnung_runtime FROM CURRENT_USER GRANTED BY CURRENT_USER;
