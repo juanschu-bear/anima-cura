@@ -37,7 +37,7 @@ export async function GET() {
       .eq("sepa_mandat", true)
       .limit(1),
     // Uses the patient's session. No service-role access to the billing module.
-    session.rpc("patient_invoice_documents"),
+    session.rpc("patient_invoice_documents_for_access"),
     session.rpc("patient_invoice_document_editions"),
   ]);
 
