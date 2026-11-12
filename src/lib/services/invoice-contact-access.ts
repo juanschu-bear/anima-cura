@@ -47,6 +47,12 @@ async function createContactUser(db: ReturnType<typeof createServerClient>, emai
 export async function requestInvoiceAccess(input: { email: string; next?: string; language?: string; ip?: string; deliver?: boolean }) {
   const db = createServerClient();
   const email = normalizeContactEmail(input.email);
+  const ipHash = input.ip ? hashToken(input.ip.split(",")[0].trim()) : null;
+  if (ipHash) {
+    const recentIp = await db.from("invoice_access_request_log").select("id", { count: "exact", head: true }).eq("ip_hash", ipHash).gt("requested_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+    if ((recentIp.count ?? 0) >= 20) return { ok: true, expiresInDays: TTL_DAYS, rateLimited: true };
+    await db.from("invoice_access_request_log").insert({ ip_hash: ipHash });
+  }
   const patients = await contactPatients(db, email);
   // The response remains identical for unknown addresses.
   if (!patients.length) return { ok: true, expiresInDays: TTL_DAYS };

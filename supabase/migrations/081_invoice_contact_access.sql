@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS public.invoice_access_attempts (
 );
 CREATE INDEX IF NOT EXISTS invoice_access_attempts_link_time ON public.invoice_access_attempts(link_id, attempted_at DESC);
 
+CREATE TABLE IF NOT EXISTS public.invoice_access_request_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip_hash text NOT NULL,
+  requested_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS invoice_access_request_log_time ON public.invoice_access_request_log(ip_hash, requested_at DESC);
+
 CREATE TABLE IF NOT EXISTS public.invoice_access_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id uuid NOT NULL REFERENCES public.invoice_access_contacts(id) ON DELETE CASCADE,
@@ -64,8 +71,10 @@ ALTER TABLE public.invoice_access_contact_patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_access_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_access_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.patient_access_memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoice_access_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoice_access_request_log ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON public.invoice_access_contacts, public.invoice_access_contact_patients, public.invoice_access_links, public.invoice_access_events, public.patient_access_memberships FROM anon, authenticated;
+REVOKE ALL ON public.invoice_access_contacts, public.invoice_access_contact_patients, public.invoice_access_links, public.invoice_access_events, public.patient_access_memberships, public.invoice_access_attempts, public.invoice_access_request_log FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.patient_invoice_documents_for_access()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
