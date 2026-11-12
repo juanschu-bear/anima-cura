@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createServerClient } from "@/lib/db/supabase";
 import { sendEmail } from "@/lib/services/email-send";
+import { buildInvoiceAccessLinkEmail } from "@/lib/email/invoice-access-link";
 
 const TTL_DAYS = 14;
 const NEXT = "/patient/portal?section=rechnungen";
@@ -61,7 +62,9 @@ export async function resendInvoiceAccess(token: string) {
       const result = await requestInvoiceAccess({ email: contact.email, language: contact.locale });
       if (result.accessToken) {
         const url = `https://animacura.io/patient/invoice-access/continue?token=${encodeURIComponent(result.accessToken)}&lang=${encodeURIComponent(contact.locale)}`;
-        const sent = await sendEmail({ to: contact.email, subject: "Dein neuer Zugang zu den Rechnungen", body: `<p>Hier ist dein neuer persönlicher Zugang zu den Rechnungen:</p><p><a href="${url}">Rechnungen öffnen</a></p><p>Der Link ist 14 Tage gültig und kann nur einmal verwendet werden.</p>`, track: false, idempotencyKey: `invoice-access-resend-${hashToken(token)}` });
+        // Gestaltete Mail von Claude (src/lib/email/invoice-access-link.ts).
+        const mail = buildInvoiceAccessLinkEmail(url, contact.locale);
+        const sent = await sendEmail({ to: contact.email, subject: mail.subject, body: mail.html, track: false, idempotencyKey: `invoice-access-resend-${hashToken(token)}` });
         if (sent.ok) await db.from("invoice_access_events").insert({ contact_id: row.contact_id, event: "mail_sent" });
       }
       return { ok: true, expiresInDays: TTL_DAYS };

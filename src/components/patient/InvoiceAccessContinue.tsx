@@ -7,12 +7,14 @@
  *
  * Datenvertrag (Codex, 12.11.2026):
  *   GET  /patient/invoice-access/continue?token=…&next=…   diese Seite, verbraucht nichts
+ *   POST /api/patient/invoice-access/track   { token }  Seite geöffnet (Tracking, ohne Wirkung auf den Link)
  *   POST /api/patient/invoice-access/confirm { token, birthDate, password }
- *        → { ok, redirect, children:[{ patientId, firstName, lastName }] }
+ *        → { ok, loginEmail, redirect, children:[{ patientId, firstName, lastName }] }; danach meldet die Seite selbst an
+ *   POST /api/patient/invoice-access/merge   { token, birthDate }  angemeldet; hängt die Kinder an einen bestehenden Zugang
  *   POST /api/patient/invoice-access/request { email, next? } → immer { ok: true }
- *   POST /api/patient/invoice-access/resend  { token }  (vorgeschlagen; fehlt er, fragt die Seite nach der Adresse)
- *   Fehlercodes: access_link_invalid, access_link_expired, birth_date_mismatch, password_invalid,
- *                rate_limited, not_authenticated, access_unavailable
+ *   POST /api/patient/invoice-access/resend  { token } → immer { ok: true }, neuer Link an dieselbe Adresse
+ *   Fehlercodes: access_link_invalid, access_link_expired, birth_date_mismatch, password_invalid, access_exists,
+ *                access_merge_requires_same_email, invalid_request, rate_limited, not_authenticated, access_unavailable
  * Der Link enthält keine Mailadresse und keine Patientendaten. Eingaben bleiben bei jedem Fehler stehen.
  */
 
@@ -20,12 +22,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, Eye, EyeOff, Loader2, LockKeyhole, Mail, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { t as translate } from "@/lib/i18n";
+import { createBrowserClient } from "@/lib/db/supabase";
 import { safePatientTarget } from "@/lib/patient-navigation";
 
 type Fehler = "" | "birth_date_mismatch" | "password_invalid" | "password_mismatch" | "password_length" | "birth_date_missing" | "rate_limited" | "access_unavailable";
 type Zustand =
   | { art: "formular" }
-  | { art: "fertig"; ziel: string; kinder: string[] }
+  | { art: "fertig"; ziel: string; kinder: string[]; angemeldet: boolean }
+  | { art: "vorhanden" }
   | { art: "link"; grund: "access_link_invalid" | "access_link_expired" | "kein_token" };
 type Nachschub = "bereit" | "sendet" | "unterwegs" | "adresse" | "adresse_sendet" | "adresse_unterwegs";
 
@@ -57,11 +61,20 @@ export default function InvoiceAccessContinue() {
   const [sendet, setSendet] = useState(false);
   const [nachschub, setNachschub] = useState<Nachschub>(token ? "bereit" : "adresse");
   const [adresse, setAdresse] = useState("");
+  const [altesPasswort, setAltesPasswort] = useState("");
+  const [anmeldeFehler, setAnmeldeFehler] = useState<"" | "falsch" | "andere_adresse" | "unavailable">("");
+  const [meldetAn, setMeldetAn] = useState(false);
   const heute = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Tracking „Seite geöffnet“: ein ausdrücklicher Aufruf der Seite, das Öffnen allein verbraucht den Link nicht.
+  useEffect(() => {
+    if (!token) return;
+    void fetch("/api/patient/invoice-access/track", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ token }) }).catch(() => undefined);
+  }, [token]);
 
   // Nach dem Einrichten kurz zeigen, wer im Zugang ist, dann weiter zu den Rechnungen.
   useEffect(() => {
-    if (zustand.art !== "fertig") return;
+    if (zustand.art !== "fertig" || !zustand.angemeldet) return;
     const id = window.setTimeout(() => router.replace(zustand.ziel), 2600);
     return () => window.clearTimeout(id);
   }, [zustand, router]);
@@ -88,12 +101,24 @@ export default function InvoiceAccessContinue() {
           ? (body.children as { firstName?: unknown }[]).map((k) => (typeof k.firstName === "string" ? k.firstName : "")).filter(Boolean)
           : [];
         const weiter = typeof body.redirect === "string" ? safePatientTarget(body.redirect) : ziel;
-        setZustand({ art: "fertig", ziel: weiter, kinder });
+        // Der Zugang steht. Jetzt mit der Mailadresse und dem neuen Passwort anmelden, damit es direkt weitergeht.
+        let angemeldet = false;
+        if (typeof body.loginEmail === "string") {
+          try {
+            const signIn = await createBrowserClient().auth.signInWithPassword({ email: body.loginEmail, password: passwort });
+            angemeldet = !signIn.error;
+          } catch { angemeldet = false; }
+        }
+        setZustand({ art: "fertig", ziel: angemeldet ? weiter : `/patient/login?next=${encodeURIComponent(weiter)}`, kinder, angemeldet });
         return;
       }
       const code = codeVon(body);
-      if (code === "access_link_invalid" || code === "access_link_expired") {
+      if (code === "access_exists") {
+        setZustand({ art: "vorhanden" });
+      } else if (code === "access_link_invalid" || code === "access_link_expired") {
         setZustand({ art: "link", grund: code });
+      } else if (code === "invalid_request" && token.length < 20) {
+        setZustand({ art: "link", grund: "access_link_invalid" });
       } else if (code === "birth_date_mismatch" || code === "password_invalid" || code === "rate_limited") {
         setFehler(code);
       } else {
@@ -103,6 +128,41 @@ export default function InvoiceAccessContinue() {
       setFehler("access_unavailable");
     } finally {
       setSendet(false);
+    }
+  }
+
+  // Es gibt schon einen Zugang für diese Adresse: anmelden, dann hängen sich weitere Kinder an (ausdrückliche Zusammenführung).
+  async function anmeldenUndZusammenfuehren(e: React.FormEvent) {
+    e.preventDefault();
+    if (meldetAn || !adresse.trim() || !altesPasswort) return;
+    setMeldetAn(true);
+    setAnmeldeFehler("");
+    try {
+      const signIn = await createBrowserClient().auth.signInWithPassword({ email: adresse.trim(), password: altesPasswort });
+      if (signIn.error) { setAnmeldeFehler("falsch"); return; }
+      const r = await fetch("/api/patient/invoice-access/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({ token, birthDate: geburtsdatum }),
+      });
+      const body = await jsonVon(r);
+      if (r.ok && body.ok) {
+        const kinder = Array.isArray(body.children)
+          ? (body.children as { firstName?: unknown }[]).map((k) => (typeof k.firstName === "string" ? k.firstName : "")).filter(Boolean)
+          : [];
+        setZustand({ art: "fertig", ziel: typeof body.redirect === "string" ? safePatientTarget(body.redirect) : ziel, kinder, angemeldet: true });
+        return;
+      }
+      const code = codeVon(body);
+      if (code === "access_merge_requires_same_email") { setAnmeldeFehler("andere_adresse"); return; }
+      // Link schon verbraucht oder abgelaufen: angemeldet ist man trotzdem, also direkt zu den Rechnungen.
+      setZustand({ art: "fertig", ziel, kinder: [], angemeldet: true });
+    } catch {
+      setAnmeldeFehler("unavailable");
+    } finally {
+      setMeldetAn(false);
     }
   }
 
@@ -228,12 +288,46 @@ export default function InvoiceAccessContinue() {
             <CheckCircle2 size={44} className="iac-done-icon" aria-hidden="true" />
             <h1 className="iac-title">{t("invoiceAccess.doneTitle")}</h1>
             <p className="iac-sub">
-              {zustand.kinder.length > 1
-                ? t("invoiceAccess.doneChildren", { names: zustand.kinder.join(", ") })
-                : t("invoiceAccess.doneText")}
+              {!zustand.angemeldet
+                ? t("invoiceAccess.doneSignIn")
+                : zustand.kinder.length > 1
+                  ? t("invoiceAccess.doneChildren", { names: zustand.kinder.join(", ") })
+                  : t("invoiceAccess.doneText")}
             </p>
-            <button type="button" className="iac-submit" onClick={() => router.replace(zustand.ziel)}>{t("invoiceAccess.toInvoices")}</button>
+            <button type="button" className="iac-submit" onClick={() => router.replace(zustand.ziel)}>{zustand.angemeldet ? t("invoiceAccess.toInvoices") : t("invoiceAccess.toSignIn")}</button>
           </div>
+        )}
+
+        {zustand.art === "vorhanden" && (
+          <form onSubmit={anmeldenUndZusammenfuehren} noValidate>
+            <h1 className="iac-title">{t("invoiceAccess.existsTitle")}</h1>
+            <p className="iac-sub">{t("invoiceAccess.existsText")}</p>
+            {anmeldeFehler && (
+              <div className="iac-error" role="alert"><AlertCircle size={16} aria-hidden="true" /><span>{anmeldeFehler === "falsch" ? t("invoiceAccess.signInFailed") : anmeldeFehler === "andere_adresse" ? t("invoiceAccess.mergeOtherEmail") : t("invoiceAccess.unavailable")}</span></div>
+            )}
+            <div className="iac-field">
+              <label htmlFor="iac-login-mail" className="iac-label">{t("invoiceAccess.email")}</label>
+              <div className="iac-wrap">
+                <Mail size={18} className="iac-icon" aria-hidden="true" />
+                <input id="iac-login-mail" type="email" inputMode="email" autoComplete="username" required value={adresse} onChange={(e) => setAdresse(e.target.value)} className="iac-input" />
+              </div>
+              <p className="iac-help">{t("invoiceAccess.emailHelp")}</p>
+            </div>
+            <div className="iac-field">
+              <label htmlFor="iac-login-pw" className="iac-label">{t("invoiceAccess.existingPassword")}</label>
+              <div className="iac-wrap">
+                <LockKeyhole size={18} className="iac-icon" aria-hidden="true" />
+                <input id="iac-login-pw" type={zeigen ? "text" : "password"} autoComplete="current-password" required value={altesPasswort} onChange={(e) => setAltesPasswort(e.target.value)} className="iac-input iac-input-pw" />
+                <button type="button" className="iac-toggle" onClick={() => setZeigen((v) => !v)} aria-label={zeigen ? t("invoiceAccess.hidePassword") : t("invoiceAccess.showPassword")} aria-pressed={zeigen}>
+                  {zeigen ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" className="iac-submit" disabled={meldetAn || !adresse.trim() || !altesPasswort}>
+              {meldetAn ? <><Loader2 size={18} className="iac-spin" aria-hidden="true" />{t("invoiceAccess.signingIn")}</> : t("invoiceAccess.existsSubmit")}
+            </button>
+            <a className="iac-login" href={`/patient/login?next=${encodeURIComponent(ziel)}`}>{t("invoiceAccess.forgotPassword")}</a>
+          </form>
         )}
 
         {zustand.art === "link" && (
