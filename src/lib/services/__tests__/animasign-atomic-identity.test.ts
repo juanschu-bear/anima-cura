@@ -49,6 +49,36 @@ test('atomic local intake rechecks swapped identity, preserves patients and neve
     await db.exec('RESET ROLE');
   } finally { await db.close(); }
 });
+test('new patients from the form are created with the insurance labels the form actually sends', async () => {
+  const db = new PGlite();
+  const ids = ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-000000000014'];
+  try {
+    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+      CREATE TABLE patients(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vorname text NOT NULL,nachname text NOT NULL,geburtsdatum date NOT NULL,
+        ivoris_id text UNIQUE,geschlecht text,kasse text NOT NULL,email text,behandlung text NOT NULL,behandlung_start date,behandlung_status text,notizen text);
+      CREATE TABLE billing_versions(id uuid PRIMARY KEY);
+      CREATE TABLE anamnese_submissions(id uuid PRIMARY KEY,vorname text,nachname text,geburtsdatum date,patient_id uuid,matched_patient_id uuid,ivoris_patient_id text,
+        answers jsonb,email text,is_existing boolean);
+      INSERT INTO anamnese_submissions(id,vorname,nachname,geburtsdatum,answers,email) VALUES
+        ('${ids[0]}','Ada','Eins','2001-01-01','{"versicherungsart":"Gesetzlich versichert","besuchsgrund":"Erstvorstellung"}','a@example.invalid'),
+        ('${ids[1]}','Bea','Zwei','2002-02-02','{"versicherungsart":"Privat versichert","besuchsgrund":"Erstvorstellung"}','b@example.invalid'),
+        ('${ids[2]}','Cem','Drei','2003-03-03','{"versicherungsart":"Beihilfe","besuchsgrund":"Erstvorstellung"}','c@example.invalid'),
+        ('${ids[3]}','Dan','Vier','2004-04-04','{"versicherungsart":"weiß nicht","besuchsgrund":"Erstvorstellung"}','d@example.invalid');`);
+    await db.exec(await readFile('supabase/migrations/059_treatment_accounts.sql', 'utf8'));
+    await db.exec(await readFile('supabase/migrations/061_atomic_intake_identity.sql', 'utf8'));
+    const resolve = async (id: string) => (await db.query<{ result: any }>('SELECT resolve_intake_identity($1,true) AS result', [id])).rows[0].result;
+    // Vorher: Die Beschriftung des Bogens galt als fehlende Angabe, es wurde kein Patient angelegt.
+    assert.equal((await resolve(ids[0])).reason, 'missing_creation_facts');
+    await db.exec(await readFile('supabase/migrations/083_intake_insurance_labels.sql', 'utf8'));
+    const kasse = async (id: string) => (await db.query<{ kasse: string }>('SELECT kasse FROM patients WHERE id=$1', [(await resolve(id)).patient_id])).rows[0]?.kasse;
+    assert.equal(await kasse(ids[0]), 'gesetzlich');
+    assert.equal(await kasse(ids[1]), 'privat');
+    assert.equal(await kasse(ids[2]), 'privat');
+    // Eine unbekannte Angabe wird weiterhin nicht geraten.
+    assert.equal((await resolve(ids[3])).reason, 'missing_creation_facts');
+    assert.equal((await db.query('SELECT * FROM patients')).rows.length, 3);
+  } finally { await db.close(); }
+});
 test('public submit has no legacy creation RPC or portal account/password write path', async () => {
   const route = await readFile('src/app/api/anima-sign/submit/route.ts', 'utf8');
   const local = await readFile('src/lib/services/animasign-local-patient-link.ts', 'utf8');
