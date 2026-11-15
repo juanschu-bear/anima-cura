@@ -25,10 +25,10 @@ test("reactions are merged per recipient from contact events, app events and the
       { patientId: P3, titel: "Neue Nachricht", createdAt: "2026-11-13T01:10:00Z" },
     ],
   });
-  assert.deepEqual(a, { key: "a", pageOpenedAt: "2026-11-13T09:00:00Z", accessCreatedAt: "2026-11-13T09:05:00Z", appReadAt: null });
-  assert.deepEqual(b, { key: "b", pageOpenedAt: null, accessCreatedAt: null, appReadAt: "2026-11-13T10:00:00Z" });
+  assert.deepEqual(a, { key: "a", pageOpenedAt: "2026-11-13T09:00:00Z", accessCreatedAt: "2026-11-13T09:05:00Z", appReadAt: null, appNoticeRead: false });
+  assert.deepEqual(b, { key: "b", pageOpenedAt: null, accessCreatedAt: null, appReadAt: "2026-11-13T10:00:00Z", appNoticeRead: true });
   // Ein anderer gelesener Hinweis zählt nicht als gelesene Rechnung.
-  assert.deepEqual(c, { key: "c", pageOpenedAt: "2026-11-13T11:00:00Z", accessCreatedAt: null, appReadAt: null });
+  assert.deepEqual(c, { key: "c", pageOpenedAt: "2026-11-13T11:00:00Z", accessCreatedAt: null, appReadAt: null, appNoticeRead: false });
 });
 
 test("a read invoice notice alone counts as read in the app", () => {
@@ -38,5 +38,7 @@ test("a read invoice notice alone counts as read in the app", () => {
     events: [],
     notices: [{ patientId: P2, titel: "Rechnungen sind da", createdAt: "2026-11-13T01:20:00Z" }],
   });
-  assert.equal(only.appReadAt, "2026-11-13T01:20:00Z");
+  // Der Hinweis hat kein Lesedatum: Ja/Nein statt einer erfundenen Uhrzeit (vorher stand hier die Anlage des Hinweises).
+  assert.equal(only.appNoticeRead, true);
+  assert.equal(only.appReadAt, null);
 });

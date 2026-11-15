@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       inParallel(chunks(patientIds, 150), part => allRows<EventRow>((from, to) =>
         db.from("invoice_access_events").select("contact_id,patient_id,event,occurred_at")
           .in("patient_id", part).in("event", ["app_read", "button_clicked"]).gte("occurred_at", since).order("id").range(from, to))),
-      // Der App-Hinweis hat kein Lesedatum, deshalb steht als Zeitpunkt seine Anlage.
+      // Der App-Hinweis hat kein Lesedatum: Für ihn meldet die Zusammenführung nur „gelesen“, keinen Zeitpunkt.
       inParallel(chunks(patientIds, 150), part => allRows<NoticeRow>((from, to) =>
         db.from("patient_notifications").select("patient_id,titel,created_at")
           .in("patient_id", part).eq("typ", "eingang").eq("gelesen", true).gte("created_at", since).order("id").range(from, to))),
