@@ -530,6 +530,8 @@ const translations: Record<string, { de: string; en: string }> = {
   'animasign.resolve.now': { de: "Jetzt zuordnen", en: "Assign now" },
   'animasign.resolve.done': { de: "Zuordnung übernommen und erneut an IVORIS übertragen.", en: "Assignment saved and sent to IVORIS again." },
   'animasign.resolve.failed': { de: "Zuordnung fehlgeschlagen.", en: "Assignment failed." },
+  'animasign.resolve.savedNotTransferred': { de: "Zuordnung gespeichert, aber IVORIS hat den Bogen noch nicht angenommen. Der Grund steht beim Bogen.", en: "Assignment saved, but IVORIS has not accepted the form yet. The reason is shown on the form." },
+  'animasign.resolve.confirmHint': { de: "Mit der Zuordnung bestätigst du, dass dieser Bogen zu diesem Patienten gehört, auch wenn der Name anders geschrieben ist. Das Geburtsdatum muss übereinstimmen.", en: "By assigning, you confirm that this form belongs to this patient, even if the name is spelled differently. The date of birth must match." },
   'intake.importTitle': { de: 'Zurückgestellte Patientenimporte', en: 'Patient imports awaiting review' },
   'intake.importHelp': { de: 'Geburtsdatum im Praxissystem ergänzen oder korrigieren. Nach einem erfolgreichen erneuten Import wird der Fall automatisch geschlossen. Gültige Zeilen werden unabhängig verarbeitet.', en: 'Complete or correct the date of birth in the practice system. The case closes automatically after a successful subsequent import. Valid rows are processed independently.' },
   'intake.birthdate_missing': { de: 'Geburtsdatum fehlt – nicht übernommen', en: 'Date of birth missing — not imported' },
