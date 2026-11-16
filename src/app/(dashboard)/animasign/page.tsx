@@ -452,7 +452,8 @@ export default function AnimaSignPage() {
       if (!res.ok || data?.ok === false) {
         throw new Error(data?.error || tt("resolve.failed"));
       }
-      setNotice({ ok: true, text: tt("resolve.done") });
+      // Zugeordnet heißt noch nicht übertragen: Nur wenn IVORIS den Bogen angenommen hat, steht hier „übertragen“.
+      setNotice(data?.transferred === false ? { ok: false, text: tt("resolve.savedNotTransferred") } : { ok: true, text: tt("resolve.done") });
       setResolveTarget(null);
       setDetail(null);
       setResolveSearch("");
@@ -940,6 +941,8 @@ export default function AnimaSignPage() {
                 <div style={{ fontSize: 13, lineHeight: 1.6, color: ink }}>{resolveTarget.ivoris_manual_review_reason}</div>
               </div>
             )}
+
+            <div style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.6, color: muted }}>{tt("resolve.confirmHint")}</div>
 
             <div style={{ display: "grid", gap: 18 }}>
               <div>

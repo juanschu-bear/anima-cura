@@ -79,6 +79,58 @@ test('new patients from the form are created with the insurance labels the form 
     assert.equal((await db.query('SELECT * FROM patients')).rows.length, 3);
   } finally { await db.close(); }
 });
+test('a manual assignment by the practice confirms identity despite a differently spelled name, but never across birthdates', async () => {
+  const db = new PGlite();
+  const form = '00000000-0000-4000-8000-000000000021', other = '00000000-0000-4000-8000-000000000022', user = '00000000-0000-4000-8000-0000000000aa';
+  const patient = '00000000-0000-4000-8000-0000000000b1', stranger = '00000000-0000-4000-8000-0000000000b2', wrongBirth = '00000000-0000-4000-8000-0000000000b3';
+  try {
+    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+      CREATE TABLE patients(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vorname text NOT NULL,nachname text NOT NULL,geburtsdatum date NOT NULL,
+        ivoris_id text UNIQUE,geschlecht text,kasse text NOT NULL,email text,behandlung text NOT NULL,behandlung_start date,behandlung_status text,notizen text);
+      CREATE TABLE billing_versions(id uuid PRIMARY KEY);
+      CREATE TABLE anamnese_submissions(id uuid PRIMARY KEY,vorname text,nachname text,geburtsdatum date,patient_id uuid,matched_patient_id uuid,ivoris_patient_id text,
+        answers jsonb,email text,is_existing boolean);
+      INSERT INTO patients(id,vorname,nachname,geburtsdatum,ivoris_id,kasse,behandlung) VALUES
+        ('${patient}','Lena','Schmitt','2010-05-05','iv-1','gesetzlich','KFO'),
+        ('${stranger}','Paul','Anders','2010-05-05','iv-2','gesetzlich','KFO'),
+        ('${wrongBirth}','Lena','Schmidt','2011-06-06','iv-3','gesetzlich','KFO');
+      INSERT INTO anamnese_submissions(id,vorname,nachname,geburtsdatum,answers) VALUES
+        ('${form}','Lena','Schmidt','2010-05-05','{"versicherungsart":"Gesetzlich versichert","besuchsgrund":"Erstvorstellung"}'),
+        ('${other}','Lena','Schmidt','2010-05-05','{}');`);
+    for (const file of ['059_treatment_accounts', '061_atomic_intake_identity', '083_intake_insurance_labels', '084_intake_practice_confirmation'])
+      await db.exec(await readFile(`supabase/migrations/${file}.sql`, 'utf8'));
+    const resolve = async (id: string) => (await db.query<{ result: any }>('SELECT resolve_intake_identity($1,false) AS result', [id])).rows[0].result;
+    const assign = (id: string, target: string) => db.exec(`UPDATE anamnese_submissions SET patient_id='${target}',matched_patient_id='${target}',ivoris_patient_id=(SELECT ivoris_id FROM patients WHERE id='${target}') WHERE id='${id}'`);
+    const confirm = (id: string, target: string) => db.exec(`INSERT INTO intake_identity_confirmations(submission_id,patient_id,confirmed_by) VALUES('${id}','${target}','${user}')
+      ON CONFLICT(submission_id) DO UPDATE SET patient_id=excluded.patient_id,confirmed_by=excluded.confirmed_by,confirmed_at=now()`);
+
+    // Vorher: Der Bogen hängt am Patienten, die Prüfung lehnt die abweichende Schreibweise trotzdem ab.
+    await assign(form, patient);
+    assert.equal((await resolve(form)).reason, 'identity_conflict');
+    // Mit Bestätigung der Praxis geht genau diese Zuordnung durch.
+    await confirm(form, patient);
+    assert.deepEqual(await resolve(form), { status: 'matched', reason: 'confirmed_by_practice', patient_id: patient, is_new: false, swapped: false });
+    // Eine Bestätigung für einen anderen Bogen gilt nicht für diesen.
+    await assign(other, patient);
+    assert.equal((await resolve(other)).reason, 'identity_conflict');
+    // Anderes Geburtsdatum: Auch eine Bestätigung reicht nicht.
+    await db.exec(`UPDATE anamnese_submissions SET patient_id=NULL,matched_patient_id=NULL,ivoris_patient_id=NULL WHERE id='${form}'`);
+    await confirm(form, wrongBirth);
+    assert.equal((await resolve(form)).reason, 'confirmed_birthdate_mismatch');
+    // Hängt der Bogen schon an einem anderen Patienten, gewinnt die Bestätigung nicht still.
+    await assign(form, stranger);
+    await confirm(form, patient);
+    assert.equal((await resolve(form)).reason, 'stable_id_conflict');
+    // Die Bestätigungen sind für anon und angemeldete Nutzer nicht erreichbar, nur für den Server.
+    const privilege = async (role: string) => (await db.query<{ ok: boolean }>(`SELECT has_table_privilege('${role}','intake_identity_confirmations','SELECT,INSERT,UPDATE,DELETE') AS ok`)).rows[0].ok;
+    assert.equal(await privilege('anon'), false);
+    assert.equal(await privilege('authenticated'), false);
+    assert.equal(await privilege('service_role'), true);
+    // Wird der Patient gelöscht (z. B. zusammengeführt), verfällt die Bestätigung.
+    await db.exec(`UPDATE anamnese_submissions SET patient_id=NULL,matched_patient_id=NULL,ivoris_patient_id=NULL WHERE id='${form}'; DELETE FROM patients WHERE id='${patient}'`);
+    assert.equal((await db.query('SELECT 1 FROM intake_identity_confirmations')).rows.length, 0);
+  } finally { await db.close(); }
+});
 test('public submit has no legacy creation RPC or portal account/password write path', async () => {
   const route = await readFile('src/app/api/anima-sign/submit/route.ts', 'utf8');
   const local = await readFile('src/lib/services/animasign-local-patient-link.ts', 'utf8');
