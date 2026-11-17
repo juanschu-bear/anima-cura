@@ -58,6 +58,11 @@ export function nextCommunicationStatus(
   return (SUCCESS_RANK[incoming] ?? -1) >= (SUCCESS_RANK[current] ?? -1) ? incoming : current;
 }
 
+export function latestCommunicationTimestamp(current: string | null | undefined, incoming: string) {
+  if (!current) return incoming;
+  return Date.parse(incoming) >= Date.parse(current) ? incoming : current;
+}
+
 function publicBaseUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://animacura.io").replace(/\/$/, "");
 }
@@ -113,7 +118,7 @@ type RecordEventInput = {
 export async function recordCommunicationEvent(input: RecordEventInput) {
   const db = createServerClient();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
-  const current = await db.from("communication_messages").select("status").eq("id", input.messageId).maybeSingle();
+  const current = await db.from("communication_messages").select("status,last_event_at").eq("id", input.messageId).maybeSingle();
   if (current.error || !current.data) throw new Error("Communication message not found");
   const status = nextCommunicationStatus(current.data.status as CommunicationMessageStatus, input.eventType);
   const eventRow = {
@@ -124,15 +129,28 @@ export async function recordCommunicationEvent(input: RecordEventInput) {
     occurred_at: occurredAt,
     metadata: input.metadata ?? {},
   };
-  // event_key is optional. PostgreSQL cannot use the partial unique index for
-  // an ON CONFLICT clause when the key is NULL, so ordinary transport events
-  // must be inserted directly. Otherwise accepted code mails remain shown as
-  // merely queued even though the provider accepted them.
-  const event = input.eventKey
-    ? await db.from("communication_events").upsert(eventRow, { onConflict: "event_key", ignoreDuplicates: true })
-    : await db.from("communication_events").insert(eventRow);
-  if (event.error) throw new Error(`Communication event unavailable: ${event.error.message}`);
-  const patch: Record<string, unknown> = { status, last_event_at: occurredAt, updated_at: new Date().toISOString() };
+  // event_key is protected by a partial unique index (WHERE event_key IS NOT
+  // NULL). PostgREST cannot infer that index for ON CONFLICT(event_key), so a
+  // keyed event is checked first and a concurrent 23505 is treated as the same
+  // provider delivery. This keeps webhook retries idempotent in Production.
+  if (input.eventKey) {
+    const existing = await db.from("communication_events").select("id").eq("event_key", input.eventKey).maybeSingle();
+    if (existing.error) throw new Error(`Communication event lookup failed: ${existing.error.message}`);
+    if (!existing.data) {
+      const event = await db.from("communication_events").insert(eventRow);
+      if (event.error && event.error.code !== "23505") {
+        throw new Error(`Communication event unavailable: ${event.error.message}`);
+      }
+    }
+  } else {
+    const event = await db.from("communication_events").insert(eventRow);
+    if (event.error) throw new Error(`Communication event unavailable: ${event.error.message}`);
+  }
+  const patch: Record<string, unknown> = {
+    status,
+    last_event_at: latestCommunicationTimestamp(current.data.last_event_at as string | null, occurredAt),
+    updated_at: new Date().toISOString(),
+  };
   if (input.providerMessageId) patch.provider_message_id = input.providerMessageId;
   if (input.eventType === "accepted") patch.sent_at = occurredAt;
   if (input.eventType === "delivered") patch.delivered_at = occurredAt;
