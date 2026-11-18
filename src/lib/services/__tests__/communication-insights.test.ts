@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { linkedPatientIds, mailEvidence, invoiceOpenedAt, inboundContact, inertEmailDocument, type DispatchMessage } from "../../communication-insights";
+import { linkedPatientIds, mailEvidence, invoiceMailTimeline, invoiceOpenedAt, inboundContact, inertEmailDocument, type DispatchMessage } from "../../communication-insights";
 
 const a = "00000000-0000-4000-8000-000000000001";
 const b = "00000000-0000-4000-8000-000000000002";
@@ -21,6 +21,31 @@ test("generic documents tab and another invoice are not evidence for this PDF", 
   assert.equal(invoiceOpenedAt(a, [{ ...base, event_type: "document_view", metadata: { documentId: a } }]), null);
   assert.equal(invoiceOpenedAt(a, [{ ...base, event_type: "invoice_document_opened", metadata: { documentId: b, source: "authenticated_document_delivery" } }]), null);
   assert.equal(invoiceOpenedAt(a, [{ ...base, event_type: "invoice_document_opened", metadata: { documentId: a, source: "authenticated_document_delivery" } }]), base.created_at);
+});
+test("invoice mail status follows the latest provider event and keeps its timeline", () => {
+  const timeline = invoiceMailTimeline({
+    status: "delivered", sent_at: "2026-11-12T08:00:00Z", delivered_at: "2026-11-12T08:01:00Z",
+    first_opened_at: null, first_clicked_at: null, created_at: "2026-11-12T07:59:00Z",
+    events: [
+      { id: "a", event_type: "accepted", source: "resend", occurred_at: "2026-11-12T08:00:00Z" },
+      { id: "d", event_type: "delivered", source: "resend", occurred_at: "2026-11-12T08:01:00Z" },
+      { id: "o", event_type: "opened", source: "resend", occurred_at: "2026-11-12T09:00:00Z" },
+    ],
+  });
+  assert.equal(timeline?.status, "opened");
+  assert.equal(timeline?.statusAt, "2026-11-12T09:00:00Z");
+  assert.equal(timeline?.acceptedAt, "2026-11-12T08:00:00Z");
+  assert.equal(timeline?.deliveredAt, "2026-11-12T08:01:00Z");
+  assert.equal(timeline?.openedAt, "2026-11-12T09:00:00Z");
+});
+test("failed, bounced and suppressed invoice mails use the stable rejected status", () => {
+  const timeline = invoiceMailTimeline({
+    status: "bounced", sent_at: "2026-11-12T08:00:00Z", delivered_at: null,
+    first_opened_at: null, first_clicked_at: null, created_at: "2026-11-12T07:59:00Z",
+    events: [{ id: "b", event_type: "bounced", source: "resend", occurred_at: "2026-11-12T08:02:00Z" }],
+  });
+  assert.equal(timeline?.status, "rejected");
+  assert.equal(timeline?.rejectedAt, "2026-11-12T08:02:00Z");
 });
 test("support audit distinguishes incoming messages, automatic response and manual escalation", () => {
   assert.equal(inboundContact({ id: a, status: "success", started_at: "now", result: { sender: " Test@example.org ", ignored: true } }), null);

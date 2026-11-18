@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { loadActivationCohort } from "@/lib/services/portal-activation-workflow";
-import { linkedPatientIds, mailEvidence, inboundContact, type DispatchMessage } from "@/lib/communication-insights";
+import { invoiceMailTimeline, linkedPatientIds, mailEvidence, inboundContact, type DispatchMessage } from "@/lib/communication-insights";
 import { HOSTINGER_SUPPORT_WORKFLOW_ID } from "@/lib/services/hostinger-support-mail";
 
 export const runtime = "nodejs";
@@ -249,7 +249,19 @@ export async function GET(request: NextRequest) {
   }
 
   const rawMessages = messagesResult.data ?? [];
-  const patientIds = Array.from(new Set(rawMessages.flatMap(linkedPatientIds)));
+  const invoiceDocumentIds = Array.from(new Set(rawMessages.flatMap((row) => asStringArray(asRecord(row.metadata)?.documentIds))));
+  const invoiceDocumentBatches = await Promise.all(chunk(invoiceDocumentIds).map((ids) =>
+    db.from("patient_documents").select("id,patient_id").in("id", ids),
+  ));
+  const invoiceDocumentError = invoiceDocumentBatches.find((result) => result.error);
+  if (invoiceDocumentError?.error) {
+    return NextResponse.json({ error: "communication_history_unavailable" }, { status: 503 });
+  }
+  const invoiceDocuments = invoiceDocumentBatches.flatMap((result) => result.data ?? []);
+  const patientIds = Array.from(new Set([
+    ...rawMessages.flatMap(linkedPatientIds),
+    ...invoiceDocuments.map((document) => document.patient_id).filter(Boolean),
+  ]));
   const messageIds = rawMessages.map(row => row.id);
   const [billingSnapshot, patientBatches, eventBatches, engagementBatches, inboundResult] = await Promise.all([
     loadBillingSnapshot(db),
@@ -319,6 +331,27 @@ export async function GET(request: NextRequest) {
     problems: allStatuses.filter(value => PROBLEM_STATUSES.has(value)).length,
   };
 
+  const documentOwner = new Map(invoiceDocuments.map((document) => [document.id, document.patient_id]));
+  const invoiceMailStatuses = enriched.flatMap((row) => {
+    if (row.channel !== "email") return [];
+    const timeline = invoiceMailTimeline(row as DispatchMessage);
+    if (!timeline) return [];
+    return asStringArray(row.metadata?.documentIds).flatMap((documentId) => {
+      const patientId = documentOwner.get(documentId) ?? row.patient_id;
+      if (!patientId) return [];
+      const patient = patients.get(patientId);
+      return [{
+        patientId,
+        patientName: patient ? [patient.vorname, patient.nachname].filter(Boolean).join(" ") : null,
+        patientNumber: patient?.ivoris_nummer ?? null,
+        documentId,
+        messageId: row.id,
+        campaignKey: row.campaign_key,
+        ...timeline,
+      }];
+    });
+  }).sort((left, right) => Date.parse(right.statusAt) - Date.parse(left.statusAt));
+
   const billingReconciliation = billingSnapshot?.reconciliation ?? null;
   const billingReviewRows = billingSnapshot
     ? await loadBillingReviewRows(
@@ -331,5 +364,5 @@ export async function GET(request: NextRequest) {
 
   const inbound = (inboundResult.data ?? []).map(inboundContact).filter(Boolean);
   const truncated = rawMessages.length >= 10000 || [...eventBatches, ...engagementBatches].some(result => (result.data?.length ?? 0) >= 1000) || (inboundResult.data?.length ?? 0) >= 1000;
-  return NextResponse.json({ ready: true, summary, messages, inbound, repliesAvailable: !inboundResult.error, truncated, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ ready: true, summary, messages, invoiceMailStatuses, inbound, repliesAvailable: !inboundResult.error, truncated, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "private, no-store" } });
 }

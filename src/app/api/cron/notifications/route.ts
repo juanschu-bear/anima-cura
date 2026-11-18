@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { hasReliablePatientIdentity, isSafeDunningRate } from "@/lib/patient-safety";
+import { loadActiveInvoiceDeliveryHoldPatientIds, type HoldClient } from "@/lib/invoice-delivery-holds";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const sc = createServerClient();
+  const invoiceDeliveryHolds = await loadActiveInvoiceDeliveryHoldPatientIds(sc as unknown as HoldClient);
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const in3Days = new Date(now.getTime() + 3 * 864e5).toISOString().slice(0, 10);
@@ -34,7 +36,8 @@ export async function GET(request: NextRequest) {
     .gte("faellig_am", today)
     .lte("faellig_am", in3Days);
 
-  const sichereFaelligBald = (faelligBald || []).filter((rate: any) => isSafeDunningRate(rate, rate.patients));
+  const sichereFaelligBald = (faelligBald || []).filter((rate: any) =>
+    isSafeDunningRate(rate, rate.patients) && !invoiceDeliveryHolds.has(rate.patient_id));
 
   for (const rate of sichereFaelligBald) {
     const tage = Math.ceil((new Date(rate.faellig_am).getTime() - now.getTime()) / 864e5);
@@ -65,7 +68,8 @@ export async function GET(request: NextRequest) {
     .eq("status", "offen")
     .lt("faellig_am", today);
 
-  const sichereUeberfaellig = (ueberfaellig || []).filter((rate: any) => isSafeDunningRate(rate, rate.patients));
+  const sichereUeberfaellig = (ueberfaellig || []).filter((rate: any) =>
+    isSafeDunningRate(rate, rate.patients) && !invoiceDeliveryHolds.has(rate.patient_id));
 
   for (const rate of sichereUeberfaellig) {
     const tage = Math.floor((now.getTime() - new Date(rate.faellig_am).getTime()) / 864e5);

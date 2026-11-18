@@ -4,6 +4,11 @@ import { createServerClient } from "@/lib/db/supabase";
 import { sendEmail } from "@/lib/services/email-send";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { PORTAL_ACTIVATION_WORKFLOW_ID, runPortalActivationWorkflow } from "@/lib/services/portal-activation-workflow";
+import {
+  isPaymentReminderTrigger,
+  loadActiveInvoiceDeliveryHoldPatientIds,
+  type HoldClient,
+} from "@/lib/invoice-delivery-holds";
 
 export const runtime = "nodejs";
 
@@ -698,6 +703,18 @@ export async function executeStoredWorkflow(
   }
 
   const triggerEvent = runtimeContext.triggerEvent;
+  const patientId = firstString(runtimeContext.patient?.id);
+  if (patientId && isPaymentReminderTrigger(triggerEvent)) {
+    const protectedPatients = await loadActiveInvoiceDeliveryHoldPatientIds(createServerClient() as unknown as HoldClient);
+    if (protectedPatients.has(patientId)) {
+      return {
+        workflowId: workflow.id,
+        status: "skipped",
+        reason: "Rechnungsübergabe durch die Praxis noch nicht bestätigt.",
+        code: "invoice_handoff_pending",
+      };
+    }
+  }
   const runId = await createWorkflowRun(workflow.id, triggerEvent, runtimeContext);
   const steps: ExecutionStep[] = [];
   const praxisIban = await loadPraxisIban();

@@ -28,6 +28,18 @@ export type PatientDossier = {
   truncated: boolean;
 };
 
+export type InvoiceMailStatusCode = "accepted" | "delivered" | "delayed" | "rejected" | "complaint" | "opened";
+export type InvoiceMailTimeline = {
+  status: InvoiceMailStatusCode;
+  statusAt: string;
+  acceptedAt: string | null;
+  deliveredAt: string | null;
+  delayedAt: string | null;
+  rejectedAt: string | null;
+  complaintAt: string | null;
+  openedAt: string | null;
+};
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function linkedPatientIds(row: { patient_id: string | null; metadata?: Record<string, unknown> | null }) {
   const linked = Array.isArray(row.metadata?.patientIds) ? row.metadata.patientIds : [];
@@ -44,6 +56,48 @@ export function invoiceOpenedAt(documentId: string, events: PortalTouchpoint[]) 
   // Historical document_view means the documents TAB, not an individual PDF.
   return events.filter(event => event.event_type === "invoice_document_opened" && event.metadata?.documentId === documentId && event.metadata?.source === "authenticated_document_delivery")
     .map(event => event.created_at).sort().at(-1) ?? null;
+}
+
+const INVOICE_MAIL_STATUS: Partial<Record<string, InvoiceMailStatusCode>> = {
+  accepted: "accepted", delivered: "delivered", delayed: "delayed",
+  failed: "rejected", bounced: "rejected", suppressed: "rejected",
+  complained: "complaint", opened: "opened", clicked: "opened",
+};
+
+function latestTimestamp(values: Array<string | null | undefined>) {
+  return values.filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
+}
+
+/** Last provider-backed state for one invoice email. Link clicks count as opened. */
+export function invoiceMailTimeline(row: Pick<DispatchMessage,
+  "status" | "sent_at" | "delivered_at" | "first_opened_at" | "first_clicked_at" | "created_at" | "events">): InvoiceMailTimeline | null {
+  const occurrences = row.events.flatMap((event) => {
+    const status = INVOICE_MAIL_STATUS[event.event_type];
+    return status ? [{ status, at: event.occurred_at, eventType: event.event_type }] : [];
+  });
+  if (row.sent_at) occurrences.push({ status: "accepted", at: row.sent_at, eventType: "accepted" });
+  if (row.delivered_at) occurrences.push({ status: "delivered", at: row.delivered_at, eventType: "delivered" });
+  if (row.first_opened_at) occurrences.push({ status: "opened", at: row.first_opened_at, eventType: "opened" });
+  if (row.first_clicked_at) occurrences.push({ status: "opened", at: row.first_clicked_at, eventType: "clicked" });
+  if (!occurrences.length) {
+    const fallback = INVOICE_MAIL_STATUS[row.status];
+    if (fallback) occurrences.push({ status: fallback, at: row.created_at, eventType: row.status });
+  }
+  if (!occurrences.length) return null;
+  occurrences.sort((left, right) => Date.parse(right.at) - Date.parse(left.at));
+  const current = occurrences[0];
+  const at = (types: string[]) => latestTimestamp(occurrences.filter(item => types.includes(item.eventType)).map(item => item.at));
+  return {
+    status: current.status,
+    statusAt: current.at,
+    acceptedAt: at(["accepted"]),
+    deliveredAt: at(["delivered"]),
+    delayedAt: at(["delayed"]),
+    rejectedAt: at(["failed", "bounced", "suppressed"]),
+    complaintAt: at(["complained"]),
+    openedAt: at(["opened", "clicked"]),
+  };
 }
 
 export function inboundContact(row: { id: string; status: string; started_at: string; result: unknown }): InboundContact | null {

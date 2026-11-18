@@ -9,6 +9,7 @@ import { createServerClient } from "../db/supabase";
 import { sendEmail } from "./email-service";
 import type { MahnEinstellungen } from "../types";
 import { isSafeDunningRate } from "../patient-safety";
+import { loadActiveInvoiceDeliveryHoldPatientIds, type HoldClient } from "../invoice-delivery-holds";
 
 interface DunningResult {
   checked: number;
@@ -50,13 +51,19 @@ export async function runDunningEngine(): Promise<DunningResult> {
   // Ein ungeklärter offener Posten sperrt automatisches Mahnen für den gesamten
   // Patienten. Raten- und Rechnungssicht dürfen sich während des Bankabgleichs
   // nicht gegenseitig überholen.
-  const { data: protectedOpenItems } = await db
-    .from("offene_posten")
-    .select("patient_id")
-    .eq("nicht_mahnen", true)
-    .in("status", ["offen", "teilbezahlt"])
-    .not("patient_id", "is", null);
-  const protectedPatientIds = new Set((protectedOpenItems || []).map((item) => item.patient_id));
+  const [{ data: protectedOpenItems }, invoiceDeliveryHolds] = await Promise.all([
+    db
+      .from("offene_posten")
+      .select("patient_id")
+      .eq("nicht_mahnen", true)
+      .in("status", ["offen", "teilbezahlt"])
+      .not("patient_id", "is", null),
+    loadActiveInvoiceDeliveryHoldPatientIds(db as unknown as HoldClient),
+  ]);
+  const protectedPatientIds = new Set([
+    ...(protectedOpenItems || []).map((item) => item.patient_id),
+    ...Array.from(invoiceDeliveryHolds),
+  ]);
 
   // 2. Überfällige Raten finden
   const today = new Date();
