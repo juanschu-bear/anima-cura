@@ -29,6 +29,7 @@ export type PatientDossier = {
 };
 
 export type InvoiceMailStatusCode = "accepted" | "delivered" | "delayed" | "rejected" | "complaint" | "opened";
+export type InvoiceMailRejectionKind = "bounced" | "failed" | "suppressed";
 export type InvoiceMailTimeline = {
   status: InvoiceMailStatusCode;
   statusAt: string;
@@ -38,6 +39,27 @@ export type InvoiceMailTimeline = {
   rejectedAt: string | null;
   complaintAt: string | null;
   openedAt: string | null;
+  rejectionKind: InvoiceMailRejectionKind | null;
+  rejectionReason: string | null;
+};
+
+export type InvoiceMailStatusRow = InvoiceMailTimeline & {
+  patientId: string;
+  firstName: string | null;
+  lastName: string | null;
+  patientName: string | null;
+  patientNumber: string | null;
+  documentId: string;
+  messageId: string;
+  campaignKey: string | null;
+};
+
+export type InvoiceMailCampaign = {
+  campaignKey: string;
+  name: string;
+  sentAt: string;
+  mailCount: number;
+  invoiceCount: number;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -69,6 +91,21 @@ function latestTimestamp(values: Array<string | null | undefined>) {
     .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
 }
 
+function rejectionReason(event: CommunicationEvent | undefined) {
+  if (!event) return null;
+  const metadata = event.metadata && typeof event.metadata === "object" ? event.metadata : {};
+  const bounce = metadata.bounce && typeof metadata.bounce === "object" && !Array.isArray(metadata.bounce)
+    ? metadata.bounce as Record<string, unknown>
+    : {};
+  const values = event.event_type === "bounced"
+    ? [bounce.type, bounce.subType, bounce.message, metadata.bounceType, metadata.bounceSubType, metadata.message]
+    : event.event_type === "suppressed"
+      ? [metadata.suppressionType, metadata.message]
+      : [metadata.reason, metadata.message];
+  const parts = Array.from(new Set(values.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map(value => value.trim())));
+  return parts.length ? parts.join(" · ") : null;
+}
+
 /** Last provider-backed state for one invoice email. Link clicks count as opened. */
 export function invoiceMailTimeline(row: Pick<DispatchMessage,
   "status" | "sent_at" | "delivered_at" | "first_opened_at" | "first_clicked_at" | "created_at" | "events">): InvoiceMailTimeline | null {
@@ -87,6 +124,9 @@ export function invoiceMailTimeline(row: Pick<DispatchMessage,
   if (!occurrences.length) return null;
   occurrences.sort((left, right) => Date.parse(right.at) - Date.parse(left.at));
   const current = occurrences[0];
+  const rejection = row.events
+    .filter(event => ["failed", "bounced", "suppressed"].includes(event.event_type))
+    .sort((left, right) => Date.parse(right.occurred_at) - Date.parse(left.occurred_at))[0];
   const at = (types: string[]) => latestTimestamp(occurrences.filter(item => types.includes(item.eventType)).map(item => item.at));
   return {
     status: current.status,
@@ -97,7 +137,36 @@ export function invoiceMailTimeline(row: Pick<DispatchMessage,
     rejectedAt: at(["failed", "bounced", "suppressed"]),
     complaintAt: at(["complained"]),
     openedAt: at(["opened", "clicked"]),
+    rejectionKind: (rejection?.event_type as InvoiceMailRejectionKind | undefined) ?? null,
+    rejectionReason: rejectionReason(rejection),
   };
+}
+
+function berlinDate(value: string) {
+  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }).format(new Date(value));
+}
+
+export function invoiceMailCampaigns(rows: InvoiceMailStatusRow[]): InvoiceMailCampaign[] {
+  const groups = new Map<string, InvoiceMailStatusRow[]>();
+  for (const row of rows) {
+    if (!row.campaignKey) continue;
+    const current = groups.get(row.campaignKey) ?? [];
+    current.push(row);
+    groups.set(row.campaignKey, current);
+  }
+  return Array.from(groups, ([campaignKey, items]) => {
+    const sentAt = items.map(item => item.acceptedAt ?? item.statusAt)
+      .sort((left, right) => Date.parse(left) - Date.parse(right))[0];
+    const normalized = campaignKey.toLocaleLowerCase("de-DE");
+    const label = normalized.includes("reminder") || normalized.includes("erinner") ? "Erinnerung" : "Rechnungsmail";
+    return {
+      campaignKey,
+      name: `${label} vom ${berlinDate(sentAt)}`,
+      sentAt,
+      mailCount: new Set(items.map(item => item.messageId)).size,
+      invoiceCount: new Set(items.map(item => item.documentId)).size,
+    };
+  }).sort((left, right) => Date.parse(right.sentAt) - Date.parse(left.sentAt));
 }
 
 export function inboundContact(row: { id: string; status: string; started_at: string; result: unknown }): InboundContact | null {

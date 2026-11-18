@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
 import { loadActivationCohort } from "@/lib/services/portal-activation-workflow";
-import { invoiceMailTimeline, linkedPatientIds, mailEvidence, inboundContact, type DispatchMessage } from "@/lib/communication-insights";
+import { invoiceMailCampaigns, invoiceMailTimeline, linkedPatientIds, mailEvidence, inboundContact, type DispatchMessage, type InvoiceMailStatusRow } from "@/lib/communication-insights";
 import { HOSTINGER_SUPPORT_WORKFLOW_ID } from "@/lib/services/hostinger-support-mail";
 
 export const runtime = "nodejs";
@@ -332,7 +332,7 @@ export async function GET(request: NextRequest) {
   };
 
   const documentOwner = new Map(invoiceDocuments.map((document) => [document.id, document.patient_id]));
-  const invoiceMailStatuses = enriched.flatMap((row) => {
+  const invoiceMailStatuses: InvoiceMailStatusRow[] = enriched.flatMap((row) => {
     if (row.channel !== "email") return [];
     const timeline = invoiceMailTimeline(row as DispatchMessage);
     if (!timeline) return [];
@@ -342,6 +342,8 @@ export async function GET(request: NextRequest) {
       const patient = patients.get(patientId);
       return [{
         patientId,
+        firstName: patient?.vorname ?? null,
+        lastName: patient?.nachname ?? null,
         patientName: patient ? [patient.vorname, patient.nachname].filter(Boolean).join(" ") : null,
         patientNumber: patient?.ivoris_nummer ?? null,
         documentId,
@@ -351,6 +353,7 @@ export async function GET(request: NextRequest) {
       }];
     });
   }).sort((left, right) => Date.parse(right.statusAt) - Date.parse(left.statusAt));
+  const campaigns = invoiceMailCampaigns(invoiceMailStatuses);
 
   const billingReconciliation = billingSnapshot?.reconciliation ?? null;
   const billingReviewRows = billingSnapshot
@@ -364,5 +367,5 @@ export async function GET(request: NextRequest) {
 
   const inbound = (inboundResult.data ?? []).map(inboundContact).filter(Boolean);
   const truncated = rawMessages.length >= 10000 || [...eventBatches, ...engagementBatches].some(result => (result.data?.length ?? 0) >= 1000) || (inboundResult.data?.length ?? 0) >= 1000;
-  return NextResponse.json({ ready: true, summary, messages, invoiceMailStatuses, inbound, repliesAvailable: !inboundResult.error, truncated, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ ready: true, summary, messages, invoiceMailStatuses, campaigns, inbound, repliesAvailable: !inboundResult.error, truncated, billingReconciliation, billingReviewRows }, { headers: { "Cache-Control": "private, no-store" } });
 }

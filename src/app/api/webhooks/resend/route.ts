@@ -8,6 +8,8 @@ import {
   resendCommunicationEvent,
   type ResendEmailWebhook,
 } from "@/lib/services/resend-webhook";
+import { createServerClient } from "@/lib/db/supabase";
+import { holdRejectedInvoiceDelivery } from "@/lib/invoice-delivery-holds";
 
 export const runtime = "nodejs";
 
@@ -52,5 +54,6 @@ export async function POST(request: Request) {
     providerMessageId: event.providerMessageId,
     metadata: event.metadata,
   });
+  await holdRejectedInvoiceDelivery(createServerClient(), message.id, event.eventType);
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { linkedPatientIds, mailEvidence, invoiceMailTimeline, invoiceOpenedAt, inboundContact, inertEmailDocument, type DispatchMessage } from "../../communication-insights";
+import { linkedPatientIds, mailEvidence, invoiceMailCampaigns, invoiceMailTimeline, invoiceOpenedAt, inboundContact, inertEmailDocument, type DispatchMessage, type InvoiceMailStatusRow } from "../../communication-insights";
 
 const a = "00000000-0000-4000-8000-000000000001";
 const b = "00000000-0000-4000-8000-000000000002";
@@ -46,6 +46,32 @@ test("failed, bounced and suppressed invoice mails use the stable rejected statu
   });
   assert.equal(timeline?.status, "rejected");
   assert.equal(timeline?.rejectedAt, "2026-11-12T08:02:00Z");
+  assert.equal(timeline?.rejectionKind, "bounced");
+  assert.equal(timeline?.rejectionReason, null);
+});
+test("rejected invoice mails expose the provider kind and operational reason", () => {
+  const timeline = invoiceMailTimeline({
+    status: "suppressed", sent_at: "2026-11-12T08:00:00Z", delivered_at: null,
+    first_opened_at: null, first_clicked_at: null, created_at: "2026-11-12T07:59:00Z",
+    events: [{ id: "s", event_type: "suppressed", source: "resend", occurred_at: "2026-11-12T08:02:00Z", metadata: { suppressionType: "complaint", message: "Recipient suppressed" } }],
+  });
+  assert.equal(timeline?.rejectionKind, "suppressed");
+  assert.equal(timeline?.rejectionReason, "complaint · Recipient suppressed");
+});
+test("invoice campaigns aggregate distinct mails and invoices with a readable date", () => {
+  const base = {
+    patientId: a, firstName: "Anna", lastName: "Beispiel", patientName: "Anna Beispiel", patientNumber: "1",
+    campaignKey: "q3_2026_invoice_email", status: "accepted", statusAt: "2026-11-13T08:00:00Z",
+    acceptedAt: "2026-11-13T08:00:00Z", deliveredAt: null, delayedAt: null, rejectedAt: null,
+    complaintAt: null, openedAt: null, rejectionKind: null, rejectionReason: null,
+  } satisfies Omit<InvoiceMailStatusRow, "documentId" | "messageId">;
+  const campaigns = invoiceMailCampaigns([
+    { ...base, documentId: a, messageId: "mail-a" },
+    { ...base, documentId: b, messageId: "mail-a" },
+  ]);
+  assert.equal(campaigns[0].name, "Rechnungsmail vom 13.11.2026");
+  assert.equal(campaigns[0].mailCount, 1);
+  assert.equal(campaigns[0].invoiceCount, 2);
 });
 test("support audit distinguishes incoming messages, automatic response and manual escalation", () => {
   assert.equal(inboundContact({ id: a, status: "success", started_at: "now", result: { sender: " Test@example.org ", ignored: true } }), null);

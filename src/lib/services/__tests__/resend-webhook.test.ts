@@ -36,6 +36,11 @@ test("keeps only operational failure details", () => {
     providerMessageId: "provider-2",
     occurredAt: "2026-11-17T09:00:00.000Z",
     metadata: {
+      bounce: {
+        type: "Permanent",
+        subType: "General",
+        message: "Mailbox unavailable",
+      },
       bounceType: "Permanent",
       bounceSubType: "General",
       message: "Mailbox unavailable",
