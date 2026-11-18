@@ -24,12 +24,15 @@ export async function loadInvoiceMailStatusOverview(days = 730) {
   const db = createServerClient();
   const since = new Date(Date.now() - Math.min(1095, Math.max(1, days)) * 86_400_000).toISOString();
   const pages = [];
-  for (let offset = 0; offset < 20_000; offset += 500) {
-    const page = await db.from("communication_messages")
+  // Filter in the database and fetch independent, stable offset windows together.
+  // Invoice emails are the only messages with documentIds in metadata.
+  for (let offset = 0; offset < 20_000; offset += 2_000) {
+    const batch = await Promise.all([0, 500, 1_000, 1_500].map(step => db.from("communication_messages")
       .select("id,patient_id,campaign_key,channel,provider,recipient,subject,status,sent_at,delivered_at,first_opened_at,first_clicked_at,created_at,metadata")
-      .eq("channel", "email").gte("created_at", since).order("created_at", { ascending: false }).order("id").range(offset, offset + 499);
-    pages.push(page);
-    if (page.error || (page.data?.length ?? 0) < 500) break;
+      .eq("channel", "email").gte("created_at", since).not("metadata->documentIds", "is", null)
+      .order("created_at", { ascending: false }).order("id").range(offset + step, offset + step + 499)));
+    pages.push(...batch);
+    if (batch.some(page => page.error || (page.data?.length ?? 0) < 500)) break;
   }
   const failedPage = pages.find(page => page.error);
   if (failedPage?.error) throw new Error("invoice_mail_status_unavailable");
