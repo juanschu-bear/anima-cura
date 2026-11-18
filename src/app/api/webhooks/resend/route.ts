@@ -43,9 +43,7 @@ export async function POST(request: Request) {
   if (!event) return NextResponse.json({ ok: true, ignored: true }, { status: 202 });
 
   const message = await communicationMessageByProviderId("resend", event.providerMessageId);
-  if (!message) return NextResponse.json({ ok: true, ignored: true }, { status: 202 });
-
-  await recordCommunicationEvent({
+  if (message) await recordCommunicationEvent({
     messageId: message.id,
     eventType: event.eventType,
     source: "transport:resend",
@@ -54,6 +52,20 @@ export async function POST(request: Request) {
     providerMessageId: event.providerMessageId,
     metadata: event.metadata,
   });
-  await holdRejectedInvoiceDelivery(createServerClient(), message.id, event.eventType);
+  if (message) await holdRejectedInvoiceDelivery(createServerClient(), message.id, event.eventType);
+  // The Leitstand sends its own mails; their provider IDs live in its module ledger.
+  const workerSecret = process.env.INVOICE_ACCESS_WORKER_SECRET;
+  if (workerSecret) {
+    const endpoint = process.env.LEITSTAND_PROVIDER_EVENT_URL ??
+      "https://anima-leitstand.vercel.app/api/abrechnung/notifications/provider-event";
+    const forwarded = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-invoice-worker-secret": workerSecret },
+      body: JSON.stringify({ eventId: id, providerId: event.providerMessageId, eventType: event.eventType,
+        occurredAt: event.occurredAt, metadata: event.metadata }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!forwarded.ok) return NextResponse.json({ code: "leitstand_provider_event_unavailable" }, { status: 503 });
+  }
   return NextResponse.json({ ok: true });
 }

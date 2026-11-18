@@ -36,7 +36,11 @@ export async function holdRejectedInvoiceDelivery(db: FailureHoldClient, message
   const documentIds = Array.isArray(metadata.documentIds)
     ? Array.from(new Set(metadata.documentIds.filter((id): id is string => typeof id === "string")))
     : [];
-  if (!documentIds.length) return { held: 0 };
+  return holdInvoiceDocuments(db, documentIds, eventType);
+}
+
+export async function holdInvoiceDocuments(db: FailureHoldClient, documentIds: string[], eventType: string) {
+  if (!INVOICE_DELIVERY_FAILURE_EVENTS.has(eventType) || !documentIds.length) return { held: 0 };
   const documents = await db.from("patient_documents").select("id,patient_id,name").in("id", documentIds);
   if (documents.error) throw new Error("invoice_delivery_documents_unavailable");
   const reason = eventType === "complained" ? "email_complaint" : "email_rejected";
