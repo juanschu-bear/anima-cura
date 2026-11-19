@@ -167,6 +167,18 @@
       ]
     },
     {
+      "file": "src/app/api/animahost/whatsapp/rules/route.ts",
+      "sha256": "07cda501d417e6f87c51544021fc88788051fd622b7c09fc63fd281b5d832b98",
+      "proof": "The authenticated route checks admin or verwaltung and same-origin, then uses createServerClient with SUPABASE_SERVICE_ROLE_KEY. The RPC grants EXECUTE only to service_role; browsers cannot call it.",
+      "calls": [
+        {
+          "name": "animahost_whatsapp_publish_rules",
+          "signature": "public.animahost_whatsapp_publish_rules(p_tenant uuid, p_expected_version integer, p_rules jsonb, p_actor uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
       "file": "src/app/api/doku/eintrag/[id]/ivoris-push/route.ts",
       "sha256": "9b6c57b98c0e028fa939acca826477b861784162dbaee20980589a1a5003ecb9",
       "proof": "Reviewed server service-key constructor or injected admin()/DbClient chain; source and injected boundary callers are pinned below. No user-session client is used for these RPC calls.",

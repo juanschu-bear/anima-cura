@@ -9,6 +9,13 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
   ...referenceTranslations,
+  'animahost.whatsapp.clarify': {de:'Die Praxis prüft Ihre Nachricht und meldet sich.',en:'The practice will review your message and get back to you.'},
+  'animahost.whatsapp.emergency': {de:'Bei Atemnot oder akuter Gefahr rufen Sie bitte sofort die 112.',en:'If you have trouble breathing or face immediate danger, call 112 now.'},
+  'animahost.whatsapp.urgent': {de:'Bitte rufen Sie wegen der Beschwerden sofort die Praxis an.',en:'Please call the practice immediately about these symptoms.'},
+  'animahost.whatsapp.clarify.title': {de:'WhatsApp-Nachricht prüfen',en:'Review WhatsApp message'},
+  'animahost.whatsapp.clarify.body': {de:'Eine Nachricht braucht eine Entscheidung der Praxis.',en:'A message needs a decision from the practice.'},
+  'animahost.whatsapp.emergency.title': {de:'Dringende WhatsApp-Nachricht',en:'Urgent WhatsApp message'},
+  'animahost.whatsapp.emergency.body': {de:'Bitte sofort prüfen und bei Bedarf selbst antworten.',en:'Please review immediately and reply personally if needed.'},
   'scribe.workspace.unavailable': {de:'Die Änderung ist gerade nicht verfügbar. Bitte erneut versuchen.',en:'This change is currently unavailable. Please try again.'},
   'scribe.workspace.forbidden': {de:'Für diese Änderung fehlt die Berechtigung.',en:'You do not have permission to make this change.'},
   'scribe.workspace.protected': {de:'Dieser Baustein gehört zur Abrechnung oder zu einer Pflichtauswahl. Bitte als Wunsch an Juan melden.',en:'This building block affects billing or a required choice. Please send a request to Juan.'},

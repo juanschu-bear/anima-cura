@@ -2,7 +2,7 @@
   "name": "anima-curo",
   "version": "0.1.0",
   "private": true,
-  "description": "Anima Curo \u2013 Automated rate management, bank reconciliation & dunning for medical practices, powered by AI.",
+  "description": "Anima Curo – Automated rate management, bank reconciliation & dunning for medical practices, powered by AI.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -57,6 +57,7 @@
     "test:scribe-workspace": "tsx --test src/lib/services/__tests__/scribe-workspace.test.ts"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^4.0.150",
     "@anthropic-ai/sdk": "^0.26.0",
     "@documenso/embed-react": "^0.6.1",
     "@signpdf/placeholder-pdf-lib": "3.4.0",
@@ -69,6 +70,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/web-push": "^3.6.4",
     "@xyflow/react": "^12.10.2",
+    "ai": "^7.0.177",
     "autoprefixer": "^10.4.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
