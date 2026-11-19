@@ -106,6 +106,20 @@ export async function GET(request: Request) {
   const startPage = Number(searchParams.get("startPage") || "0");
   if(!Number.isSafeInteger(startPage)||startPage<0||startPage>100000)return NextResponse.json({error:"invalid_start_page"},{status:400});
   const discoverOnly=searchParams.get("mode")==="discover";
+  if (searchParams.get("mode")==="diagnostic") {
+    try {
+      const page=await fetchIvorisPage(startPage);
+      if (!Array.isArray(page)) return NextResponse.json({code:"ivoris_response_invalid"},{status:502});
+      const numberFields={string:0,number:0,missing:0};
+      for(const raw of page){
+        const value=raw?.HumanReadableId;
+        if(typeof value==="string"&&/^\d+$/.test(value.trim()))numberFields.string++;
+        else if(typeof value==="number"&&Number.isSafeInteger(value))numberFields.number++;
+        else numberFields.missing++;
+      }
+      return NextResponse.json({mode:"diagnostic",page:startPage,patients:page.length,numberFields},{headers:{"Cache-Control":"private, no-store"}});
+    }catch{return NextResponse.json({code:"ivoris_read_failed"},{status:502});}
+  }
   const started=Date.now();
   let nextPageNumber=startPage;
 
@@ -114,6 +128,7 @@ export async function GET(request: Request) {
   let totalUpserted = 0;
   let totalSkipped = 0;
   let totalDeferred = 0;
+  const numberFields = { string: 0, number: 0, missing: 0 };
   let reachedEnd = false;
   const errors: string[] = [];
 
@@ -136,6 +151,12 @@ export async function GET(request: Request) {
     }
 
     totalFetched += patients.length;
+    for (const raw of patients) {
+      const kind = typeof raw?.HumanReadableId;
+      if (kind === "string" && /^\d+$/.test(raw.HumanReadableId.trim())) numberFields.string++;
+      else if (kind === "number" && Number.isSafeInteger(raw.HumanReadableId)) numberFields.number++;
+      else numberFields.missing++;
+    }
 
     const split = await splitPatientImport(db, patients);
     totalDeferred += split.deferred;
@@ -321,7 +342,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     batch: { startPage },
-    results: { fetched: totalFetched, upserted: totalUpserted, skipped: totalSkipped, deferred: totalDeferred },
+    results: { fetched: totalFetched, upserted: totalUpserted, skipped: totalSkipped, deferred: totalDeferred, numberFields },
     errors: errors.slice(0, 20),
     done: reachedEnd,
     nextPage,

@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 test('15 minute discovery preserves five full-refresh windows, without AI',()=>{
  const cron=JSON.parse(readFileSync('vercel.json','utf8')).crons.find((c:{path:string})=>c.path==='/api/cron/patients');assert.equal(cron.schedule,'*/15 * * * *');
  assert.equal(patientSyncMode(new Date('2026-11-09T10:00:00Z')),'full');
+ assert.equal(patientSyncMode(new Date('2026-11-09T10:04:00Z')),'full');
+ assert.equal(patientSyncMode(new Date('2026-11-09T10:14:59Z')),'full');
  assert.equal(patientSyncMode(new Date('2026-11-09T10:15:00Z')),'discover');
  assert.equal(patientSyncMode(new Date('2026-11-09T11:00:00Z')),'discover');
 });

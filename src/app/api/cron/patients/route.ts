@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   let upserted = 0;
   let skipped = 0;
   let deferred = 0;
+  const numberFields = { string: 0, number: 0, missing: 0 };
   let done = false;
   const errors: string[] = [];
 
@@ -44,6 +45,8 @@ export async function GET(req: NextRequest) {
       upserted += json.results?.upserted ?? 0;
       skipped += json.results?.skipped ?? 0;
       deferred += json.results?.deferred ?? 0;
+      for (const kind of ["string", "number", "missing"] as const)
+        numberFields[kind] += json.results?.numberFields?.[kind] ?? 0;
       if (Array.isArray(json.errors)) errors.push(...json.errors);
       if(json.errors?.length){break;}
       if (json.done || json.nextPage === null || json.nextPage === undefined) {
@@ -60,7 +63,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     success: done && errors.length===0,
     mode,
-    results: { fetched, upserted, skipped, deferred, done },
+    results: { fetched, upserted, skipped, deferred, done, numberFields },
     errors: errors.slice(0, 20),
     duration_ms: Date.now() - startTime,
   });

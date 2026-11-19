@@ -4,6 +4,7 @@ import { findPotentialDuplicateCandidates, isSamePersonCandidate, ivorisHumanRea
 
 test("reads the printed IVORIS patient number and never the insurance number", () => {
   assert.equal(ivorisHumanReadableId({ Id: "uuid", HumanReadableId: "00001234", CurrentInsurance: { InsuranceNumber: "XYZ" } }), "00001234");
+  assert.equal(ivorisHumanReadableId({ Id: "uuid", HumanReadableId: 1234 }), "1234");
   assert.equal(ivorisHumanReadableId({ Id: "uuid", CurrentInsurance: { InsuranceNumber: "12345678" } }), null);
   assert.equal(ivorisHumanReadableId({ HumanReadableId: "invalid" }), null);
 });

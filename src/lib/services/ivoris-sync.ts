@@ -64,7 +64,9 @@ function pickString(source: GenericRecord, keys: string[]): string | null {
 /** Official IVORIS Patient_v1_Patient.HumanReadableId, not CurrentInsurance.InsuranceNumber. */
 export function ivorisHumanReadableId(raw: GenericRecord): string | null {
   const value = raw.HumanReadableId;
-  return typeof value === "string" && /^\d+$/.test(value.trim()) ? value.trim() : null;
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return value.trim();
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
+  return null;
 }
 
 function parseDate(input: string | null): string | null {
