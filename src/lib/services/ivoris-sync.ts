@@ -6,6 +6,7 @@ type GenericRecord = Record<string, unknown>;
 
 type NormalizedPatient = {
   ivoris_id: string;
+  ivoris_nummer: string | null;
   vorname: string;
   nachname: string;
   geburtsdatum: string;
@@ -26,6 +27,7 @@ type NormalizedPatient = {
 type ExistingPatientCandidate = {
   id: string;
   ivoris_id: string | null;
+  ivoris_nummer?: string | null;
   vorname: string;
   nachname: string;
   geburtsdatum: string;
@@ -57,6 +59,12 @@ function pickString(source: GenericRecord, keys: string[]): string | null {
     }
   }
   return null;
+}
+
+/** Official IVORIS Patient_v1_Patient.HumanReadableId, not CurrentInsurance.InsuranceNumber. */
+export function ivorisHumanReadableId(raw: GenericRecord): string | null {
+  const value = raw.HumanReadableId;
+  return typeof value === "string" && /^\d+$/.test(value.trim()) ? value.trim() : null;
 }
 
 function parseDate(input: string | null): string | null {
@@ -169,6 +177,7 @@ function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPa
 
   const patient: NormalizedPatient = {
     ivoris_id: ivorisId,
+    ivoris_nummer: ivorisHumanReadableId(raw),
     vorname,
     nachname,
     geburtsdatum,
@@ -258,6 +267,7 @@ export async function syncIvorisPatients(): Promise<{
       const { error } = await db
         .from("patients")
         .update({
+          ...(patient.ivoris_nummer ? { ivoris_nummer: patient.ivoris_nummer } : {}),
           vorname: patient.vorname,
           nachname: patient.nachname,
           geburtsdatum: patient.geburtsdatum,
@@ -312,6 +322,7 @@ export async function syncIvorisPatients(): Promise<{
           .from("patients")
           .update({
             ivoris_id: patient.ivoris_id,
+            ...(patient.ivoris_nummer ? { ivoris_nummer: patient.ivoris_nummer } : {}),
             vorname: patient.vorname,
             nachname: patient.nachname,
             geburtsdatum: patient.geburtsdatum,
@@ -351,6 +362,7 @@ export async function syncIvorisPatients(): Promise<{
 
     const { error: insertError } = await db.from("patients").insert({
       ivoris_id: patient.ivoris_id,
+      ivoris_nummer: patient.ivoris_nummer,
       vorname: patient.vorname,
       nachname: patient.nachname,
       geburtsdatum: patient.geburtsdatum,

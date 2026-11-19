@@ -2,7 +2,7 @@ import {isPatientSyncCron,discoveryRows} from "@/lib/services/patient-sync-sched
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
-import { findPotentialDuplicateCandidates, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
+import { findPotentialDuplicateCandidates, ivorisHumanReadableId, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
 import { splitPatientImport, resolveValidPatientImports } from '@/lib/services/patient-import-review';
 
 export const runtime = "nodejs";
@@ -59,6 +59,7 @@ function normalizePatient(raw: any) {
 
   return {
     ivoris_id: ivorisId,
+    ivoris_nummer: ivorisHumanReadableId(raw),
     vorname: String(raw.Firstname || "").trim(),
     nachname: String(raw.Lastname || "").trim(),
     geburtsdatum: raw.Birthday ? new Date(raw.Birthday).toISOString().slice(0, 10) : null,
@@ -81,6 +82,7 @@ type BatchPatientRow = NonNullable<ReturnType<typeof normalizePatient>>;
 type ExistingPatientCandidate = {
   id: string;
   ivoris_id: string | null;
+  ivoris_nummer: string | null;
   vorname: string;
   nachname: string;
   geburtsdatum: string;
@@ -153,7 +155,7 @@ export async function GET(request: Request) {
 
     const { data: existingRows, error: existingRowsError } = await db
       .from("patients")
-      .select("id, ivoris_id, vorname, nachname, geburtsdatum")
+      .select("id, ivoris_id, ivoris_nummer, vorname, nachname, geburtsdatum")
       .in("ivoris_id", ivorisIds);
 
     if (existingRowsError) {
@@ -182,6 +184,11 @@ export async function GET(request: Request) {
         .map((row) => row.ivoris_id)
         .filter((value): value is string => Boolean(value))
     );
+    const existingNumbers = new Map(
+      ((existingRows ?? []) as Array<{ ivoris_id: string | null; ivoris_nummer: string | null }>)
+        .filter((row): row is { ivoris_id: string; ivoris_nummer: string | null } => Boolean(row.ivoris_id))
+        .map((row) => [row.ivoris_id, row.ivoris_nummer])
+    );
 
     // Discovery must not rewrite existing clinical/contact fields every 15 minutes.
     const importRows=discoverOnly?discoveryRows(normalizedRows,existingByIvorisId,knownAliasIds):normalizedRows;
@@ -191,7 +198,7 @@ export async function GET(request: Request) {
     if (birthdays.length > 0) {
       const { data: sameBirthdayRows, error: sameBirthdayError } = await db
         .from("patients")
-        .select("id, ivoris_id, vorname, nachname, geburtsdatum")
+        .select("id, ivoris_id, ivoris_nummer, vorname, nachname, geburtsdatum")
         .in("geburtsdatum", birthdays);
 
       if (sameBirthdayError) {
@@ -216,7 +223,7 @@ export async function GET(request: Request) {
       }
 
       if (existingByIvorisId.has(row.ivoris_id)) {
-        rows.push(row);
+        rows.push({ ...row, ivoris_nummer: row.ivoris_nummer ?? existingNumbers.get(row.ivoris_id) ?? null });
         queuedIdentityKeys.add(identityKey);
         continue;
       }
@@ -252,6 +259,7 @@ export async function GET(request: Request) {
             .from("patients")
             .update({
               ivoris_id: row.ivoris_id,
+              ivoris_nummer: row.ivoris_nummer ?? candidate.ivoris_nummer ?? null,
               vorname: row.vorname,
               nachname: row.nachname,
               geburtsdatum: row.geburtsdatum,

@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findPotentialDuplicateCandidates, isSamePersonCandidate, patientIdentityMatchKind } from "../ivoris-sync";
+import { findPotentialDuplicateCandidates, isSamePersonCandidate, ivorisHumanReadableId, patientIdentityMatchKind } from "../ivoris-sync";
+
+test("reads the printed IVORIS patient number and never the insurance number", () => {
+  assert.equal(ivorisHumanReadableId({ Id: "uuid", HumanReadableId: "00001234", CurrentInsurance: { InsuranceNumber: "XYZ" } }), "00001234");
+  assert.equal(ivorisHumanReadableId({ Id: "uuid", CurrentInsurance: { InsuranceNumber: "12345678" } }), null);
+  assert.equal(ivorisHumanReadableId({ HumanReadableId: "invalid" }), null);
+});
 
 test("treats same name and birthday with different ivoris ids as duplicate candidate", () => {
   const duplicate = isSamePersonCandidate(
