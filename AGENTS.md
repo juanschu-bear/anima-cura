@@ -47,3 +47,9 @@ github.com/juanschu-bear/anima-cura
 
 ## Grundregel für Scribe (Juans Entscheidung, 11.11.2026)
 - Die Praxis kommt immer sofort selbst weiter und hängt nie an Juan. Stimmt etwas nicht, sagt Scribe der Praxis, was los ist, und macht einen Vorschlag. Will die Praxis es trotzdem so, bestätigt sie ein zweites Mal. Dann gilt ihre Entscheidung, festgehalten mit Name und Zeit. Was auf unserer Seite nicht stimmt, fängt das System automatisch ab. Was die Praxis eingetippt hat, geht nie verloren.
+
+## SQL für Juan (19.11.2026)
+- Neue SQL-Dateien beginnen in Zeile 1 mit Dateiname, Zielprojekt und Projekt-ID (`zymqxzhjbcxzhzvjqvbv`).
+- Der erste ausführbare Block prüft die Projektidentität anhand eines projektspezifischen Datenbankmerkmals und bricht im falschen Projekt mit einem klaren deutschen Fehler ab. Ein bloßer Kommentar ist keine Prüfung.
+- Die letzte Abfrage liefert genau eine Ergebniszeile mit Dateiname und `eingespielt`.
+- Bereits ausgeführte SQL-Dateien und ihre Prüfsummen nicht stillschweigend ändern. Bei Umbenennung nach Kollision den installierten Stand erkennen und einen erneuten Lauf ohne doppelte Anlage sicher machen.

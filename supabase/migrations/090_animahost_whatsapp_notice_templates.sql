@@ -1,7 +1,20 @@
--- Versioned, practice-owned one-patient WhatsApp notice templates.
--- One SQL Editor statement; run after 087_animahost_whatsapp_rulebook.sql.
+-- 090_animahost_whatsapp_notice_templates.sql | Zielprojekt: Anima Cura | Projekt-ID: zymqxzhjbcxzhzvjqvbv
+-- Die Vorlagen wurden am 19.11.2026 bereits unter der kollidierenden Nummer 088 eingespielt.
+-- Ein erneuter Lauf prüft den vorhandenen Stand und legt nichts doppelt an.
 DO $install$
 BEGIN
+ IF to_regclass('public.patients') IS NULL OR
+    to_regclass('public.animahost_whatsapp_settings') IS NULL OR
+    to_regclass('public.animaline_connections') IS NOT NULL THEN
+  RAISE EXCEPTION 'Falsches Projekt: 090_animahost_whatsapp_notice_templates.sql gehört zu Anima Cura (zymqxzhjbcxzhzvjqvbv).';
+ END IF;
+ IF to_regclass('public.animahost_whatsapp_notice_template_versions') IS NOT NULL THEN
+  IF to_regprocedure('public.animahost_publish_notice_template(uuid,uuid,integer,text,text,text,boolean,uuid)') IS NULL OR
+     NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.animahost_whatsapp_notice_template_versions'::regclass
+       AND tgname='animahost_notice_template_immutable' AND NOT tgisinternal) THEN
+   RAISE EXCEPTION 'Die Mitteilungsvorlagen sind nur teilweise vorhanden; bitte den Datenbankstand prüfen.';
+  END IF;
+ ELSE
  CREATE TABLE public.animahost_whatsapp_notice_template_versions (
   tenant_id uuid NOT NULL REFERENCES public.animahost_whatsapp_settings(tenant_id),
   template_id uuid NOT NULL,
@@ -47,5 +60,7 @@ BEGIN
   FROM PUBLIC,anon,authenticated;
  GRANT EXECUTE ON FUNCTION public.animahost_publish_notice_template(uuid,uuid,integer,text,text,text,boolean,uuid)
   TO service_role;
+ END IF;
 END
 $install$;
+SELECT '090_animahost_whatsapp_notice_templates.sql eingespielt' AS ergebnis;
