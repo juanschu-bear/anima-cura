@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "src/app/scribe/scribe.css"
+        ],
+        "createdAt": "2026-11-19T02:54:36.460Z",
+        "reason": "Existing intentional brand highlight in Scribe heading; font delivery change preserves it unchanged."
+      }
+    ]
+  }
+}

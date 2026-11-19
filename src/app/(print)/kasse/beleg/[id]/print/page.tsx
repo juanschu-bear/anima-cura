@@ -1,4 +1,4 @@
-import { IBM_Plex_Mono, Inter } from "next/font/google";
+import { receiptInter as inter, receiptMono as ibmPlexMono } from "@/lib/local-fonts";
 import { notFound, redirect } from "next/navigation";
 import ReceiptPrintDocument from "@/components/kasse/ReceiptPrintDocument";
 import ReceiptPreviewShell from "@/components/kasse/ReceiptPreviewShell";
@@ -16,19 +16,6 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-receipt-sans",
-  display: "swap",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["500", "700"],
-  variable: "--font-receipt-mono",
-  display: "swap",
-});
 
 export default async function ReceiptPrintPage({
   params,
