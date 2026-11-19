@@ -4,6 +4,7 @@ import { resolveOpenItemAmount, resolvePaidItemAmount, resolveOpenItemStatus } f
 import { projectInvoicePaymentGuidance } from "@/lib/patient-payment-guidance";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { attachPatientInvoiceDocuments, type PatientInvoiceDocument } from "@/lib/patient-invoice-documents";
+import { loadPatientImmediateInvoices } from "@/lib/patient-immediate-invoices";
 
 export async function GET() {
   const session = createServerComponentClient();
@@ -18,7 +19,7 @@ export async function GET() {
 
   const { data: memberships } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
   const patientIds = Array.from(new Set([patient.patientId, ...(memberships ?? []).map(row => row.patient_id)]));
-  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult] = await Promise.all([
+  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult, immediateResult] = await Promise.all([
     supabase
       .from("offene_posten")
       .select("id, patient_id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
@@ -40,6 +41,8 @@ export async function GET() {
     // Uses the patient's session. No service-role access to the billing module.
     session.rpc("patient_invoice_documents_for_access"),
     session.rpc("patient_invoice_document_editions"),
+    loadPatientImmediateInvoices(patientIds).then(items => ({items,status:"available" as const}))
+      .catch(() => ({items:[],status:"unavailable" as const})),
   ]);
 
   const { data: posten, error } = postenResult;
@@ -74,6 +77,8 @@ export async function GET() {
   const documents:PatientInvoiceDocument[]=documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)}));
   return NextResponse.json({
     rechnungen: attachPatientInvoiceDocuments(guided, documents),
+    sofortrechnungen: immediateResult.items,
+    sofortrechnungenStatus: immediateResult.status,
     belegeStatus: documentsResult.error ? "unavailable" : "available",
     zahlungsprofil: {
       guthaben: Math.max(0, credits.get(patient.patientId) ?? 0),

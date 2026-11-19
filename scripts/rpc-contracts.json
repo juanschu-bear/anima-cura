@@ -404,7 +404,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "294739e1e6f022acc1501259510925e974d2aa832571dcd0730e7f755ee915c2",
+      "sha256": "527153bfa4da6ac1515cea4cbb810275b6ef2def9ba778319fb5ec03c6a41e11",
       "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The access RPC executes as a SECURITY DEFINER function, checks auth.uid() and verified patient memberships, and never accepts a patient ID. Edition RPC uses the same authenticated patient session and the same membership scope. No privileged retry.",
       "calls": [
         {
@@ -463,6 +463,30 @@
         {
           "name": "practice_mark_notifications",
           "signature": "public.practice_mark_notifications(p_id uuid, p_before timestamp with time zone)",
+          "role": "authenticated"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patient/internal/immediate-invoice-payment/route.ts",
+      "sha256": "69a5ab75bbd55132d9be480446aa9c5511aa59a12ede55a7e25453da0e805688",
+      "proof": "The internal route authenticates the shared worker secret before parsing input, uses createServerClient backed by the Cura service role, and calls only the protected idempotent cash-booking function. The RPC checks the practice actor again and no browser role has EXECUTE.",
+      "calls": [
+        {
+          "name": "record_immediate_invoice_payment",
+          "signature": "public.record_immediate_invoice_payment(p_command_id uuid,p_invoice_id uuid,p_patient_id uuid,p_actor_id uuid,p_amount_cents bigint,p_payment_method text,p_invoice_number text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patients/[id]/billing-mode/route.ts",
+      "sha256": "8658d3b244a8e652b0de81ff0c5099b4e7f342f3e26f3d8069615f438357e1a0",
+      "proof": "The route uses createServerComponentClient from the signed-in cookie and auth.getUser; set_patient_billing_mode checks authenticated practice roles and writes an audited version. No service-key client is used.",
+      "calls": [
+        {
+          "name": "set_patient_billing_mode",
+          "signature": "public.set_patient_billing_mode(p_patient_id uuid,p_mode text,p_reason text)",
           "role": "authenticated"
         }
       ]
