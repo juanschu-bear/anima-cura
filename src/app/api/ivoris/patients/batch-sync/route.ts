@@ -1,4 +1,5 @@
 import {isPatientSyncCron,discoveryRows} from "@/lib/services/patient-sync-schedule";
+import {fetchIvorisPatientsPage} from "@/lib/api/ivoris-client";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
@@ -8,29 +9,10 @@ import { splitPatientImport, resolveValidPatientImports } from '@/lib/services/p
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro
 
-const DEFAULT_RELAY_HOST = "https://relay.computer-konkret.de";
 const PAGES_PER_BATCH = 100; // alle Seiten in einem Durchlauf
 
 async function fetchIvorisPage(page: number) {
-  const app = process.env.IVORIS_APP!;
-  const appVersion = process.env.IVORIS_APP_VERSION!;
-  const apiKey = process.env.IVORIS_API_KEY!;
-  const linkname = process.env.IVORIS_LINKNAME!;
-  const username = process.env.IVORIS_USERNAME!;
-  const password = process.env.IVORIS_PASSWORD!;
-  const baseUrl = `${DEFAULT_RELAY_HOST}/relay/${linkname}/webservice/api`;
-  const basic = Buffer.from(`${username}:${password}`).toString("base64");
-
-  const url = `${baseUrl}/Patient/v1/AllPatients?app=${encodeURIComponent(app)}&app_version=${encodeURIComponent(appVersion)}&api_key=${encodeURIComponent(apiKey)}&page=${page}`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Basic ${basic}`, Accept: "application/json" },
-    cache: "no-store",
-    signal:AbortSignal.timeout(15000),
-  });
-
-  if (!res.ok) throw new Error(`IVORIS page ${page}: HTTP ${res.status}`);
-  return await res.json();
+  return fetchIvorisPatientsPage(page);
 }
 
 function mapGender(raw: string | null | undefined): string | null {
@@ -118,7 +100,11 @@ export async function GET(request: Request) {
         else numberFields.missing++;
       }
       return NextResponse.json({mode:"diagnostic",page:startPage,patients:page.length,numberFields},{headers:{"Cache-Control":"private, no-store"}});
-    }catch{return NextResponse.json({code:"ivoris_read_failed"},{status:502});}
+    }catch(error){
+      const message=error instanceof Error?error.message:'';
+      const status=message.match(/\((\d{3})\)/)?.[1];
+      return NextResponse.json({code:"ivoris_read_failed",reason:status?`upstream_http_${status}`:/Timeout/i.test(message)?'upstream_timeout':'upstream_network_error'},{status:502});
+    }
   }
   const started=Date.now();
   let nextPageNumber=startPage;
@@ -137,7 +123,7 @@ export async function GET(request: Request) {
     if(Date.now()-started>200000)break;
     let patients: any[];
     try {
-      patients = await fetchIvorisPage(page);
+      patients = await fetchIvorisPage(page) as any[];
     } catch (e) {
       errors.push(`IVORIS page ${page}: request failed`);
       break;
