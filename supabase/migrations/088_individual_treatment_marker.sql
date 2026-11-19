@@ -1,7 +1,7 @@
 -- Patient-level billing mode. Existing patients keep their current plan workflow.
--- Juan applies this file in the Production SQL editor before the module migration.
-BEGIN;
-SET LOCAL lock_timeout = '5s';
+-- Juan applies this single statement in the Production SQL editor before 030.
+DO $install$ BEGIN
+PERFORM set_config('lock_timeout','5s',true);
 
 ALTER TABLE public.patients
   ADD COLUMN IF NOT EXISTS billing_mode text NOT NULL DEFAULT 'plan';
@@ -47,4 +47,4 @@ END $$;
 REVOKE ALL ON FUNCTION public.set_patient_billing_mode(uuid,text,text) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.set_patient_billing_mode(uuid,text,text) TO authenticated;
 
-COMMIT;
+END $install$;
