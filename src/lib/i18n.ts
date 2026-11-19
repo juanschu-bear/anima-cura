@@ -10,6 +10,7 @@ import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
   ...referenceTranslations,
   'animahost.whatsapp.clarify': {de:'Die Praxis prüft Ihre Nachricht und meldet sich.',en:'The practice will review your message and get back to you.'},
+  'animahost.whatsapp.doctolib': {de:'Für diese Terminart können Sie den passenden Termin hier auswählen: {url}',en:'You can choose this appointment type here: {url}'},
   'animahost.whatsapp.emergency': {de:'Bei Atemnot oder akuter Gefahr rufen Sie bitte sofort die 112.',en:'If you have trouble breathing or face immediate danger, call 112 now.'},
   'animahost.whatsapp.urgent': {de:'Bitte rufen Sie wegen der Beschwerden sofort die Praxis an.',en:'Please call the practice immediately about these symptoms.'},
   'animahost.whatsapp.clarify.title': {de:'WhatsApp-Nachricht prüfen',en:'Review WhatsApp message'},
