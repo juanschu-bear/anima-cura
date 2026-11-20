@@ -428,3 +428,4 @@ const CSS = `
 @media (max-width:460px){.iac-root{align-items:flex-start;padding:18px 12px 28px}.iac-card{padding:26px 20px;border-radius:20px}}
 @media (prefers-reduced-motion:reduce){.iac-spin{animation:none}}
 `;
+export { CSS as INVOICE_ACCESS_CSS };
