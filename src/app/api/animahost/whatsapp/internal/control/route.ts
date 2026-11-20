@@ -4,6 +4,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerClient} from '@/lib/db/supabase';
 import {safeRuleText,whatsappRulesSchema} from '@/lib/services/animahost-whatsapp';
+import {closurePeriodsSchema} from '@/lib/services/animahost-practice-closures';
 import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,validateNoticeTemplate,
  type ContactPatient} from '@/lib/services/animahost-contact-notices';
 
@@ -17,6 +18,7 @@ const settingsSchema=z.strictObject({
  practicePhone:z.string().max(40).nullable().optional(),
  salutation:z.enum(['Sie','Du']).optional(),hostName:z.string().trim().min(1).max(80).optional(),
  introduction:z.string().trim().min(1).max(200).optional(),
+ closurePeriods:closurePeriodsSchema.optional(),
 });
 const bodySchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('publish_rules'),actorId:z.string().uuid(),expectedVersion:z.number().int().positive().nullable(),rules:whatsappRulesSchema}),
@@ -47,6 +49,18 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='case_changes'){
+  const id=z.string().uuid().safeParse(request.nextUrl.searchParams.get('patientId'));
+  if(!id.success)return NextResponse.json({code:'patient_invalid'},{status:400,headers});
+  const [contact,recipient]=await Promise.all([
+   db.from('animahost_contact_changes').select('id,state,previous,proposed,created_at,applied_at,confirmed_by')
+    .eq('tenant_id',tenant).eq('patient_id',id.data).order('created_at',{ascending:false}).limit(50),
+   db.from('billing_invoice_recipient_versions').select('id,state,snapshot,ivoris_mirror_state,created_at,activated_at,expires_at')
+    .eq('tenant_id',tenant).eq('patient_id',id.data).order('created_at',{ascending:false}).limit(50),
+  ]);
+  if(contact.error||recipient.error)return unavailable();
+  return NextResponse.json({contactChanges:contact.data,invoiceRecipients:recipient.data},{headers});
+ }
  if(resource==='patient_suggestions'){
   const phone=normalizeContactPhone(request.nextUrl.searchParams.get('phone'));
   if(!phone)return NextResponse.json({code:'phone_invalid'},{status:400,headers});
@@ -159,7 +173,7 @@ export async function POST(request:NextRequest){
  }
  const map={model:'model',voiceOutputEnabled:'voice_output_enabled',voicePerceptionEnabled:'voice_perception_enabled',
   doctolibUrl:'doctolib_url',practicePhone:'practice_phone',salutation:'salutation',
-  hostName:'host_name',introduction:'introduction'} as const;
+  hostName:'host_name',introduction:'introduction',closurePeriods:'closure_periods'} as const;
  const values:Record<string,unknown>={updated_at:new Date().toISOString(),updated_by:input.actorId};
  for(const [key,column] of Object.entries(map)){
   const value=input.settings[key as keyof typeof map];

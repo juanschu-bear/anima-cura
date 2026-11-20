@@ -30,6 +30,8 @@ export const invoiceSnapshot = z.object({
   patientId: z.string().uuid(),
   patientName: z.string().trim().min(1).max(500),
   patientNumber: z.string().nullable().optional(),
+  invoiceRecipient: z.object({ name: z.string().min(1).max(160), street: z.string().min(1).max(160),
+    postalCode: z.string().min(1).max(12), city: z.string().min(1).max(160), email: z.string().email().max(254) }).strict().optional(),
   periodFrom: billingDate,
   periodTo: billingDate,
   payerModel: z.enum(["private_full", "statutory_share"]),
@@ -101,7 +103,15 @@ export async function buildIssuedInvoicePdf(raw: unknown) {
   draw("Dr. Maria Elena Schubert", 48, 17, bold, green); next(20);
   draw("Zahnärztin für Kieferorthopädie", 48, 10, regular, muted); next(14);
   draw("Nikolaistr. 20 im Oelßner's Hof · 04109 Leipzig", 48, 9, regular, muted); next(34);
-  draw(snapshot.patientName, 48, 11, bold); next(16);
+  if (snapshot.invoiceRecipient) {
+    const recipient = snapshot.invoiceRecipient;
+    for (const entry of [recipient.name, recipient.street, `${recipient.postalCode} ${recipient.city}`]) {
+      for (const line of wrap(entry, 64)) { draw(line, 48, 10); next(14); }
+    }
+    draw(`Behandelte Person: ${snapshot.patientName}`, 48, 10, bold); next(16);
+  } else {
+    draw(snapshot.patientName, 48, 11, bold); next(16);
+  }
   if (snapshot.patientNumber) { draw(`Patientennummer: ${snapshot.patientNumber}`, 48, 9, regular, muted); next(14); }
   draw("RECHNUNG", 360, 20, bold, green); next(25);
   draw(`Rechnungsnummer: ${snapshot.invoiceNumber}`, 360, 9); next(14);

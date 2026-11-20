@@ -490,6 +490,88 @@
           "role": "authenticated"
         }
       ]
+    },
+    {
+      "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
+      "sha256": "f85821ce16419f490bdce93c49688a4aae0e679f1d3de924ae15ace957c3a0a4",
+      "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
+      "calls": [
+        {
+          "name": "animahost_publish_notice_template",
+          "signature": "public.animahost_publish_notice_template(p_tenant uuid, p_template uuid, p_expected integer, p_kind text, p_title text, p_body text, p_active boolean, p_actor uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_whatsapp_publish_rules",
+          "signature": "public.animahost_whatsapp_publish_rules(p_tenant uuid, p_expected_version integer, p_rules jsonb, p_actor uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/animahost/whatsapp/followups/route.ts",
+      "sha256": "0036d083ca6b0235be169899a3728c63983e96d6f488892373858bac268a780c",
+      "proof": "The shared daemon secret and practice scope are checked before creating the server service client.",
+      "calls": [
+        {
+          "name": "animahost_claim_recipient_followup",
+          "signature": "public.animahost_claim_recipient_followup(p_tenant uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patient/contact-changes/[id]/route.ts",
+      "sha256": "512a73606222350b2abdf36735288fe273cc66da0bcaab33cd3df5c4c4d529ec",
+      "proof": "The session user and patient scope are resolved in load; the SQL confirms the same account before writing. The RPC client is created by the server service constructor.",
+      "calls": [
+        {
+          "name": "animahost_contact_change",
+          "signature": "public.animahost_contact_change(p_tenant uuid, p_message text, p_patient uuid, p_patch jsonb, p_request uuid, p_user uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/patient/invoice-recipient/confirm/route.ts",
+      "sha256": "fb9ddc75ad7e5f6bf06c2ad110b20fdeed1a499f60e092340dd33c659988d9f3",
+      "proof": "The server service client passes only the hash of a format-checked high-entropy token. The RPC validates and consumes the pending request.",
+      "calls": [
+        {
+          "name": "animahost_confirm_invoice_recipient",
+          "signature": "public.animahost_confirm_invoice_recipient(p_hash text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-attendance.ts",
+      "sha256": "06fafad1355d54fa1bf063eeaf9668ee63e09aeb0763c7a4093f5e79e2d721cc",
+      "proof": "Only the authenticated WhatsApp route supplies its server service client. The service checks practice, patient, visit evidence and private PDF upload before publication.",
+      "calls": [
+        {
+          "name": "animahost_publish_attendance_certificate",
+          "signature": "public.animahost_publish_attendance_certificate(p_document uuid, p_patient uuid, p_tenant uuid, p_message text, p_date date, p_time time without time zone, p_hash text, p_evidence jsonb, p_artwork text, p_title text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-contact-changes.ts",
+      "sha256": "66e746eb2a986e59ce194c5cfb79de2abe6133de69e485cfde2580262c9750ed",
+      "proof": "Only the authenticated WhatsApp route supplies its server service client. The service checks practice, patient, observed contact number and extracted values before requesting a change.",
+      "calls": [
+        {
+          "name": "animahost_contact_change",
+          "signature": "public.animahost_contact_change(p_tenant uuid, p_message text, p_patient uuid, p_patch jsonb, p_request uuid, p_user uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_invoice_recipient_change",
+          "signature": "public.animahost_invoice_recipient_change(p_tenant uuid, p_message text, p_patient uuid, p_patch jsonb, p_new boolean, p_hash text, p_chat text, p_language text)",
+          "role": "service_role"
+        }
+      ]
     }
   ],
   "proofs": [
@@ -568,6 +650,10 @@
     {
       "file": "src/lib/patient-invoice-documents.ts",
       "sha256": "b4776517a2e415d5d6ceae7360f0ed3b53a18c7d4b764ef4234941df5ff151a8"
+    },
+    {
+      "file": "src/app/api/animahost/whatsapp/route.ts",
+      "sha256": "f4aad1e165e0e63067e45db21a53e6f6bf1bcc070cbc230de2e178f171e06c4e"
     }
   ],
   "boundaries": [
@@ -581,6 +667,9 @@
     "retryPendingScribeIvorisPushes",
     "ensureLinkedLocalPatientForSubmission",
     "reconcilePendingAnimaSignSignatures",
-    "resolvePatientInvoicePdf"
+    "resolvePatientInvoicePdf",
+    "issueAttendanceFromChat",
+    "changeChatInvoiceRecipient",
+    "changeChatPatientContact"
   ]
 }

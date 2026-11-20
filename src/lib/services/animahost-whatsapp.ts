@@ -51,10 +51,23 @@ export function explicitOptOut(message:string):boolean{
 }
 
 export function isAppointmentLinkRule(rule:WhatsAppRule):boolean{
- return Boolean(rule.appointmentTypeId)||/doctolib/i.test(rule.patientText);
+ return Boolean(rule.appointmentTypeId);
 }
 
-export function decisionFromRule(rule:WhatsAppRule|null):WhatsAppDecision{
- if(!rule||!safeRuleText(rule))return {action:'klaerfall',text:t('animahost.whatsapp.clarify','de'),rule:'no_applicable_rule'};
- return {action:rule.action,text:rule.patientText,rule:rule.id};
+export function renderWhatsAppRuleText(text: string, doctolibUrl: string | null): string | null {
+ if (!text.includes('{doctolib_link}')) return text;
+ if (!doctolibUrl) return null;
+ try {
+  const url = new URL(doctolibUrl);
+  if (url.protocol !== 'https:' || url.username || url.password) return null;
+  return text.replaceAll('{doctolib_link}', url.href);
+ } catch {
+  return null;
+ }
+}
+
+export function decisionFromRule(rule:WhatsAppRule|null, doctolibUrl: string | null = null):WhatsAppDecision{
+ const text = rule && safeRuleText(rule) ? renderWhatsAppRuleText(rule.patientText, doctolibUrl) : null;
+ if(!rule||text===null)return {action:'klaerfall',text:t('animahost.whatsapp.clarify','de'),rule:'no_applicable_rule'};
+ return {action:rule.action,text,rule:rule.id};
 }

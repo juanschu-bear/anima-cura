@@ -84,6 +84,7 @@ export async function requestInvoiceAccess(input: { email: string; next?: string
     const mail = buildInvoiceAccessLinkEmail(url, locale(input.language));
     const sent = await sendEmail({ to: email, subject: mail.subject, body: mail.html, track: false, idempotencyKey: `invoice-access-${hashToken(token)}` });
     if (sent.ok) await db.from("invoice_access_events").insert({ contact_id: contact.id, event: "mail_sent" });
+    return { ...result, mailAccepted: sent.ok };
   }
   return result;
 }

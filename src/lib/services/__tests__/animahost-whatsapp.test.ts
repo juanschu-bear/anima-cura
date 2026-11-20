@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {candidateRules,decisionFromRule,emergencyDecision,explicitOptOut,mandatoryAppointmentClarification,
  isAppointmentLinkRule,safeRuleText,whatsappRulesSchema} from '../animahost-whatsapp';
+import {appointmentNoticeDecision,appointmentNoticeFromDecision} from '../animahost-appointment-notices';
+import {closureDecision,closurePeriodsSchema} from '../animahost-practice-closures';
 
 const rule={id:'doctolib',topic:'Termine online buchen',keywords:['termin','buchen'],
  action:'antworten' as const,patientText:'Termine können Sie direkt über Doctolib buchen.'};
@@ -33,13 +35,38 @@ test('practice arrangements and appliance appointments override a possible onlin
  ])assert.equal(mandatoryAppointmentClarification(message),true,message);
  assert.equal(mandatoryAppointmentClarification('Ich möchte eine Routinekontrolle für die feste Spange buchen.'),false);
 });
-test('approved appointment types are complete and unique; generic Doctolib rules never bypass them',()=>{
+test('approved appointment types are complete and unique; other rules can render a Doctolib placeholder',()=>{
  const appointment={...rule,appointmentTypeId:'routine_control',
   appointmentDescription:'Reguläre Verlaufskontrolle einer bestehenden Zahnspange'};
  assert.equal(whatsappRulesSchema.safeParse([appointment]).success,true);
  assert.equal(whatsappRulesSchema.safeParse([{...rule,appointmentTypeId:'routine_control'}]).success,false);
  assert.equal(whatsappRulesSchema.safeParse([appointment,{...appointment,id:'other'}]).success,false);
- assert.equal(isAppointmentLinkRule(rule),true);
+ assert.equal(isAppointmentLinkRule(appointment),true);
+ assert.equal(isAppointmentLinkRule(rule),false);
+ const rebook={...rule,patientText:'Wenn Sie neu buchen möchten: {doctolib_link}'};
+ assert.equal(decisionFromRule(rebook,'https://www.doctolib.de/praxis').text,
+  'Wenn Sie neu buchen möchten: https://www.doctolib.de/praxis');
+ assert.equal(decisionFromRule(rebook).action,'klaerfall');
+ assert.equal(decisionFromRule(rebook,'http://www.doctolib.de/praxis').action,'klaerfall');
+});
+test('appointment notices respect Berlin date and the strict 15-minute threshold',()=>{
+ const received='2026-11-19T23:05:00Z';
+ const late={kind:'late' as const,appointmentDate:'2026-11-20',delayMinutes:16};
+ const decide=(notice:Parameters<typeof appointmentNoticeDecision>[0])=>appointmentNoticeDecision(notice,received,'de',null,null);
+ assert.equal(decide({...late,delayMinutes:15}),null);
+ assert.equal(decide({...late,delayMinutes:null}),null);
+ assert.deepEqual(appointmentNoticeFromDecision(decide(late)!),{kind:'late',urgent:true});
+ assert.deepEqual(appointmentNoticeFromDecision(decide({...late,kind:'cancel'})!),{kind:'cancel',urgent:true});
+ assert.deepEqual(appointmentNoticeFromDecision(decide({...late,kind:'reschedule'})!),{kind:'reschedule',urgent:false});
+ assert.deepEqual(appointmentNoticeFromDecision(decide({...late,kind:'missed'})!),{kind:'missed',urgent:false});
+ assert.deepEqual(appointmentNoticeFromDecision(decide({...late,kind:'cancel',appointmentDate:'2026-11-21'})!),{kind:'cancel',urgent:false});
+});
+test('a closure answers only for the stored period, including both ends',()=>{
+ const periods=[{from:'2026-12-24',through:'2027-01-03',kind:'holiday'}];
+ assert.equal(closurePeriodsSchema.safeParse([{...periods[0],through:'2026-12-23'}]).success,false);
+ assert.equal(closureDecision(periods,'2026-12-24','de')?.rule,'practice_closure:holiday');
+ assert.equal(closureDecision(periods,'2027-01-03','en')?.action,'antworten');
+ assert.equal(closureDecision(periods,'2027-01-04','de'),null);
 });
 test('common stop wording is recognized even before model acceptance',()=>{
  for(const text of ['Stopp','Bitte keine WhatsApp-Nachrichten mehr',

@@ -6,12 +6,14 @@ const ALLOWED_SECTIONS = new Set(["documents", "invoices"]);
 type PortalTargetInput = {
   document?: string | null;
   section?: string | null;
+  contactChange?: string | null;
 };
 
 export function buildPatientPortalTarget(input: PortalTargetInput = {}) {
   const params = new URLSearchParams();
   if (input.document && DOCUMENT_ID.test(input.document)) params.set("document", input.document);
   if (input.section && ALLOWED_SECTIONS.has(input.section)) params.set("section", input.section);
+  if (input.contactChange && DOCUMENT_ID.test(input.contactChange)) params.set("contactChange", input.contactChange);
   const query = params.toString();
   return `${PATIENT_PORTAL_PATH}${query ? `?${query}` : ""}`;
 }
@@ -24,6 +26,7 @@ export function safePatientTarget(value: string | null | undefined) {
     return buildPatientPortalTarget({
       document: parsed.searchParams.get("document"),
       section: parsed.searchParams.get("section"),
+      contactChange: parsed.searchParams.get("contactChange"),
     });
   } catch {
     return PATIENT_PORTAL_PATH;

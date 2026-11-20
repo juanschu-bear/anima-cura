@@ -71,6 +71,12 @@ export async function buildInvoiceCancellationPdf(raw: unknown) {
   text('Dr. Maria Elena Schubert', 17, true);
   text('Zahnärztin für Kieferorthopädie', 10, false, muted);
   text("Nikolaistr. 20 im Oelßner's Hof · 04109 Leipzig", 9, false, muted); y -= 24;
+  if (original.invoiceRecipient) {
+    const recipient = original.invoiceRecipient;
+    text(recipient.name, 12, true);
+    text(recipient.street, 10);
+    text(`${recipient.postalCode} ${recipient.city}`, 10);
+  }
   text(original.patientName, 12, true);
   if (original.patientNumber) text(`Patientennummer: ${original.patientNumber}`, 10, false, muted);
   y -= 24;

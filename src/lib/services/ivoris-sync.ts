@@ -200,6 +200,13 @@ function normalizePatient(raw: GenericRecord): { ok: true; patient: NormalizedPa
   return { ok: true, patient };
 }
 
+export async function ivorisContactImportFields(db: ReturnType<typeof createServerClient>) {
+  const result = await db.from('patients').select('ivoris_contact_import').limit(0);
+  if (!result.error) return { ivoris_contact_import: true as const };
+  if (['42703', 'PGRST204'].includes(result.error.code) && result.error.message.includes('ivoris_contact_import')) return {};
+  throw Error('ivoris_contact_import_schema_unavailable');
+}
+
 export async function syncIvorisPatients(): Promise<{
   imported: number;
   updated: number;
@@ -207,6 +214,7 @@ export async function syncIvorisPatients(): Promise<{
   errors: string[];
 }> {
   const db = createServerClient();
+  const importFields = await ivorisContactImportFields(db);
   const errors: string[] = [];
   let imported = 0;
   let updated = 0;
@@ -269,6 +277,7 @@ export async function syncIvorisPatients(): Promise<{
       const { error } = await db
         .from("patients")
         .update({
+          ...importFields,
           ...(patient.ivoris_nummer ? { ivoris_nummer: patient.ivoris_nummer } : {}),
           vorname: patient.vorname,
           nachname: patient.nachname,
@@ -323,6 +332,7 @@ export async function syncIvorisPatients(): Promise<{
         const { error: linkError } = await db
           .from("patients")
           .update({
+            ...importFields,
             ivoris_id: patient.ivoris_id,
             ...(patient.ivoris_nummer ? { ivoris_nummer: patient.ivoris_nummer } : {}),
             vorname: patient.vorname,

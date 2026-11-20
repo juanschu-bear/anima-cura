@@ -3,7 +3,7 @@ import {fetchIvorisPatientsPage} from "@/lib/api/ivoris-client";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { requirePraxisRole } from "@/lib/require-praxis";
-import { findPotentialDuplicateCandidates, ivorisHumanReadableId, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
+import { findPotentialDuplicateCandidates, ivorisContactImportFields, ivorisHumanReadableId, patientIdentityMatchKind } from "@/lib/services/ivoris-sync";
 import { splitPatientImport, resolveValidPatientImports } from '@/lib/services/patient-import-review';
 
 export const runtime = "nodejs";
@@ -110,6 +110,8 @@ export async function GET(request: Request) {
   let nextPageNumber=startPage;
 
   const db = createServerClient();
+  const importFields = await ivorisContactImportFields(db).catch(() => null);
+  if (!importFields) return NextResponse.json({ code: 'ivoris_contact_import_schema_unavailable' }, { status: 503 });
   let totalFetched = 0;
   let totalUpserted = 0;
   let totalSkipped = 0;
@@ -265,6 +267,7 @@ export async function GET(request: Request) {
           const { error: linkError } = await db
             .from("patients")
             .update({
+              ...importFields,
               ivoris_id: row.ivoris_id,
               ivoris_nummer: row.ivoris_nummer ?? candidate.ivoris_nummer ?? null,
               vorname: row.vorname,
@@ -310,7 +313,7 @@ export async function GET(request: Request) {
 
     const { error } = await db
       .from("patients")
-      .upsert(rows, { onConflict: "ivoris_id" });
+      .upsert(rows.map(row => ({ ...row, ...importFields })), { onConflict: "ivoris_id" });
 
     if (error) {
       errors.push(`Upsert Seite ${page}: ${error.message}`);
