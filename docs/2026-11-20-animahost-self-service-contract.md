@@ -60,4 +60,16 @@ Beide Antworten haben HTTP 200. Unbekannte, widerrufene und falsch formatierte C
 - **Änderung der Kontaktadresse**: Nach eindeutiger Chatzuordnung werden Anschrift und Telefonnummer in der Patientenakte geändert. Anima Cura speichert Alt- und Neuwert. Eine Änderung mit neuer E-Mail bleibt bis zur Bestätigung im bisherigen App-Konto offen. `ANIMAHOST_CONTACT_CONFIRM_PAGE_READY=true` erst setzen, nachdem Claude die Abfrage `contactChange` in `/patient/portal?contactChange=<id>` angeschlossen hat. `GET /api/patient/contact-changes/<id>` liefert für den berechtigten Patienten `{id,state,proposed}`. `POST` an denselben Pfad bestätigt und liefert `{id,state:"applied"}`. Browser-Sitzung und gleicher Origin sind erforderlich. HTTP 409 bei `contact_change_expired`, `contact_change_stale` oder `contact_email_conflict`. Ein Vorschlag läuft nach 24 Stunden ab. Der Import erhält die bestätigten Kontaktfelder. Andere Stammdaten werden wie bisher synchronisiert.
 - **Akte im Leitstand**: `GET /api/animahost/control?resource=case_changes&patientId=<uuid>` für `admin` und `verwaltung` liefert `contactChanges: [{id,state,previous,proposed,created_at,applied_at,confirmed_by}]` und `invoiceRecipients: [{id,state,snapshot,ivoris_mirror_state,created_at,activated_at,expires_at}]`, jeweils maximal 50. `snapshot` enthält `name`, `street`, `postalCode`, `city`, `email`.
 
-Für die Freigabe sind die geprüften Migrationen 091 bis 094, ein erneuter Modelltest mit Regelbuch Version 4 und die oben beschriebenen Seiten und Dateien nötig.
+Für die Freigabe sind die geprüften Migrationen 091 bis 094, ein erneuter Modelltest mit Regelbuch Version 6 und die oben beschriebenen Seiten und Dateien nötig.
+
+## „Das war ich nicht“ im Patientenportal
+
+`POST /api/patient/contact-changes/<id>` mit JSON `{ "action": "reject" }`, derselben Browser-Sitzung und demselben Origin wie beim Bestätigen. Bei Erfolg kommt HTTP 200 `{ "id": "<id>", "state": "rejected" }`. Wiederholen gibt dieselbe Antwort. Das System protokolliert Zeitpunkt und angemeldetes Konto und legt je Praxisrolle genau eine wichtige Meldung mit Link zur Akte an. Die ablehnende Person sieht keine alten oder neuen Kontaktdaten in dieser Antwort.
+
+- Ein späteres `GET` oder eine Bestätigung desselben Vorschlags liefert HTTP 409 `{ "code": "contact_change_rejected" }`.
+- Bereits angewandt: HTTP 409 `{ "code": "contact_change_already_applied" }`. Abgelaufene, unverarbeitete Vorschläge können noch gemeldet werden.
+- Unbekannter oder fremder Vorschlag: HTTP 404 `contact_change_not_found`. Ohne Sitzung: HTTP 401 `not_authenticated`. Fremder Origin: HTTP 403 `invalid_origin`. Technischer Fehler: HTTP 503 `contact_change_unavailable`.
+
+Migration 095 schaltet die Ablehnung frei. Aktuelle Grundlage der Modellabnahme ist Regelbuchversion 6 mit 83 Regeln und 17 Regeltexten mit `{doctolib_link}`.
+
+Der Leitstand liest die Meldungen über `GET /api/animahost/control?resource=contact_alerts` als `{ notices: [{ id, kind: "wichtig", title, body, link, createdAt }] }`. Die Sitzung liefert die Praxisrolle. `link` führt zur betroffenen Akte in Anima Cura. Fehler beim Lesen ergeben HTTP 503 `contact_alerts_unavailable`.

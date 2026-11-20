@@ -10,6 +10,7 @@ import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string }> = {
   ...referenceTranslations,
   'animahost.whatsapp.clarify': {de:'Die Praxis prüft Ihre Nachricht und meldet sich.',en:'The practice will review your message and get back to you.'},
+  'animahost.whatsapp.askTopic': {de:'Wie kann ich Ihnen helfen?',en:'How can I help you?'},
   'animahost.whatsapp.doctolib': {de:'Für diese Terminart können Sie den passenden Termin hier auswählen: {url}',en:'You can choose this appointment type here: {url}'},
   'animahost.whatsapp.emergency': {de:'Bei Atemnot oder akuter Gefahr rufen Sie bitte sofort die 112.',en:'If you have trouble breathing or face immediate danger, call 112 now.'},
   'animahost.whatsapp.urgent': {de:'Bitte rufen Sie wegen der Beschwerden sofort die Praxis an.',en:'Please call the practice immediately about these symptoms.'},
@@ -67,6 +68,8 @@ const translations: Record<string, { de: string; en: string }> = {
   'selfService.contact.intro': {de:"Diese Angaben wurden im WhatsApp-Chat mit der Praxis genannt. Stimmen sie?",en:"These details were given in the WhatsApp chat with the practice. Are they correct?"},
   'selfService.contact.button': {de:"Ja, so übernehmen",en:"Yes, apply"},
   'selfService.contact.notMe': {de:"Das war ich nicht",en:"That was not me"},
+  'selfService.contact.rejectedNoticeTitle': {de:"Kontaktänderung abgelehnt",en:"Contact change rejected"},
+  'selfService.contact.rejectedNoticeBody': {de:"Ein Patient meldet, dass die im WhatsApp-Chat angefragte Änderung seiner Kontaktdaten nicht von ihm stammt. Vorgang: {requestId}",en:"A patient reports that they did not request the contact change proposed in the WhatsApp chat. Reference: {requestId}"},
   'selfService.contact.close': {de:"Schließen",en:"Close"},
   'selfService.contact.doneTitle': {de:"Ihre Kontaktdaten sind aktualisiert",en:"Your contact details are updated"},
   'selfService.contact.doneText': {de:"Die Praxis schreibt Ihnen ab jetzt an die neue Adresse.",en:"The practice will use the new address from now on."},

@@ -522,12 +522,17 @@
     },
     {
       "file": "src/app/api/patient/contact-changes/[id]/route.ts",
-      "sha256": "512a73606222350b2abdf36735288fe273cc66da0bcaab33cd3df5c4c4d529ec",
+      "sha256": "6b25ecd3902a72e6f7b125e0ba397aeb283e0f0ac0cbd6ace5e8e9ce6d45d2b5",
       "proof": "The session user and patient scope are resolved in load; the SQL confirms the same account before writing. The RPC client is created by the server service constructor.",
       "calls": [
         {
           "name": "animahost_contact_change",
           "signature": "public.animahost_contact_change(p_tenant uuid, p_message text, p_patient uuid, p_patch jsonb, p_request uuid, p_user uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_reject_contact_change",
+          "signature": "public.animahost_reject_contact_change(p_request uuid, p_user uuid, p_title text, p_body text)",
           "role": "service_role"
         }
       ]
@@ -653,7 +658,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "f4aad1e165e0e63067e45db21a53e6f6bf1bcc070cbc230de2e178f171e06c4e"
+      "sha256": "53dc5f6925457d0072753eddf657ab9a8f639210cd33b3f2be768c822849012f"
     }
   ],
   "boundaries": [

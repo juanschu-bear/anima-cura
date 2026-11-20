@@ -2,12 +2,20 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient } from '@/lib/db/supabase';
 import { createServerComponentClient } from '@/lib/db/supabase-server';
+import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers });
+const postSchema = z.object({ action: z.enum(['confirm', 'reject']).default('confirm') }).strict();
 
-async function load(id: string) {
+function displayChanges(values: Record<string, unknown>) {
+  const labels = { email: 'email', telefon: 'phone', strasse: 'street', plz: 'postalCode', ort: 'city' };
+  return Object.fromEntries(Object.entries(labels).flatMap(([field, label]) =>
+    typeof values[field] === 'string' ? [[label, values[field]]] : []));
+}
+
+async function load(id: string, allowExpired = false) {
   if (!z.string().uuid().safeParse(id).success) return reply({ code: 'contact_change_not_found' }, 404);
   const session = createServerComponentClient();
   const { data: { user } } = await session.auth.getUser();
@@ -24,22 +32,38 @@ async function load(id: string) {
     if (membership.error) return reply({ code: 'contact_change_unavailable' }, 503);
     if (!membership.data) return reply({ code: 'contact_change_not_found' }, 404);
   }
-  if (change.state === 'pending' && Date.parse(change.created_at) < Date.now() - 86_400_000) return reply({ code: 'contact_change_expired' }, 409);
+  if (!allowExpired && change.state === 'pending' && Date.parse(change.created_at) < Date.now() - 86_400_000) return reply({ code: 'contact_change_expired' }, 409);
   return { user, change, db };
 }
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const loaded = await load(params.id);
-  return loaded instanceof Response ? loaded : reply({ id: params.id, state: loaded.change.state, proposed: loaded.change.proposed });
+  if (loaded instanceof Response) return loaded;
+  if (loaded.change.state === 'rejected') return reply({ code: 'contact_change_rejected' }, 409);
+  return reply({ id: params.id, state: loaded.change.state, proposed: displayChanges(loaded.change.proposed) });
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   if (request.headers.get('origin') !== request.nextUrl.origin) return reply({ code: 'invalid_origin' }, 403);
-  const loaded = await load(params.id);
+  const body = await request.text();
+  let input: unknown = {};
+  try { if (body.trim()) input = JSON.parse(body); } catch { return reply({ code: 'contact_change_invalid' }, 400); }
+  const parsed = postSchema.safeParse(input);
+  if (!parsed.success) return reply({ code: 'contact_change_invalid' }, 400);
+  const rejecting = parsed.data.action === 'reject';
+  const loaded = await load(params.id, rejecting);
   if (loaded instanceof Response) return loaded;
-  const result = await loaded.db.rpc('animahost_contact_change', { p_tenant: null, p_message: null, p_patient: null,
-    p_patch: null, p_request: params.id, p_user: loaded.user.id });
+  if (!rejecting && loaded.change.state === 'rejected') return reply({ code: 'contact_change_rejected' }, 409);
+  const result = rejecting
+    ? await loaded.db.rpc('animahost_reject_contact_change', {
+      p_request: params.id, p_user: loaded.user.id,
+      p_title: t('selfService.contact.rejectedNoticeTitle', 'de'),
+      p_body: t('selfService.contact.rejectedNoticeBody', 'de', { requestId: params.id }),
+    })
+    : await loaded.db.rpc('animahost_contact_change', { p_tenant: null, p_message: null, p_patient: null,
+      p_patch: null, p_request: params.id, p_user: loaded.user.id });
   if (!result.error) return reply(result.data);
-  const reason = ['contact_change_expired', 'contact_change_stale', 'contact_email_conflict'].find(code => result.error.message.includes(code));
+  if (result.error.message.includes('contact_change_not_found')) return reply({ code: 'contact_change_not_found' }, 404);
+  const reason = ['contact_change_expired', 'contact_change_stale', 'contact_email_conflict', 'contact_change_rejected', 'contact_change_already_applied'].find(code => result.error.message.includes(code));
   return reply({ code: reason ?? 'contact_change_unavailable' }, reason ? 409 : 503);
 }

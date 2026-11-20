@@ -4,6 +4,7 @@ import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
 const migration = readFileSync('supabase/migrations/094_animahost_contact_and_invoice_recipient.sql', 'utf8');
+const rejectMigration = readFileSync('supabase/migrations/095_animahost_reject_contact_change.sql', 'utf8');
 const tenant = '0514a140-e570-4c10-a5c1-838a2cfd1d12';
 const patient = '00000000-0000-4000-8000-000000000001';
 const user = '00000000-0000-4000-8000-000000000002';
@@ -21,10 +22,12 @@ test('contact and recipient changes stay patient-scoped, auditable and stable th
       CREATE TABLE zahler(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text, strasse text, plz text, ort text, email text);
       CREATE TABLE behandlungsfall(patient_id uuid,zahler_id uuid,status text);
       CREATE TABLE billing_invoices(patient_id uuid,snapshot jsonb);
-      CREATE TABLE practice_notifications(recipient_role text,kind text,title text,body text,link text,source_key text,UNIQUE(source_key,recipient_role));
+      CREATE TABLE practice_notifications(recipient_role text,kind text,title text NOT NULL,body text NOT NULL,link text,source_key text,UNIQUE(source_key,recipient_role));
       GRANT SELECT,INSERT,UPDATE ON patients,user_profiles,patient_access_memberships,zahler,behandlungsfall,practice_notifications TO service_role;`);
     const result = await db.exec(migration);
     assert.match(String((result.at(-1)?.rows[0] as { ergebnis: string }).ergebnis), /094.*eingespielt/);
+    await db.exec(rejectMigration);
+    assert.match(String(((await db.exec(rejectMigration)).at(-1)?.rows[0] as { ergebnis: string }).ergebnis), /095.*eingespielt/);
     await db.query('INSERT INTO animahost_whatsapp_settings VALUES ($1)', [tenant]);
     await db.query("INSERT INTO patients(id,ivoris_id,vorname,nachname,email) VALUES ($1,'p','Mia','Muster','before@example.de')", [patient]);
     await db.query("INSERT INTO user_profiles VALUES($1,'patient',$2)", [user, patient]);
@@ -41,6 +44,21 @@ test('contact and recipient changes stay patient-scoped, auditable and stable th
     await db.query("INSERT INTO patients(id,ivoris_id,email,ivoris_contact_import,telefon,strasse) VALUES($1,'p','old@example.de',true,'+4934100','Alte Straße') ON CONFLICT(ivoris_id) DO UPDATE SET email=excluded.email,telefon=excluded.telefon,strasse=excluded.strasse,ivoris_contact_import=excluded.ivoris_contact_import", [patient]);
     const updated = (await db.query('SELECT email,telefon,strasse,ivoris_contact_import AS marker FROM patients')).rows[0];
     assert.deepEqual(updated, { email: 'after@example.de', telefon: '+4934100', strasse: 'Neue Straße 2', marker: false });
+
+    const unwanted = (await db.query<{ result: { id: string } }>(changeSql,
+      [tenant, 'wamid.unwanted', patient, JSON.stringify({ email: 'unwanted@example.invalid' }), null, null])).rows[0].result.id;
+    const reject = 'SELECT animahost_reject_contact_change($1,$2,$3,$4) AS result';
+    await assert.rejects(db.query(reject, [unwanted, unrelated, 'Abgelehnt', 'Vorschlag prüfen.']), /contact_change_not_found/);
+    await assert.rejects(db.query(reject, [requestId, user, 'Abgelehnt', 'Vorschlag prüfen.']), /contact_change_already_applied/);
+    await assert.rejects(db.query(reject, [unwanted, user, null, 'Vorschlag prüfen.']), /null value/);
+    assert.deepEqual((await db.query('SELECT state FROM animahost_contact_changes WHERE id=$1', [unwanted])).rows, [{ state: 'pending' }]);
+    const rejection = await db.query(reject, [unwanted, user, 'Abgelehnt', 'Vorschlag prüfen.']);
+    assert.deepEqual(rejection.rows, [{ result: { id: unwanted, state: 'rejected' } }]);
+    assert.deepEqual((await db.query(reject, [unwanted, user, 'Abgelehnt', 'Vorschlag prüfen.'])).rows, rejection.rows);
+    assert.deepEqual((await db.query('SELECT recipient_role,kind,link FROM practice_notifications ORDER BY recipient_role')).rows,
+      ['admin', 'verwaltung'].map(recipient_role => ({ recipient_role, kind: 'wichtig', link: '/patienten/' + patient })));
+    await assert.rejects(db.query(changeSql, [null, null, null, null, unwanted, user]), /contact_change_rejected/);
+    assert.deepEqual((await db.query('SELECT email FROM patients')).rows, [{ email: 'after@example.de' }]);
 
     const address = { name: 'Alex Muster', street: 'Nebenstraße 4', postalCode: '04109', city: 'Leipzig', email: 'payer@example.de' };
     const confirmation = 'a'.repeat(64);
