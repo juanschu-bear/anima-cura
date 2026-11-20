@@ -67,6 +67,7 @@ Für die Freigabe sind die geprüften Migrationen 091 bis 094, ein erneuter Mode
 `POST /api/patient/contact-changes/<id>` mit JSON `{ "action": "reject" }`, derselben Browser-Sitzung und demselben Origin wie beim Bestätigen. Bei Erfolg kommt HTTP 200 `{ "id": "<id>", "state": "rejected" }`. Wiederholen gibt dieselbe Antwort. Das System protokolliert Zeitpunkt und angemeldetes Konto und legt je Praxisrolle genau eine wichtige Meldung mit Link zur Akte an. Die ablehnende Person sieht keine alten oder neuen Kontaktdaten in dieser Antwort.
 
 - Ein späteres `GET` oder eine Bestätigung desselben Vorschlags liefert HTTP 409 `{ "code": "contact_change_rejected" }`.
+- In der Akte liefert `GET /api/animahost/control?resource=case_changes&patientId=<uuid>` den Eintrag weiter in `contactChanges`, mit `state: "rejected"`. Die Anzeige dafür lautet „Abgelehnt“. `previous` und `proposed` bleiben zur Prüfung erhalten. `applied_at` und `confirmed_by` bleiben leer.
 - Bereits angewandt: HTTP 409 `{ "code": "contact_change_already_applied" }`. Abgelaufene, unverarbeitete Vorschläge können noch gemeldet werden.
 - Unbekannter oder fremder Vorschlag: HTTP 404 `contact_change_not_found`. Ohne Sitzung: HTTP 401 `not_authenticated`. Fremder Origin: HTTP 403 `invalid_origin`. Technischer Fehler: HTTP 503 `contact_change_unavailable`.
 
