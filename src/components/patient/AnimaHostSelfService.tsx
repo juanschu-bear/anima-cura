@@ -150,9 +150,9 @@ export function ContactChangeConfirm({ id }: { id: string }) {
   const [locale, setLocale] = useState<Locale>("de");
   const [open, setOpen] = useState(true);
   const [proposed, setProposed] = useState<unknown>(null);
-  const [state, setState] = useState<"loading" | "ready" | "sending" | "done" | "gone" | "expired" | "conflict" | "down">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "sending" | "done" | "asking" | "rejecting" | "rejected" | "alreadyApplied" | "gone" | "expired" | "conflict" | "down">("loading");
   const t = (k: string, v?: Record<string, string | number>) => translate(k, locale, v);
-  const fromCode = (c: unknown) => (c === "contact_change_expired" ? "expired" : c === "contact_email_conflict" ? "conflict" : c === "contact_change_stale" || c === "contact_change_not_found" ? "gone" : "down");
+  const fromCode = (c: unknown) => (c === "contact_change_expired" ? "expired" : c === "contact_email_conflict" ? "conflict" : c === "contact_change_rejected" ? "rejected" : c === "contact_change_already_applied" ? "alreadyApplied" : c === "contact_change_stale" || c === "contact_change_not_found" ? "gone" : "down");
 
   useEffect(() => {
     setLocale(localeNow());
@@ -180,6 +180,16 @@ export function ContactChangeConfirm({ id }: { id: string }) {
       setState(r.ok && body.state === "applied" ? "done" : fromCode(body.code));
     } catch { setState("down"); }
   }
+  // „Das war ich nicht“: meldet der Praxis, dass die Änderung nicht vom Patienten kam. Nichts an den Kontaktdaten ändert sich.
+  async function reject() {
+    if (state !== "asking") return;
+    setState("rejecting");
+    try {
+      const r = await post(`/api/patient/contact-changes/${id}`, { action: "reject" });
+      const body = await json(r);
+      setState(r.ok && body.state === "rejected" ? "rejected" : fromCode(body.code));
+    } catch { setState("down"); }
+  }
   if (!open) return null;
   const close = <button type="button" className="ahs-ghost" onClick={() => setOpen(false)}>{t("selfService.contact.close")}</button>;
   const rows = proposedRows(proposed);
@@ -189,6 +199,17 @@ export function ContactChangeConfirm({ id }: { id: string }) {
       <Frame tag={t("selfService.contact.tag")}>
         {state === "loading" ? <p className="iac-sub"><Loader2 size={16} className="iac-spin" aria-hidden="true" /> {t("selfService.sending")}</p>
           : state === "done" ? <div className="iac-done"><CheckCircle2 size={44} className="iac-done-icon" aria-hidden="true" /><h1 className="iac-title">{t("selfService.contact.doneTitle")}</h1><p className="iac-sub">{t("selfService.contact.doneText")}</p>{close}</div>
+          : state === "rejected" ? <div className="iac-done"><ShieldCheck size={44} className="iac-done-icon" aria-hidden="true" /><h1 className="iac-title">{t("selfService.contact.rejectedTitle")}</h1><p className="iac-sub">{t("selfService.contact.rejectedText")}</p>{close}</div>
+          : state === "asking" || state === "rejecting" ? (
+            <>
+              <h1 className="iac-title">{t("selfService.contact.rejectAsk")}</h1>
+              <p className="iac-sub">{t("selfService.contact.rejectAskText")}</p>
+              <button type="button" className="iac-submit" onClick={reject} disabled={state === "rejecting"}>
+                {state === "rejecting" ? <Busy label={t("selfService.sending")} /> : <><ShieldCheck size={18} aria-hidden="true" />{t("selfService.contact.rejectButton")}</>}
+              </button>
+              <button type="button" className="ahs-ghost" onClick={() => setState("ready")} disabled={state === "rejecting"}>{t("selfService.contact.back")}</button>
+            </>
+          )
           : state === "ready" || state === "sending" ? (
             <>
               <h1 className="iac-title">{t("selfService.contact.title")}</h1>
@@ -197,7 +218,7 @@ export function ContactChangeConfirm({ id }: { id: string }) {
               <button type="button" className="iac-submit" onClick={confirm} disabled={state === "sending"}>
                 {state === "sending" ? <Busy label={t("selfService.sending")} /> : <><CheckCircle2 size={18} aria-hidden="true" />{t("selfService.contact.button")}</>}
               </button>
-              <button type="button" className="ahs-ghost" onClick={() => setOpen(false)}>{t("selfService.contact.notMe")}</button>
+              <button type="button" className="ahs-ghost" onClick={() => setState("asking")} disabled={state === "sending"}>{t("selfService.contact.notMe")}</button>
             </>
           ) : (
             <div className="iac-done"><XCircle size={44} className="ahs-bad" aria-hidden="true" />
