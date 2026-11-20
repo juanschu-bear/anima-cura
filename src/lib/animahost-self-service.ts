@@ -15,7 +15,8 @@ export function germanDate(iso: string): string {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 }
 
-const LABELS: Record<string, string> = { email: "selfService.field.email", phone: "selfService.field.phone", street: "selfService.field.street", postalCode: "selfService.field.postalCode", city: "selfService.field.city" };
+// Schlüssel sind die Spalten der Patientenakte, so wie animahost_contact_changes.proposed sie speichert.
+const LABELS: Record<string, string> = { email: "selfService.field.email", telefon: "selfService.field.phone", strasse: "selfService.field.street", plz: "selfService.field.postalCode", ort: "selfService.field.city" };
 /** Zeigt nur bekannte Textfelder eines Vorschlags, in fester Reihenfolge. */
 export function proposedRows(proposed: unknown): { key: string; label: string; value: string }[] {
   if (!proposed || typeof proposed !== "object") return [];
