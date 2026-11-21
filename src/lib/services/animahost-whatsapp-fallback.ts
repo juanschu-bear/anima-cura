@@ -43,7 +43,7 @@ export function fallbackHints(message: string | null): { topic: FallbackTopic; a
   const appointment = /termin|vorbeikommen|appointment|book a visit|pedir cita|una cita/i.test(text);
   const topic = /attachment|knöpfchen|bracket/i.test(text) ? 'attachment'
     : /spange|schiene|retainer|aligner/i.test(text) ? 'appliance'
-    : /rechnung|zahlung|invoice/i.test(text) ? 'billing'
+    : /rechnung|zahlung|invoice|reimbursement|versicherer.{0,60}rückzahl/i.test(text) ? 'billing'
     : /per telefon|zurückruf|call me/i.test(text) ? 'callback'
     : appointment ? 'appointment' : 'other';
   return { topic, appointment };

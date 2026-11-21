@@ -158,7 +158,7 @@ export async function POST(request:NextRequest){
         maxOutputTokens:650,providerOptions:{gateway:{inferenceRegion:{scope:'zone',geoRegion:'eu'},zeroDataRetention:true}}});
        const chosen=result.output;
        language=chosen.language||'de';
-       topic=hints.topic==='attachment'||hints.topic==='callback'?hints.topic:chosen.fallbackTopic??topic;
+       topic=hints.topic!=='other'&&hints.topic!=='appointment'?hints.topic:chosen.fallbackTopic??topic;
        appointment=chosen.appointmentRelated||appointment||chosen.kind==='appointment'||chosen.kind==='appointment_notice';
        const reportedSymptoms=chosen.emergencyEvidence?.trim()??'';
        const hasEmergencyEvidence=reportedSymptoms.length>=4&&
