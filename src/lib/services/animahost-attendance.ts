@@ -1,5 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { PDFDocument } from 'pdf-lib';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import fontkit from '@pdf-lib/fontkit';
+import { PDFDocument, PDFRef } from 'pdf-lib';
 import type { createServerClient } from '@/lib/db/supabase';
 import { BILLING_DOCUMENTS_BUCKET, billingDocumentPath } from '@/lib/billing-document-access';
 import { buildPatientPortalTarget } from '@/lib/patient-navigation';
@@ -10,7 +13,23 @@ import { patientHasContactPhone } from './animahost-contact-notices';
 type Db = ReturnType<typeof createServerClient>;
 export type AttendanceEvidence = { source: 'tagesplan_termine' | 'doku_tagesdatensaetze' | 'treatment_events'; id: string; occurredAt: string };
 type Identity = { patientId: string; phone: string };
+type Language = 'de' | 'en';
 const localTime = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const certificateDates = {
+  de: new Intl.DateTimeFormat('de-DE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }),
+  en: new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }),
+};
+const boldFontPath = join(process.cwd(), 'src/lib/services/schrift/NunitoSans_700Bold.ttf');
+const regularFontPath = join(process.cwd(), 'src/lib/services/schrift/NunitoSans_400Regular.ttf');
+
+export function attendanceArtworkVersion() {
+  const version = process.env.ANIMAHOST_ATTENDANCE_ARTWORK_VERSION;
+  return version && /^[\w-]{1,80}$/.test(version) ? version : null;
+}
+
+export function mayBeAttendanceRequest(text: string) {
+  return /bescheinigung|\b(?:certificate|proof|confirmation|note)\b.{0,40}\b(?:attend\w*|visit\w*|appointment)\b|\b(?:attend\w*|visit\w*|appointment)\b.{0,40}\b(?:certificate|proof|confirmation|note)\b/i.test(text);
+}
 
 export function uniqueAttendanceTime(witnesses: AttendanceEvidence[], date: string, through: string) {
   const candidates = witnesses.filter(w => Number.isFinite(Date.parse(w.occurredAt)) &&
@@ -51,13 +70,39 @@ async function attendanceProof(db: Db, patientId: string, date: string, received
 
 type PdfFields = { patientName: string; serviceDate: string; serviceTime: string; issuedDate: string; verificationCode: string; verificationUrl: string };
 
-export async function renderAttendanceCertificate(template: Uint8Array, stamp: Uint8Array, signature: Uint8Array, fields: PdfFields) {
+export async function renderAttendanceCertificate(
+  template: Uint8Array, stamp: Uint8Array, signature: Uint8Array, fields: PdfFields, language: Language,
+) {
   const pdf = await PDFDocument.load(template);
+  pdf.registerFontkit(fontkit);
+  const [boldBytes, regularBytes] = await Promise.all([readFile(boldFontPath), readFile(regularFontPath)]);
+  const bold = await pdf.embedFont(boldBytes, { subset: false });
+  const regular = await pdf.embedFont(regularBytes, { subset: false });
   const form = pdf.getForm();
-  for (const [name, value] of Object.entries(fields)) form.getTextField(name).setText(value);
+  const formatDate = (date: string) => certificateDates[language].format(new Date(`${date}T00:00:00Z`));
+  const values = { ...fields, serviceDate: formatDate(fields.serviceDate), issuedDate: formatDate(fields.issuedDate) };
+  for (const [name, value] of Object.entries(values)) form.getTextField(name).setText(value);
+
+  const nameField = form.getTextField('patientName');
+  const width = nameField.acroField.getWidgets()[0].getRectangle().width - 4;
+  let size = 13.5;
+  while (size > 9 && bold.widthOfTextAtSize(fields.patientName, size) > width) size -= 0.5;
+  nameField.setFontSize(size);
+  form.getTextField('verificationUrl').updateAppearances(regular);
+  form.getTextField('issuedDate').updateAppearances(regular);
+  form.updateFieldAppearances(bold);
   form.getButton('practiceStamp').setImage(await pdf.embedPng(stamp));
   form.getButton('practiceSignature').setImage(await pdf.embedPng(signature));
-  form.flatten();
+  form.flatten({ updateFieldAppearances: false });
+  // pdf-lib can delete a field widget but leave its reference in the page annotations.
+  for (const page of pdf.getPages()) {
+    const annotations = page.node.Annots();
+    if (!annotations) continue;
+    for (let index = annotations.size() - 1; index >= 0; index--) {
+      const annotation = annotations.get(index);
+      if (annotation instanceof PDFRef && !pdf.context.lookup(annotation)) annotations.remove(index);
+    }
+  }
   return pdf.save({ useObjectStreams: false });
 }
 
@@ -67,9 +112,10 @@ function nameKey(value: string) {
 
 export async function issueAttendanceFromChat(db: Db, input: {
   identity?: Identity; tenantId: string; messageId: string; receivedAt: string;
-  date: string; patientName: string; language: 'de' | 'en';
+  date: string; patientName: string; language: Language;
 }): Promise<string | null> {
-  if (!input.identity || input.tenantId !== process.env.ANIMAHOST_TENANT_ID || input.date > appointmentLocalDate(input.receivedAt)) return null;
+  const artworkVersion = attendanceArtworkVersion();
+  if (!artworkVersion || !input.identity || input.tenantId !== process.env.ANIMAHOST_TENANT_ID || input.date > appointmentLocalDate(input.receivedAt)) return null;
   const { patientId, phone } = input.identity;
   const row = await db.from('patients').select('id,vorname,nachname,telefon,mobiltelefon,versicherter_telefon,eb2_telefon')
     .eq('id', patientId).maybeSingle();
@@ -79,8 +125,6 @@ export async function issueAttendanceFromChat(db: Db, input: {
   if (![patientName, `${patient.nachname} ${patient.vorname}`].map(nameKey).includes(nameKey(input.patientName))) return null;
   const proof = await attendanceProof(db, patientId, input.date, input.receivedAt);
   if (!proof) return null;
-  const artworkVersion = process.env.ANIMAHOST_ATTENDANCE_ARTWORK_VERSION;
-  if (!artworkVersion || !/^[\w-]{1,80}$/.test(artworkVersion)) return null;
   const bucket = await db.storage.getBucket(BILLING_DOCUMENTS_BUCKET);
   if (bucket.error || bucket.data?.public !== false) return null;
   const storage = db.storage.from(BILLING_DOCUMENTS_BUCKET);
@@ -96,7 +140,7 @@ export async function issueAttendanceFromChat(db: Db, input: {
   const pdf = await renderAttendanceCertificate(blank, stamp, signature, {
     patientName, serviceDate: input.date, serviceTime: proof.time, issuedDate: appointmentLocalDate(new Date().toISOString()),
     verificationCode: code, verificationUrl: 'https://animacura.io/patient/attendance-certificate/verify',
-  });
+  }, input.language);
   const path = billingDocumentPath(patientId, documentId);
   const uploaded = await storage.upload(path, pdf, { contentType: 'application/pdf', upsert: false });
   if (uploaded.error) return null;

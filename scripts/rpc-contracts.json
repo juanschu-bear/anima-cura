@@ -551,7 +551,7 @@
     },
     {
       "file": "src/lib/services/animahost-attendance.ts",
-      "sha256": "06fafad1355d54fa1bf063eeaf9668ee63e09aeb0763c7a4093f5e79e2d721cc",
+      "sha256": "b5500499ddacb9d1795fdf6a92f5ea9ee7a20d835b2cc4ef1f0efdcc62ea802a",
       "proof": "Only the authenticated WhatsApp route supplies its server service client. The service checks practice, patient, visit evidence and private PDF upload before publication.",
       "calls": [
         {
@@ -658,7 +658,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "91551a8c790c77d0ebc0435f70db6b1efa0c2b8b5f4c8fefff622067ed153982"
+      "sha256": "51cf2f9d3491e9722e511cfa443be09950b1ea5b842fea08a76a2ddb88455eac"
     }
   ],
   "boundaries": [
