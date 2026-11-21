@@ -10,7 +10,7 @@ const rule={id:'doctolib',topic:'Termine online buchen',keywords:['termin','buch
 
 test('notfall overrides any rule and places 112 first',()=>{
  assert.deepEqual(emergencyDecision('Mein Kind bekommt keine Luft'),
-  {action:'notfall',text:'Bei Atemnot oder akuter Gefahr rufen Sie bitte sofort die 112.',rule:'emergency_112'});
+  {action:'notfall',text:'Bei Atemnot, starker Blutung oder akuter Gefahr rufen Sie bitte sofort die 112.',rule:'emergency_112'});
  assert.equal(emergencyDecision('Ein Bracket wurde verschluckt')?.action,'notfall');
  assert.equal(emergencyDecision('Der Draht sticht und es blutet')?.action,'notfall');
  assert.equal(emergencyDecision('Die Lippe ist angeschwollen und ich kriege schlecht Luft')?.rule,'emergency_112');
