@@ -1,3 +1,4 @@
+import {patientWriteTarget} from "@/lib/patient-write-target";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -297,20 +298,10 @@ async function executeQuery(action: QueryAction) {
 
       if (!body) return { error: "body parameter required" };
 
-      let email = "";
-      let fullName = "";
-      if (patientId) {
-        const { data } = await getSupabase().from("patients").select("email, vorname, nachname").eq("id", patientId).maybeSingle();
-        email = data?.email || "";
-        fullName = `${data?.vorname || ""} ${data?.nachname || ""}`.trim();
-      } else if (patientName) {
-        const parts = patientName.split(/[,\s]+/).filter(Boolean);
-        if (parts.length >= 1) {
-          const { data } = await getSupabase().from("patients").select("email, vorname, nachname").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
-          email = data?.email || "";
-          fullName = `${data?.vorname || ""} ${data?.nachname || ""}`.trim();
-        }
-      }
+      const target=await patientWriteTarget(supabase,action.params||{});
+      if(target.error)return target;
+      const email=target.patient!.email||"";
+      const fullName=`${target.patient!.vorname||""} ${target.patient!.nachname||""}`.trim();
 
       if (!email) return { error: "Patient email not found" };
 
@@ -334,16 +325,10 @@ async function executeQuery(action: QueryAction) {
 
       if (stage === undefined) return { error: "stage parameter required (0-4)" };
 
-      let id = patientId;
-      if (!id && patientName) {
-        const parts = patientName.split(/[,\s]+/).filter(Boolean);
-        if (parts.length >= 1) {
-          const { data } = await getSupabase().from("patients").select("id").ilike("nachname", `%${parts[0]}%`).limit(1).maybeSingle();
-          id = data?.id;
-        }
-      }
-
-      if (!id) return { error: "Patient not found" };
+      if (!Number.isInteger(stage) || stage < 0 || stage > 4) return {error:"invalid_stage"};
+      const target=await patientWriteTarget(supabase,action.params||{});
+      if(target.error)return target;
+      const id=target.patient!.id;
 
       const { error } = await supabase
         .from("patients")
