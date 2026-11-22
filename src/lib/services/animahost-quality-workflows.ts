@@ -56,6 +56,12 @@ function kindOf(text:string):SubjectTask|'portal'|'general' {
  return 'general';
 }
 
+export function invoicePortalIntent(text:string){
+ if(kindOf(text)==='missing_invoice')return 'missing';
+ if(/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text))return 'section';
+ return null;
+}
+
 const noProgress=/nicht|kein|kann.{0,18}nicht|keine mail|can.t|don.t|no puedo|sigue sin/i;
 const cancellation=/absag|stornier|cancel|no (?:puedo|podré) asistir/i;
 function coverage(text:string,receivedAt:string){

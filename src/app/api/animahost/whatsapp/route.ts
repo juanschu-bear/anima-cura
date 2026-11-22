@@ -21,7 +21,7 @@ import {conversationHistorySchema,enforceConversationOutput,formulateConversatio
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 
 import {explicitlyOffersDu,maskBirthDates,phoneLabels,phonePatients,selectPhonePatient,type ChatContext} from '@/lib/services/animahost-chat-identity';
-import {qualityWorkflow,selfServiceReply,styleMessage,visitReply,type ChatDetails} from '@/lib/services/animahost-quality-workflows';
+import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitReply,type ChatDetails} from '@/lib/services/animahost-quality-workflows';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -180,6 +180,17 @@ export async function POST(request:NextRequest){
      receivedAt:input.receivedAt,text:input.text,language,teamTime:teamTime(),patients:candidates,
      patient,context:preferences.context,doctolib:practice.doctolib_url,closures:practice.closure_periods,phoneForPractice:practice.practice_phone,onlyInvoiceRouting:!automaticReplies});
     if(resolved){decision=resolved.decision;details=resolved.details;qualityHandled=true;}
+   }
+  }
+  if(!preferences&&input.text&&!input.handoffOnly&&!explicitOptOut(input.text)&&!emergencyDecision(input.text)){
+   const portalIntent=invoicePortalIntent(input.text);
+   if(portalIntent==='missing'){
+    decision={action:'klaerfall',rule:'invoice_portal:manual_review',
+     text:t('animahost.quality.invoice_manual',language)+' '+t('animahost.team.reply',language,{when:teamTime()})};
+    qualityHandled=true;
+   }else if(portalIntent==='section'){
+    decision={action:'antworten',rule:'quality:invoice_section',text:t('animahost.quality.invoice_section',language)};
+    qualityHandled=true;
    }
   }
   let informal=preferences?.informal??false;
@@ -445,7 +456,7 @@ export async function POST(request:NextRequest){
   }
   }
   if(explicitLater&&decision.rule.startsWith('doctolib:'))decision=decisionFromRule(null);
-  if(decision.rule==='no_applicable_rule'||(!automaticReplies&&decision.action==='klaerfall')){
+  if(decision.rule==='no_applicable_rule'||(!automaticReplies&&decision.action==='klaerfall'&&!decision.rule.startsWith('invoice_portal:'))){
    decision=fallbackDecision({topic,appointment:appointment&&!lateLanguage&&!explicitLater&&topic!=='attachment',language,teamTime:teamTime(),safetyAck:!freeForm,
     doctolibUrl:practice.doctolib_url});
   }
