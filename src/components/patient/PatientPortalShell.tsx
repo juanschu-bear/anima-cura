@@ -10,6 +10,7 @@ import { getPatientDocumentTypeOption } from "@/lib/patient-document-types";
 import AnimaPayOverlay from "@/components/patient/AnimaPayOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { hapticLight, hapticMedium, hapticStrong, hapticSuccess } from "@/lib/haptics";
+import { t as tr } from "@/lib/i18n";
 import { t, langLabels, translatePhase, translatePhaseButton, translateBadge, getPhaseContent, translateTipp, type Lang } from "@/lib/patient-i18n";
 
 interface Props { patientId: string; patientName: string; patientEmail: string }
@@ -34,7 +35,7 @@ interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am:
 interface BelegPosition { datum: string | null; nr: string | null; text: string; region: string | null; anzahl: number; anzahlText: string; punkte: number | null; faktor: number | null; eur: number | null; abschnitt: string; tarif: string; begruendungen: string[] }
 /** Originalrechnung aus der Praxisabrechnung (Vertrag: Leitstand docs/2026-11-06-invoice-startbestand-contract.md). */
 interface Beleg { id: string; quartal: string | null; art: "BEMA" | "GOZ" | null; pdf: true; pdfUrl: string; positionen: BelegPosition[]; begruendungen: { key: string; text: string }[] }
-interface Rechnung { source?: "patient_upload"; name?: string; id: string; patientId?: string | null; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number | null; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
+interface Rechnung { source?: "patient_upload"; name?: string; documentType?: string | null; uploadedAt?: string | null; id: string; patientId?: string | null; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number | null; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
 const getLocale = (l: string) => l === "en" ? "en-GB" : l === "es" ? "es-ES" : "de-DE";
@@ -45,6 +46,11 @@ const fmtEuro = (n: number) => n.toLocaleString("de-DE") + " €";
 const daysTill = (d: string) => Math.max(0, Math.ceil((new Date(d).getTime() - Date.now()) / 864e5));
 const docLabel = (doc: Doc) => doc.anzeige_typ || getPatientDocumentTypeOption(doc.typ).label;
 const docIcon = (doc: Doc) => getPatientDocumentTypeOption(doc.typ).icon;
+
+/** Liest die Verfügbarkeitsfelder aus /api/patient/rechnungen. Fehlt ein Feld, gilt der Teil als verfügbar (ältere Antworten). */
+function rechnungsStandAus(j: { belegeStatus?: unknown; hochgeladeneRechnungenStatus?: unknown; zahlungsdatenStatus?: unknown }) {
+  return { fehler: false, belege: j.belegeStatus !== "unavailable", hochgeladen: j.hochgeladeneRechnungenStatus !== "unavailable", zahlungen: j.zahlungsdatenStatus !== "unavailable" };
+}
 
 export default function PatientPortalShell({ patientName, patientId }: Props) {
   const router = useRouter();
@@ -94,7 +100,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
-  const [invoiceUnavailable, setInvoiceUnavailable] = useState(false);
+  // Verfügbarkeit (Codex' Vertrag 22.11.2026): Eine Störung darf nie wie „keine Rechnungen“ aussehen.
+  const [rechnungsStand, setRechnungsStand] = useState<{ fehler: boolean; belege: boolean; hochgeladen: boolean; zahlungen: boolean }>({ fehler: false, belege: true, hochgeladen: true, zahlungen: true });
+  const [rechnungenLaden, setRechnungenLaden] = useState(false);
+  // ganz: nichts ladbar · teilweise: ein Teil der Rechnungen fehlt · zahlungen: nur der Zahlungsstand fehlt.
+  const rechnungsStoerung: "ganz" | "teilweise" | "zahlungen" | null =
+    rechnungsStand.fehler || (!rechnungsStand.belege && !rechnungsStand.hochgeladen) ? "ganz"
+    : !rechnungsStand.belege || !rechnungsStand.hochgeladen ? "teilweise"
+    : !rechnungsStand.zahlungen ? "zahlungen" : null;
   const [offenerBeleg, setOffenerBeleg] = useState<string | null>(null);
   const [rechnungSeite, setRechnungSeite] = useState(0);
   // Mehrere Kinder an einem Zugang (Codex, 12.11.2026): Rechnungen tragen patientId, die Auswahl passiert hier in der Oberfläche.
@@ -236,12 +249,26 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     }
   };
 
+  // Antwort von /api/patient/rechnungen übernehmen. null oder ohne Liste heißt: nicht ladbar, nie „keine Rechnungen“.
+  const uebernehmeRechnungen = useCallback((j: { rechnungen?: unknown; belegeStatus?: unknown; hochgeladeneRechnungenStatus?: unknown; zahlungsdatenStatus?: unknown } | null) => {
+    if (!j || !Array.isArray(j.rechnungen)) { setRechnungen([]); setRechnungsStand({ fehler: true, belege: true, hochgeladen: true, zahlungen: true }); return; }
+    setRechnungen(j.rechnungen as Rechnung[]); setRechnungsStand(rechnungsStandAus(j));
+  }, []);
+  // Frisch laden: beim Öffnen aus der Benachrichtigung, über den Link und mit „Erneut laden“.
+  const ladeRechnungen = useCallback(async () => {
+    setRechnungenLaden(true);
+    try {
+      const r = await fetch("/api/patient/rechnungen", { cache: "no-store" });
+      uebernehmeRechnungen(r.ok ? await r.json() : null);
+    } catch { uebernehmeRechnungen(null); }
+    setRechnungenLaden(false);
+  }, [uebernehmeRechnungen]);
   const fetchAll = useCallback(async () => {
     const ep = ["ratenplan", "behandlung", "badges", "nachrichten", "benachrichtigungen", "dokumente", "tipps", "zahlungen", "rechnungen"];
     const results = await Promise.allSettled(ep.map(e => fetch("/api/patient/" + e)));
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      if (r.status !== "fulfilled" || !r.value.ok) { if (i === 8) setInvoiceUnavailable(true); continue; }
+      if (r.status !== "fulfilled" || !r.value.ok) { if (i === 8) uebernehmeRechnungen(null); continue; }
       try {
         const j = await r.value.json();
         if (i === 0) setRp(j);
@@ -252,15 +279,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         if (i === 5) setDocs(j.dokumente || []);
         if (i === 6) setTipps(j.tipps || []);
         if (i === 7) setPays([...(j.ueberfaellige || []), ...(j.zahlungen || [])]);
-        if (i === 8) {
-          const valid = Array.isArray(j.rechnungen);
-          setRechnungen(valid ? j.rechnungen : []);
-          setInvoiceUnavailable(!valid || j.belegeStatus === "unavailable" || j.hochgeladeneRechnungenStatus === "unavailable" || j.zahlungsdatenStatus === "unavailable");
-        }
-      } catch { if (i === 8) setInvoiceUnavailable(true); }
+        if (i === 8) uebernehmeRechnungen(j);
+      } catch { if (i === 8) uebernehmeRechnungen(null); }
     }
     setLoading(false);
-  }, []);
+  }, [uebernehmeRechnungen]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => {
@@ -286,13 +309,13 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
       setTab("more");
     } else if (section === "rechnungen" || section === "invoices") {
       // Quartalsrechnungen mit Positionen: Liste im Bereich Fortschritt (Link aus der Mail „Deine Rechnungen sind da“).
-      setBalanceView(false); setTab("progress");
+      setBalanceView(false); setTab("progress"); void ladeRechnungen();
       window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
       // Tracking „In der App gelesen“ (Codex' Vertrag 12.11.2026): die Rechnungen wurden über Mail, Push oder App-Hinweis geöffnet.
       void fetch("/api/patient/invoice-access/event", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ event: "app_read" }) }).catch(() => undefined);
     }
     deepLinkHandledRef.current = true;
-  }, [docs, loading, searchParams]);
+  }, [docs, loading, searchParams, ladeRechnungen]);
   useEffect(() => { if (chatScrollRef.current && tab === "chat") chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight; }, [msgs, tab, typing]);
   useEffect(() => {
     try {
@@ -549,7 +572,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           {!b.art ? t("invoice.pdfDocument", lang) : b.art === "GOZ" ? L("Privatrechnung", "Private invoice", "Factura privada") : L("Kassenrechnung, Eigenanteil", "Statutory insurance invoice, own share", "Factura de la caja, parte propia")}
           {b.quartal && <> · {L("Quartal", "Quarter", "Trimestre")} {q ? `${q[2]}/${q[1]}` : b.quartal}</>}
         </div>
-        <div style={{ borderRadius: 12, border: "1px solid " + border, overflow: "hidden" }}>
+        {b.positionen.length > 0 && <div style={{ borderRadius: 12, border: "1px solid " + border, overflow: "hidden" }}>
           {b.positionen.map((p, k) => (
             <div key={k} style={{ padding: "9px 12px", borderTop: k > 0 ? "1px solid " + border : "none", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
               <div style={{ minWidth: 0 }}>
@@ -574,7 +597,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               <div style={{ fontSize: 12.5, fontWeight: 700, color: fg, whiteSpace: "nowrap" }}>{p.eur !== null ? eur(p.eur) : ""}</div>
             </div>
           ))}
-        </div>
+        </div>}
         {b.begruendungen.length > 0 && (
           <div style={{ fontSize: 11, color: muted, display: "grid", gap: 2 }}>
             {b.begruendungen.map(x => <div key={x.key}><b style={{ color: warn }}>{x.key}</b> {x.text}</div>)}
@@ -741,7 +764,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <div style={{ fontSize: 12.5, color: soft, lineHeight: 1.55, marginTop: 10 }}>{n.text}</div>
         <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
           {invoice ? (
-            <button onClick={() => { hapticLight(); opened(); setNOpen(false); setBalanceView(false); setTab("progress"); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250); }} style={pill}>{lang === "en" ? "View invoices →" : lang === "es" ? "Ver facturas →" : "Rechnungen ansehen →"}</button>
+            <button onClick={() => { hapticLight(); opened(); setNOpen(false); setBalanceView(false); setTab("progress"); void ladeRechnungen(); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250); }} style={pill}>{lang === "en" ? "View invoices →" : lang === "es" ? "Ver facturas →" : "Rechnungen ansehen →"}</button>
           ) : (
             <a href={DOCTOLIB_URL} target="_blank" rel="noopener noreferrer" onClick={() => { hapticLight(); opened(); }} style={pill}>{lang === "en" ? "Book on Doctolib →" : lang === "es" ? "Reservar en Doctolib →" : "Termin bei Doctolib →"}</a>
           )}
@@ -1335,11 +1358,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           )}
         </div>
       )}
-      {(rechnungen.length > 0 || invoiceUnavailable) && (
+      {(rechnungen.length > 0 || rechnungsStoerung !== null) && (
         <div id="portal-rechnungen" style={{ marginBottom: 16, scrollMarginTop: 72 }}>
           <div style={{ padding: "0 20px" }}>
             <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
-              {lang === "en" ? "Invoices & claims" : lang === "es" ? "Facturas y cargos" : "Rechnungen & Forderungen"}
+              {tr("portal.invoices.title", lang)}
             </p>
             {mehrereKinder && (
               <div role="group" aria-label={lang === "en" ? "Show invoices for" : lang === "es" ? "Mostrar facturas de" : "Rechnungen zeigen für"} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
@@ -1356,17 +1379,18 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
             )}
           </div>
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
-            {invoiceUnavailable && <div role="status" style={{padding:"14px 0",color:fg}}>
-              <p>{t("invoice.unavailable", lang)}</p>
-              <button type="button" onClick={() => void fetchAll()} style={{padding:"10px 14px",borderRadius:12,cursor:"pointer"}}>{t("invoice.retry", lang)}</button>
+            {rechnungsStoerung && <div role="status" style={{ padding: "14px 0", color: fg }}>
+              <p style={{ margin: "0 0 10px", fontSize: 14, lineHeight: 1.5 }}>{tr(rechnungsStoerung === "ganz" ? "portal.invoices.unavailable" : rechnungsStoerung === "teilweise" ? "portal.invoices.partlyUnavailable" : "portal.invoices.paymentsUnavailable", lang)}</p>
+              <button type="button" disabled={rechnungenLaden} onClick={() => void ladeRechnungen()} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid " + border, background: "transparent", color: fg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{rechnungenLaden ? tr("portal.invoices.loading", lang) : tr("portal.invoices.retry", lang)}</button>
             </div>}
-            {sichtbareRechnungen.length === 0 && !invoiceUnavailable && (
+            {sichtbareRechnungen.length === 0 && rechnungsStoerung === null && (
               <p style={{ margin: "14px 0", color: muted, fontSize: 14 }}>{lang === "en" ? "No invoices for this child yet." : lang === "es" ? "Aún no hay facturas para este niño." : "Für dieses Kind gibt es noch keine Rechnung."}</p>
             )}
             {sichtbareRechnungen.slice(rechnungSeite * 6, rechnungSeite * 6 + 6).map((r, i) => {
               const settledByCredit = r.zahlungsmodus === "credit";
               const isDirectDebit = r.zahlungsmodus === "direct_debit";
-              const isBeleg = r.status === "beleg";
+              const isUpload = r.source === "patient_upload";
+              const isBeleg = r.status === "beleg" || isUpload;
               const openColor = dk ? "#fbbf24" : "#b45309";
               const pillColor = r.status === "bezahlt" || settledByCredit || isDirectDebit ? grn : openColor;
               const statusColor = isBeleg ? fg : r.status === "bezahlt" || settledByCredit ? grn : r.status === "teilbezahlt" || r.guthaben_angerechnet > 0 ? warn : fg;
@@ -1393,8 +1417,15 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
                     {mehrereKinder && !kindFilter && kindName(r.patientId) && (
                       <span style={{ display: "inline-block", marginBottom: 6, padding: "2px 10px", borderRadius: 999, background: dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", color: fg, fontSize: 12, fontWeight: 700 }}>{kindName(r.patientId)}</span>
                     )}
-                    {r.beleg ? (() => {
-                      const q = r.beleg.quartal?.match(/^(\d{4})-Q([1-4])$/);
+                    {isUpload ? <>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>
+                        {r.name || tr(r.documentType === "erste_rechnung" ? "portal.invoices.firstInvoice" : "portal.invoices.invoice", lang)}
+                      </div>
+                      <div style={{ fontSize: 12, color: muted, marginTop: 3 }}>
+                        {[r.uploadedAt ? tr("portal.invoices.uploaded", lang, { date: fmtDateL(r.uploadedAt, lang) }) : "PDF", r.rechnung_nr ? (lang === "en" ? "No. " : "Nr. ") + r.rechnung_nr : null].filter(Boolean).join(" · ")}
+                      </div>
+                    </> : r.beleg ? (() => {
+                      const q = r.beleg.quartal ? r.beleg.quartal.match(/^(\d{4})-Q([1-4])$/) : null;
                       const art = !r.beleg.art ? null : r.beleg.art === "GOZ" ? (lang === "en" ? "private" : lang === "es" ? "privada" : "privat") : (lang === "en" ? "health insurance" : lang === "es" ? "seguro público" : "Krankenkasse");
                       return <>
                         <div style={{ fontSize: 15, fontWeight: 700, color: fg }}>
@@ -1853,7 +1884,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
-            {(rechnungen.length > 0 || invoiceUnavailable) && (
+            {(rechnungen.length > 0 || rechnungsStoerung !== null) && (
               <button onClick={() => { setBalanceView(false); setTab("progress"); setFinSheet(false); hapticLight(); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderRadius: 18, padding: "15px 14px", marginBottom: 10, background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", fontFamily: "inherit" }}>
                 <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)" }}>🧾</span>
                 <span><b style={{ display: "block", fontSize: 15, color: fg }}>{lang === "en" ? "Your invoices" : lang === "es" ? "Tus facturas" : "Deine Rechnungen"}</b><span style={{ fontSize: 12, color: muted }}>{lang === "en" ? "All items, PDF for your insurance" : lang === "es" ? "Todas las posiciones, PDF para tu seguro" : "Alle Positionen, PDF für die Versicherung"}</span></span>
