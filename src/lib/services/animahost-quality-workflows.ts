@@ -3,7 +3,7 @@ import {t} from '@/lib/i18n';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {closurePeriodsSchema} from './animahost-practice-closures';
 import {renderWhatsAppRuleText,type WhatsAppDecision} from './animahost-whatsapp';
-import {identifyByBirthDate,maskBirthDates,parseBirthDate,patientIsMinor,selectPhonePatient,useDu,
+import {identifyByBirthDate,maskBirthDates,mentionsPatient,parseBirthDate,patientIsMinor,selectPhonePatient,useDu,
  type ChatContext,type PhonePatient,type SubjectTask} from './animahost-chat-identity';
 import {recoverPatientInvoice} from './animahost-invoice-recovery';
 
@@ -13,8 +13,18 @@ type Outcome={decision:WhatsAppDecision;details?:ChatDetails};
 const portal='https://animacura.io';
 const labelMatch=(rule:string,text:string,action:WhatsAppDecision['action']='antworten'):Outcome=>({decision:{action,rule,text}});
 
+const GREETING=/^\s*(?:guten (?:tag|morgen|abend)|hallo|hello|hi|hola|buen(?:os|as) (?:días|tardes|noches))(?![A-Za-zÄÖÜäöüßÀ-ÿ])[\s,.!]*/i;
+/** Eine Antwort grüßt nur 1-mal: Steht der Gruß mit Namen davor, entfällt der Gruß am Anfang der Regel. */
+function withoutGreeting(message:string){
+ const rest=message.replace(GREETING,'');
+ return rest===message||!rest?message:rest[0].toLocaleUpperCase('de-DE')+rest.slice(1);
+}
+/**
+ * `incoming`: die Nachricht des Patienten. Ein Kind nennt AnimaHost nur beim Namen, wenn die Nachricht selbst von diesem Kind spricht,
+ * und nie vor einer Übergabe ans Team (22.11.2026: „gern helfe ich Ihnen bei Ihrer Frage zu …“ stand vor falschen Kindern und vor Rückfall-Antworten).
+ */
 export function styleMessage(decision:WhatsAppDecision,patient:PhonePatient|null,input:{
- language:string;receivedAt:string;firstReply:boolean;informal:boolean;teamTime:string;
+ language:string;receivedAt:string;firstReply:boolean;informal:boolean;teamTime:string;incoming?:string;
 }){
  if(decision.action==='notfall')return decision;
  const {language,firstReply,informal}=input;
@@ -24,13 +34,15 @@ export function styleMessage(decision:WhatsAppDecision,patient:PhonePatient|null
  const alreadyNamed=names.some(name=>message.toLocaleLowerCase().includes(name.toLocaleLowerCase()));
  if(patient&&!addressed&&!alreadyNamed){
   const minor=patientIsMinor(patient.geburtsdatum,appointmentLocalDate(input.receivedAt));
-  if(minor!==false)message=t(firstReply?'animahost.identity.child':'animahost.identity.child_followup',language,{name:patient.vorname})+' '+message;
+  const handoff=decision.action==='klaerfall'||decision.rule.startsWith('fallback:');
+  if(minor!==false&&!handoff&&mentionsPatient(input.incoming??'',patient))
+   message=t(firstReply?'animahost.identity.child':'animahost.identity.child_followup',language,{name:patient.vorname})+' '+withoutGreeting(message);
   if(minor===false){
    const sex=(patient.geschlecht??'').toLocaleLowerCase();
    const name=/^(?:w|weiblich|female)$/.test(sex)?`Frau ${patient.nachname}`:
     /^(?:m|männlich|maennlich|male)$/.test(sex)?`Herr ${patient.nachname}`:`${patient.vorname} ${patient.nachname}`;
    message=t('animahost.identity.adult',language,{name:language==='de'?name:
-    minor===false?`${patient.vorname} ${patient.nachname}`:name})+' '+message;
+    minor===false?`${patient.vorname} ${patient.nachname}`:name})+' '+withoutGreeting(message);
   }
  }
  if(decision.action==='klaerfall'&&!/^late_arrival:|^fallback:|^invoice_portal:|^quality:/.test(decision.rule)&&

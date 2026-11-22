@@ -3,7 +3,7 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {teamReplyTime} from '../animahost-team-time';
-import {explicitlyOffersDu,identifyByBirthDate,parseBirthDate,patientIsMinor,selectPhonePatient,useDu,type ChatContext,type PhonePatient} from '../animahost-chat-identity';
+import {explicitlyOffersDu,identifyByBirthDate,mentionsPatient,namedSubject,parseBirthDate,patientIsMinor,selectPhonePatient,useDu,type ChatContext,type PhonePatient} from '../animahost-chat-identity';
 import {qualityWorkflow,styleMessage} from '../animahost-quality-workflows';
 
 const lead:PhonePatient={id:'30000000-0000-4000-8000-000000000003',vorname:'Leon',nachname:'Beispiel',geburtsdatum:'2012-05-03',geschlecht:'m'};
@@ -40,10 +40,64 @@ test('the first greeting distinguishes a child and an adult, and Du requires an 
  const original={rule:'general',text:'Ihren Termin finden Sie in Ihrem Konto.',action:'antworten' as const};
  const opts={language:'de',receivedAt:sunday,firstReply:true,informal:false,teamTime:'am Montag'};
  assert.match(styleMessage(original,adult,opts).text,/Frau Beispiel/);
- assert.match(styleMessage(original,child,opts).text,/Emma/);
+ assert.match(styleMessage(original,child,{...opts,incoming:'Wann hat Emma ihren Termin?'}).text,/Emma/);
  assert.equal(explicitlyOffersDu('Bist du ein Mensch?'),false);
  assert.equal(explicitlyOffersDu('Du kannst mich übrigens auch duzen.'),true);
  assert.match(useDu(original.text),/Deinen Termin findest du in Deinem Konto/);
+});
+
+// 22.11.2026, live: Die Mutter schrieb über ein Kind, das nicht an der Nummer hängt. AnimaHost antwortete
+// „Guten Tag, gern helfe ich Ihnen bei Ihrer Frage zu <anderes Kind>. Guten Tag, wie können wir Ihnen helfen?“ und danach
+// „Für <anderes Kind> gilt Folgendes. Danke für Ihre Nachricht. …“. Alle Namen hier sind erfunden.
+test('a number with one child is no proof that the message is about that child',()=>{
+ const about='Hallo Frau Muster, ist es möglich Leons Termin am Mittwoch auf kommende Woche zu verschieben? Viele Grüße Bea Beispiel';
+ assert.equal(namedSubject(about),'Leon');
+ assert.equal(namedSubject('Mein Sohn Leon braucht eine Bescheinigung.'),'Leon');
+ assert.equal(namedSubject('Es geht um unsere Tochter Emma.'),'Emma');
+ // Keine Vornamen: Besitzwörter, Wochentage, Anreden und Wörter ohne klare Form.
+ for(const text of ['Wir möchten Ihres Termins wegen fragen.','Kann ich Dienstags Termin verschieben?','Meine Tochter hat Schmerzen.','Hallo Frau Muster, wann ist der Termin?',
+  'Ich hoffe das uns Frau Muster am Montag antwortet','Anima Cura so viel zur Hilfe','wegen leons termin',''])assert.equal(namedSubject(text),null,text);
+ // 1 Kind an der Nummer, die Nachricht nennt ausdrücklich ein anderes: Es wird nichts angenommen.
+ assert.equal(selectPhonePatient([child],about),null);
+ assert.equal(selectPhonePatient([child],'Mein Sohn Leon braucht eine Bescheinigung.'),null);
+ // Dasselbe Kind genannt oder niemand genannt: wie bisher der Patient der Nummer.
+ assert.equal(selectPhonePatient([child],'Wann ist Emmas Termin?'),child);
+ assert.equal(selectPhonePatient([child],'Wann ist der nächste Termin?'),child);
+ assert.equal(selectPhonePatient([child],'Ich hoffe das uns Frau Muster am Montag antwortet'),child);
+ // Geschwister: „Emmas Termin“ benennt Emma eindeutig, ein fremder Name niemanden.
+ assert.equal(selectPhonePatient([lead,child],'Wann ist Emmas Termin?'),child);
+ assert.equal(selectPhonePatient([lead,child],'Emma und Leon kommen beide.'),null);
+ assert.equal(selectPhonePatient([lead,child],'Wann ist Noahs Termin?'),null);
+ assert.equal(mentionsPatient('Wann ist Emmas Termin?',child),true);
+ assert.equal(mentionsPatient('Wann ist der Termin von emma?',child),true);
+ assert.equal(mentionsPatient('Wann ist der Termin?',child),false);
+ assert.equal(mentionsPatient('Es geht um Elias.',{...child,vorname:'Noah Elias'}),true);
+});
+
+test('a child is named only when the message is about that child, never twice greeted and never before a handoff',()=>{
+ const opts={language:'de',receivedAt:sunday,firstReply:true,informal:false,teamTime:'am Montag'};
+ const greeting={rule:'rulebook:greeting',text:'Guten Tag, wie können wir Ihnen helfen?',action:'antworten' as const};
+ const answer={rule:'rulebook:pickup',text:'Schienen können Sie Dienstag bis Donnerstag abholen.',action:'antworten' as const};
+ const fallback={rule:'fallback:general',text:'Danke für Ihre Nachricht. Das sieht sich unser Praxisteam persönlich an und meldet sich am Montag bei Ihnen.',action:'klaerfall' as const};
+ // Die Nachricht nennt das Kind nicht: kein Namenssatz, der Text bleibt, wie die Regel ihn vorgibt.
+ assert.equal(styleMessage(greeting,child,{...opts,incoming:'Hallo, ich habe eine Frage.'}).text,greeting.text);
+ assert.equal(styleMessage(answer,child,{...opts,incoming:'Wann können wir die Schiene abholen?'}).text,answer.text);
+ assert.equal(styleMessage(answer,child,opts).text,answer.text);
+ // Die Nachricht nennt das Kind: 1 Begrüßung, danach die Antwort.
+ assert.equal(styleMessage(answer,child,{...opts,incoming:'Wann kann Emma die Schiene abholen?'}).text,
+  'Guten Tag, gern helfe ich Ihnen bei Ihrer Frage zu Emma. Schienen können Sie Dienstag bis Donnerstag abholen.');
+ const greeted=styleMessage(greeting,child,{...opts,incoming:'Hallo, es geht um Emma.'}).text;
+ assert.equal(greeted,'Guten Tag, gern helfe ich Ihnen bei Ihrer Frage zu Emma. Wie können wir Ihnen helfen?');
+ assert.equal(greeted.match(/Guten Tag/g)?.length,1);
+ // Übergabe ans Team: kein „gern helfe ich“ und kein „Für Emma gilt Folgendes.“ davor.
+ assert.equal(styleMessage(fallback,child,{...opts,incoming:'Emma hat eine Frage zur Rechnung.'}).text,fallback.text);
+ assert.equal(styleMessage(fallback,child,{...opts,firstReply:false,incoming:'Ich hoffe, dass Emma am Montag eine Antwort bekommt.'}).text,fallback.text);
+ assert.doesNotMatch(styleMessage(fallback,child,{...opts,firstReply:false,incoming:'Ich hoffe das uns Frau Muster am Montag antwortet'}).text,/gilt Folgendes|Emma/);
+ // Folgeantwort mit Bezug zum Kind bleibt möglich.
+ assert.equal(styleMessage(answer,child,{...opts,firstReply:false,incoming:'Und Emmas Schiene?'}).text,'Für Emma gilt Folgendes. Schienen können Sie Dienstag bis Donnerstag abholen.');
+ // Erwachsene: Anrede mit Namen, aber nur 1 Begrüßung.
+ assert.equal(styleMessage(greeting,adult,opts).text,'Guten Tag Frau Beispiel. Wie können wir Ihnen helfen?');
+ assert.equal(styleMessage(answer,adult,opts).text,'Guten Tag Frau Beispiel. Schienen können Sie Dienstag bis Donnerstag abholen.');
 });
 
 test('self-service escalates only after two attempts, includes a team date and honours the newest topic',async()=>{

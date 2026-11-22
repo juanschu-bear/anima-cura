@@ -465,7 +465,7 @@ export async function POST(request:NextRequest){
     doctolibUrl:practice.doctolib_url});
   }
    decision=styleMessage(decision,qualityAvailable?patient:null,{language,receivedAt:input.receivedAt,
-   firstReply:!history.some(item=>item.direction==='outgoing'),informal,teamTime:teamTime()});
+   firstReply:!history.some(item=>item.direction==='outgoing'),informal,teamTime:teamTime(),incoming:input.text??''});
   if(preferences){
    const saved=await db.from('animahost_whatsapp_chat_preferences').upsert({tenant_id:input.tenantId,chat_jid:input.from,
     informal:preferences.informal,context:preferences.context,updated_at:input.receivedAt},{onConflict:'tenant_id,chat_jid'});

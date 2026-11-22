@@ -31,12 +31,41 @@ export function patientIsMinor(birth:string|null,date:string){
 
 const normalized=(value:string)=>value.normalize('NFKC').trim().toLocaleLowerCase('de-DE')
  .replace(/[^a-zà-ÿ0-9]+/g,' ').trim();
+/** Die Nachricht nennt diesen Patienten beim Vornamen, auch als „Emmas Termin“. Bei mehreren Vornamen reicht einer. */
+export function mentionsPatient(text:string,patient:PhonePatient){
+ const words=new Set(normalized(text).split(' '));
+ return normalized(patient.vorname).split(' ').some(name=>name.length>1&&(words.has(name)||words.has(`${name}s`)));
+}
+// Wörter, die an der Stelle eines Vornamens stehen können, aber keiner sind („Ihres Termins“, „Dienstags Termin“, „des Sohnes Termin“).
+const NOT_A_NAME=new Set(['ihr','ihre','ihren','unser','unsere','unseren','mein','meine','meinen','dein','deine','deinen','sein','seine','seinen','ein','eine','einen','kein','keine','keinen',
+ 'diese','dieser','diesen','jede','jeden','welche','alle','manche','solche','beide','andere','letzte','nächste','neue','weitere','erste','zweite',
+ 'montag','dienstag','mittwoch','donnerstag','freitag','samstag','sonntag','heute','morgen','gestern','abend','mittag','vormittag','nachmittag','anfang','ende',
+ 'frau','herr','doktor','praxis','doctolib','anima','whatsapp','kind','kinde','sohn','sohne','tochter','bruder','schwester','mann','manne','junge','eltern','familie','patient','patientin']);
+const L='A-Za-zÄÖÜäöüßÀ-ÿ';
+const SUBJECT_THING=new RegExp(`^(?:(?:nächste|neue|letzte|erste|zweite)[rnms]?\\s+)?(?:termine?s?|rechnung(?:en)?|spange|zahnspange|schienen?|behandlung|behandlungsplan|bescheinigung|kontrolle|retainer|brackets?|röntgenbild(?:er)?|unterlagen|akte|abholung|kostenplan)(?![${L}])`,'i');
+/**
+ * Vorname, den die Nachricht ausdrücklich als betroffene Person nennt: „Fabians Termin“ oder „mein Sohn Fabian“ (22.11.2026).
+ * Bewusst eng: Nur diese 2 eindeutigen Formen zählen. Alles andere bleibt unentschieden und liefert null.
+ */
+export function namedSubject(text:string):string|null{
+ const name=(value:string|undefined)=>value&&!NOT_A_NAME.has(value.toLocaleLowerCase('de-DE'))?value:null;
+ const genitive=new RegExp(`(?:^|[^${L}])([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})s\\s+`,'g');
+ for(let hit=genitive.exec(text);hit;hit=genitive.exec(text)){
+  if(SUBJECT_THING.test(text.slice(genitive.lastIndex))&&name(hit[1]))return hit[1];
+ }
+ const family=new RegExp(`(?:^|[^${L}])(?:[Mm]ein|[Uu]nser)(?:e[mnr]?)?\\s+(?:Sohn|Tochter|Kind|Bruder|Schwester|Enkel|Enkelin)\\s+([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})(?![${L}])`).exec(text);
+ return name(family?.[1]);
+}
+/**
+ * Wem gilt die Nachricht? Genau 1 genannter Patient der Nummer: dieser. Niemand genannt und nur 1 Patient an der Nummer: dieser,
+ * außer die Nachricht nennt ausdrücklich eine andere Person. Dann wird nichts angenommen, statt über das falsche Kind zu antworten.
+ */
 export function selectPhonePatient(list:PhonePatient[],text:string){
- if(list.length===1)return list[0];
  const line=` ${normalized(text)} `;
- const mentioned=list.filter(p=>line.includes(` ${normalized(p.vorname)} `)||
-  line.includes(` ${normalized(`${p.vorname} ${p.nachname}`)} `));
- return mentioned.length===1?mentioned[0]:null;
+ const mentioned=list.filter(p=>mentionsPatient(text,p)||line.includes(` ${normalized(`${p.vorname} ${p.nachname}`)} `));
+ if(mentioned.length===1)return mentioned[0];
+ if(mentioned.length>1||list.length!==1)return null;
+ return namedSubject(text)?null:list[0];
 }
 
 export function parseBirthDate(text:string){
