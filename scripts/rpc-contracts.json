@@ -387,8 +387,8 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
-      "sha256": "fbaad6f7ea7bcce808d5faa0c166c4d806b6e04099fb2a93c5ed411903262b6d",
-      "proof": "createServerComponentClient uses the existing authenticated cookie/JWT; auth.getUser verifies the session. The RPC accepts only a document UUID and checks ownership through auth.uid() and the authoritative patient profile. No service client or client-provided patient ID. Edition RPC uses the same authenticated patient session; SECURITY DEFINER is owned by restricted abrechnung_runtime and checks auth.uid()/patient profile. No privileged retry.",
+      "sha256": "12088a05df4646961cf9d6a301e490af5585f6d9840ffa480e92d6e4b39e8140",
+      "proof": "Imported invoice RPCs use only the authenticated cookie/JWT. Explicit uploads use a separate authorized profile-and-membership path and are never a privileged retry of the import RPC.",
       "calls": [
         {
           "name": "patient_invoice_document_pdf",

@@ -9,7 +9,7 @@
 | `uploadedAt`, `rechnung_datum` | Zeitpunkt der Ablage. Rechnungsdatum ist bei einem reinen Upload unbekannt |
 | `betrag`, `rechnung_nr` | `null` bei einem reinen Upload ohne strukturierte Daten |
 | `paymentStatusKnown`, `paymentActionAllowed` | Beide `false` bei einem reinen Beleg ohne zugeordneten offenen Posten |
-| `beleg.pdfUrl` | `GET /api/patient/rechnungen/<id>/pdf` mit der bestehenden Patientensitzung |
+| `beleg.pdfUrl` | `GET /api/patient/rechnungen/<id>/pdf?source=upload` mit der bestehenden Patientensitzung |
 | `beleg.positionen`, `beleg.begruendungen` | Bei einem reinen PDF-Upload leere Listen. Den PDF-Knopf trotzdem anzeigen |
 | `beleg.art`, `beleg.quartal` | Bei einem reinen PDF-Upload `null` |
 
