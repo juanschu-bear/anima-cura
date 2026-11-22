@@ -129,11 +129,11 @@ export async function qualityWorkflow(db:Db,input:{
   const selected=await recoverPatientInvoice(db,p.id,coverage(question,receivedAt));
   if(selected.cause==='manual_review')return {...handoff('invoice_portal:manual_review','invoice_manual_named',{patient:p.vorname}),
    details:detail(p,selected.cause,selected.invoiceDate)};
-  if(selected.cause==='no_invoice')return {...labelMatch('invoice_portal:no_invoice',translated('invoice_none')),
+  if(selected.cause==='no_invoice')return {...labelMatch('invoice_portal:no_invoice',translated('invoice_none_named',{patient:p.vorname})),
    details:detail(p,selected.cause,null)};
   const date=verified&&selected.invoiceDate?new Intl.DateTimeFormat(language==='en'?'en-GB':language==='es'?'es-ES':'de-DE',
    {dateStyle:'medium',timeZone:'UTC'}).format(new Date(selected.invoiceDate+'T12:00:00Z')):'';
-  return {...labelMatch(`invoice_portal:${selected.cause}`,translated(date?'invoice_ready_date':'invoice_ready',{date})),
+  return {...labelMatch(`invoice_portal:${selected.cause}`,translated(date?'invoice_ready_date_named':'invoice_ready_named',{date,patient:p.vorname})),
    details:detail(p,selected.cause,selected.invoiceDate)};
  };
  const financial=async(p:PhonePatient, question:string)=>{
@@ -205,7 +205,9 @@ export async function qualityWorkflow(db:Db,input:{
    if(searchingDocuments)result.decision.text=translated('invoice_section')+' '+result.decision.text;
    return result;
   }
-  const result={...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'manual_review',null)};
+  const availability=await recoverPatientInvoice(db,null,{from:null,through:null});
+  const result=availability.checked?waiting({kind:'missing_invoice',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt}):
+   {...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'manual_review',null)};
   const prefix=searchingDocuments?translated('invoice_section'):corrected?translated('correction'):'';
   if(prefix)result.decision.text=prefix+' '+result.decision.text;
   return result;

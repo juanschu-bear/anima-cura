@@ -589,6 +589,18 @@
           "role": "service_role"
         }
       ]
+    },
+    {
+      "file": "src/lib/services/animahost-invoice-recovery.ts",
+      "sha256": "18ade9740623a4b69709e1078ee001f53ddcfb26e0879b981606fcc03e58e008",
+      "proof": "The bound WhatsApp workflow passes a matched or birth-date-verified patient. The read-only RPC returns only a status and invoice date using the same account scope, active document, and PDF as the patient portal. A null patient ID verifies availability without resolving any patient.",
+      "calls": [
+        {
+          "name": "animahost_invoice_portal_visibility",
+          "signature": "public.animahost_invoice_portal_visibility(p_patient uuid,p_from date,p_through date)",
+          "role": "service_role"
+        }
+      ]
     }
   ],
   "proofs": [
