@@ -91,3 +91,30 @@ export function withRuleReplies(
     text: Array.from(new Set(ordered.map(item => item.text))).join('\n\n'),
   } : null;
 }
+
+/** For a gateway failure, only use unambiguous, literally present rulebook cues. */
+export function matchApprovedRuleFallback(message:string,rules:WhatsAppRule[]):string[]{
+ const separators=new RegExp('[^\\p{L}\\p{N}]+','gu');
+ const normalize=(value:string)=>' '+value.toLocaleLowerCase('de-DE').normalize('NFKC')
+  .replace(separators,' ').trim()+' ';
+ const clauses=message.split(/[?;]\s*|\bund\b|\band\b/i).map(normalize).filter(value=>value.trim().length>=5);
+ const eligible=rules.filter(rule=>rule.action==='antworten'&&!rule.appointmentTypeId);
+ const matchesByPhrase=new Map<string,Set<string>>();
+ for(const rule of eligible)for(const keyword of rule.keywords){
+  const phrase=normalize(keyword);
+  if(phrase.trim().length<5||/^(?: rechnung | termin | hilfe | bitte | praxis | zahlung )$/.test(phrase))continue;
+  if(!matchesByPhrase.has(phrase))matchesByPhrase.set(phrase,new Set());
+  matchesByPhrase.get(phrase)!.add(rule.id);
+ }
+ const matches=clauses.flatMap(clause=>{
+  const best=new Map<string,number>();
+  for(const [phrase,ids] of Array.from(matchesByPhrase)){
+   if(ids.size!==1||!clause.includes(phrase))continue;
+   const id=ids.values().next().value!;
+   best.set(id,Math.max(best.get(id)??0,phrase.trim().length));
+  }
+  const ranked=Array.from(best).sort((a,b)=>b[1]-a[1]);
+  return ranked[0]&&(!ranked[1]||ranked[0][1]>=ranked[1][1]+5)?[ranked[0][0]]:[];
+ });
+ return Array.from(new Set(matches));
+}

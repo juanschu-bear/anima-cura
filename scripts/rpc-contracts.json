@@ -682,7 +682,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "18856cbf0c2616ccaa9b8bb92cfb6cddd13603841386badf919bf51987fb0b9d"
+      "sha256": "01b4abc284177ac1afd28af655c5e38fd4a368c8186892698c983166f14c9402"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

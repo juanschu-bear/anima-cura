@@ -137,8 +137,11 @@ export async function qualityWorkflow(db:Db,input:{
   lastName:p?.nachname??null,invoiceDate:date,cause});
  const repair=async(p:PhonePatient,question:string,verified:boolean)=>{
   const selected=await recoverPatientInvoice(db,p.id,coverage(question,receivedAt));
-  if(selected.cause==='manual_review')return {...handoff('invoice_portal:manual_review','invoice_manual_named',{patient:p.vorname}),
-   details:detail(p,selected.cause,selected.invoiceDate)};
+  if(selected.cause==='manual_review'){
+   const alreadyAssigned=patients.some(candidate=>candidate.id===p.id);
+   return {...handoff('invoice_portal:manual_review',alreadyAssigned?'invoice_manual_named':'invoice_manual',{patient:p.vorname}),
+    details:detail(p,selected.cause,selected.invoiceDate)};
+  }
   if(selected.cause==='no_invoice')return {...labelMatch('invoice_portal:no_invoice',translated('invoice_none_named',{patient:p.vorname})),
    details:detail(p,selected.cause,null)};
   const date=verified&&selected.invoiceDate?new Intl.DateTimeFormat(language==='en'?'en-GB':language==='es'?'es-ES':'de-DE',

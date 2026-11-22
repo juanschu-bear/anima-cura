@@ -8,7 +8,7 @@ import {decisionFromRule,emergencyDecision,resolveEmergency,explicitOptOut,manda
  renderWhatsAppRuleText,whatsappRulesSchema,type WhatsAppDecision} from '@/lib/services/animahost-whatsapp';
 import {appointmentLocalDate,appointmentNoticeDecision,appointmentNoticeFromDecision,
  appointmentNoticeSchema} from '@/lib/services/animahost-appointment-notices';
-import {fallbackDecision,fallbackHints,fallbackTopics,withRuleReplies,type FallbackTopic} from '@/lib/services/animahost-whatsapp-fallback';
+import {fallbackDecision,fallbackHints,fallbackTopics,matchApprovedRuleFallback,withRuleReplies,type FallbackTopic} from '@/lib/services/animahost-whatsapp-fallback';
 import {closureDecision} from '@/lib/services/animahost-practice-closures';
 import {accessReissuePurpose,reissueChatAccess,verifiedChatIdentitySchema} from '@/lib/services/animahost-access-reissue';
 import {attendanceArtworkVersion,attendanceProof,issueAttendanceFromChat,mayBeAttendanceRequest} from '@/lib/services/animahost-attendance';
@@ -238,8 +238,18 @@ export async function POST(request:NextRequest){
       const validated=whatsappRulesSchema.safeParse(version.data?.rules);
       if(validated.success){
       hoursRule=validated.data.find(rule=>rule.id==='oeffnungszeiten-und-sprechzeiten')?.patientText;
+      const medicationRule='medizinische-frage-zu-medikamenten-schmerzen-ode';
+      const medicationQuestion=/\b(ibuprofen|paracetamol|schmerzmittel|painkillers?)\b/i.test(input.text)&&
+       /[?]|\b(?:einnehmen|nehmen|take)\b/i.test(input.text);
+      const looseBrace=/\b(?:bracket|band|brackets?|brace)\b.{0,48}(?:abge|gelöst|lock|lose|loose)|(?:los|locker|gelöst).{0,32}\b(?:bracket|band|brace)\b/i.test(input.text);
       if(emergency){
        decision=resolveEmergency(input.text,emergency,validated.data,[],language,practice.practice_phone||'0179 5351813');
+      }else if(automaticReplies&&!input.handoffOnly&&medicationQuestion){
+       decision=withRuleReplies(null,[medicationRule],validated.data,practice.doctolib_url)??decision;
+       if(decision.rule!=='no_applicable_rule')decision={...decision,
+        text:`${t('animahost.quality.medication_limit',language)} ${t('animahost.quality.medical_contact',language,{phone:practice.practice_phone||'0179 5351813'})}`};
+      }else if(automaticReplies&&!input.handoffOnly&&looseBrace){
+       decision=decisionFromRule(validated.data.find(rule=>rule.id==='bracket-oder-band-hat-sich-geloest')??null,practice.doctolib_url);
       }else if(automaticReplies||handleAttendance){
       try{
        const arrivalIntent=Boolean(tolerance.success&&(explicitLater||
@@ -290,9 +300,6 @@ export async function POST(request:NextRequest){
         emergencyDecision(reportedSymptoms)!==null;
        const semanticEmergency=hasEmergencyEvidence?chosen.emergency:'none';
        const selectedRules=chosen.ruleIds??[];
-       const medicationQuestion=/\b(ibuprofen|paracetamol|schmerzmittel|painkillers?)\b/i.test(input.text)&&
-        /[?]|\b(?:einnehmen|nehmen|take)\b/i.test(input.text);
-       const medicationRule='medizinische-frage-zu-medikamenten-schmerzen-ode';
        const ruleIds=medicationQuestion&&!emergency&&semanticEmergency!=='immediate'&&semanticEmergency!=='urgent'
         ?[medicationRule,...selectedRules.filter(id=>validated.data.find(rule=>rule.id===id)?.action!=='notfall')]
         :selectedRules.filter(id=>validated.data.find(rule=>rule.id===id)?.action!=='notfall');
@@ -426,7 +433,11 @@ export async function POST(request:NextRequest){
          primary??(chosen.clear&&uniqueRules.length===1?withRuleReplies(null,uniqueRules,validated.data,practice.doctolib_url):null))??fallback();
        }
       }catch{
-       if(decision.action!=='notfall')decision=decisionFromRule(null);
+       if(decision.action!=='notfall'){
+        const cues=automaticReplies&&!input.handoffOnly&&!explicitLater&&!lateLanguage&&!mandatoryAppointmentClarification(input.text)
+         ?matchApprovedRuleFallback(input.text,validated.data):[];
+        decision=withRuleReplies(null,cues,validated.data,practice.doctolib_url)??decisionFromRule(null);
+       }
       }
       }
       }
