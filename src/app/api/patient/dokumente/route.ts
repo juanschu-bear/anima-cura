@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePatient } from "@/lib/patient-auth";
 import { createServerClient } from "@/lib/db/supabase";
-import { decodePatientDocumentRecord } from "@/lib/patient-document-types";
+import { decodePatientDocumentRecord, isInvoiceDocumentType } from "@/lib/patient-document-types";
 
 export async function GET() {
   const patient = await requirePatient();
@@ -20,6 +20,6 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    dokumente: (docs ?? []).map((d) => decodePatientDocumentRecord(d)),
+    dokumente: (docs ?? []).map(decodePatientDocumentRecord).filter(d=>!isInvoiceDocumentType(d.typ)),
   });
 }

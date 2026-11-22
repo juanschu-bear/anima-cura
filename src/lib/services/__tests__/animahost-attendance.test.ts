@@ -45,8 +45,8 @@ test('certificate renderer embeds Unicode fonts, fits names and freezes both lan
       assert.equal(pdf.getPageCount(), 1);
       assert.equal(pdf.getForm().getFields().length, 0);
       const xObjects = pdf.getPages()[0].node.Resources()?.lookup(PDFName.of('XObject'), PDFDict);
-      const nameAppearance = xObjects && pdf.context.lookup(xObjects.entries()[0][1], PDFRawStream);
-      assert.ok(nameAppearance);
+      const nameAppearance = xObjects && pdf.context.lookup(xObjects.entries()[0][1]);
+      assert.ok(nameAppearance instanceof PDFRawStream);
       const stream = Buffer.from(decodePDFRawStream(nameAppearance).decode()).toString();
       const size = Number(/ ([\d.]+) Tf/.exec(stream)?.[1]);
       assert.ok(name.length > 30 ? size >= 9 && size < 13.5 : size === 13.5, `name size: ${size}`);

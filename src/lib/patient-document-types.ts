@@ -69,3 +69,5 @@ export function decodePatientDocumentRecord(input: {
     icon: option.icon,
   };
 }
+
+export const isInvoiceDocumentType=(type:string)=>type==="rechnung"||type==="erste_rechnung";

@@ -4,6 +4,7 @@ import { resolveOpenItemAmount, resolvePaidItemAmount, resolveOpenItemStatus } f
 import { projectInvoicePaymentGuidance } from "@/lib/patient-payment-guidance";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { attachPatientInvoiceDocuments, type PatientInvoiceDocument } from "@/lib/patient-invoice-documents";
+import {loadUploadedPatientInvoices} from "@/lib/patient-uploaded-invoices";
 import { loadPatientImmediateInvoices } from "@/lib/patient-immediate-invoices";
 
 export async function GET() {
@@ -17,7 +18,7 @@ export async function GET() {
 
   const supabase = createServerClient();
 
-  const { data: memberships } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
+  const { data: memberships,error:membershipsError } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
   const patientIds = Array.from(new Set([patient.patientId, ...(memberships ?? []).map(row => row.patient_id)]));
   const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult, immediateResult] = await Promise.all([
     supabase
@@ -47,11 +48,9 @@ export async function GET() {
 
   const { data: posten, error } = postenResult;
 
-  if (error || patientResult.error || directDebitResult.error) {
-    return NextResponse.json({ error: "Fehler beim Laden" }, { status: 500 });
-  }
+  const paymentUnavailable=Boolean(error||patientResult.error||directDebitResult.error||membershipsError);
 
-  const normalized = (posten ?? []).map((item) => ({
+  const normalized = (paymentUnavailable?[]:posten??[]).map((item) => ({
       patientId: item.patient_id,
       id: item.id,
       typ: item.typ,
@@ -75,8 +74,13 @@ export async function GET() {
 
   const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
   const documents:PatientInvoiceDocument[]=documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)}));
+  const uploads=await loadUploadedPatientInvoices(supabase,patientIds,new Set(documents.map(d=>d.id)))
+    .then(items=>({items,status:"available" as const}))
+    .catch(()=>({items:[],status:"unavailable" as const}));
   return NextResponse.json({
-    rechnungen: attachPatientInvoiceDocuments(guided, documents),
+    rechnungen: [...attachPatientInvoiceDocuments(guided, documents),...uploads.items],
+    hochgeladeneRechnungenStatus: uploads.status,
+    zahlungsdatenStatus: paymentUnavailable?"unavailable":"available",
     sofortrechnungen: immediateResult.items,
     sofortrechnungenStatus: immediateResult.status,
     belegeStatus: documentsResult.error ? "unavailable" : "available",

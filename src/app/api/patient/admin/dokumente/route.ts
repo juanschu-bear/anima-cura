@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { createServerClient } from "@/lib/db/supabase";
@@ -5,7 +6,10 @@ import {
   decodePatientDocumentRecord,
   encodePatientDocumentName,
   getPatientDocumentTypeOption,
+  isInvoiceDocumentType,
 } from "@/lib/patient-document-types";
+import {BILLING_DOCUMENTS_BUCKET,billingDocumentPath,billingDocumentUrl} from "@/lib/billing-document-access";
+import {patientInvoicePdfUrl} from "@/lib/patient-uploaded-invoices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,11 +75,32 @@ export async function POST(request: NextRequest) {
   const typeOption = getPatientDocumentTypeOption(requestedType);
   const encodedName = encodePatientDocumentName(name, requestedType);
 
-  if (!patientId || !name) {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(patientId) || !name) {
     return NextResponse.json({ error: "patient_id und name sind erforderlich" }, { status: 400 });
   }
   if (!file || file.size <= 0) {
     return NextResponse.json({ error: "Bitte eine echte Datei auswählen" }, { status: 400 });
+  }
+
+  const invoice=isInvoiceDocumentType(typeOption.value);
+  if(invoice){
+    if(file.size>25*1024*1024||await file.slice(0,5).text()!=="%PDF-")
+      return NextResponse.json({code:"invoice_upload_pdf_required"},{status:400});
+    const id=randomUUID(),path=billingDocumentPath(patientId,id);
+    const {data:bucket,error:bucketError}=await serviceClient.storage.getBucket(BILLING_DOCUMENTS_BUCKET);
+    if(bucketError||bucket?.public!==false)return NextResponse.json({code:"invoice_upload_unavailable"},{status:503});
+    const storage=serviceClient.storage.from(BILLING_DOCUMENTS_BUCKET);
+    const upload=await storage.upload(path,file,{contentType:"application/pdf",upsert:false});
+    if(upload.error)return NextResponse.json({code:"invoice_upload_unavailable"},{status:503});
+    const saved=await serviceClient.from("patient_documents").insert({id,patient_id:patientId,name:encodedName,
+      typ:typeOption.storageType,file_url:patientInvoicePdfUrl(id)})
+      .select("id,name,typ,file_url,hochgeladen_am").single();
+    if(saved.error){
+      const persisted=await serviceClient.from("patient_documents").select("id").eq("id",id).maybeSingle();
+      if(!persisted.error&&!persisted.data)await storage.remove([path]);
+      return NextResponse.json({code:"invoice_upload_unavailable"},{status:503});
+    }
+    return NextResponse.json({dokument:decodePatientDocumentRecord({...saved.data,file_url:billingDocumentUrl(id)}),destination:"rechnungen"});
   }
 
   let fileUrl: string | null = null;
@@ -131,6 +156,9 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 
   const serviceClient = createServerClient();
+  const {data:profile}=await serviceClient.from("user_profiles").select("role").eq("id",user.id).maybeSingle();
+  if(!profile||!["admin","verwaltung"].includes(profile.role))
+    return NextResponse.json({code:"document_access_forbidden"},{status:403});
   const patientId = request.nextUrl.searchParams.get("patient_id");
 
   if (!patientId) {
@@ -144,6 +172,6 @@ export async function GET(request: NextRequest) {
     .order("hochgeladen_am", { ascending: false });
 
   return NextResponse.json({
-    dokumente: (docs || []).map((doc) => decodePatientDocumentRecord(doc)),
+    dokumente: (docs || []).map(doc=>decodePatientDocumentRecord(doc.file_url===patientInvoicePdfUrl(doc.id)?{...doc,file_url:billingDocumentUrl(doc.id)}:doc)),
   });
 }

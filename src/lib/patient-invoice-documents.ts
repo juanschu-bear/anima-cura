@@ -27,9 +27,8 @@ export async function resolvePatientInvoicePdf(rpc:(name:string,args:Record<stri
     const result=await rpc("patient_invoice_document_edition",{document_id:id,original_only:false});
     if(result.error?.code==="42501")return {error:"patient_invoice_forbidden" as const,status:403};
     if(!result.error){
-      if(result.data===null)return {error:"invoice_not_found" as const,status:404};
-      const value=result.data as {edition?:string;pdf?:string};
-      if((value.edition==="original"||value.edition==="typeset")&&typeof value.pdf==="string"){
+      const value=result.data as {edition?:string;pdf?:string}|null;
+      if(value&&(value.edition==="original"||value.edition==="typeset")&&typeof value.pdf==="string"){
         const bytes=Buffer.from(value.pdf,"base64");
         if(bytes.subarray(0,5).toString()==="%PDF-")return {bytes,edition:value.edition};
       }

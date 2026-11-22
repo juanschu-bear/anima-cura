@@ -59,7 +59,7 @@ test('self-service escalates only after two attempts, includes a team date and h
  assert.doesNotMatch(answers[1]?.text??'',/https:\/\/|Team/);
  assert.match(answers[2]?.text??'',/Geburtsdatum.*am Montag/);
  const invoice=await run('Nein, nicht Abrechnung, die Rechnungen, die angeblich in der App zu sehen sein sollten.');
- assert.equal(invoice?.decision.rule,'identity:missing_invoice');
+ assert.equal(invoice?.decision.rule,'invoice_portal:manual_review');
  assert.match(invoice?.decision.text??'',/missverstanden/);
 });
 

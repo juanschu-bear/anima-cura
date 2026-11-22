@@ -39,7 +39,8 @@ export function billingDocumentHandler(session: () => Client, service: () => Cli
       if (documentError) return fail('unavailable', 503);
       if (!document || !z.string().uuid().safeParse(document.patient_id).success ||
           (patient && document.patient_id !== profile.patient_id) ||
-          document.id !== documentId || document.file_url !== billingDocumentUrl(documentId)) {
+          document.id !== documentId || (document.file_url !== billingDocumentUrl(documentId)&&
+            (!staff||document.file_url!==`/api/patient/rechnungen/${documentId}/pdf`))) {
         return fail('notFound', 404);
       }
       const { data: bucket, error: bucketError } = await db.storage.getBucket(BILLING_DOCUMENTS_BUCKET);

@@ -387,7 +387,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
-      "sha256": "90ca01a924cb69a81e51039b8801a879e356e016cc3b699526ca2b2ebdd4091a",
+      "sha256": "fbaad6f7ea7bcce808d5faa0c166c4d806b6e04099fb2a93c5ed411903262b6d",
       "proof": "createServerComponentClient uses the existing authenticated cookie/JWT; auth.getUser verifies the session. The RPC accepts only a document UUID and checks ownership through auth.uid() and the authoritative patient profile. No service client or client-provided patient ID. Edition RPC uses the same authenticated patient session; SECURITY DEFINER is owned by restricted abrechnung_runtime and checks auth.uid()/patient profile. No privileged retry.",
       "calls": [
         {
@@ -404,7 +404,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "527153bfa4da6ac1515cea4cbb810275b6ef2def9ba778319fb5ec03c6a41e11",
+      "sha256": "46d7f9c23d377b0cda5ee42e0b2bd9a1687d7c54e6f03eb35d5339fca7164acc",
       "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The access RPC executes as a SECURITY DEFINER function, checks auth.uid() and verified patient memberships, and never accepts a patient ID. Edition RPC uses the same authenticated patient session and the same membership scope. No privileged retry.",
       "calls": [
         {
@@ -589,23 +589,6 @@
           "role": "service_role"
         }
       ]
-    },
-    {
-      "file": "src/lib/services/animahost-invoice-recovery.ts",
-      "sha256": "d1eff5153bad869de80ceb32f3074ca5b703e2951dfdb36cbf430741990d7f1e",
-      "proof": "The authenticated WhatsApp workflow supplies the scoped patient ID from a current exact match or verified identity. The imported read uses two calls, summaries then one exact existing document.",
-      "calls": [
-        {
-          "name": "animahost_imported_invoice_documents",
-          "signature": "public.animahost_imported_invoice_documents(p_patient uuid, p_document uuid)",
-          "role": "service_role"
-        },
-        {
-          "name": "animahost_imported_invoice_documents",
-          "signature": "public.animahost_imported_invoice_documents(p_patient uuid, p_document uuid)",
-          "role": "service_role"
-        }
-      ]
     }
   ],
   "proofs": [
@@ -683,11 +666,11 @@
     },
     {
       "file": "src/lib/patient-invoice-documents.ts",
-      "sha256": "b4776517a2e415d5d6ceae7360f0ed3b53a18c7d4b764ef4234941df5ff151a8"
+      "sha256": "f4831b8045bbb755f31a65424a87f18360573a7ec576de94d950a2f13581954c"
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "be699ed91098af3f2b6f29f017b7545a8eaaeb0ac8d00d517d3cf6d2758edc2a"
+      "sha256": "e191d85c9fbf18ab30a442713c736d5712647e874fc27f1a68412e428df8219a"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

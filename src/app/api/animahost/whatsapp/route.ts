@@ -161,16 +161,16 @@ export async function POST(request:NextRequest){
   }
   let details:ChatDetails|undefined;
   let qualityHandled=false;
-  if(preferences&&trustedPhone&&input.text&&input.messageType==='text'&&automaticReplies&&!input.handoffOnly&&
+  if(preferences&&trustedPhone&&input.text&&input.messageType==='text'&&!input.handoffOnly&&
      !explicitOptOut(input.text)&&!emergencyDecision(input.text)){
-   if(explicitlyOffersDu(input.text)){
+   if(automaticReplies&&explicitlyOffersDu(input.text)){
     preferences.informal=true;
     decision={action:'antworten',rule:'address:du',text:t('animahost.quality.du',language)};
     qualityHandled=true;
    }else{
     const resolved=await qualityWorkflow(db,{tenantId:input.tenantId,from:input.from,phone:trustedPhone,
      receivedAt:input.receivedAt,text:input.text,language,teamTime:teamTime(),patients:candidates,
-     patient,context:preferences.context,doctolib:practice.doctolib_url,closures:practice.closure_periods});
+     patient,context:preferences.context,doctolib:practice.doctolib_url,closures:practice.closure_periods,onlyInvoiceRouting:!automaticReplies});
     if(resolved){decision=resolved.decision;details=resolved.details;qualityHandled=true;}
    }
   }

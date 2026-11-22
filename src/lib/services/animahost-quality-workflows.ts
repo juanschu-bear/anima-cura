@@ -44,6 +44,7 @@ export function styleMessage(decision:WhatsAppDecision,patient:PhonePatient|null
 function kindOf(text:string):SubjectTask|'portal'|'general' {
  if(/bescheinigung|attendance certificate|proof of attendance|justificante/i.test(text))return 'attendance_certificate';
  if(/^\s*nein.{0,25}abrechnung.{0,45}rechnungen?.{0,45}(?:app|portal)/i.test(text))return 'missing_invoice';
+ if(/(?:rechnungen?|invoice|factura).{0,90}(?:benachrichtigung|verfügbar|notification|disponible).{0,90}(?:aber|nicht|kein|but|no)/i.test(text))return 'missing_invoice';
  if(/(?:rechnungen?|invoice|factura).{0,70}(?:fehl|nicht (?:sichtbar|zu sehen|angezeigt|da|find)|noch nicht|can.t see|missing|no aparece)|(?:nicht (?:sichtbar|zu sehen)|seh.{0,35}nicht|find.{0,35}nicht).{0,70}(?:rechnung|invoice|factura)|(?:app|portal).{0,80}(?:rechnung|invoice|factura).{0,90}(?:nicht|fehl)/i.test(text))return 'missing_invoice';
  if(/(?:mahnung|zahlungserinnerung|guthaben|doppelt bezahlt|überwies|nicht bezahlt|payment reminder|saldo pendiente)/i.test(text))return 'financial';
  if(/wann.{0,40}(?:termin|appointment)|(?:termin|appointment).{0,34}(?:wann|uhrzeit|finde ich|wo sehe)|(?:weiß|weiss).{0,35}nicht.{0,30}(?:termin|appointment)|when.{0,32}appointment/i.test(text))return 'appointment';
@@ -110,7 +111,7 @@ export function selfServiceReply(input:{
 
 export async function qualityWorkflow(db:Db,input:{
  tenantId:string;from:string;phone:string;receivedAt:string;text:string;language:string;teamTime:string;
- patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;
+ patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;onlyInvoiceRouting?:boolean;
 }):Promise<Outcome|null>{
  const {text,language,teamTime,context,patients,patient,receivedAt}=input;
  const message=t('animahost.team.reply',language,{when:teamTime});
@@ -126,7 +127,7 @@ export async function qualityWorkflow(db:Db,input:{
   lastName:p?.nachname??null,invoiceDate:date,cause});
  const repair=async(p:PhonePatient,question:string,verified:boolean)=>{
   const selected=await recoverPatientInvoice(db,p.id,coverage(question,receivedAt));
-  if(selected.cause==='manual_review')return {...handoff('invoice_portal:manual_review','invoice_manual'),
+  if(selected.cause==='manual_review')return {...handoff('invoice_portal:manual_review','invoice_manual_named',{patient:p.vorname}),
    details:detail(p,selected.cause,selected.invoiceDate)};
   if(selected.cause==='no_invoice')return {...labelMatch('invoice_portal:no_invoice',translated('invoice_none')),
    details:detail(p,selected.cause,null)};
@@ -154,6 +155,8 @@ export async function qualityWorkflow(db:Db,input:{
  const now=Date.parse(receivedAt);
  const fresh=(at:string)=>now-Date.parse(at)<=7*86_400_000&&Date.parse(at)<=now;
  const requested=kindOf(text);
+ const searchingDocuments=/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
+ if(input.onlyInvoiceRouting&&requested!=='missing_invoice'&&!searchingDocuments)return null;
  if(/abhol|pick up|recoger/i.test(text)&&/schien|aligner/i.test(text)&&/später|later|tarde/i.test(text)){
   const date=appointmentLocalDate(receivedAt),day=new Date(date+'T12:00:00Z').getUTCDay();
   const blocks=closurePeriodsSchema.safeParse(input.closures);
@@ -194,11 +197,18 @@ export async function qualityWorkflow(db:Db,input:{
   context.subject={kind:requested==='general'?'appointment':requested as SubjectTask,question:maskBirthDates(text),at:receivedAt};
   return labelMatch('identity:which_patient',translated('which_patient',{patients:new Intl.ListFormat(language,{type:'disjunction'}).format(patients.map(p=>p.vorname))}));
  }
+ if(searchingDocuments&&requested!=='missing_invoice')return labelMatch('quality:invoice_section',translated('invoice_section'));
  if(requested==='missing_invoice'){
   const corrected=/^\s*nein|missverstanden|ich meinte|not the/i.test(text);
-  if(patient)return repair(patient,text,false);
-  const pending=waiting({kind:'missing_invoice',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});
-  return corrected?{...pending,decision:{...pending.decision,text:translated('correction')+' '+pending.decision.text}}:pending;
+  if(patient){
+   const result=await repair(patient,text,false);
+   if(searchingDocuments)result.decision.text=translated('invoice_section')+' '+result.decision.text;
+   return result;
+  }
+  const result={...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'manual_review',null)};
+  const prefix=searchingDocuments?translated('invoice_section'):corrected?translated('correction'):'';
+  if(prefix)result.decision.text=prefix+' '+result.decision.text;
+  return result;
  }
  if(requested==='financial'){
   if(!patient)return waiting({kind:'financial',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});
