@@ -160,3 +160,16 @@ Datenvertrag für Claude: `/api/abrechnung/notifications/followups` ergänzt `in
 Lokaler PostgreSQL-Test: 325 synthetische Rechnungen / 181 Personen werden einmalig aufgenommen; erneuter Lauf erzeugt keinen Doppelauftrag. Produktionsaufnahme noch durch den nächsten Lauf und `docs/2026-11-22-invoice-reconciliation-readonly.sql` bestätigen. Die 325 sind die historische Prüfkohorte; nach Versand/Öffnung kann die aktuelle Restzahl kleiner werden. Nachweis erforderlich: keine unerklärten `not_in_worker`-Fälle.
 
 Der Worker-Rückgabewert ergänzt `followupPlanning.initial` mit `candidates`, `scheduled`, `alreadyTracked`. Diese Zahlen stammen aus dem konkreten Lauf; sie sind keine fest codierte Behauptung über die 325.
+
+
+## Konkreter Aufnahmelauf für Claude (nach Meldung 20:50)
+
+Juan hat bestätigt, dass Claude den Lauf auslöst und misst. Geschützter vorhandener Worker-Endpunkt:
+
+`POST https://anima-leitstand.vercel.app/api/abrechnung/notifications/dispatch`
+
+JSON-Body: `{"intakeOnly":true}`. Bestehende Worker-Authentifizierung verwenden; keine Zugangsdaten weitergeben. Dieser explizite Modus legt ausschließlich Erstzustellaufträge an. Er erzeugt keine Zugangslinks und ruft weder Mailversand noch App/Push auf, auch tagsüber nicht. Danach übernimmt der normale Worker innerhalb 09:00–19:00 Berlin den geprüften Versand.
+
+Antwort: `intakeOnly: true`, `mailSent: 0`, `initial: {candidates,scheduled,alreadyTracked}` sowie `states[]: {worker_state,initial_delivery,invoices,people}`. Bei erstmaliger unveränderter Kohorte erwartet: 325 Kandidaten / 181 Personen; konkret zurückgemeldete Zahlen sind maßgeblich. Mehrfachausführung ist idempotent. Die gesonderte offene Patientenzuordnung wird nicht ausgeführt.
+
+Die Aufnahme liest Metadaten und Mailannahmen einmalig, ohne globale PDF-View oder korrelierte globale Versandabfrage pro Rechnung. Sie wird vor der historischen Erinnerungsplanung in einer eigenen Transaktion bestätigt; ein Fehler in der historischen Planung rollt die Aufnahme nicht zurück. Der reguläre Worker meldet einen solchen Fehler ausdrücklich als `followupPlanning.warning: historical_followup_planning_unavailable`; das wäre separat zu untersuchen, kein erfolgreicher Nachfassnachweis.

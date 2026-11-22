@@ -408,23 +408,6 @@
       ]
     },
     {
-      "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "96f12a405a1396a325fdbbdf60dd40e3cd51dc5786c1aaeb69e2c0bd8a38f7d4",
-      "proof": "Verified cookie/JWT through createServerComponentClient and auth.getUser; authoritative patient profile required, never repaired from user metadata. Imported invoice and edition RPCs use only this authenticated session. Migration 099 scopes both with invoice_portal_jwt_uid and invoice_portal_patient_scope under the restricted definer. Public payment/upload queries use a separate service client, scoped to the verified profile and stored memberships; technical failures produce unavailable status. The service client records anonymous operational failures only and never retries an imported module RPC. No patient ID is accepted from the browser.",
-      "calls": [
-        {
-          "name": "patient_invoice_documents_for_access",
-          "signature": "public.patient_invoice_documents_for_access()",
-          "role": "authenticated"
-        },
-        {
-          "name": "patient_invoice_document_editions",
-          "signature": "public.patient_invoice_document_editions()",
-          "role": "authenticated"
-        }
-      ]
-    },
-    {
       "file": "src/lib/scribe-template-history-service.ts",
       "sha256": "c3d46239e6549fe20a264cdb9cbb44182d7c4228451e6f8b5cb8dd0d8ffa83e8",
       "proof": "Reviewed client provenance: template mutations use the explicit service client only after workspace actor authorization. Historical reads accept an injected server-only client after the billing-export login and practice-permission checks; they never accept patient identity or perform writes. The sole RPC remains service-role-only.",

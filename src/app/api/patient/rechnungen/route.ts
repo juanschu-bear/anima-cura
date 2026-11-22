@@ -6,7 +6,7 @@ import { resolveOpenItemAmount, resolvePaidItemAmount, resolveOpenItemStatus } f
 import { projectInvoicePaymentGuidance } from "@/lib/patient-payment-guidance";
 import { createServerComponentClient } from "@/lib/db/supabase-server";
 import { attachPatientInvoiceDocuments, type PatientInvoiceDocument } from "@/lib/patient-invoice-documents";
-import {loadUploadedPatientInvoices} from "@/lib/patient-uploaded-invoices";
+import {loadUploadedPatientInvoices,isPublishedQuarterSummary} from "@/lib/patient-uploaded-invoices";
 import { loadPatientImmediateInvoices } from "@/lib/patient-immediate-invoices";
 
 export async function GET() {
@@ -22,7 +22,7 @@ export async function GET() {
 
   const { data: memberships,error:membershipsError } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
   const patientIds = Array.from(new Set([patient.patientId, ...(memberships ?? []).map(row => row.patient_id)]));
-  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult, immediateResult, shared] = await Promise.all([
+  const [postenResult, patientResult, directDebitResult, immediateResult, shared] = await Promise.all([
     supabase
       .from("offene_posten")
       .select("id, patient_id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
@@ -41,9 +41,6 @@ export async function GET() {
       .eq("status", "aktiv")
       .eq("sepa_mandat", true)
       .limit(1),
-    // Uses the patient's session. No service-role access to the billing module.
-    session.rpc("patient_invoice_documents_for_access"),
-    session.rpc("patient_invoice_document_editions"),
     loadPatientImmediateInvoices(patientIds).then(items => ({items,status:"available" as const}))
       .catch(() => ({items:[],status:"unavailable" as const})),
     invoiceRecordRead(new Request('https://animacura.io/api/rechnungsakte')).then(async response=>response.ok?await response.json():null).catch(()=>null),
@@ -75,14 +72,13 @@ export async function GET() {
     directDebitPatients.has(patientId),
   ));
 
-  const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
   const historicalIds=new Set<string>([...(shared?.records??[]).flatMap((r:any)=>r.history.map((h:any)=>h.documentId)),...(shared?.unmatchedHistory??[]).map((h:any)=>h.id)]);
   const commonDocuments:PatientInvoiceDocument[]|null=shared?.records?.map((r:any)=>({id:r.id,patientId:r.patientId,invoiceNumber:r.invoiceNumber,date:r.date,reference:r.reference??null,quarter:r.quarter,art:r.art,patientCents:r.amountCents,grossCents:r.amountCents,linkedOpenItemId:r.payment?.openItemId??null,positions:r.positions,reasons:r.reasons}));
-  const documents:PatientInvoiceDocument[]=commonDocuments??(documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)})));
+  const documents:PatientInvoiceDocument[]=commonDocuments??[];
   const uploads=await loadUploadedPatientInvoices(supabase,patientIds,new Set(documents.map(d=>d.id)))
     .then(items=>({items,status:"available" as const}))
     .catch(()=>({items:[],status:"unavailable" as const}));
-  const availability=patientInvoiceAvailability({documents:commonDocuments?null:documentsResult.error,editions:commonDocuments?null:editionsResult.error,memberships:membershipsError});
+  const availability=patientInvoiceAvailability({documents:commonDocuments?null:{code:"invoice_record_unavailable"},editions:null,memberships:membershipsError});
   if(availability.status==="unavailable"){
     // Operational evidence only: no patient, invoice, JWT or database error text.
     const recorded=await supabase.from("audit_log").insert({id:crypto.randomUUID(),tabelle:"patient_invoice_read",
@@ -91,7 +87,7 @@ export async function GET() {
   }
   return NextResponse.json({
     belegVerfuegbarkeit:availability,
-    rechnungen: [...attachPatientInvoiceDocuments(guided, documents).map((r:any)=>shared&&r.beleg?{...r,...((payment:any)=>payment?{betrag:payment.amountCents===null?null:payment.amountCents/100,offen:payment.openCents===null?null:payment.openCents/100,gezahlt:payment.paidCents===null?null:payment.paidCents/100,status:payment.status,paymentStatusKnown:[payment.amountCents,payment.openCents,payment.paidCents].every(Number.isFinite)}:{})(shared.records.find((a:any)=>a.id===r.beleg.id)?.payment),beleg:{...r.beleg,history:(shared.records.find((a:any)=>a.id===r.beleg.id)?.history??[]).map((h:any)=>({...h,pdfUrl:`/api/rechnungsakte?historyId=${h.documentId}`})),pdfUrl:`/api/rechnungsakte?documentId=${r.beleg.id}`}}:r),...uploads.items.filter(r=>!historicalIds.has(r.id))],
+    rechnungen: [...attachPatientInvoiceDocuments(guided, documents).map((r:any)=>shared&&r.beleg?{...r,...((payment:any)=>payment?{betrag:payment.amountCents===null?null:payment.amountCents/100,offen:payment.openCents===null?null:payment.openCents/100,gezahlt:payment.paidCents===null?null:payment.paidCents/100,status:payment.status,paymentStatusKnown:[payment.amountCents,payment.openCents,payment.paidCents].every(Number.isFinite)}:{})(shared.records.find((a:any)=>a.id===r.beleg.id)?.payment),beleg:{...r.beleg,history:(shared.records.find((a:any)=>a.id===r.beleg.id)?.history??[]).map((h:any)=>({...h,pdfUrl:`/api/rechnungsakte?historyId=${h.documentId}`})),pdfUrl:`/api/rechnungsakte?documentId=${r.beleg.id}`}}:r),...uploads.items.filter(r=>!historicalIds.has(r.id)&&!isPublishedQuarterSummary(r.id,r.name))],
     rechnungsaktenStatus:shared?'available':'unavailable',
     rechnungsakten:shared?.records??[],
     rechnungsverlaufOhneZuordnung:shared?.unmatchedHistory??[],

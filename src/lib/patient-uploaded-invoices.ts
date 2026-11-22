@@ -8,8 +8,9 @@ type Document={id:string;patient_id:string;name:string;typ:string;file_url:strin
 export const patientInvoicePdfUrl=(id:string)=>`/api/patient/rechnungen/${id}/pdf`;
 const uploadPdfUrl=(id:string)=>`${patientInvoicePdfUrl(id)}?source=upload`;
 
+export const isPublishedQuarterSummary=(id:string,name:string)=>id[14]==="5"&&/^Rechnung [1-4]\/\d{4} · (?:BEMA|GOZ) · /.test(name);
 function publishedLegacyInvoice(document:Document){
-  return document.id[14]==="5"&&/^Rechnung [1-4]\/\d{4} · (?:BEMA|GOZ) · /.test(decodePatientDocumentRecord(document).name);
+  return isPublishedQuarterSummary(document.id,decodePatientDocumentRecord(document).name);
 }
 
 function originalUploadPath(document:Document){
