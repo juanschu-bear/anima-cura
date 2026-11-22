@@ -130,4 +130,11 @@ const BAUSTEINE_GLOCKE_INFOBOX: Entwurf = {
   ].join("\n"),
 };
 
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_ANLIEGEN: Entwurf = {
+ slug:'2026-11-22-animahost-anliegen-und-namen',art:'hinweis',bestaetigen:false,
+ titel:'WhatsApp: Anliegen und Namen sorgfältiger zuordnen',kurz:'Terminwunsch und Rechnungsfrage bleiben zusammen; persönliche Nachrichten kommen vollständig beim Team an.',
+ text:'AnimaHost setzt keine pauschalen Namenssätze mehr vor Antworten. Bei mehreren Kindern zählt der ausdrücklich genannte Name. Unklare Namen und persönlich ans Team gerichtete Nachrichten werden mit allen Angaben weitergegeben. Ein Terminwunsch zusammen mit einer Rechnungsfrage wird gemeinsam bearbeitet; eine Begrüßung verdrängt keine konkreten Anliegen.',
+ titelEn:'WhatsApp: handle requests and names more carefully',kurzEn:'Appointment and invoice requests stay together; personal messages reach the team in full.',
+ textEn:'AnimaHost no longer prefixes replies with generic name statements. With siblings, the explicitly named child determines the subject. Unmatched names and messages addressed personally to staff are passed to the team with all details. Appointment and invoice requests are handled together; a greeting cannot replace a concrete request.'
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

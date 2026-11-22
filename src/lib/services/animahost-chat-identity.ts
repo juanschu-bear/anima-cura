@@ -45,22 +45,28 @@ const L='A-Za-zÄÖÜäöüßÀ-ÿ';
 const SUBJECT_THING=new RegExp(`^(?:(?:nächste|neue|letzte|erste|zweite)[rnms]?\\s+)?(?:termine?s?|rechnung(?:en)?|spange|zahnspange|schienen?|behandlung|behandlungsplan|bescheinigung|kontrolle|retainer|brackets?|röntgenbild(?:er)?|unterlagen|akte|abholung|kostenplan)(?![${L}])`,'i');
 /**
  * Vorname, den die Nachricht ausdrücklich als betroffene Person nennt: „Fabians Termin“ oder „mein Sohn Fabian“ (22.11.2026).
- * Bewusst eng: Nur diese 2 eindeutigen Formen zählen. Alles andere bleibt unentschieden und liefert null.
+ * Nur eindeutige sprachliche Personenbezüge zählen; sonst bleibt die Zuordnung offen.
  */
 export function namedSubject(text:string):string|null{
- const name=(value:string|undefined)=>value&&!NOT_A_NAME.has(value.toLocaleLowerCase('de-DE'))?value:null;
+ const name=(value:string|undefined)=>value&&!NOT_A_NAME.has(value.toLocaleLowerCase('de-DE'))&&!SUBJECT_THING.test(value)&&!['Fragen','Hilfe','Antwort','Rückmeldung','Informationen','Rechnungen','Termin'].includes(value)?value:null;
  const genitive=new RegExp(`(?:^|[^${L}])([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})s\\s+`,'g');
  for(let hit=genitive.exec(text);hit;hit=genitive.exec(text)){
   if(SUBJECT_THING.test(text.slice(genitive.lastIndex))&&name(hit[1]))return hit[1];
  }
  const family=new RegExp(`(?:^|[^${L}])(?:[Mm]ein|[Uu]nser)(?:e[mnr]?)?\\s+(?:Sohn|Tochter|Kind|Bruder|Schwester|Enkel|Enkelin)\\s+([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})(?![${L}])`).exec(text);
- return name(family?.[1]);
+ if(name(family?.[1]))return name(family?.[1]);
+ const explicit=new RegExp(`(?:für|von|um)\\s+([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})(?![${L}])`).exec(text);
+ if(name(explicit?.[1]))return name(explicit?.[1]);
+ const active=new RegExp(`(?:^|[.!?]\\s+)([A-ZÄÖÜ][a-zäöüßà-ÿ]{2,})(?:\\s*:\\s*(?:Termin|Rechnung)|\\s+(?:hat|braucht|benötigt)\\s+(?:einen?|den|seinen?|ihren?)\\s+(?:Termin|Rechnung))`).exec(text);
+ return name(active?.[1]);
 }
 /**
  * Wem gilt die Nachricht? Genau 1 genannter Patient der Nummer: dieser. Niemand genannt und nur 1 Patient an der Nummer: dieser,
  * außer die Nachricht nennt ausdrücklich eine andere Person. Dann wird nichts angenommen, statt über das falsche Kind zu antworten.
  */
 export function selectPhonePatient(list:PhonePatient[],text:string){
+ const subject=namedSubject(text);
+ if(subject){const matches=list.filter(p=>mentionsPatient(subject,p));return matches.length===1?matches[0]:null;}
  const line=` ${normalized(text)} `;
  const mentioned=list.filter(p=>mentionsPatient(text,p)||line.includes(` ${normalized(`${p.vorname} ${p.nachname}`)} `));
  if(mentioned.length===1)return mentioned[0];

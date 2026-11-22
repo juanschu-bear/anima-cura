@@ -19,6 +19,10 @@ export const whatsappRulesSchema=z.array(whatsappRuleSchema).max(100).refine(
 export type WhatsAppRule=z.infer<typeof whatsappRuleSchema>;
 export type WhatsAppDecision={action:'antworten'|'klaerfall'|'notfall';text:string;rule:string};
 
+export const isGreetingOnly=(text:string)=>/^\s*(?:hallo|hi|hello|hola|guten (?:tag|morgen|abend)|buenos días)[\s!,.]*$/i.test(text);
+export const greetingRule=(rule:WhatsAppRule)=>/begrüß|begrüss|begrue|greeting|saludo/i.test(rule.id+' '+rule.topic)||isGreetingOnly(rule.keywords.join(' '));
+export const applicableMessageRules=(text:string,rules:WhatsAppRule[])=>isGreetingOnly(text)?rules:rules.filter(rule=>!greetingRule(rule));
+
 export function emergencyDecision(message:string):WhatsAppDecision|null{
  const symptoms=message.replace(/\b(?:keine atemnot|keine blutung|keine starken schmerzen|keinen unfall|nichts verschluckt)\b/gi,'');
  if(/\b(?:atemnot|keine luft|schlecht luft|erstick\w*|bewusstlos\w*|stark\w* blutung\w*|can(?:not|'t|’t) breathe|heavy bleeding|no puedo respirar)\b/i.test(symptoms))
@@ -34,7 +38,7 @@ export function safeRuleText(rule:WhatsAppRule):boolean{
 
 export function candidateRules(message:string,rules:WhatsAppRule[]):WhatsAppRule[]{
  const normalized=message.toLocaleLowerCase('de-DE');
- return rules.filter(rule=>rule.keywords.some(word=>normalized.includes(word.toLocaleLowerCase('de-DE'))));
+ return applicableMessageRules(message,rules).filter(rule=>rule.keywords.some(word=>normalized.includes(word.toLocaleLowerCase('de-DE'))));
 }
 
 export function mandatoryAppointmentClarification(message:string):boolean{

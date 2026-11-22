@@ -1,7 +1,7 @@
 import { t } from '@/lib/i18n';
 import { appointmentLocalDate } from './animahost-appointment-notices';
 import { closurePeriodsSchema } from './animahost-practice-closures';
-import { decisionFromRule, isAppointmentLinkRule, renderWhatsAppRuleText, type WhatsAppDecision, type WhatsAppRule } from './animahost-whatsapp';
+import { applicableMessageRules, decisionFromRule, isAppointmentLinkRule, renderWhatsAppRuleText, type WhatsAppDecision, type WhatsAppRule } from './animahost-whatsapp';
 
 export const fallbackTopics = [
   'attachment', 'appliance', 'appointment', 'callback', 'billing', 'access', 'certificate', 'medical', 'practice', 'other',
@@ -98,7 +98,7 @@ export function matchApprovedRuleFallback(message:string,rules:WhatsAppRule[]):s
  const normalize=(value:string)=>' '+value.toLocaleLowerCase('de-DE').normalize('NFKC')
   .replace(separators,' ').trim()+' ';
  const clauses=message.split(/[?;]\s*|\bund\b|\band\b/i).map(normalize).filter(value=>value.trim().length>=5);
- const eligible=rules.filter(rule=>rule.action==='antworten'&&!rule.appointmentTypeId);
+ const eligible=applicableMessageRules(message,rules).filter(rule=>rule.action==='antworten'&&!rule.appointmentTypeId);
  const matchesByPhrase=new Map<string,Set<string>>();
  for(const rule of eligible)for(const keyword of rule.keywords){
   const phrase=normalize(keyword);

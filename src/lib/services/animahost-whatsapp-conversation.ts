@@ -58,6 +58,8 @@ export function enforceConversationOutput(decision:WhatsAppDecision,history:Conv
   const when=options.teamTime??t('animahost.team.next',language);
   const time=new Intl.DateTimeFormat(language,{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',second:'2-digit'})
    .format(new Date(options.receivedAt??Date.now()));
+  if(decision.rule==='quality:personal_team')return {...decision,
+   text:t('animahost.quality.personal_team_followup',language,{when,time})};
   const keys=options.informal&&language==='de'?['repeat_du','repeat_du_alt','repeat_du_time']:['repeat','repeat_alt','repeat_time'];
   const choices=keys.map(key=>t(`animahost.whatsapp.${key}`,language,{when,time}));
   return {action:'klaerfall',rule:'conversation:repeat_review',text:choices.find(value=>!prior.has(normalizedReply(value)))??choices.at(-1)!};

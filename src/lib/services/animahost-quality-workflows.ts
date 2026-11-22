@@ -3,48 +3,24 @@ import {t} from '@/lib/i18n';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {closurePeriodsSchema} from './animahost-practice-closures';
 import {renderWhatsAppRuleText,type WhatsAppDecision} from './animahost-whatsapp';
-import {identifyByBirthDate,maskBirthDates,mentionsPatient,parseBirthDate,patientIsMinor,selectPhonePatient,useDu,
+import {identifyByBirthDate,maskBirthDates,parseBirthDate,patientIsMinor,useDu,
  type ChatContext,type PhonePatient,type SubjectTask} from './animahost-chat-identity';
 import {recoverPatientInvoice} from './animahost-invoice-recovery';
 
 type Db=ReturnType<typeof createServerClient>;
-export type ChatDetails={patientId:string|null;firstName:string|null;lastName:string|null;invoiceDate:string|null;cause:string};
-type Outcome={decision:WhatsAppDecision;details?:ChatDetails};
+export type ChatDetails={patientId:string|null;firstName:string|null;lastName:string|null;invoiceDate:string|null;cause:string;requestedName?:string|null;practiceSummary?:string;concerns?:string[]};
+export type Outcome={decision:WhatsAppDecision;details?:ChatDetails};
 const portal='https://animacura.io';
 const labelMatch=(rule:string,text:string,action:WhatsAppDecision['action']='antworten'):Outcome=>({decision:{action,rule,text}});
 
-const GREETING=/^\s*(?:guten (?:tag|morgen|abend)|hallo|hello|hi|hola|buen(?:os|as) (?:días|tardes|noches))(?![A-Za-zÄÖÜäöüßÀ-ÿ])[\s,.!]*/i;
-/** Eine Antwort grüßt nur 1-mal: Steht der Gruß mit Namen davor, entfällt der Gruß am Anfang der Regel. */
-function withoutGreeting(message:string){
- const rest=message.replace(GREETING,'');
- return rest===message||!rest?message:rest[0].toLocaleUpperCase('de-DE')+rest.slice(1);
-}
-/**
- * `incoming`: die Nachricht des Patienten. Ein Kind nennt AnimaHost nur beim Namen, wenn die Nachricht selbst von diesem Kind spricht,
- * und nie vor einer Übergabe ans Team (22.11.2026: „gern helfe ich Ihnen bei Ihrer Frage zu …“ stand vor falschen Kindern und vor Rückfall-Antworten).
- */
+/** Keep authored subject-specific names, without adding generic identity preambles. */
 export function styleMessage(decision:WhatsAppDecision,patient:PhonePatient|null,input:{
  language:string;receivedAt:string;firstReply:boolean;informal:boolean;teamTime:string;incoming?:string;
 }){
  if(decision.action==='notfall')return decision;
- const {language,firstReply,informal}=input;
+ const {language,informal}=input;
  let message=decision.text;
- const addressed=/^(?:identity:|address:|media:|opt_out|invoice_portal:manual_review)/.test(decision.rule);
- const names=patient?[patient.vorname,patient.nachname].filter(Boolean):[];
- const alreadyNamed=names.some(name=>message.toLocaleLowerCase().includes(name.toLocaleLowerCase()));
- if(patient&&!addressed&&!alreadyNamed){
-  const minor=patientIsMinor(patient.geburtsdatum,appointmentLocalDate(input.receivedAt));
-  const handoff=decision.action==='klaerfall'||decision.rule.startsWith('fallback:');
-  if(minor!==false&&!handoff&&mentionsPatient(input.incoming??'',patient))
-   message=t(firstReply?'animahost.identity.child':'animahost.identity.child_followup',language,{name:patient.vorname})+' '+withoutGreeting(message);
-  if(minor===false){
-   const sex=(patient.geschlecht??'').toLocaleLowerCase();
-   const name=/^(?:w|weiblich|female)$/.test(sex)?`Frau ${patient.nachname}`:
-    /^(?:m|männlich|maennlich|male)$/.test(sex)?`Herr ${patient.nachname}`:`${patient.vorname} ${patient.nachname}`;
-   message=t('animahost.identity.adult',language,{name:language==='de'?name:
-    minor===false?`${patient.vorname} ${patient.nachname}`:name})+' '+withoutGreeting(message);
-  }
- }
+ // Names belong in authored, subject-specific sentences, never in generic prefixes.
  if(decision.action==='klaerfall'&&!/^late_arrival:|^fallback:|^invoice_portal:|^quality:/.test(decision.rule)&&
   !message.includes(input.teamTime)){
   message=message.replace(/(?:Unser Team|Das Team|Die Praxis) meldet sich(?: bei Ihnen)?\.?/gi,'').trim();
@@ -71,7 +47,7 @@ function kindOf(text:string):SubjectTask|'portal'|'general' {
 const mentionsInvoiceAndDocuments=(text:string)=>/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
 
 export function invoicePortalIntent(text:string){
- if(kindOf(text)==='missing_invoice')return 'missing';
+ if(kindOf(text)==='missing_invoice'||/(?:rechnung|invoice|factura)[\s\S]{0,150}(?:nicht.{0,25}(?:abruf|öffn|oeffn|lad)|lässt sich nicht|cannot.{0,20}(?:open|download)|can.t.{0,20}(?:open|download)|no puedo)/i.test(text))return 'missing';
  if(mentionsInvoiceAndDocuments(text))return 'section';
  if(/(?:\bwo\b|\bwhere\b|dónde).{0,50}(?:rechnung|invoice|factura)/i.test(text))return 'location';
  return null;
@@ -188,8 +164,8 @@ export async function qualityWorkflow(db:Db,input:{
  };
  const now=Date.parse(receivedAt);
  const fresh=(at:string)=>now-Date.parse(at)<=7*86_400_000&&Date.parse(at)<=now;
- const requested=kindOf(text);
  const intent=invoicePortalIntent(text);
+ const requested=intent==='missing'?'missing_invoice':kindOf(text);
  const asksInvoiceLocation=intent==='location';
  const searchingDocuments=mentionsInvoiceAndDocuments(text);
  if(input.onlyInvoiceRouting&&!intent)return null;
