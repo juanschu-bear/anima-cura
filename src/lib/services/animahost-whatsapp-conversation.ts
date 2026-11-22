@@ -27,19 +27,19 @@ const guard='Keine Buchung, Verschiebung oder Stornierung im Terminkalender zusa
 
 export async function formulateConversationReply(input:{
  model:string;decision:WhatsAppDecision;text:string;history:ConversationHistory;language:string;
- verifiedIdentity:boolean;signal:AbortSignal;deadline:number;
+ verifiedIdentity:boolean;informal?:boolean;signal:AbortSignal;deadline:number;
 }):Promise<WhatsAppDecision>{
  const {decision,signal,model}=input;
  // Functional access links and identity/account workflows stay within their audited template.
  if(/^(?:attendance_|access_|contact_change_|invoice_recipient_)/.test(decision.rule))return decision;
  if(input.deadline-Date.now()<1_200)return decision;
  const facts={approved:decision.text,rule:decision.rule,action:decision.action,patientMessage:input.text,
-  history:input.history,language:input.language,verifiedIdentity:input.verifiedIdentity};
+  history:input.history,language:input.language,addressMode:input.informal?'Du':'Sie',verifiedIdentity:input.verifiedIdentity};
  try{
   const drafted=await generateText({model,providerOptions:gatewayOptions,maxRetries:0,maxOutputTokens:440,
    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(Math.max(1,Math.min(4_000,input.deadline-Date.now()-900)))]),
    output:Output.object({schema:z.object({reply:z.string().min(1).max(1500)})}),
-   system:`Formuliere anhand der freigegebenen Antwort eine natürliche kurze WhatsApp-Antwort in der Sprache des Patienten, freundlich und in der Sie-Form. Greife dessen Anliegen oder Einwand in höchstens drei kurzen Sätzen auf. Beginne direkt mit der Antwort. Vermeide Anrede, Abschiedsgruß, Wiederholungen und unpassende Wünsche. Die freigegebene Antwort ist eine Faktenvorlage. Formuliere eigenständig und passe die Satzstruktur an den Verlauf an. Die ausdrücklich erlaubte Information darf sehr knapp, aber vollständig sein. Behalte sämtliche Fakten, Schritte und Grenzen bei. ${guard}`,
+   system:`Formuliere anhand der freigegebenen Antwort eine natürliche kurze WhatsApp-Antwort in der Sprache des Patienten, freundlich und konsequent in der angegebenen Anredeform. Greife dessen Anliegen oder Einwand in höchstens drei kurzen Sätzen auf. Beginne direkt mit der Antwort. Vermeide Anrede, Abschiedsgruß, Wiederholungen und unpassende Wünsche. Die freigegebene Antwort ist eine Faktenvorlage. Formuliere eigenständig und passe die Satzstruktur an den Verlauf an. Die ausdrücklich erlaubte Information darf sehr knapp, aber vollständig sein. Behalte sämtliche Fakten, Schritte und Grenzen bei. ${guard}`,
    prompt:JSON.stringify(facts)});
   const candidate=drafted.output.reply.trim();
   if(candidate===decision.text||!withinReplyBounds(candidate,decision.text)||input.deadline-Date.now()<500)return decision;
@@ -48,7 +48,7 @@ export async function formulateConversationReply(input:{
    output:Output.object({schema:z.object({violations:z.array(z.enum([
     'extra_commitment','missing_instruction','unsafe_advice','private_data','wrong_fact','wrong_language',
    ])).max(6)})}),
-   system:`Prüfe die vorgeschlagene Nachricht unabhängig gegen die Faktenvorlage. Gib nur konkrete Verstöße zurück, sonst violations=[]. Eine freundlichere Wortwahl oder ein sparsamer Bezug auf das Anliegen aus der aktuellen Nachricht sind erlaubt. Prüfe den Inhalt statt den genauen Wortlaut. Die ausdrücklich erlaubte spätere Ankunft zum selben Termin ist keine Änderung im Kalender. Sichere Alternativformulierungen sind gültig, wenn alle wesentlichen Fakten, nächsten Schritte und die Wartezeit oder Rückfrage, falls vorgesehen, erhalten bleiben. ${guard}`,
+   system:`Prüfe die vorgeschlagene Nachricht unabhängig gegen die Faktenvorlage. Gib nur konkrete Verstöße zurück, sonst violations=[]. Eine freundlichere Wortwahl oder ein sparsamer Bezug auf das Anliegen aus der aktuellen Nachricht sind erlaubt. Prüfe den Inhalt statt den genauen Wortlaut. Bei Deutsch gilt die angegebene Anredeform Du oder Sie. Die ausdrücklich erlaubte spätere Ankunft zum selben Termin ist keine Änderung im Kalender. Sichere Alternativformulierungen sind gültig, wenn alle wesentlichen Fakten, nächsten Schritte und die Wartezeit oder Rückfrage, falls vorgesehen, erhalten bleiben. ${guard}`,
    prompt:JSON.stringify({...facts,proposed:candidate})});
   return checked.output.violations.length===0?{...decision,text:candidate}:decision;
  }catch{return decision;}

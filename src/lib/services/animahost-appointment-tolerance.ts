@@ -29,7 +29,7 @@ export const lateIntentSchema = z.strictObject({
 export type LateIntent = z.infer<typeof lateIntentSchema>;
 export const lateStateSchema = lateIntentSchema.extend({
  refusals:z.number().int().min(0).max(2),
- outcome:z.enum(['accept','wait','rebook','pending','ask_type','ask_time','already_pending','phone']),
+ outcome:z.enum(['accept','wait','rebook','pending','incomplete_review','ask_type','ask_time','already_pending','phone']),
 });
 export type LateState = z.infer<typeof lateStateSchema>;
 export type Language = 'de' | 'en' | 'es';
@@ -96,6 +96,9 @@ export function planLateArrival(
  if(delay<tolerance.okUpTo||(delay===tolerance.okUpTo&&(appointmentTypeId||!tolerance.strictTypes.length)))return result('accept');
  if(lenient)return review();
  if(!appointmentTypeId){
+  if(context&&next.challengesRefusal&&delay===tolerance.rebookFrom)
+   return originalTime&&arrivalTime&&appointmentDate?result('pending'):result('incomplete_review');
+  if(delay>tolerance.rebookFrom)return rebook();
   if(next.typeUnknown||context?.outcome==='ask_type')return review();
   // At the threshold, get the team involved if the patient gave enough details to assess the same visit.
   if(delay===tolerance.rebookFrom&&originalTime&&arrivalTime&&appointmentDate)return result('pending');

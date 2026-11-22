@@ -38,7 +38,7 @@ export function uniqueAttendanceTime(witnesses: AttendanceEvidence[], date: stri
   return times.size === 1 ? { time: Array.from(times)[0], evidence: candidates[0] } : null;
 }
 
-async function attendanceProof(db: Db, patientId: string, date: string, receivedAt: string) {
+export async function attendanceProof(db: Db, patientId: string, date: string, receivedAt: string) {
   const [agenda, day, events] = await Promise.all([
     db.from('tagesplan_termine').select('id,eingecheckt_um').eq('patient_id', patientId).eq('datum', date)
       .in('status', ['eingecheckt', 'in_behandlung', 'fertig']).not('eingecheckt_um', 'is', null).limit(21),

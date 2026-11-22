@@ -7,7 +7,7 @@ export const fallbackTopics = [
   'attachment', 'appliance', 'appointment', 'callback', 'billing', 'access', 'certificate', 'medical', 'practice', 'other',
 ] as const;
 export type FallbackTopic = (typeof fallbackTopics)[number];
-type Language = 'de' | 'en';
+type Language = 'de' | 'en' | 'es';
 
 const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
@@ -50,13 +50,14 @@ export function fallbackHints(message: string | null): { topic: FallbackTopic; a
 }
 
 export function fallbackDecision(options: {
-  topic: FallbackTopic; appointment: boolean; language: Language; day: string | null; doctolibUrl: string | null;
+  topic: FallbackTopic; appointment: boolean; language: Language; day?: string | null; teamTime?: string; doctolibUrl: string | null;
 }): WhatsAppDecision {
-  const { topic, appointment, language, day, doctolibUrl } = options;
+  const { topic, appointment, language, day, teamTime, doctolibUrl } = options;
   const link = appointment ? renderWhatsAppRuleText('{doctolib_link}', doctolibUrl) : null;
   const text = [
     t(`animahost.whatsapp.fallback.${topic}`, language),
-    t(day ? 'animahost.whatsapp.fallback.date' : 'animahost.whatsapp.fallback.next', language, { day: day ?? '' }),
+    teamTime?t('animahost.team.reply',language,{when:teamTime}):
+      t(day ? 'animahost.whatsapp.fallback.date' : 'animahost.whatsapp.fallback.next', language, { day: day ?? '' }),
     link ? t('animahost.whatsapp.fallback.link', language, { link }) : null,
   ].filter(Boolean).join(' ');
   return { action: 'klaerfall', rule: `fallback:${topic}`, text };

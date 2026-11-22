@@ -6,6 +6,7 @@ import {createServerClient} from '@/lib/db/supabase';
 import {safeRuleText,whatsappRulesSchema} from '@/lib/services/animahost-whatsapp';
 import {appointmentToleranceSchema,defaultAppointmentTolerance} from '@/lib/services/animahost-appointment-tolerance';
 import {appointmentCaseView,caseColumns,decideAppointmentCase} from '@/lib/services/animahost-appointment-cases';
+import {defaultTeamReplyDays,teamReplyDaysSchema} from '@/lib/services/animahost-team-time';
 import {closurePeriodsSchema} from '@/lib/services/animahost-practice-closures';
 import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,validateNoticeTemplate,
  type ContactPatient} from '@/lib/services/animahost-contact-notices';
@@ -20,7 +21,7 @@ const settingsSchema=z.strictObject({
  practicePhone:z.string().max(40).nullable().optional(),
  salutation:z.enum(['Sie','Du']).optional(),hostName:z.string().trim().min(1).max(80).optional(),
  introduction:z.string().trim().min(1).max(200).optional(),
- closurePeriods:closurePeriodsSchema.optional(),appointmentTolerance:appointmentToleranceSchema.optional(),
+ closurePeriods:closurePeriodsSchema.optional(),appointmentTolerance:appointmentToleranceSchema.optional(),teamReplyDays:teamReplyDaysSchema.optional(),
 });
 const bodySchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('publish_rules'),actorId:z.string().uuid(),expectedVersion:z.number().int().positive().nullable(),rules:whatsappRulesSchema}),
@@ -110,7 +111,7 @@ export async function GET(request:NextRequest){
  }
  if(resource==='settings'){
   const result=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).single();
-  return result.error?unavailable():NextResponse.json({settings:result.data},{headers});
+  return result.error?unavailable():NextResponse.json({settings:{...result.data,teamReplyDays:result.data.team_reply_days??defaultTeamReplyDays}},{headers});
  }
  if(resource==='rules'){
   const [settings,history]=await Promise.all([
@@ -121,7 +122,7 @@ export async function GET(request:NextRequest){
   if(settings.error||history.error)return unavailable();
   const active=history.data.find(item=>item.version===settings.data.active_rulebook_version);
   const tolerance=settings.data.appointment_tolerance;
-  return NextResponse.json({settings:{...settings.data,closurePeriods:settings.data.closure_periods,
+  return NextResponse.json({settings:{...settings.data,closurePeriods:settings.data.closure_periods,teamReplyDays:settings.data.team_reply_days??defaultTeamReplyDays,
    appointmentTolerance:tolerance??defaultAppointmentTolerance,appointmentToleranceAvailable:Boolean(tolerance)},activeVersion:settings.data.active_rulebook_version,
    rules:active?.rules||[],versions:request.nextUrl.searchParams.get('history')==='1'?
     history.data.map(({version,created_at,created_by})=>({version,createdAt:created_at,createdBy:created_by})):undefined},{headers});
@@ -202,7 +203,7 @@ export async function POST(request:NextRequest){
  }
  const map={model:'model',voiceOutputEnabled:'voice_output_enabled',voicePerceptionEnabled:'voice_perception_enabled',
   doctolibUrl:'doctolib_url',practicePhone:'practice_phone',salutation:'salutation',
-  hostName:'host_name',introduction:'introduction',closurePeriods:'closure_periods',appointmentTolerance:'appointment_tolerance'} as const;
+  hostName:'host_name',introduction:'introduction',closurePeriods:'closure_periods',appointmentTolerance:'appointment_tolerance',teamReplyDays:'team_reply_days'} as const;
  const values:Record<string,unknown>={updated_at:new Date().toISOString(),updated_by:input.actorId};
  for(const [key,column] of Object.entries(map)){
   const value=input.settings[key as keyof typeof map];
@@ -210,7 +211,7 @@ export async function POST(request:NextRequest){
  }
  const saved=await db.from('animahost_whatsapp_settings').update(values)
   .eq('tenant_id',tenant).select('*').single();
- return saved.error?unavailable():NextResponse.json({settings:{...saved.data,closurePeriods:saved.data.closure_periods,
+ return saved.error?unavailable():NextResponse.json({settings:{...saved.data,closurePeriods:saved.data.closure_periods,teamReplyDays:saved.data.team_reply_days??defaultTeamReplyDays,
   appointmentTolerance:saved.data.appointment_tolerance??defaultAppointmentTolerance,
   appointmentToleranceAvailable:Boolean(saved.data.appointment_tolerance)}},{headers});
 }

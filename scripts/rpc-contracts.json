@@ -493,7 +493,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "83e710338d93cc7dc69f3f1a99e112e8f547fd5a215e719913136a10650549cc",
+      "sha256": "81dd97e1c1ca5d08fab428c1c1ba6bb81d5436d313ffabe0d67a47af447ce5b1",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -551,7 +551,7 @@
     },
     {
       "file": "src/lib/services/animahost-attendance.ts",
-      "sha256": "b5500499ddacb9d1795fdf6a92f5ea9ee7a20d835b2cc4ef1f0efdcc62ea802a",
+      "sha256": "85a1a159a4d13b9ad247008b2ae1b896247b264dda4116976c4d01128986bcf5",
       "proof": "Only the authenticated WhatsApp route supplies its server service client. The service checks practice, patient, visit evidence and private PDF upload before publication.",
       "calls": [
         {
@@ -574,6 +574,35 @@
         {
           "name": "animahost_invoice_recipient_change",
           "signature": "public.animahost_invoice_recipient_change(p_tenant uuid, p_message text, p_patient uuid, p_patch jsonb, p_new boolean, p_hash text, p_chat text, p_language text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-chat-identity.ts",
+      "sha256": "e8343c700376c2a4075a14711e1ea1553b5f442317ab274a88271bdf1ab677a1",
+      "proof": "The authenticated WhatsApp route passes its server client only after transport authentication. The lookup returns exact phone matches. Birth dates and gender remain inside the host service.",
+      "calls": [
+        {
+          "name": "animahost_phone_patients",
+          "signature": "public.animahost_phone_patients(p_phone text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-invoice-recovery.ts",
+      "sha256": "d1eff5153bad869de80ceb32f3074ca5b703e2951dfdb36cbf430741990d7f1e",
+      "proof": "The authenticated WhatsApp workflow supplies the scoped patient ID from a current exact match or verified identity. The imported read uses two calls, summaries then one exact existing document.",
+      "calls": [
+        {
+          "name": "animahost_imported_invoice_documents",
+          "signature": "public.animahost_imported_invoice_documents(p_patient uuid, p_document uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_imported_invoice_documents",
+          "signature": "public.animahost_imported_invoice_documents(p_patient uuid, p_document uuid)",
           "role": "service_role"
         }
       ]
@@ -658,7 +687,11 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "aa073915c5983eb837e8dc48ae133e30a7f0729047aca4e9447bc34431b6a9a8"
+      "sha256": "7885c8aadacb22f9aa349074fe41ae7e6040e9ae43e75cf9e6d3484a344099e5"
+    },
+    {
+      "file": "scripts/animahost-quality-v3-acceptance.cjs",
+      "sha256": "1d58730c05502e3aab4cc6b2eec89b4939a600fdf5f6d9f0ab70435e2d8bf1b1"
     }
   ],
   "boundaries": [
