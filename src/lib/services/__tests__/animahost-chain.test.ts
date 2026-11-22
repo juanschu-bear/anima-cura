@@ -171,3 +171,13 @@ test('handing over to the team: time is stated, the practice gets a summary, and
   input({message:'Warum habe ich eine Mahnung bekommen?'}));
  assert.equal(identity.ok&&identity.rule,'chain:identity');assert.equal(identity.ok&&identity.asksIdentity,true);
 });
+
+test('Jeder Schritt bekommt eine Frist in ganzen Millisekunden, auch im großen Rahmen des Probelaufs',async()=>{
+ const open='Wir sind Dienstag bis Donnerstag von 9:00 bis 13:00 Uhr und von 14:00 bis 18:30 Uhr für Sie da.';
+ for(const budgetMs of [17_000,30_000,45_000]){
+  const answers:unknown[]=[draft(open),fine],seen:number[]=[];
+  const generate:Generate=async call=>{seen.push(call.timeoutMs);AbortSignal.timeout(call.timeoutMs);return answers.shift() as never;};
+  const result=await runChain(generate,input({message:'Wann haben Sie geöffnet?',budgetMs}));
+  assert.equal(result.ok,true);assert.equal(seen.length,2);assert.ok(seen.every(Number.isInteger));
+ }
+});
