@@ -101,8 +101,13 @@ export async function identifyByBirthDate(db:Db,text:string,allowed:PhonePatient
  const rows=await db.from('patients').select('id,vorname,nachname,geburtsdatum,geschlecht,ivoris_nummer')
   .eq('geburtsdatum',birthday).limit(101);
  if(rows.error||rows.data.length>100)return null;
+ // Patienten schreiben selten nur den Namen („Mein Sohn Max Muster, geboren am …“). Es zählt, dass der Nachname vollständig und
+ // mindestens 1 Vorname in der Nachricht stehen (bei „Noah Elias“ reicht „Noah“). Das Geburtsdatum hat die Auswahl schon eingegrenzt,
+ // und nur 1 eindeutiger Treffer gilt: Zwillinge mit beiden Namen in der Nachricht bleiben offen.
+ const words=new Set(named.split(' '));
+ const parts=(value:string|null)=>normalized(value??'').split(' ').filter(Boolean);
  const matches=rows.data.filter(p=>patientNumber?String(p.ivoris_nummer??'').replace(/^0+/,'')===patientNumber.replace(/^0+/,''):
-  [`${p.vorname} ${p.nachname}`,`${p.nachname} ${p.vorname}`].some(name=>named===normalized(name)));
+  parts(p.nachname).length>0&&parts(p.nachname).every(part=>words.has(part))&&parts(p.vorname).some(part=>words.has(part)));
  return matches.length===1?matches[0]:null;
 }
 

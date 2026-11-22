@@ -46,7 +46,22 @@ function kindOf(text:string):SubjectTask|'portal'|'general' {
 
 const mentionsInvoiceAndDocuments=(text:string)=>/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
 
+const OPEN_VERB='(?:öffn|oeffn|aufmach|aufbekomm|aufkrieg|herunterlad|runterlad|download|abruf|anzeig|lädt|laden|open|descarg|abrir)';
+const SENTENCE='[^.!?]';
+const OPEN_FAILS=new RegExp(`(?:kann|können|konnte|konnten|lässt sich|lassen sich|geht|klappt|funktioniert)${SENTENCE}{0,70}\\bnicht\\b${SENTENCE}{0,30}${OPEN_VERB}`
+ +`|${OPEN_VERB}${SENTENCE}{0,45}(?:geht|klappt|funktioniert|sich)${SENTENCE}{0,15}\\bnicht\\b`
+ +`|(?:fehlermeldung|\\bfehler\\b|error)${SENTENCE}{0,70}${OPEN_VERB}|${OPEN_VERB}${SENTENCE}{0,70}(?:fehlermeldung|\\bfehler\\b|error)`
+ +`|geht nicht auf|can.t open|cannot open|won.t open|no (?:puedo|se puede) abrir`,'i');
+/**
+ * Die Rechnung ist da, lässt sich aber nicht öffnen oder laden („kann sie nicht aufmachen“, „beim Öffnen kommt ein Fehler“).
+ * Das ist eine Störung und keine Frage nach dem Ort: Die Antwort darf nie „Sie finden Ihre Rechnungen unter …“ sein (22.11.2026).
+ * Ein Fehler im Inhalt der Rechnung („der Betrag stimmt nicht“) gehört nicht hierher.
+ */
+export function cannotOpenInvoice(text:string){
+ return /rechnung|invoice|factura/i.test(text)&&OPEN_FAILS.test(text);
+}
 export function invoicePortalIntent(text:string){
+ if(cannotOpenInvoice(text))return 'missing';
  if(kindOf(text)==='missing_invoice'||/(?:rechnung|invoice|factura)[\s\S]{0,150}(?:nicht.{0,25}(?:abruf|öffn|oeffn|lad)|lässt sich nicht|cannot.{0,20}(?:open|download)|can.t.{0,20}(?:open|download)|no puedo)/i.test(text))return 'missing';
  if(mentionsInvoiceAndDocuments(text))return 'section';
  if(/(?:\bwo\b|\bwhere\b|dónde).{0,50}(?:rechnung|invoice|factura)/i.test(text))return 'location';
