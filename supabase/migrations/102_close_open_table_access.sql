@@ -1,5 +1,6 @@
+-- 102_close_open_table_access.sql | Zielprojekt: Anima Cura | Projekt-ID: zymqxzhjbcxzhzvjqvbv
 -- Offene Tabellen schließen (17.11.2026, Juan: ok).
--- Befund in Produktion, bestätigt am 17.11.2026:
+-- Befund in Produktion, bestätigt am 17.11.2026 und unverändert am 22.11.2026 (dieselben 43 Regeln, 5 Sichten, 8 Tabellen):
 --  1. OHNE Anmeldung lesbar (Regeln „Anon read access“ für die Rolle anon): patients, raten, ratenplaene, transaktionen,
 --     mahnungen, ki_analysen, alerts (auch änderbar) und einstellungen (lesen und schreiben). Dazu 5 Sichten, die die
 --     Zeilenregeln ihrer Tabellen umgehen (u. a. patient_geldstatus, patient_finance_ledger_shadow).
@@ -20,6 +21,15 @@
 -- nimmt alles zurück, wenn noch irgendeine offene Regel übrig ist.
 BEGIN;
 SET LOCAL lock_timeout = '10s';
+
+-- 0. Nur im richtigen Projekt laufen: Anima Cura hat patients und user_profiles, aber keine Tabelle der WhatsApp-Kopplung.
+DO $target$
+BEGIN
+  IF to_regclass('public.patients') IS NULL OR to_regclass('public.user_profiles') IS NULL
+     OR to_regclass('public.animaline_connections') IS NOT NULL THEN
+    RAISE EXCEPTION 'Falsches Projekt: 102_close_open_table_access.sql gehört zu Anima Cura (zymqxzhjbcxzhzvjqvbv).';
+  END IF;
+END $target$;
 
 -- 1. Bisherige offene Regeln entfernen (genaue Namen aus Produktion, 17.11.2026).
 DROP POLICY IF EXISTS "Anon read access" ON public.alerts;
