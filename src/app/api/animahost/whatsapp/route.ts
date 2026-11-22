@@ -15,7 +15,7 @@ import {attendanceArtworkVersion,issueAttendanceFromChat,mayBeAttendanceRequest}
 import {changeChatInvoiceRecipient,changeChatPatientContact,chatContactChangeIntent,chatRecipientChangeIntent} from '@/lib/services/animahost-contact-changes';
 
 import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,planLateArrival,recoverLateTimes,knownVisitType,type LateState} from '@/lib/services/animahost-appointment-tolerance';
-import {openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
+import {latestAppointmentCase,openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {conversationHistorySchema,formulateConversationReply,gatewayOptions,recentConversation} from '@/lib/services/animahost-whatsapp-conversation';
 
 export const runtime='nodejs';
@@ -239,6 +239,11 @@ export async function POST(request:NextRequest){
          if(lateState.outcome==='pending'){
           const opened=await openAppointmentCase(db,input,lateState,language);
           if(!opened)lateState={...lateState,outcome:'ask_time'};
+         }else if(lateState.outcome==='already_pending'){
+          const saved=await latestAppointmentCase(db,input.tenantId,input.from,lateState);
+          if(saved?.status==='approved')lateState={...lateState,outcome:'wait',arrivalTime:saved.arrivalTime};
+          if(saved?.status==='declined')lateState={...lateState,outcome:'rebook'};
+          if(saved?.status==='phone_required')lateState={...lateState,outcome:'phone'};
          }
          decision={action:lateState.outcome==='pending'||lateState.outcome==='already_pending'?'klaerfall':'antworten',
           rule:`late_arrival:${lateState.outcome}`,text:lateReply(lateState,language,practice.doctolib_url,practice.practice_phone)};

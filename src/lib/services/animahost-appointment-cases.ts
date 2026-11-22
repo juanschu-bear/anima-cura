@@ -34,7 +34,10 @@ export async function openAppointmentCase(db:DB,input:{tenantId:string;messageId
  if(!state.originalTime||!state.arrivalTime||!state.appointmentDate||!state.delayMinutes)return null;
  const existing=await db.from(table).select(caseColumns).eq('tenant_id',input.tenantId).eq('message_id',input.messageId).maybeSingle();
  if(existing.error)throw Error('appointment_case_unavailable');
- if(existing.data)return appointmentCaseView(existing.data as CaseRow);
+ if(existing.data){
+  if(existing.data.status==='pending')await alert(db,input.tenantId,existing.data.id).catch(()=>undefined);
+  return appointmentCaseView(existing.data);
+ }
  const stored=await db.from(table).insert({tenant_id:input.tenantId,message_id:input.messageId,chat_jid:input.from,
   appointment_date:state.appointmentDate,original_time:state.originalTime,arrival_time:state.arrivalTime,
   delay_minutes:state.delayMinutes,appointment_type_id:state.appointmentTypeId,language,
@@ -44,11 +47,26 @@ export async function openAppointmentCase(db:DB,input:{tenantId:string;messageId
  if(stored.error?.code==='23505'){
   const pending=await db.from(table).select(caseColumns).eq('tenant_id',input.tenantId).eq('chat_jid',input.from)
    .eq('appointment_date',state.appointmentDate).eq('original_time',state.originalTime).eq('status','pending').maybeSingle();
-  if(pending.data)return appointmentCaseView(pending.data as CaseRow);
+  if(pending.data){
+   const updated=await db.from(table).update({arrival_time:state.arrivalTime,delay_minutes:state.delayMinutes,
+    appointment_type_id:state.appointmentTypeId??pending.data.appointment_type_id})
+    .eq('tenant_id',input.tenantId).eq('id',pending.data.id).eq('status','pending')
+    .select(caseColumns).maybeSingle();
+   if(updated.data)return appointmentCaseView(updated.data);
+  }
  }
  if(stored.error||!stored.data)throw Error('appointment_case_unavailable');
  await alert(db,input.tenantId,stored.data.id).catch(()=>console.error('animahost_appointment_case_notice_failed'));
  return appointmentCaseView(stored.data as CaseRow);
+}
+
+export async function latestAppointmentCase(db:DB,tenant:string,chat:string,state:LateState){
+ if(!state.appointmentDate||!state.originalTime)return null;
+ const result=await db.from(table).select(caseColumns).eq('tenant_id',tenant).eq('chat_jid',chat)
+  .eq('appointment_date',state.appointmentDate).eq('original_time',state.originalTime)
+  .order('created_at',{ascending:false}).limit(1).maybeSingle();
+ if(result.error)throw Error('appointment_case_unavailable');
+ return result.data?appointmentCaseView(result.data):null;
 }
 
 export async function dueAppointmentCases(db:DB,tenant:string,phone:string|null,now:Date){
