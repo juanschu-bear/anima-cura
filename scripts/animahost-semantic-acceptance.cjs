@@ -5,7 +5,7 @@ const { readFileSync } = require('node:fs');
 const { NextRequest } = require('next/server');
 
 const examples = [
-  { name: 'Attachment und Vorbeikommen', text: 'Attachment abgegangen, kann ich spontan vorbeikommen?', topic: 'attachment', link: true },
+  { name: 'Attachment und Vorbeikommen', text: 'Attachment abgegangen, kann ich spontan vorbeikommen?', topic: 'attachment', noLink: true },
   { name: 'Anfahrt mit dem Wagen', text: 'Gibt es einen Stellplatz für meinen Wagen, wenn ich zu euch komme?', rule: 'anfahrt-parken-und-zugang' },
   { name: 'Anfahrt auf Englisch', text: 'Where can I leave my car when I visit?', rule: 'anfahrt-parken-und-zugang' },
   { name: 'Besuchszeiten mit Tippfehler', text: 'An welchen Wochentagn ist eure Tür für Patienten auf?', rule: 'oeffnungszeiten-und-sprechzeiten' },
@@ -90,6 +90,7 @@ async function run() {
         (!example.rules || action === 'antworten' && example.rules.every(key => rule?.split('|').includes(key))) &&
         (!example.topic || rule?.startsWith(`fallback:${example.topic}`)) &&
         (!example.link || text?.includes(practice.doctolib_url)) &&
+        (!example.noLink || !text?.includes('https://')) &&
         (!example.contains || text?.includes(example.contains)) &&
         (action !== 'notfall' || urgentNote);
       return { name: example.name, passed, elapsedMs, hits, action, rule, text };

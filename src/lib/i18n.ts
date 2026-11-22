@@ -7,8 +7,26 @@
 
 import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
-const translations: Record<string, { de: string; en: string }> = {
+const translations: Record<string, { de: string; en: string; es?: string }> = {
   ...referenceTranslations,
+  'animahost.late.accept_time': {de:'Kein Problem, dann sehen wir uns um {arrival} Uhr.',en:'No problem. We’ll see you at {arrival}.',es:'No hay problema. Nos vemos a las {arrival}.'},
+  'animahost.late.accept_minutes': {de:'Kein Problem, Sie können {minutes} Minuten später kommen.',en:'No problem. You can come {minutes} minutes later.',es:'No hay problema. Puede llegar {minutes} minutos más tarde.'},
+  'animahost.late.wait_time': {de:'Sie können um {arrival} Uhr kommen. Es kann sein, dass Sie etwas warten müssen.',en:'You can come at {arrival}. There may be a short wait.',es:'Puede llegar a las {arrival}. Es posible que tenga que esperar un poco.'},
+  'animahost.late.wait_minutes': {de:'Sie können {minutes} Minuten später kommen. Es kann sein, dass Sie etwas warten müssen.',en:'You can come {minutes} minutes later. There may be a short wait.',es:'Puede llegar {minutes} minutos más tarde. Es posible que tenga que esperar un poco.'},
+  'animahost.late.rebook': {de:'Für die Behandlung brauchen wir ausreichend Zeit. So viel später können wir den Termin leider nicht einplanen. Bitte wählen Sie einen neuen Termin.',en:'We need enough time for your treatment, so we can’t see you that much later. Please choose a new appointment.',es:'Necesitamos tiempo suficiente para atenderle y no podemos recibirle con ese retraso. Por favor, elija una nueva cita.'},
+  'animahost.late.rebook_objection': {de:'Ich verstehe, dass Sie am selben Tag kommen möchten. Wir brauchen für Ihre Behandlung ausreichend Zeit und können die spätere Ankunft leider nicht einplanen. Bitte wählen Sie einen neuen Termin.',en:'I understand that you’d like to come on the same day. We need enough time for your treatment, so we can’t accommodate the later arrival. Please choose a new appointment.',es:'Entiendo que quiera venir el mismo día. Necesitamos tiempo suficiente para atenderle y no podemos recibirle a esa hora. Por favor, elija una cita nueva.'},
+  'animahost.late.book': {de:'Hier können Sie neu buchen: {url}',en:'You can book again here: {url}',es:'Puede reservar otra cita aquí: {url}'},
+  'animahost.late.pending': {de:'Ich kläre kurz mit dem Team, ob Sie zu Ihrem Termin später kommen können, und melde mich gleich bei Ihnen.',en:'I’ll check with the team whether you can arrive later for the same appointment and get back to you shortly.',es:'Voy a consultar con el equipo si puede llegar más tarde a la misma cita. Le responderé en breve.'},
+  'animahost.late.already_pending': {de:'Das Team prüft bereits, ob Sie zu Ihrem Termin später kommen können. Sobald ich eine Rückmeldung habe, melde ich mich bei Ihnen.',en:'The team is already checking whether you can arrive later for the same appointment. I’ll let you know as soon as I hear back.',es:'El equipo ya está comprobando si puede llegar más tarde a la misma cita. Le avisaré en cuanto tenga respuesta.'},
+  'animahost.late.ask_type': {de:'Um welche Art von Termin geht es, zum Beispiel um eine Kontrolle oder um eine Erstuntersuchung? Davon hängt ab, ob Sie später kommen können.',en:'What kind of appointment is it, for example a check-up or a first consultation? That determines whether you can arrive later.',es:'¿De qué tipo de cita se trata, por ejemplo un control o una primera consulta? De eso depende si puede llegar más tarde.'},
+  'animahost.late.ask_time': {de:'Wann ist Ihr Termin, und wann könnten Sie kommen? Mit Tag und Uhrzeit kann das Team besser prüfen, ob es passt.',en:'When is your appointment, and when could you arrive? The date and time will help the team check what’s possible.',es:'¿Cuándo tiene su cita y a qué hora podría llegar? Con el día y la hora, el equipo podrá comprobarlo.'},
+  'animahost.late.phone': {de:'Ich konnte das Team gerade nicht erreichen. Bitte rufen Sie kurz an: {phone}.',en:'I couldn’t reach the team just now. Please call the practice on {phone}.',es:'Ahora mismo no he podido contactar con el equipo. Por favor, llame al {phone}.'},
+  'animahost.late.approved': {de:'Das Team hat nachgesehen. Sie können um {arrival} Uhr kommen. Es kann sein, dass Sie etwas warten müssen.',en:'The team has checked. You can come at {arrival}. There may be a short wait.',es:'El equipo lo ha comprobado. Puede llegar a las {arrival}. Es posible que tenga que esperar un poco.'},
+  'animahost.late.cancel_recorded': {de:'Danke, dass Sie Bescheid geben. Ich habe Ihre Absage für das Praxisteam vermerkt.',en:'Thank you for letting us know. I’ve noted your cancellation for the practice team.',es:'Gracias por avisar. He dejado constancia de su cancelación para el equipo.'},
+  'animahost.late.cancel_prompt': {de:'Möchten Sie einen neuen Termin vereinbaren?',en:'Would you like to arrange a new appointment?',es:'¿Quiere concertar una nueva cita?'},
+  'animahost.late.notice.title': {de:'Rückfrage zu späterer Ankunft',en:'Later arrival needs a decision'},
+  'animahost.late.notice.body': {de:'Bitte in den Nachrichten entscheiden, ob die spätere Ankunft für denselben Termin passt.',en:'Please use Messages to decide whether the later arrival works for the same appointment.'},
+  'animahost.late.reminder.title': {de:'Erinnerung: spätere Ankunft noch offen',en:'Reminder: later arrival is still pending'},
   'animahost.whatsapp.clarify': {de:'Die Praxis prüft Ihre Nachricht und meldet sich.',en:'The practice will review your message and get back to you.'},
   'animahost.whatsapp.askTopic': {de:'Wie kann ich Ihnen helfen?',en:'How can I help you?'},
   'animahost.whatsapp.doctolib': {de:'Für diese Terminart können Sie den passenden Termin hier auswählen: {url}',en:'You can choose this appointment type here: {url}'},
@@ -2493,7 +2511,7 @@ const translations: Record<string, { de: string; en: string }> = {
 
 export function t(key: string, locale: string = "de", vars?: Record<string, string | number>): string {
   const entry = translations[key];
-  let value = entry ? (locale === "en" ? entry.en : entry.de) : key;
+  let value = entry ? (locale === "en" ? entry.en : locale === "es" ? entry.es ?? entry.de : entry.de) : key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       value = value.split(`{${k}}`).join(String(v));

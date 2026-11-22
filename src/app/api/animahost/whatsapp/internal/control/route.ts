@@ -4,6 +4,8 @@ import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerClient} from '@/lib/db/supabase';
 import {safeRuleText,whatsappRulesSchema} from '@/lib/services/animahost-whatsapp';
+import {appointmentToleranceSchema,defaultAppointmentTolerance} from '@/lib/services/animahost-appointment-tolerance';
+import {appointmentCaseView,caseColumns,decideAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {closurePeriodsSchema} from '@/lib/services/animahost-practice-closures';
 import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,validateNoticeTemplate,
  type ContactPatient} from '@/lib/services/animahost-contact-notices';
@@ -18,11 +20,13 @@ const settingsSchema=z.strictObject({
  practicePhone:z.string().max(40).nullable().optional(),
  salutation:z.enum(['Sie','Du']).optional(),hostName:z.string().trim().min(1).max(80).optional(),
  introduction:z.string().trim().min(1).max(200).optional(),
- closurePeriods:closurePeriodsSchema.optional(),
+ closurePeriods:closurePeriodsSchema.optional(),appointmentTolerance:appointmentToleranceSchema.optional(),
 });
 const bodySchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('publish_rules'),actorId:z.string().uuid(),expectedVersion:z.number().int().positive().nullable(),rules:whatsappRulesSchema}),
  z.strictObject({action:z.literal('update_settings'),actorId:z.string().uuid(),settings:settingsSchema}),
+ z.strictObject({action:z.literal('decide_appointment_case'),actorId:z.string().uuid(),caseId:z.string().uuid(),
+  decision:z.enum(['approved','declined']),note:z.string().trim().max(280).nullable().optional()}),
  z.strictObject({action:z.literal('verify_patients'),phoneNumber:z.string().max(40),
   patientIds:z.array(z.string().uuid()).min(1).max(10),
   manualReason:z.string().trim().min(10).max(300).nullable()}),
@@ -49,6 +53,20 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='appointment_cases'){
+  const chat=request.nextUrl.searchParams.get('chatJid');
+  if(chat&&!/^\d{6,20}@(s\.whatsapp\.net|lid)$/.test(chat))
+   return NextResponse.json({code:'chat_invalid'},{status:400,headers});
+  let query=db.from('animahost_appointment_cases').select(caseColumns).eq('tenant_id',tenant);
+  const list=request.nextUrl.searchParams.get('view')==='chat_list';
+  query=chat?query.eq('chat_jid',chat):list?
+   query.or(`status.eq.pending,created_at.gte.${new Date(Date.now()-7*86_400_000).toISOString()}`):query.eq('status','pending');
+  const result=await query.order('created_at',{ascending:false}).limit(chat?100:500);
+  if(result.error?.code==='42P01'||result.error?.code==='PGRST205')
+   return NextResponse.json({appointmentCases:[],appointmentCasesAvailable:false},{headers});
+  if(result.error)return unavailable();
+  return NextResponse.json({appointmentCases:result.data.map(appointmentCaseView),appointmentCasesAvailable:true},{headers});
+ }
  if(resource==='case_changes'){
   const id=z.string().uuid().safeParse(request.nextUrl.searchParams.get('patientId'));
   if(!id.success)return NextResponse.json({code:'patient_invalid'},{status:400,headers});
@@ -96,13 +114,15 @@ export async function GET(request:NextRequest){
  }
  if(resource==='rules'){
   const [settings,history]=await Promise.all([
-   db.from('animahost_whatsapp_settings').select('active_rulebook_version,model,voice_output_enabled,voice_perception_enabled,doctolib_url,practice_phone,salutation,host_name,introduction,updated_at').eq('tenant_id',tenant).single(),
+   db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).single(),
    db.from('animahost_whatsapp_rulebook_versions').select('version,created_at,created_by,rules')
     .eq('tenant_id',tenant).order('version',{ascending:false}).limit(request.nextUrl.searchParams.get('history')==='1'?50:1),
   ]);
   if(settings.error||history.error)return unavailable();
   const active=history.data.find(item=>item.version===settings.data.active_rulebook_version);
-  return NextResponse.json({settings:settings.data,activeVersion:settings.data.active_rulebook_version,
+  const tolerance=settings.data.appointment_tolerance;
+  return NextResponse.json({settings:{...settings.data,closurePeriods:settings.data.closure_periods,
+   appointmentTolerance:tolerance??defaultAppointmentTolerance,appointmentToleranceAvailable:Boolean(tolerance)},activeVersion:settings.data.active_rulebook_version,
    rules:active?.rules||[],versions:request.nextUrl.searchParams.get('history')==='1'?
     history.data.map(({version,created_at,created_by})=>({version,createdAt:created_at,createdBy:created_by})):undefined},{headers});
  }
@@ -117,6 +137,15 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='decide_appointment_case'){
+  const settings=await db.from('animahost_whatsapp_settings').select('doctolib_url,model').eq('tenant_id',tenant).single();
+  if(settings.error)return unavailable();
+  try{
+   const outcome=await decideAppointmentCase(db,tenant,input,settings.data.doctolib_url,settings.data.model,request.signal);
+   return NextResponse.json(outcome,{headers,status:outcome.code==='appointment_case_not_found'?404:
+    outcome.code==='appointment_case_closed'?409:200});
+  }catch{return unavailable();}
+ }
  if(input.action==='verify_patients'){
   const phone=normalizeContactPhone(input.phoneNumber);
   if(!phone)return NextResponse.json({code:'phone_invalid'},{status:400,headers});
@@ -173,7 +202,7 @@ export async function POST(request:NextRequest){
  }
  const map={model:'model',voiceOutputEnabled:'voice_output_enabled',voicePerceptionEnabled:'voice_perception_enabled',
   doctolibUrl:'doctolib_url',practicePhone:'practice_phone',salutation:'salutation',
-  hostName:'host_name',introduction:'introduction',closurePeriods:'closure_periods'} as const;
+  hostName:'host_name',introduction:'introduction',closurePeriods:'closure_periods',appointmentTolerance:'appointment_tolerance'} as const;
  const values:Record<string,unknown>={updated_at:new Date().toISOString(),updated_by:input.actorId};
  for(const [key,column] of Object.entries(map)){
   const value=input.settings[key as keyof typeof map];
@@ -181,5 +210,7 @@ export async function POST(request:NextRequest){
  }
  const saved=await db.from('animahost_whatsapp_settings').update(values)
   .eq('tenant_id',tenant).select('*').single();
- return saved.error?unavailable():NextResponse.json({settings:saved.data},{headers});
+ return saved.error?unavailable():NextResponse.json({settings:{...saved.data,closurePeriods:saved.data.closure_periods,
+  appointmentTolerance:saved.data.appointment_tolerance??defaultAppointmentTolerance,
+  appointmentToleranceAvailable:Boolean(saved.data.appointment_tolerance)}},{headers});
 }

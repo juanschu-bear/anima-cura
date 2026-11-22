@@ -493,7 +493,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "f85821ce16419f490bdce93c49688a4aae0e679f1d3de924ae15ace957c3a0a4",
+      "sha256": "83e710338d93cc7dc69f3f1a99e112e8f547fd5a215e719913136a10650549cc",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -510,7 +510,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/followups/route.ts",
-      "sha256": "0036d083ca6b0235be169899a3728c63983e96d6f488892373858bac268a780c",
+      "sha256": "7bfdd5f7210086fb72386b53f9be9fd69c2f6dc25e1f60ec0a97f9b0f54d86b7",
       "proof": "The shared daemon secret and practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -658,7 +658,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "8cdb54517ecc26a5dc21756ed787d867fd849c2edd11c10e3bd46431193e1b4d"
+      "sha256": "f4adbb8349fb41d7cb78adfa94d3d97e4f24ba68718700756b7e0f70c783d8d6"
     }
   ],
   "boundaries": [
