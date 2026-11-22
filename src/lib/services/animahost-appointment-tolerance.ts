@@ -117,6 +117,14 @@ export function lateReply(state:LateState,language:Language,link:string|null,pho
  return url?`${text} ${t('animahost.late.book',language,{url})}`:text;
 }
 
+export function statesLaterArrival(text:string,times:Partial<LateIntent>):boolean {
+ const arrival=/\b(?:komm\w*|eintreff\w*|arriv\w*|lleg\w*)\b/i.test(text);
+ const late=/\b(?:später|verspät\w*|late|later|tarde)\b/i.test(text);
+ if(arrival&&late&&times.delayMinutes!==undefined&&times.delayMinutes!==null)return true;
+ return Boolean(times.originalTime&&times.arrivalTime&&arrival&&
+  /statt|erst|schaff.{0,20}nicht|instead|rather|solo puedo|en vez/i.test(text));
+}
+
 export function recoverLateTimes(text:string,localDate:string):Partial<LateIntent>{
  const stated=Array.from(text.matchAll(/\b(\d{1,2}:\d{2})\b/g),match=>match[1].padStart(5,'0'));
  const [originalTime,arrivalTime]=stated.length===2?stated:[null,null];

@@ -14,7 +14,7 @@ import {accessReissuePurpose,reissueChatAccess,verifiedChatIdentitySchema} from 
 import {attendanceArtworkVersion,issueAttendanceFromChat,mayBeAttendanceRequest} from '@/lib/services/animahost-attendance';
 import {changeChatInvoiceRecipient,changeChatPatientContact,chatContactChangeIntent,chatRecipientChangeIntent} from '@/lib/services/animahost-contact-changes';
 
-import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,planLateArrival,recoverLateTimes,knownVisitType,type LateState} from '@/lib/services/animahost-appointment-tolerance';
+import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,planLateArrival,recoverLateTimes,knownVisitType,statesLaterArrival,type LateState} from '@/lib/services/animahost-appointment-tolerance';
 import {latestAppointmentCase,openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {conversationHistorySchema,formulateConversationReply,gatewayOptions,recentConversation} from '@/lib/services/animahost-whatsapp-conversation';
 
@@ -107,6 +107,8 @@ export async function POST(request:NextRequest){
   const practice=settings.data;
   const tolerance=appointmentToleranceSchema.safeParse(practice.appointment_tolerance);
   const lateLanguage=/(?:später|verspät\w*|erst um|statt um|schaff.{0,18}nicht.{0,45}kann.{0,15}kommen|running late|minutes late|llegar.{0,20}tarde)/i.test(input.text??'');
+  const explicitTimes=recoverLateTimes(input.text??'',appointmentLocalDate(input.receivedAt));
+  const explicitLater=statesLaterArrival(input.text??'',explicitTimes);
   const hints=fallbackHints(input.text);
   let topic:FallbackTopic=hints.topic;
   let appointment=hints.appointment;
@@ -206,7 +208,7 @@ export async function POST(request:NextRequest){
         appointmentDate:chosen.appointmentNotice.appointmentDate,originalTime:null,arrivalTime:null,
         delayMinutes:chosen.appointmentNotice.delayMinutes,appointmentTypeId:null,
        }:null);
-       const sameVisit=chosen.kind==='late_arrival'||chosen.appointmentNotice?.kind==='late'||
+       const sameVisit=explicitLater||chosen.kind==='late_arrival'||chosen.appointmentNotice?.kind==='late'||
         (lateLanguage&&(chosen.kind==='appointment'||chosen.appointmentNotice?.kind==='reschedule'));
        const rebookRequested=recentRule?.startsWith('appointment_notice:cancel:')&&
         (chosen.kind==='rebook_after_cancel'||/^(?:ja(?:[,.! ]|$)|yes(?:[,.! ]|$)|s[ií](?:[,.! ]|$))/i.test(input.text.trim())||
@@ -226,7 +228,7 @@ export async function POST(request:NextRequest){
        }else if(sameVisit){
         if(tolerance.success){
          const requested=late??{appointmentDate:null,originalTime:null,arrivalTime:null,delayMinutes:null,appointmentTypeId:null};
-         const recovered=recoverLateTimes(input.text,appointmentLocalDate(input.receivedAt));
+         const recovered=explicitTimes;
          const hasDayEvidence=/\b(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|morgen|today|tomorrow|mon(?:day)?|tuesday|wednesday|thursday|friday|saturday|sunday|lunes|martes|miércoles|jueves|viernes|sábado|domingo|hoy|mañana)\b|\d{1,2}[./-]\d{1,2}/i.test(input.text);
          const hasTimeEvidence=/\d{1,2}:\d{2}|(?:um|gegen|at|a las) +\d{1,2}\b|\b(?:halb|viertel)\b/i.test(input.text);
          lateState=planLateArrival({...requested,
@@ -314,8 +316,9 @@ export async function POST(request:NextRequest){
    const rules=whatsappRulesSchema.safeParse(version.data?.rules);
    if(rules.success)hoursRule=rules.data.find(rule=>rule.id==='oeffnungszeiten-und-sprechzeiten')?.patientText;
   }
+  if(explicitLater&&decision.rule.startsWith('doctolib:'))decision=decisionFromRule(null);
   if(decision.rule==='no_applicable_rule'||(!automaticReplies&&decision.action==='klaerfall')){
-   decision=fallbackDecision({topic,appointment:appointment&&!lateLanguage&&topic!=='attachment',language:language==='es'?'de':language,
+   decision=fallbackDecision({topic,appointment:appointment&&!lateLanguage&&!explicitLater&&topic!=='attachment',language:language==='es'?'de':language,
     day:nextPracticeDay(input.receivedAt,hoursRule,practice.closure_periods,language==='es'?'de':language),
     doctolibUrl:practice.doctolib_url});
   }

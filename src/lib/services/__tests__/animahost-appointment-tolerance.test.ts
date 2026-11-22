@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
-import {appointmentInstant,appointmentToleranceSchema,defaultAppointmentTolerance as defaults,lateReply,planLateArrival,recoverLateTimes,type LateIntent} from '../animahost-appointment-tolerance';
+import {appointmentInstant,appointmentToleranceSchema,defaultAppointmentTolerance as defaults,lateReply,planLateArrival,recoverLateTimes,statesLaterArrival,type LateIntent} from '../animahost-appointment-tolerance';
 import {recentConversation,withinReplyBounds} from '../animahost-whatsapp-conversation';
 
 const ordinary='Unsere regulären Sprechzeiten sind Dienstag bis Donnerstag von 9:00 bis 13:00 Uhr und von 14:00 bis 18:30 Uhr. Montag und Freitag sind wir nur nach gesonderter Vereinbarung für Sie da.';
@@ -53,6 +53,12 @@ test('recovers the same-visit times and uses Berlin for the 60-minute threshold'
   {originalTime:'14:30',arrivalTime:'15:00',appointmentDate:'2026-11-23'});
  assert.equal(appointmentInstant('2026-11-23','14:30').toISOString(),'2026-11-23T13:30:00.000Z');
  assert.equal(appointmentInstant('2026-07-23','14:30').toISOString(),'2026-07-23T12:30:00.000Z');
+});
+
+test('an explicit 45-minute arrival delay cannot be classified as a fresh booking',()=>{
+ const text='Ich habe am Montag um 14:30 meine Erstuntersuchung für Erwachsene. Ich komme 45 Minuten später.';
+ assert.equal(statesLaterArrival(text,recoverLateTimes(text,'2026-11-22')),true);
+ assert.equal(statesLaterArrival('Ich brauche einen neuen Termin, die Uhrzeit ist offen.',{}),false);
 });
 
 test('history excludes old messages, redacts old access links and blocks novel promises or links',()=>{
