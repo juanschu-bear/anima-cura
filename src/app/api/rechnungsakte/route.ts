@@ -26,6 +26,6 @@ export async function GET(request:Request){
    if(!owner)throw Error('invoice_owner_unavailable');
    await recordInvoiceEngagement(user.id,q.get('documentId')!,'pdf_retrieved',owner);
   }
-  return new Response(response.body,{status:response.status,headers:{'Content-Type':response.headers.get('content-type')??'application/json','Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}});
+  return new Response(response.body,{status:response.status,headers:{'Content-Type':response.headers.get('content-type')??'application/json','Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff',...(response.headers.get('server-timing')?{'Server-Timing':response.headers.get('server-timing')!}:{})}});
  }catch{return Response.json({code:'invoice_record_unavailable'},{status:503});}
 }
