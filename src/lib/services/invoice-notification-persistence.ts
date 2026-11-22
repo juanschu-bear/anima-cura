@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
 
+/** Select the verified login's notification/device owner, including sibling-only invoices. */
+export function invoiceNotificationDeliveryPatients(requested:string[],account:{role:string;patientId:string|null;memberPatientIds:string[]}|null){
+  if(!account)return Array.from(new Set(requested));
+  const scope=new Set([account.patientId,...account.memberPatientIds]);
+  if(account.role!=="patient"||!account.patientId||requested.some(id=>!scope.has(id)))throw Error("account_scope_mismatch");
+  return [account.patientId];
+}
+
 function uuidFromHash(value: string) {
   const bytes = createHash("sha256").update(value).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x50;

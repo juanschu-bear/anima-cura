@@ -18,7 +18,7 @@ const upload = {
 };
 const structured = {
   ...upload, id: `${id}-structured`, source: undefined, betrag: 123.45, rechnung_nr: 'TEST-1',
-  beleg: { ...upload.beleg, art: 'BEMA', quartal: '2026-Q3', pdfUrl: `/api/patient/rechnungen/${id}/pdf` },
+  beleg: { ...upload.beleg, positionen:[{datum:'2026-09-30',nr:'TEST',text:'Kontrolle',region:null,anzahl:1,anzahlText:'1',punkte:null,faktor:null,eur:123.45,abschnitt:'Test',tarif:'BEMA',begruendungen:[]}], art: 'BEMA', quartal: '2026-Q3', pdfUrl: `/api/patient/rechnungen/${id}/pdf` },
 };
 const available = {
   rechnungen: [upload], belegeStatus: 'available', hochgeladeneRechnungenStatus: 'available',
@@ -116,6 +116,7 @@ try {
     } finally { await page.close(); }
   }
   await test('uploaded PDF with null quarter/type/amount; direct invoice link', async page => {
+    const events=[];page.on('request',r=>{if(r.url().endsWith('/rechnungen/event'))events.push(r.postDataJSON());});
     await page.goto(`${origin}/patient/portal?section=rechnungen`);
     const invoices = page.locator('#portal-rechnungen');
     await invoices.getByText('Betrag siehe PDF', { exact: true }).waitFor();
@@ -123,6 +124,7 @@ try {
     await invoices.getByRole('button', { name: 'PDF anzeigen' }).click();
     const link = invoices.locator(`a[href="${upload.beleg.pdfUrl}"]`);
     await link.waitFor();
+    assert.equal(events.filter(e=>e.event==='invoice_opened').length,0,'An upload card with no invoice contents is not invoice viewing evidence');
     const response = await page.request.get(new URL(await link.getAttribute('href'), origin).href);
     assert.equal(response.status(), 200);
     assert.equal((await response.body()).subarray(0, 5).toString(), '%PDF-');
@@ -134,7 +136,9 @@ try {
     const invoices = page.locator('#portal-rechnungen');
     await invoices.getByText('Rechnung 3. Quartal 2026', { exact: true }).waitFor();
     assert.match(await invoices.innerText(), /123,45\s*€/);
+    const event=page.waitForRequest(r=>r.url().endsWith('/rechnungen/event'));
     await invoices.getByRole('button', { name: 'Positionen und PDF' }).click();
+    assert.deepEqual((await event).postDataJSON(),{event:'invoice_opened',documentId:id});
     await invoices.getByText('Quartal 3/2026', { exact: false }).waitFor();
   });
   for (const failure of ['belegeStatus', 'hochgeladeneRechnungenStatus', 'zahlungsdatenStatus', 'http', 'network', 'json']) {

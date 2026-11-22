@@ -1,4 +1,5 @@
 "use client";
+import {queuePatientInvoiceEvent,startPatientInvoiceTracking} from "@/lib/patient-invoice-engagement";
 import { trackEvent } from "@/lib/useTracking";
 import { explainPosition } from "@/lib/patient-position-explanations";
 import QRCode from "qrcode";
@@ -109,6 +110,14 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     : !rechnungsStand.belege || !rechnungsStand.hochgeladen ? "teilweise"
     : !rechnungsStand.zahlungen ? "zahlungen" : null;
   const [offenerBeleg, setOffenerBeleg] = useState<string | null>(null);
+  useEffect(() => startPatientInvoiceTracking(patientId), [patientId]);
+
+  useEffect(() => {
+    const installed = () => queuePatientInvoiceEvent(patientId, { event: "app_installed" });
+    if (window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone) installed();
+    window.addEventListener("appinstalled", installed);
+    return () => window.removeEventListener("appinstalled", installed);
+  }, [patientId]);
   const [rechnungSeite, setRechnungSeite] = useState(0);
   // Mehrere Kinder an einem Zugang (Codex, 12.11.2026): Rechnungen tragen patientId, die Auswahl passiert hier in der Oberfläche.
   const [kinder, setKinder] = useState<{ patientId: string; firstName: string }[]>([]);
@@ -157,6 +166,11 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   // ── Anima Balance ──
   const [finSheet, setFinSheet] = useState(false);
   const [balanceView, setBalanceView] = useState(false);
+  useEffect(() => {
+    if (!offenerBeleg || tab !== "progress" || balanceView) return;
+    const invoice = rechnungen.find(row => row.id === offenerBeleg);
+    if (invoice?.beleg?.id && invoice.beleg.positionen.length > 0) queuePatientInvoiceEvent(patientId, { event: "invoice_opened", documentId: invoice.beleg.id });
+  }, [offenerBeleg, rechnungen, patientId, tab, balanceView]);
   const [balPage, setBalPage] = useState(0);
   useEffect(() => {
     try { sessionStorage.setItem("ac_balance", balanceView ? "1" : "0"); } catch { /* ignorieren */ }

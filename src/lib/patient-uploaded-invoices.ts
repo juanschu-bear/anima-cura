@@ -63,7 +63,7 @@ export async function loadUploadedPatientInvoices(db:Db,patientIds:string[],impo
   });
 }
 
-export async function loadUploadedPatientInvoicePdf(db:Db,patientIds:string[],documentId:string){
+export async function loadUploadedPatientInvoicePdf(db:Db,patientIds:string[],documentId:string,verifiedOwner?:(patientId:string)=>void){
   const result=await db.from("patient_documents").select("id,patient_id,name,typ,file_url,hochgeladen_am")
     .eq("id",documentId).in("patient_id",patientIds).maybeSingle();
   if(result.error)throw Error("uploaded_invoice_unavailable");
@@ -79,5 +79,7 @@ export async function loadUploadedPatientInvoicePdf(db:Db,patientIds:string[],do
   const {data,error}=await db.storage.from(file.bucket).download(file.path);
   if(error||!data||data.size>25*1024*1024||await data.slice(0,5).text()!=="%PDF-")
     throw Error("uploaded_invoice_source_unavailable");
-  return new Uint8Array(await data.arrayBuffer());
+  const bytes=new Uint8Array(await data.arrayBuffer());
+  verifiedOwner?.(d.patient_id);
+  return bytes;
 }

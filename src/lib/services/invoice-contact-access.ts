@@ -75,9 +75,11 @@ export async function requestInvoiceAccess(input: { email: string; next?: string
   }
   const recent = input.trustedWorker ? null : await db.from("invoice_access_links").select("id", { count: "exact", head: true }).eq("contact_id", contact.id).gt("requested_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
   if ((recent?.count ?? 0) >= 3) return { ok: true, expiresInDays: TTL_DAYS, rateLimited: true };
-  await db.from("invoice_access_contact_patients").upsert(patients.map(patient => ({ contact_id: contact!.id, patient_id: patient.id })), { onConflict: "contact_id,patient_id" });
+  const linked = await db.from("invoice_access_contact_patients").upsert(patients.map(patient => ({ contact_id: contact!.id, patient_id: patient.id })), { onConflict: "contact_id,patient_id" });
+  if (linked.error) throw new Error("invoice_access_membership_save_failed");
   const token = randomBytes(32).toString("base64url");
-  await db.from("invoice_access_links").insert({ contact_id: contact.id, token_hash: hashToken(token), next_path: input.next === NEXT ? NEXT : NEXT, locale: locale(input.language), expires_at: new Date(Date.now() + TTL_DAYS * 86400000).toISOString() });
+  const savedLink = await db.from("invoice_access_links").insert({ contact_id: contact.id, token_hash: hashToken(token), next_path: input.next === NEXT ? NEXT : NEXT, locale: locale(input.language), expires_at: new Date(Date.now() + TTL_DAYS * 86400000).toISOString() });
+  if (savedLink.error) throw new Error("invoice_access_link_save_failed");
   const result = { ok: true as const, expiresInDays: TTL_DAYS, accessToken: token, email, contactId: contact.id };
   if (input.deliver) {
     const url = `https://animacura.io/patient/invoice-access/continue?token=${encodeURIComponent(token)}&lang=${encodeURIComponent(locale(input.language))}`;

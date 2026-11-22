@@ -387,7 +387,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
-      "sha256": "12088a05df4646961cf9d6a301e490af5585f6d9840ffa480e92d6e4b39e8140",
+      "sha256": "cf5313aa0c777a6dfdb4164020582688588b67c5c877aae8d179219a86ed748e",
       "proof": "Imported invoice RPCs use only the authenticated cookie/JWT. Explicit uploads use a separate authorized profile-and-membership path and are never a privileged retry of the import RPC. After migration 099 the restricted definer reads JWT identity via invoice_portal_jwt_uid and verifies invoice_portal_patient_scope; RPC calls still use the authenticated session. Only the explicit patient_invoice_forbidden guard maps to HTTP 403; schema ACL errors map to HTTP 503. Uploaded PDFs use the separately verified profile/membership scope, never a privileged retry of module RPCs.",
       "calls": [
         {
@@ -398,6 +398,11 @@
         {
           "name": "patient_invoice_document_edition",
           "signature": "public.patient_invoice_document_edition(document_id uuid, original_only boolean)",
+          "role": "authenticated"
+        },
+        {
+          "name": "patient_invoice_documents_for_access",
+          "signature": "public.patient_invoice_documents_for_access()",
           "role": "authenticated"
         }
       ]

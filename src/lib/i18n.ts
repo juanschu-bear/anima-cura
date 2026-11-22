@@ -9,6 +9,12 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string; es?: string }> = {
   ...referenceTranslations,
+  'invoiceFollowup.unsubscribeTitle': {de:'Rechnungserinnerungen abbestellen',en:'Unsubscribe from invoice reminders'},
+  'invoiceFollowup.unsubscribeBody': {de:'Wenn du bestätigst, erhältst du keine weiteren Rechnungserinnerungen an diese E-Mail-Adresse.',en:'Confirm to stop further invoice reminders to this email address.'},
+  'invoiceFollowup.unsubscribeButton': {de:'Erinnerungen abbestellen',en:'Unsubscribe from reminders'},
+  'invoiceFollowup.unsubscribed': {de:'Deine Rechnungserinnerungen sind abbestellt.',en:'You have unsubscribed from invoice reminders.'},
+  'invoiceFollowup.invalidLink': {de:'Dieser Link ist ungültig. Bitte verwende den Link aus deiner Rechnungsmail.',en:'This link is invalid. Please use the link in your invoice email.'},
+  'invoiceFollowup.retry': {de:'Das hat gerade nicht funktioniert. Bitte versuche es erneut.',en:'That did not work. Please try again.'},
   "patientLogin.connectionError": {de:"Die Anmeldung konnte gerade nicht abgeschlossen werden. Bitte versuche es erneut.",en:"We could not complete sign-in. Please try again."},
   "patientError.title": {de:"Diese Seite konnte nicht angezeigt werden",en:"This page could not be displayed"},
   "patientError.body": {de:"Bitte lade die Seite erneut. Wenn der Fehler wieder auftritt, kannst du zur Startseite deines Portals zurückkehren oder die Praxis kontaktieren.",en:"Please reload this page. If the problem happens again, return to your portal home or contact the practice."},
