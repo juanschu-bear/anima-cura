@@ -21,7 +21,7 @@ const STEP_MS=50_000;
 const text=(max:number)=>z.string().trim().min(1).max(max);
 const bodySchema=z.discriminatedUnion('mode',[
  z.strictObject({mode:z.literal('assign'),pairs:z.array(voicePairSchema).min(1).max(30)}),
- z.strictObject({mode:z.literal('bundle'),topics:z.array(z.strictObject({name:text(60),count:z.number().int().min(1).max(100000)})).min(1).max(400)}),
+ z.strictObject({mode:z.literal('bundle'),topics:z.array(z.strictObject({name:text(60),count:z.number().int().min(1).max(100000)})).min(1).max(200)}),
  z.strictObject({mode:z.literal('describe'),topic:text(60),ruleId:z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/).nullable(),
   answers:z.array(text(900)).min(3).max(40),questions:z.array(text(700)).max(12)}),
 ]);

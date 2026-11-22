@@ -26,8 +26,8 @@ test('Zuordnung schickt dem Modell von den Regeln nur Thema und Stichworte, nich
 });
 test('Bündeln: jedes Thema landet in genau 1 Gruppe, Vergessenes behält seinen Namen, Erfundenes wird ignoriert',async()=>{
  const topics=[{name:'Termin absagen',count:9},{name:'Terminabsage',count:4},{name:'Spange drückt',count:3},{name:'Parkplatz',count:1}];
- const map=await bundleTopics(model({themen:[{name:'Termin absagen',gehoertDazu:['Termin absagen','Terminabsage','Gibt es nicht']},
-  {name:'Beschwerden mit der Spange',gehoertDazu:['Spange drückt','Terminabsage']}]}),topics,1000);
+ const map=await bundleTopics(model({themen:[{name:'Termin absagen',gehoertDazu:[1,2,99]},
+  {name:'Beschwerden mit der Spange',gehoertDazu:[3,2]}]}),topics,1000);
  assert.deepEqual(map,{'Termin absagen':'Termin absagen','Terminabsage':'Termin absagen','Spange drückt':'Beschwerden mit der Spange','Parkplatz':'Parkplatz'});
 });
 test('Beschreiben: gibt Muster, typische Antwort und Unterschied zurück und legt dem Modell den heutigen Text der Regel vor',async()=>{
