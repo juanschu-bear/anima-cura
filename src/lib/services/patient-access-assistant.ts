@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n';
+
 export function answerAccessQuestion(message: string, locale: "de" | "en") {
   const value = message.toLocaleLowerCase(locale === "de" ? "de-DE" : "en-US");
   if (/noch kein.*(zugang|konto)|kein.*(zugang|konto)|account.*(erstellen|aktivieren)|erstmal.*aktivier|selb(er|st).*(registrier|anmeld|aktivier)|registrier.*ohne.*praxis|ohne.*praxis.*registrier/.test(value)) {
@@ -11,9 +13,7 @@ export function answerAccessQuestion(message: string, locale: "de" | "en") {
       : "Tippe unter dem Passwortfeld auf „Passwort vergessen?“. Gib dort deine persönliche Anima-Cura-Anmeldeadresse ein. Sie endet meist auf @animacura.de, dient nur als Benutzername und empfängt selbst keine E-Mails. Den sechsstelligen Code erhältst du an deine bei der Praxis hinterlegte private Kontakt-E-Mail. Trage den Code in der geöffneten App ein und vergib dein neues Passwort zweimal. Danach kommst du direkt zur zuvor geöffneten Rechnung zurück.";
   }
   if (/rechnung|invoice|dokument|document|öffnen|oeffnen/.test(value)) {
-    return locale === "en"
-      ? "Open the invoice button in the email and sign in. After sign-in, Anima Cura opens the matching invoice automatically. Future invoices are available in the patient portal under Documents."
-      : "Öffne den Rechnungsbutton in der E-Mail und melde dich an. Nach der Anmeldung öffnet Anima Cura automatisch die passende Rechnung. Künftige Rechnungen findest du im Patientenportal unter „Dokumente“.";
+    return t('patientAccess.invoiceLocation', locale);
   }
   if (/qr|überweis|ueberweis|bank|zahl|payment|rate/.test(value)) {
     return locale === "en"

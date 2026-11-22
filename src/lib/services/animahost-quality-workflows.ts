@@ -56,9 +56,12 @@ function kindOf(text:string):SubjectTask|'portal'|'general' {
  return 'general';
 }
 
+const mentionsInvoiceAndDocuments=(text:string)=>/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
+
 export function invoicePortalIntent(text:string){
  if(kindOf(text)==='missing_invoice')return 'missing';
- if(/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text))return 'section';
+ if(mentionsInvoiceAndDocuments(text))return 'section';
+ if(/(?:\bwo\b|\bwhere\b|dónde).{0,50}(?:rechnung|invoice|factura)/i.test(text))return 'location';
  return null;
 }
 
@@ -174,8 +177,10 @@ export async function qualityWorkflow(db:Db,input:{
  const now=Date.parse(receivedAt);
  const fresh=(at:string)=>now-Date.parse(at)<=7*86_400_000&&Date.parse(at)<=now;
  const requested=kindOf(text);
- const searchingDocuments=/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
- if(input.onlyInvoiceRouting&&requested!=='missing_invoice'&&!searchingDocuments)return null;
+ const intent=invoicePortalIntent(text);
+ const asksInvoiceLocation=intent==='location';
+ const searchingDocuments=mentionsInvoiceAndDocuments(text);
+ if(input.onlyInvoiceRouting&&!intent)return null;
  const phone=input.phoneForPractice||'0179 5351813';
  if(/abhol|pick up|recoger/i.test(text)&&/schien|aligner/i.test(text)&&/später|later|tarde/i.test(text)){
   const date=appointmentLocalDate(receivedAt),day=new Date(date+'T12:00:00Z').getUTCDay();
@@ -232,8 +237,11 @@ export async function qualityWorkflow(db:Db,input:{
   if(prefix)result.decision.text=prefix+' '+result.decision.text;
   return result;
  }
- if(patient&&/(?:wo|where|dónde).{0,50}(?:rechnung|invoice|factura)/i.test(text))
-  return labelMatch('quality:invoice_documents',translated('portal_invoice'));
+ if(asksInvoiceLocation){
+  const patientName=patient&&patientIsMinor(patient.geburtsdatum,appointmentLocalDate(receivedAt))===true?patient.vorname:'';
+  return labelMatch('quality:invoice_documents',translated(patientName?'portal_invoice_named':'portal_invoice',
+   {portal:`${portal}/patient/portal?section=rechnungen`,patient:patientName}));
+ }
  if(/(?:spange|schiene|aligner|retainer).{0,55}(?:verlor|verleg|lost|perd)|(?:verlor|verleg|lost|perd).{0,55}(?:spange|schiene|aligner|retainer)/i.test(text))
   return handoff('quality:device_lost',patient?'device_lost':'device_lost_identify');
  if(requested==='financial'){

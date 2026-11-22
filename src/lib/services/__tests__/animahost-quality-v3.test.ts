@@ -77,6 +77,21 @@ test('a reminder asks for date of birth before opening any payment or invoice da
  assert.equal(context.challenge?.patientId,child.id);
 });
 
+test('invoice navigation stays in Rechnungen even when free-form replies are paused',async()=>{
+ const input={tenantId:adult.id,from:'999000000@s.whatsapp.net',phone:publicPhone,receivedAt:sunday,
+  teamTime:'am Montag',patients:[child],patient:child,context:{},doctolib:null,closures:[],onlyInvoiceRouting:true};
+ for(const [language,text,section] of [['de','Wo finde ich die Rechnung?','„Rechnungen“'],
+  ['en','Where can I find the invoice?','under Invoices'],['es','¿Dónde está la factura?','«Facturas»']]){
+  const response=await qualityWorkflow(simpleDb,{...input,text,language});
+  assert.equal(response?.decision.rule,'quality:invoice_documents');
+  assert.ok(response?.decision.text.includes(section));
+  assert.match(response.decision.text,/Emma.*https:\/\/animacura\.io\/patient\/portal\?section=rechnungen/);
+  assert.doesNotMatch(response.decision.text,/Dokumente|Documents|Documentos/);
+ }
+ const wrongSection=await qualityWorkflow(simpleDb,{...input,text:'Gehört die Rechnung unter Dokumente?',language:'de'});
+ assert.match(wrongSection?.decision.text??'',/„Rechnungen“.*„Dokumente“.*Anamnesebögen/);
+});
+
 test('phone migration checks the project and matches formats, guardians and active payers without duplicates',async()=>{
  const sql=readFileSync('supabase/migrations/097_animahost_phone_identity.sql','utf8');
  const pg=new PGlite();
