@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {enforceConversationOutput} from '../animahost-whatsapp-conversation';
 import assert from 'node:assert/strict';
-import {applicableMessageRules,combinedMessageWorkflow,practiceMessageHandoff} from '../animahost-message-concerns';
+import {applicableMessageRules,combinedMessageWorkflow,personRequest,personRequestReply,practiceMessageHandoff} from '../animahost-message-concerns';
 import {selectPhonePatient,type PhonePatient} from '../animahost-chat-identity';
 import {styleMessage,invoicePortalIntent} from '../animahost-quality-workflows';
 import {matchApprovedRuleFallback} from '../animahost-whatsapp-fallback';
@@ -49,16 +49,37 @@ test('one message executes the invoice check and preserves the appointment answe
  assert.deepEqual(result!.details?.concerns,['appointment','invoice']);
  assert.match(result!.details?.practiceSummary??'',/Mittwoch.*30.11.*15 Uhr.*Rechnung/);
 });
-test('personal team addressee gets the entire request before any private workflow',()=>{
+// Juan, 22.11.2026: Eine Anrede ans Team ist kein Grund für eine Übergabe. Dafür ist das System da.
+test('addressing a team member by name does not hand the message to the team',()=>{
  const addressed=text.replace('Hallo,','Hallo Frau Muster,');
- const result=practiceMessageHandoff(addressed,children,'de','am Montag')!;
- assert.equal(result.decision.rule,'quality:personal_team');
- assert.equal(result.decision.action,'klaerfall');
- assert.match(result.decision.text,/vollständige Nachricht mit allen Anliegen.*Team/);
- assert.ok(result.details?.practiceSummary?.endsWith(addressed));
- assert.match(result.details?.practiceSummary??'',/Anliegen fürs Praxisteam: Terminwunsch; Rechnung/);
- assert.deepEqual(result.details?.concerns,['appointment','invoice']);
- assert.doesNotMatch(result.decision.text,/Milan|Nora|geändert|abrufbar/);
+ assert.equal(practiceMessageHandoff(addressed,children,'de','am Montag'),null);
+ assert.equal(personRequest(addressed),'none');
+ for(const plain of ['Hallo Frau Muster, wann haben Sie geöffnet?','Guten Tag Herr Beispiel, in der App kommt eine Fehlermeldung bei der Rechnung.',
+  'Liebe Frau Muster, wir kommen am Dienstag 10 Minuten später.','Meine Frau holt die Schiene ab.','Hallo, wann ist die Praxis geöffnet?'])assert.equal(personRequest(plain),'none',plain);
+});
+
+test('the wish for a person is answered with help first and reaches the team only on the 3rd request',()=>{
+ for(const wish of ['Ich möchte lieber mit Frau Muster sprechen.','Kann mich Frau Muster bitte anrufen?','Ich will mit einem echten Menschen sprechen','Bitte um Rückruf','Rufen Sie mich bitte zurück',
+  'Hallo Frau Muster, bitte antworten Sie uns.','Ich hoffe das uns Frau Muster am Montag antwortet','Kein Bot bitte, ich möchte mit jemandem reden'])assert.equal(personRequest(wish),'only',wish);
+ // Mit einem Anliegen dabei beantwortet der normale Weg das Anliegen.
+ for(const mixed of ['Ich möchte lieber mit Frau Muster sprechen, weil die Zahnspange von Milan gebrochen ist.',
+  'Kann mich Frau Muster anrufen? Es geht um die Ratenzahlung für die Behandlung.'])assert.equal(personRequest(mixed),'with_concern',mixed);
+ const reply=(lastAction:string|null,lastRule:string|null,automatic=true)=>personRequestReply({text:'Ich möchte lieber mit Frau Muster sprechen.',language:'de',teamTime:'am Montag',automatic,lastAction,lastRule});
+ const first=reply(null,null),second=reply('antworten','quality:prefers_person:1'),third=reply('antworten','quality:prefers_person:2');
+ assert.equal(first.decision.action,'antworten');assert.equal(first.decision.rule,'quality:prefers_person:1');
+ assert.match(first.decision.text,/helfe ich Ihnen gern sofort weiter.*worum es geht/);
+ assert.equal(second.decision.action,'antworten');assert.equal(second.decision.rule,'quality:prefers_person:2');
+ assert.notEqual(second.decision.text,first.decision.text);
+ assert.equal(third.decision.action,'klaerfall');assert.equal(third.decision.rule,'quality:personal_team');
+ assert.match(third.decision.text,/vollständige Nachricht mit allen Anliegen.*Team.*am Montag/);
+ assert.ok(third.details?.practiceSummary?.endsWith('Ich möchte lieber mit Frau Muster sprechen.'));
+ // Kein Name eines Teammitglieds und kein Versprechen über eine bestimmte Person in den Antworten.
+ for(const answer of [first,second,third])assert.doesNotMatch(answer.decision.text,/Muster|Milan|Nora/);
+ // Nach einer normalen Antwort beginnt die Zählung neu.
+ assert.equal(reply('antworten','oeffnungszeiten').decision.rule,'quality:prefers_person:1');
+ // Liegt schon ein Fall beim Team, ist die Nachricht eine Ergänzung dazu. Ohne automatische Antworten geht sie immer ans Team.
+ assert.equal(reply('klaerfall','fallback:other').decision.rule,'quality:personal_team');
+ assert.equal(reply(null,null,false).decision.rule,'quality:personal_team');
 });
 
 test('a failed invoice check keeps the appointment answer and a complete team case',async()=>{
@@ -72,7 +93,7 @@ test('a failed invoice check keeps the appointment answer and a complete team ca
 });
 
 test('a personal follow-up does not falsely claim that the assistant is stuck',()=>{
- const decision=practiceMessageHandoff('Hallo Frau Muster, bitte antworten Sie uns.',children,'de','am Montag')!.decision;
+ const decision=personRequestReply({text:'Hallo Frau Muster, bitte antworten Sie uns.',language:'de',teamTime:'am Montag',automatic:true,lastAction:'klaerfall',lastRule:'fallback:other'}).decision;
  const followup=enforceConversationOutput(decision,[{direction:'outgoing',text:decision.text,at:opts.receivedAt}],
   'de',{receivedAt:'2026-11-22T09:11:00+01:00',teamTime:'am Montag'});
  assert.equal(followup.rule,'quality:personal_team');

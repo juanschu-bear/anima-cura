@@ -23,7 +23,7 @@ import {teamReplyTime} from '@/lib/services/animahost-team-time';
 import {explicitlyOffersDu,maskBirthDates,phoneLabels,phonePatients,selectPhonePatient,type ChatContext} from '@/lib/services/animahost-chat-identity';
 import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitReply,type ChatDetails} from '@/lib/services/animahost-quality-workflows';
 
-import {applicableMessageRules,practiceMessageHandoff,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
+import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -167,6 +167,16 @@ export async function POST(request:NextRequest){
   if(input.text&&!input.handoffOnly&&!explicitOptOut(input.text)&&!emergencyDecision(input.text)){
    const handoff=practiceMessageHandoff(input.text,candidates,language,teamTime());
    if(handoff){decision=handoff.decision;details=handoff.details;qualityHandled=true;}
+   else if(personRequest(input.text)==='only'){
+    // Wunsch nach einer Person ohne Anliegen: AnimaHost hilft zuerst selbst weiter. Der letzte Stand des Chats entscheidet über den Schritt.
+    const last=await db.from('animahost_whatsapp_decisions').select('action,rule_id')
+     .eq('tenant_id',input.tenantId).eq('sender_jid',input.from)
+     .gte('created_at',new Date(Date.parse(input.receivedAt)-24*3_600_000).toISOString())
+     .order('created_at',{ascending:false}).limit(1).maybeSingle();
+    const answer=personRequestReply({text:input.text,language,teamTime:teamTime(),automatic:automaticReplies,
+     lastAction:last.data?.action??null,lastRule:last.data?.rule_id??null});
+    decision=answer.decision;details=answer.details;qualityHandled=true;
+   }
   }
   if(!input.text&&!input.handoffOnly&&input.messageType!=='text'){
    const kind=input.messageType.replace(/^view_once_/,'');
