@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { patientDocumentTypeOptions } from "@/lib/patient-document-types";
+import { isInvoiceDocumentType, patientDocumentTypeOptions } from "@/lib/patient-document-types";
 import { useAppStore } from "@/hooks/useAppStore";
+import PatientInvoiceRecords from "./PatientInvoiceRecords";
 
 interface Props {
   patientId: string;
   patientName: string;
+  guthaben?: number | null;
 }
 
 interface Phase {
@@ -36,7 +38,7 @@ const phaseStatuses = [
 
 const docTypes = patientDocumentTypeOptions;
 
-export default function PatientPortalAdmin({ patientId, patientName }: Props) {
+export default function PatientPortalAdmin({ patientId, patientName, guthaben = null }: Props) {
   const { theme } = useAppStore();
   const isDark = theme === "dark";
   const [portalAccess, setPortalAccess] = useState<{
@@ -446,12 +448,15 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
         </div>
       </div>
 
+      {/* Rechnungen: gemeinsame Akte, dieselbe wie in der Patienten-App */}
+      <PatientInvoiceRecords patientId={patientId} guthaben={guthaben} />
+
       {/* Documents */}
       <div className={sectionStyle}>
         <h3 className={headingStyle}>Dokumente für Patient</h3>
-        {docs.length > 0 && (
+        {docs.some(d => !isInvoiceDocumentType(d.typ)) && (
           <div className="space-y-2 mb-4">
-            {docs.map(d => (
+            {docs.filter(d => !isInvoiceDocumentType(d.typ)).map(d => (
               <div key={d.id} className="flex items-center justify-between rounded-lg border border-surface-200 px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-praxis-700">{d.name}</p>
@@ -469,7 +474,7 @@ export default function PatientPortalAdmin({ patientId, patientName }: Props) {
         <div className="border-t border-surface-200 pt-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-praxis-400">Dokument hinzufügen</p>
           <p className="text-sm text-praxis-500">
-            Nach dem Speichern erscheint das Dokument direkt im Patientenportal unter den Dokumenten des zugehörigen Patienten.
+            Nach dem Speichern erscheint das Dokument direkt im Patientenportal unter den Dokumenten des zugehörigen Patienten. Rechnungen erscheinen oben unter „Rechnungen“, in der App ebenso.
           </p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <input value={docName} onChange={e => setDocName(e.target.value)} placeholder="Dokumentname" className={inputStyle} />

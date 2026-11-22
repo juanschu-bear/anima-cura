@@ -523,6 +523,7 @@ export default function PatientDetailPage() {
       <PatientPortalAdmin
         patientId={patient.id}
         patientName={`${patient.vorname} ${patient.nachname}`}
+        guthaben={typeof patient.guthaben === "number" || typeof patient.guthaben === "string" ? Number(patient.guthaben) : null}
       />
 
       {/* Rechnung generieren */}
