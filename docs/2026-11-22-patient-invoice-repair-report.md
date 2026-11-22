@@ -87,3 +87,10 @@ Beide Builds erfolgreich. Gezielte Rechnungstests: 12/12; Leitstandtests: 11/11.
 Leitstand: Vorprüfung vor Manifest, Freigabe und Versand ist bereits in `52ab971` enthalten. Vier neue Regressionstests sichern erneute Prüfung und Fehlerfälle. Übergabe in `docs/2026-11-22-invoice-portal-preflight-contract.md`; keine UI-Änderung und kein Versand.
 
 Noch offen: Installation 100 mit sauberem Rechnungs-Funktionsaudit, zweite unabhängige Familienprobe in Production, sichtbare App-/Praxiswarnungsabnahme. Alle Berichte und Tests bleiben ohne Patientennamen und Geheimnisse.
+
+## Veröffentlichungsnachweis
+
+- Patienten-App: Code und Tests `20860ef`, auf main; Vercel meldet Production-Deployment erfolgreich. Damit sind auch `belegVerfuegbarkeit` und `/api/patient/internal/invoice-access-health` veröffentlicht. Eine authentifizierte Patientenantwort wurde hier nicht abgerufen.
+- Leitstand: Tests und Vertrag `c90e83a`, auf main; Vercel meldet Deployment erfolgreich.
+- GitHub Actions für `20860ef`: Typecheck und der neue PostgreSQL-Rollentest erfolgreich. Die Gesamtprüfung stoppt später an den beiden bereits unabhängig festgestellten Live-RPC-Abweichungen `record_immediate_invoice_payment` und `set_patient_billing_mode`. Ein bloßer Leerzeichenabgleich behebt sie nicht; kein Vertrag wurde dafür gelockert. Der noch nicht aktualisierte SQL-Funktionsaudit benötigt außerdem Migration 100.
+- Zusätzlicher lesender Abgleich mit dem aktuellen Upload-Lader: 733 historische Datensätze, 732 als Upload angeboten, 1 wegen identischer aktiver Import-ID dedupliziert, 0 unberücksichtigt. Speicherprüfung aller 733 Dateien ebenfalls erfolgreich; beides ersetzt keine Patientensitzungsabnahme.
