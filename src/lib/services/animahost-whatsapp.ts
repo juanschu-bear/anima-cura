@@ -23,7 +23,7 @@ export function emergencyDecision(message:string):WhatsAppDecision|null{
  const symptoms=message.replace(/\b(?:keine atemnot|keine blutung|keine starken schmerzen|keinen unfall|nichts verschluckt)\b/gi,'');
  if(/\b(?:atemnot|keine luft|schlecht luft|erstick\w*|bewusstlos\w*|stark\w* blutung\w*|can(?:not|'t|’t) breathe|heavy bleeding|no puedo respirar)\b/i.test(symptoms))
   return {action:'notfall',text:t('animahost.whatsapp.emergency','de'),rule:'emergency_112'};
- if(/\b(?:verschluckt|sticht|angeschwollen|schwellung|unfall|verletz\w*|blutet|blutung|stark\w* schmerzen|unerträglich\w* schmerzen|severe pain|swallowed|dolor insoportable|me tragué)\b/i.test(symptoms))
+ if(/\b(?:verschluckt|angeschwollen|schwellung|unfall|gestürzt|hingefallen|verletz\w*|blutet|blutung|stark\w* schmerzen|unerträglich\w* schmerzen|severe pain|swallowed|dolor insoportable|me tragué)\b/i.test(symptoms))
   return {action:'notfall',text:t('animahost.whatsapp.urgent','de'),rule:'emergency_practice'};
  return null;
 }
@@ -67,11 +67,21 @@ export function renderWhatsAppRuleText(text: string, doctolibUrl: string | null)
 }
 
 export function decisionFromRule(rule:WhatsAppRule|null, doctolibUrl: string | null = null):WhatsAppDecision{
- const approvedText = rule?.patientText
-  .replaceAll('Reibt etwas, hilft bis dahin ein kleines Stück Wachs auf der Stelle. ', '')
-  .replaceAll('Wenn Brackets oder Drähte reiben, hilft ein kleines Stück Wachs auf der Stelle. Das bekommen Sie jederzeit bei uns.', '')
-  .trim();
- const text = rule && approvedText && safeRuleText(rule) ? renderWhatsAppRuleText(approvedText, doctolibUrl) : null;
+ if(rule?.action==='notfall')return {action:'notfall',text:rule.patientText,rule:rule.id};
+ const text = rule && safeRuleText(rule) ? renderWhatsAppRuleText(rule.patientText, doctolibUrl) : null;
  if(!rule||text===null)return {action:'klaerfall',text:t('animahost.whatsapp.clarify','de'),rule:'no_applicable_rule'};
  return {action:rule.action,text,rule:rule.id};
+}
+
+export function resolveEmergency(message:string,signal:WhatsAppDecision,rules:WhatsAppRule[],selected:string[],language:string,phone:string):WhatsAppDecision{
+ const acute=signal.rule==='emergency_112';
+ if(acute)return {...signal,text:t('animahost.whatsapp.emergency',language)};
+ const explicit=/notdienst|außerhalb.{0,30}sprechzeiten|wochenende|out.of.hours|weekend|fuera de horario/i.test(message)?'notdienst-ausserhalb-der-sprechzeiten':
+  /verschluck|swallow|tragu/i.test(message)?'etwas-verschluckt':
+  /unfall|sturz|gestürzt|hingefallen|schwell|angeschwoll|swollen|fell|fall|hinch/i.test(message)?'schwellung-unfall-oder-sturz-auf-die-zaehne':
+  /draht|bogen|wire|alambre/i.test(message)?'draht-sticht-oder-etwas-tut-weh':null;
+ const approved=rules.find(rule=>rule.action==='notfall'&&rule.id===explicit)??
+  rules.find(rule=>rule.action==='notfall'&&selected.includes(rule.id))??
+  rules.find(rule=>rule.action==='notfall'&&rule.id==='draht-sticht-oder-etwas-tut-weh');
+ return approved?decisionFromRule(approved):{...signal,text:t('animahost.quality.attendance_emergency',language,{phone})};
 }

@@ -27,10 +27,13 @@ test('a standalone new topic and a stale attachment do not share classification 
  assert.deepEqual(referenceHistory('Geht das auch ohne?',history.slice(0,1),now),[]);
 });
 
-test('consecutive identical texts yield a waiting decision without sendable text',()=>{
+test('consecutive identical texts yield a new timed response and a practice case',()=>{
  const last:ConversationHistory=[{direction:'outgoing',at:'2026-11-22T02:06:00+01:00',text:'Wir melden uns. Vielen Dank.'}];
- const answer=enforceConversationOutput({rule:'fallback:other',action:'klaerfall',text:'Wir melden uns.\nVielen Dank.'},last,'de');
- assert.deepEqual(answer,{rule:'duplicate_reply_suppressed',action:'klaerfall',text:''});
+ const answer=enforceConversationOutput({rule:'fallback:other',action:'klaerfall',text:'Wir melden uns.\nVielen Dank.'},last,'de',
+  {teamTime:'am Montag',receivedAt:'2026-11-22T02:08:00+01:00'});
+ assert.equal(answer.rule,'conversation:repeat_review');
+ assert.equal(answer.action,'klaerfall');
+ assert.match(answer.text,/am Montag/);
 });
 
 test('a previously sent link is referenced without duplication',()=>{
@@ -38,4 +41,11 @@ test('a previously sent link is referenced without duplication',()=>{
  const history:ConversationHistory=[{direction:'outgoing',at:'2026-11-22T02:06:00+01:00',text:`Portal: ${link}`}];
  const answer=enforceConversationOutput({rule:'portal',action:'antworten',text:`Öffnen Sie das Portal: ${link}`},history,'de');
  assert.equal(answer.text,'Öffnen Sie das Portal. Den Link finden Sie weiter oben im Chat.');
+});
+
+test('an emergency rule bypasses link cleanup and duplicate detection',()=>{
+ const text='Bitte  rufen Sie sofort an. https://example.invalid/notdienst';
+ const decision={rule:'practice-emergency',action:'notfall' as const,text};
+ const history:ConversationHistory=[{direction:'outgoing',at:'2026-11-22T02:06:00+01:00',text}];
+ assert.equal(enforceConversationOutput(decision,history,'de'),decision);
 });

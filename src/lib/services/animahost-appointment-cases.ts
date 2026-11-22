@@ -1,7 +1,7 @@
-import {formulateConversationReply} from './animahost-whatsapp-conversation';
+import {renderWhatsAppRuleText} from './animahost-whatsapp';
 import {t} from '@/lib/i18n';
 import type {createServerClient} from '@/lib/db/supabase';
-import {appointmentInstant,lateReply,type Language,type LateState} from './animahost-appointment-tolerance';
+import {appointmentInstant,type Language,type LateState} from './animahost-appointment-tolerance';
 
 type DB = ReturnType<typeof createServerClient>;
 const table='animahost_appointment_cases';
@@ -96,7 +96,7 @@ export async function dueAppointmentCases(db:DB,tenant:string,phone:string|null,
 
 export async function decideAppointmentCase(db:DB,tenant:string,input:{
  caseId:string;actorId:string;decision:'approved'|'declined';note?:string|null;
-},doctolib:string|null,model:string,signal:AbortSignal, now=new Date()){
+},doctolib:string|null,now=new Date()){
  const found=await db.from(table).select(`${caseColumns},language`).eq('tenant_id',tenant).eq('id',input.caseId).maybeSingle();
  if(found.error)throw Error('appointment_case_unavailable');
  if(!found.data)return {code:'appointment_case_not_found'} as const;
@@ -104,15 +104,15 @@ export async function decideAppointmentCase(db:DB,tenant:string,input:{
  if(row.status===input.decision&&row.decided_by===input.actorId&&row.note===(input.note??null))
   return {appointmentCase:appointmentCaseView(row)};
  if(row.status!=='pending'||Date.parse(row.fallback_at)<=now.getTime())return {code:'appointment_case_closed'} as const;
- const text=input.decision==='approved'?t('animahost.late.approved',row.language,{arrival:row.arrival_time.slice(0,5)}):
-  lateReply({outcome:'rebook'} as LateState,row.language,doctolib,null);
- const formulated=await formulateConversationReply({model,decision:{action:'antworten',
-  rule:`late_arrival:${input.decision}`,text},
-  text:t('animahost.late.pending',row.language),history:[],language:row.language,
-  verifiedIdentity:false,signal,deadline:Date.now()+5_500});
- const decisionTime=new Date().toISOString();
+ const day=new Intl.DateTimeFormat(row.language,{weekday:'long',timeZone:'UTC'})
+  .format(new Date(`${row.appointment_date}T12:00:00Z`));
+ const reply=t(input.decision==='approved'?'animahost.late.approved_at':'animahost.late.declined_at',
+  row.language,{day,arrival:row.arrival_time.slice(0,5)});
+ const link=input.decision==='declined'?renderWhatsAppRuleText('{doctolib_link}',doctolib):null;
+ const text=link?`${reply} ${t('animahost.late.book',row.language,{url:link})}`:reply;
+ const decisionTime=now.toISOString();
  const saved=await db.from(table).update({status:input.decision,decided_at:decisionTime,decided_by:input.actorId,
-  note:input.note??null,delivery_state:'queued',patient_reply:formulated.text})
+  note:input.note??null,delivery_state:'queued',patient_reply:text})
   .eq('tenant_id',tenant).eq('id',row.id).eq('status','pending').gt('fallback_at',decisionTime)
   .select(caseColumns).maybeSingle();
  if(saved.error)throw Error('appointment_case_unavailable');

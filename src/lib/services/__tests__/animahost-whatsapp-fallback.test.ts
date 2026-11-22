@@ -22,23 +22,23 @@ test('an attachment handover names the issue, next day and online options', () =
   assert.match(reply.text, /Attachment.*Dienstag, 24. November.*https:\/\/example.invalid\/termine/);
 });
 
-test('multiple selected rules read as one reply with urgent information first', () => {
+test('the exact emergency copy is sent alone even when other rules match', () => {
   const common = { topic: 'Example', keywords: ['example'] };
   const rules: WhatsAppRule[] = [
     { ...common, id: 'parking', action: 'antworten', patientText: 'Parken können Sie im Parkhaus.' },
     { ...common, id: 'urgency', action: 'notfall', patientText: 'Bitte rufen Sie sofort in der Praxis an.' },
   ];
   assert.deepEqual(withRuleReplies(null, ['parking', 'unknown', 'urgency', 'parking'], rules, null), {
-    action: 'notfall', rule: 'urgency|parking',
-    text: 'Bitte rufen Sie sofort in der Praxis an.\n\nParken können Sie im Parkhaus.',
+    action: 'notfall', rule: 'urgency',
+    text: 'Bitte rufen Sie sofort in der Praxis an.',
   });
 });
 
-test('existing practice text offers an appointment without self-care instructions', () => {
+test('an existing approved practice instruction stays part of its rule text', () => {
   const reply = decisionFromRule({
     id: 'bracket', topic: 'Bracket', keywords: ['Bracket'], action: 'antworten',
     patientText: 'Bitte wählen Sie einen Kontrolltermin: {doctolib_link} Reibt etwas, hilft bis dahin ein kleines Stück Wachs auf der Stelle. Bei Schmerzen rufen Sie bitte an.',
   }, 'https://example.invalid/termine');
   assert.match(reply.text, /Kontrolltermin/);
-  assert.doesNotMatch(reply.text, /Wachs/);
+  assert.match(reply.text, /Wachs/);
 });

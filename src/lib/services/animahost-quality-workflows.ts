@@ -16,12 +16,15 @@ const labelMatch=(rule:string,text:string,action:WhatsAppDecision['action']='ant
 export function styleMessage(decision:WhatsAppDecision,patient:PhonePatient|null,input:{
  language:string;receivedAt:string;firstReply:boolean;informal:boolean;teamTime:string;
 }){
+ if(decision.action==='notfall')return decision;
  const {language,firstReply,informal}=input;
  let message=decision.text;
- const addressed=/^invoice_portal:|^identity:|^late_arrival:|^notfall|^emergency_|^address:/.test(decision.rule);
- if(patient&&decision.action!=='notfall'&&!addressed&&firstReply){
+ const addressed=/^(?:identity:|address:|media:|opt_out|invoice_portal:manual_review)/.test(decision.rule);
+ const names=patient?[patient.vorname,patient.nachname].filter(Boolean):[];
+ const alreadyNamed=names.some(name=>message.toLocaleLowerCase().includes(name.toLocaleLowerCase()));
+ if(patient&&!addressed&&!alreadyNamed){
   const minor=patientIsMinor(patient.geburtsdatum,appointmentLocalDate(input.receivedAt));
-  if(minor===true)message=t('animahost.identity.child',language,{name:patient.vorname})+' '+message;
+  if(minor!==false)message=t(firstReply?'animahost.identity.child':'animahost.identity.child_followup',language,{name:patient.vorname})+' '+message;
   if(minor===false){
    const sex=(patient.geschlecht??'').toLocaleLowerCase();
    const name=/^(?:w|weiblich|female)$/.test(sex)?`Frau ${patient.nachname}`:
@@ -46,8 +49,9 @@ function kindOf(text:string):SubjectTask|'portal'|'general' {
  if(/^\s*nein.{0,25}abrechnung.{0,45}rechnungen?.{0,45}(?:app|portal)/i.test(text))return 'missing_invoice';
  if(/(?:rechnungen?|invoice|factura).{0,90}(?:benachrichtigung|verfügbar|notification|disponible).{0,90}(?:aber|nicht|kein|but|no)/i.test(text))return 'missing_invoice';
  if(/(?:rechnungen?|invoice|factura).{0,70}(?:fehl|nicht (?:sichtbar|zu sehen|angezeigt|da|find)|noch nicht|can.t see|missing|no aparece)|(?:nicht (?:sichtbar|zu sehen)|seh.{0,35}nicht|find.{0,35}nicht).{0,70}(?:rechnung|invoice|factura)|(?:app|portal).{0,80}(?:rechnung|invoice|factura).{0,90}(?:nicht|fehl)/i.test(text))return 'missing_invoice';
- if(/(?:mahnung|zahlungserinnerung|guthaben|doppelt bezahlt|überwies|nicht bezahlt|payment reminder|saldo pendiente)/i.test(text))return 'financial';
- if(/wann.{0,40}(?:termin|appointment)|(?:termin|appointment).{0,34}(?:wann|uhrzeit|finde ich|wo sehe)|(?:weiß|weiss).{0,35}nicht.{0,30}(?:termin|appointment)|when.{0,32}appointment/i.test(text))return 'appointment';
+ if(/(?:mahnung|zahlungs(?:erinnerung|aufforderung)|payment reminder|saldo pendiente)/i.test(text)&&!/(?:schon|bereits|already|ya).{0,30}(?:bezahlt|überwies|paid|pag)/i.test(text))return 'financial';
+ if(/(?:mahnung|zahlungserinnerung|payment reminder|saldo pendiente).{0,90}(?:versteh|wofür|welche|warum|why|which)|(?:was|wofür|welche|warum|why|which).{0,90}(?:mahnung|zahlungserinnerung|payment reminder)|(?:mein(?:e[snmr]?)?|my|mi)\s+(?:guthaben|saldo|balance)|(?:wie viel|how much|cuánto).{0,55}(?:guthaben|offen|überwies|balance|saldo)/i.test(text))return 'financial';
+ if(/wa(?:n{1,2})\b.{0,40}(?:termin|appointment)|(?:termin|appointment).{0,34}(?:wann|uhrzeit|finde ich|wo sehe)|(?:weiß|weiss).{0,35}nicht.{0,30}(?:termin|appointment)|when.{0,32}appointment/i.test(text))return 'appointment';
  if(/(?:portal|app|login).{0,50}(?:zugang|download|herunterlad|anmeld|passwort|profil|install|einloggen)|(?:anmeld|login|download|install|passwort|ohne).{0,50}(?:portal|app)/i.test(text))return 'portal';
  return 'general';
 }
@@ -82,7 +86,7 @@ export function visitReply(input:{text:string;language:string;receivedAt:string;
 }
 
 export function selfServiceReply(input:{
- text:string;language:string;receivedAt:string;teamTime:string;doctolib:string|null;context:ChatContext;assigned:boolean;
+text:string;language:string;receivedAt:string;teamTime:string;doctolib:string|null;context:ChatContext;assigned:boolean;
 }):Outcome|null{
  const {text,language,receivedAt,context}=input;
  const now=Date.parse(receivedAt);
@@ -103,6 +107,12 @@ export function selfServiceReply(input:{
   return handoff(`quality:${journey.kind}:3`,input.assigned?`${journey.kind}_3`:`${journey.kind}_3_identify`);
  }
  if(requested==='appointment'||requested==='portal'){
+  if(journey?.kind===requested&&journey.step>=1){
+   const next=Math.min(journey.step+1,3);
+   context.journey={kind:requested,step:next,at:receivedAt};
+   if(next===2)return labelMatch(`quality:${requested}:2`,translated(`${requested}_2`));
+   return handoff(`quality:${requested}:3`,input.assigned?`${requested}_3`:`${requested}_3_identify`);
+  }
   context.journey={kind:requested,step:1,at:receivedAt};
   return labelMatch(`quality:${requested}:1`,translated(`${requested}_1`));
  }
@@ -111,7 +121,7 @@ export function selfServiceReply(input:{
 
 export async function qualityWorkflow(db:Db,input:{
  tenantId:string;from:string;phone:string;receivedAt:string;text:string;language:string;teamTime:string;
- patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;onlyInvoiceRouting?:boolean;
+ patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;onlyInvoiceRouting?:boolean;phoneForPractice?:string|null;
 }):Promise<Outcome|null>{
  const {text,language,teamTime,context,patients,patient,receivedAt}=input;
  const message=t('animahost.team.reply',language,{when:teamTime});
@@ -157,6 +167,7 @@ export async function qualityWorkflow(db:Db,input:{
  const requested=kindOf(text);
  const searchingDocuments=/(?:rechnung|invoice|factura).{0,90}(?:dokumente|documents|documentos)|(?:dokumente|documents|documentos).{0,90}(?:rechnung|invoice|factura)/i.test(text);
  if(input.onlyInvoiceRouting&&requested!=='missing_invoice'&&!searchingDocuments)return null;
+ const phone=input.phoneForPractice||'0179 5351813';
  if(/abhol|pick up|recoger/i.test(text)&&/schien|aligner/i.test(text)&&/später|later|tarde/i.test(text)){
   const date=appointmentLocalDate(receivedAt),day=new Date(date+'T12:00:00Z').getUTCDay();
   const blocks=closurePeriodsSchema.safeParse(input.closures);
@@ -212,6 +223,10 @@ export async function qualityWorkflow(db:Db,input:{
   if(prefix)result.decision.text=prefix+' '+result.decision.text;
   return result;
  }
+ if(patient&&/(?:wo|where|dónde).{0,50}(?:rechnung|invoice|factura)/i.test(text))
+  return labelMatch('quality:invoice_documents',translated('portal_invoice'));
+ if(/(?:spange|schiene|aligner|retainer).{0,55}(?:verlor|verleg|lost|perd)|(?:verlor|verleg|lost|perd).{0,55}(?:spange|schiene|aligner|retainer)/i.test(text))
+  return handoff('quality:device_lost',patient?'device_lost':'device_lost_identify');
  if(requested==='financial'){
   if(!patient)return waiting({kind:'financial',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});
   const verified=await db.from('animahost_whatsapp_verified_patients').select('patient_id')
@@ -224,8 +239,6 @@ export async function qualityWorkflow(db:Db,input:{
  if(/\b(?:mensch|menschen|human)\b/i.test(text)&&/(?:sprechen|mit|talk)/i.test(text))return handoff('quality:human','human');
  if(/\b(?:sauer|verärgert|beschwerde|furious|angry)\b/i.test(text))return handoff('quality:complaint','complaint');
  if(/spange.{0,35}(?:drückt|drueckt)|(?:drückt|drueckt).{0,30}spange/i.test(text)&&/früher|kurzfristig/i.test(text))
-  return labelMatch('quality:appliance_visit',translated(book?'appliance_earlier':'appliance_no_link'));
- if(/bracket.{0,38}(?:ab|locker|gelöst)|(?:daughter|son).{0,30}brace.{0,20}loose/i.test(text)&&
-  !/stark.{0,22}(?:schmerz|blut)|unfall/i.test(text))return labelMatch('quality:bracket',translated(book?'bracket_link':'bracket'));
+  return labelMatch('quality:appliance_visit',translated(book?'appliance_earlier':'appliance_no_link',{phone}));
  return selfServiceReply({text,language,receivedAt,teamTime,doctolib:input.doctolib,context,assigned:Boolean(patient)});
 }

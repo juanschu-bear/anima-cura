@@ -74,17 +74,16 @@ export function withRuleReplies(
     const decision = decisionFromRule(rule, doctolibUrl);
     return decision.rule === id ? [decision] : [];
   });
+  if(primary?.action==='notfall')return primary;
+  const emergency=additional.find(item=>item.action==='notfall');
+  if(emergency)return emergency;
   // Keep the original rule identifier for stateful operations and practice notices.
   if (primary) {
     const extras = additional.filter(item => item.rule !== primary.rule);
-    const stronger = extras.find(item => item.action === 'notfall');
-    const action = primary.action === 'notfall' || stronger ? 'notfall'
-      : primary.action === 'klaerfall' || extras.some(item => item.action === 'klaerfall') ? 'klaerfall' : 'antworten';
-    const urgentFirst = primary.action === 'notfall' ? [primary, ...extras]
-      : [...extras.filter(item => item.action === 'notfall'), primary, ...extras.filter(item => item.action !== 'notfall')];
-    return { ...primary, action, text: Array.from(new Set(urgentFirst.map(item => item.text))).join('\n\n') };
+    const action = primary.action === 'klaerfall' || extras.some(item => item.action === 'klaerfall') ? 'klaerfall' : 'antworten';
+    return { ...primary, action, text: Array.from(new Set([primary,...extras].map(item => item.text))).join('\n\n') };
   }
-  const ordered = ['notfall', 'klaerfall', 'antworten'].flatMap(action => additional.filter(item => item.action === action));
+  const ordered = ['klaerfall', 'antworten'].flatMap(action => additional.filter(item => item.action === action));
   const first = ordered[0];
   return first ? {
     action: first.action,

@@ -493,7 +493,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "81dd97e1c1ca5d08fab428c1c1ba6bb81d5436d313ffabe0d67a47af447ce5b1",
+      "sha256": "912ef77c7bee18e30e3cba50a81b48496a1f34c05a04d0c5a8c98a6f14c12c38",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -682,7 +682,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "e191d85c9fbf18ab30a442713c736d5712647e874fc27f1a68412e428df8219a"
+      "sha256": "18856cbf0c2616ccaa9b8bb92cfb6cddd13603841386badf919bf51987fb0b9d"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

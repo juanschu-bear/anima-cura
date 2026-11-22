@@ -142,7 +142,7 @@ export async function POST(request:NextRequest){
   const settings=await db.from('animahost_whatsapp_settings').select('doctolib_url,model').eq('tenant_id',tenant).single();
   if(settings.error)return unavailable();
   try{
-   const outcome=await decideAppointmentCase(db,tenant,input,settings.data.doctolib_url,settings.data.model,request.signal);
+   const outcome=await decideAppointmentCase(db,tenant,input,settings.data.doctolib_url);
    return NextResponse.json(outcome,{headers,status:outcome.code==='appointment_case_not_found'?404:
     outcome.code==='appointment_case_closed'?409:200});
   }catch{return unavailable();}

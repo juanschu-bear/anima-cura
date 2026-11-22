@@ -109,11 +109,15 @@ export function planLateArrival(
  return review();
 }
 
-export function lateReply(state:LateState,language:Language,link:string|null,phone:string|null):string {
+export function lateReply(state:LateState,language:Language,link:string|null,phone:string|null,
+ rules:WhatsAppRule[]=[],tolerance:AppointmentTolerance=defaultAppointmentTolerance):string {
  const vars={arrival:state.arrivalTime??'',minutes:state.delayMinutes??0,phone:phone||'0179 5351813'};
  const key=state.outcome==='rebook'&&state.challengesRefusal?'rebook_objection':state.outcome==='accept'?(state.arrivalTime?'accept_time':'accept_minutes'):
   state.outcome==='wait'?(state.arrivalTime?'wait_time':'wait_minutes'):state.outcome;
- const text=t(`animahost.late.${key}`,language,vars);
+ const strictRule=state.outcome==='rebook'&&state.appointmentTypeId&&tolerance.strictTypes.includes(state.appointmentTypeId)
+  ?rules.find(rule=>rule.appointmentTypeId===state.appointmentTypeId):null;
+ const text=strictRule?t('animahost.late.strict_rebook',language,{...vars,type:strictRule.topic}):
+  t(`animahost.late.${key}`,language,vars);
  if(state.outcome==='pending'&&!state.appointmentTypeId&&!state.typeUnknown)
   return `${text} ${t('animahost.late.ask_type',language)}`;
  const url=state.outcome==='rebook'?renderWhatsAppRuleText('{doctolib_link}',link):null;

@@ -33,23 +33,35 @@ const rawUrls=(value:string)=>value.match(/https:\/\/[^\s<>]+/g)??[];
 function canonicalUrl(value:string){
  try{return new URL(value.replace(/[.,!?;)]$/,'')).href;}catch{return value;}
 }
-export function enforceConversationOutput(decision:WhatsAppDecision,history:ConversationHistory,language:string):WhatsAppDecision {
+export function enforceConversationOutput(decision:WhatsAppDecision,history:ConversationHistory,language:string,
+ options:{teamTime?:string;receivedAt?:string;keepLinks?:boolean;informal?:boolean}={}):WhatsAppDecision {
+ if(decision.action==='notfall'||decision.rule==='opt_out')return decision;
  const sent=history.filter(item=>item.direction==='outgoing').sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));
  const earlierLinks=new Set(sent.flatMap(item=>rawUrls(item.text).map(canonicalUrl)));
  const used=new Set<string>();
  let repeatsEarlier=false;
  const singleLinks=decision.text.replace(/https:\/\/[^\s<>]+/g,url=>{
   const id=canonicalUrl(url);
-  if(earlierLinks.has(id)){repeatsEarlier=true;return '';}
+  if(!options.keepLinks&&earlierLinks.has(id)){repeatsEarlier=true;return '';}
   if(used.has(id))return '';
   used.add(id);
   return url;
  }).replace(/ {2,}/g,' ').trim();
  const prefix=singleLinks.replace(/:\s*$/,'').trim();
  const text=repeatsEarlier?[prefix&&(/[.!?]$/.test(prefix)?prefix:prefix+'.'),t('animahost.whatsapp.link_in_chat',language)].filter(Boolean).join(' '):singleLinks;
- const prior=sent.at(-1)?.text;
- if(prior&&(normalizedReply(prior)===normalizedReply(text)||normalizedReply(prior)===normalizedReply(decision.text)))
-  return {action:decision.action==='notfall'?'notfall':'klaerfall',rule:'duplicate_reply_suppressed',text:''};
+ const prior=new Set(sent.map(item=>normalizedReply(item.text)));
+ if(!text||prior.has(normalizedReply(text))||prior.has(normalizedReply(decision.text))){
+  if(decision.rule.startsWith('media:')){
+   const short=t('animahost.whatsapp.media.followup',language);
+   if(!prior.has(normalizedReply(short)))return {...decision,text:short};
+  }
+  const when=options.teamTime??t('animahost.team.next',language);
+  const time=new Intl.DateTimeFormat(language,{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit',second:'2-digit'})
+   .format(new Date(options.receivedAt??Date.now()));
+  const keys=options.informal&&language==='de'?['repeat_du','repeat_du_alt','repeat_du_time']:['repeat','repeat_alt','repeat_time'];
+  const choices=keys.map(key=>t(`animahost.whatsapp.${key}`,language,{when,time}));
+  return {action:'klaerfall',rule:'conversation:repeat_review',text:choices.find(value=>!prior.has(normalizedReply(value)))??choices.at(-1)!};
+ }
  return {...decision,text};
 }
 
@@ -68,7 +80,7 @@ export async function formulateConversationReply(input:{
 }):Promise<WhatsAppDecision>{
  const {decision,signal,model}=input;
  // Functional access links and identity/account workflows stay within their audited template.
- if(/^(?:attendance_|access_|contact_change_|invoice_recipient_)/.test(decision.rule))return decision;
+ if(decision.action==='notfall'||/^(?:attendance_|access_|contact_change_|invoice_recipient_|invoice_portal:|identity:|quality:|late_arrival:|media:)/.test(decision.rule))return decision;
  if(input.deadline-Date.now()<1_200)return decision;
  const facts={approved:decision.text,rule:decision.rule,action:decision.action,patientMessage:input.text,
   history:input.history,language:input.language,addressMode:input.informal?'Du':'Sie',verifiedIdentity:input.verifiedIdentity};
