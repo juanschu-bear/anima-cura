@@ -50,9 +50,11 @@ export function fallbackHints(message: string | null): { topic: FallbackTopic; a
 }
 
 export function fallbackDecision(options: {
-  topic: FallbackTopic; appointment: boolean; language: Language; day?: string | null; teamTime?: string; doctolibUrl: string | null;
+  topic: FallbackTopic; appointment: boolean; language: Language; day?: string | null; teamTime?: string; safetyAck?: boolean; doctolibUrl: string | null;
 }): WhatsAppDecision {
-  const { topic, appointment, language, day, teamTime, doctolibUrl } = options;
+  const { topic, appointment, language, day, teamTime, safetyAck, doctolibUrl } = options;
+  if(safetyAck)return {action:'klaerfall',rule:`fallback:${topic}`,text:t('animahost.whatsapp.safety_ack',language,
+    {when:teamTime??t('animahost.team.next',language)})};
   const link = appointment ? renderWhatsAppRuleText('{doctolib_link}', doctolibUrl) : null;
   const text = [
     t(`animahost.whatsapp.fallback.${topic}`, language),

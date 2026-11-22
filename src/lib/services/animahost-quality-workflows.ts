@@ -65,6 +65,49 @@ function coverage(text:string,receivedAt:string){
  return {from:null,through:null};
 }
 
+export function visitReply(input:{text:string;language:string;receivedAt:string;doctolib:string|null;closures:unknown}):Outcome|null{
+ const {text,language,receivedAt}=input;
+ const book=renderWhatsAppRuleText('{doctolib_link}',input.doctolib);
+ const translated=(key:string)=>t(`animahost.quality.${key}`,language,{link:book??''});
+ if(/(?:spontan|ohne termin).{0,45}(?:vorbei|kommen)|(?:vorbei|kommen).{0,45}(?:spontan|ohne termin)|attachment.{0,20}(?:ab|locker|gelöst)/i.test(text)){
+  const attachment=/attachment/i.test(text);
+  const blocks=closurePeriodsSchema.safeParse(input.closures);
+  const closed=blocks.success&&blocks.data.some(p=>p.from<=appointmentLocalDate(receivedAt)&&appointmentLocalDate(receivedAt)<=p.through);
+  const walk=translated(closed?'walk_closed':'walk');
+  return labelMatch(attachment?'quality:attachment':'quality:walk_in',
+   [attachment?translated('attachment'):null,walk,book?translated(attachment?'aligner_link':'booking_link'):null].filter(Boolean).join(' '));
+ }
+ return null;
+}
+
+export function selfServiceReply(input:{
+ text:string;language:string;receivedAt:string;teamTime:string;doctolib:string|null;context:ChatContext;assigned:boolean;
+}):Outcome|null{
+ const {text,language,receivedAt,context}=input;
+ const now=Date.parse(receivedAt);
+ const fresh=(at:string)=>now-Date.parse(at)<=7*86_400_000&&Date.parse(at)<=now;
+ const requested=kindOf(text);
+ const book=renderWhatsAppRuleText('{doctolib_link}',input.doctolib);
+ const translated=(key:string)=>t(`animahost.quality.${key}`,language,{link:book??'',portal}).trim();
+ const handoff=(rule:string,key:string)=>labelMatch(rule,
+  translated(key)+' '+t('animahost.team.reply',language,{when:input.teamTime}),'klaerfall');
+ const journey=context.journey&&fresh(context.journey.at)?context.journey:null;
+ if(/geht.{0,15}auch ohne|ohne (?:das |ein )?portal|(?:also|auch) ohne\??$|without (?:it|the portal)/i.test(text)&&
+  journey?.kind==='portal')return labelMatch('quality:portal_alternative',translated('portal_alternative'));
+ if(journey?.kind==='appointment'&&/(?:doctolib|mail|profil|konto|rein)/i.test(text)&&noProgress.test(text)||
+   journey?.kind==='portal'&&/(?:portal|login|konto|rein|code)/i.test(text)&&noProgress.test(text)){
+  const next=Math.min(journey.step+1,3);
+  context.journey={kind:journey.kind,step:next,at:receivedAt};
+  if(next===2)return labelMatch(`quality:${journey.kind}:2`,translated(`${journey.kind}_2`));
+  return handoff(`quality:${journey.kind}:3`,input.assigned?`${journey.kind}_3`:`${journey.kind}_3_identify`);
+ }
+ if(requested==='appointment'||requested==='portal'){
+  context.journey={kind:requested,step:1,at:receivedAt};
+  return labelMatch(`quality:${requested}:1`,translated(`${requested}_1`));
+ }
+ return null;
+}
+
 export async function qualityWorkflow(db:Db,input:{
  tenantId:string;from:string;phone:string;receivedAt:string;text:string;language:string;teamTime:string;
  patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;
@@ -164,33 +207,13 @@ export async function qualityWorkflow(db:Db,input:{
   if(verified.error||!verified.data)return waiting({kind:'financial',patientId:patient.id,question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});
   return financial(patient,text);
  }
- const journey=context.journey&&fresh(context.journey.at)?context.journey:null;
- if(/geht.{0,15}auch ohne|ohne (?:das |ein )?portal|(?:also|auch) ohne\??$|without (?:it|the portal)/i.test(text)&&
-  journey?.kind==='portal')return labelMatch('quality:portal_alternative',translated('portal_alternative'));
- if(/(?:spontan|ohne termin).{0,45}(?:vorbei|kommen)|(?:vorbei|kommen).{0,45}(?:spontan|ohne termin)|attachment.{0,20}(?:ab|locker|gelöst)/i.test(text)){
-  const attachment=/attachment/i.test(text);
-  const blocks=closurePeriodsSchema.safeParse(input.closures);
-  const closed=blocks.success&&blocks.data.some(p=>p.from<=appointmentLocalDate(receivedAt)&&appointmentLocalDate(receivedAt)<=p.through);
-  const walk=translated(closed?'walk_closed':'walk');
-  return labelMatch(attachment?'quality:attachment':'quality:walk_in',
-   [attachment?translated('attachment'):null,walk,book?translated(attachment?'aligner_link':'booking_link'):null].filter(Boolean).join(' '));
- }
+ const visit=visitReply({text,language,receivedAt,doctolib:input.doctolib,closures:input.closures});
+ if(visit)return visit;
  if(/\b(?:mensch|menschen|human)\b/i.test(text)&&/(?:sprechen|mit|talk)/i.test(text))return handoff('quality:human','human');
  if(/\b(?:sauer|verärgert|beschwerde|furious|angry)\b/i.test(text))return handoff('quality:complaint','complaint');
  if(/spange.{0,35}(?:drückt|drueckt)|(?:drückt|drueckt).{0,30}spange/i.test(text)&&/früher|kurzfristig/i.test(text))
   return labelMatch('quality:appliance_visit',translated(book?'appliance_earlier':'appliance_no_link'));
  if(/bracket.{0,38}(?:ab|locker|gelöst)|(?:daughter|son).{0,30}brace.{0,20}loose/i.test(text)&&
   !/stark.{0,22}(?:schmerz|blut)|unfall/i.test(text))return labelMatch('quality:bracket',translated(book?'bracket_link':'bracket'));
- if(journey?.kind==='appointment'&&/(?:doctolib|mail|profil|konto|rein)/i.test(text)&&noProgress.test(text)||
-   journey?.kind==='portal'&&/(?:portal|login|konto|rein|code)/i.test(text)&&noProgress.test(text)){
-  const next=Math.min(journey.step+1,3);
-  context.journey={kind:journey.kind,step:next,at:receivedAt};
-  if(next===2)return labelMatch(`quality:${journey.kind}:2`,translated(`${journey.kind}_2`));
-  return handoff(`quality:${journey.kind}:3`,patient?`${journey.kind}_3`:`${journey.kind}_3_identify`);
- }
- if(requested==='appointment'||requested==='portal'){
-  context.journey={kind:requested,step:1,at:receivedAt};
-  return labelMatch(`quality:${requested}:1`,translated(`${requested}_1`));
- }
- return null;
+ return selfServiceReply({text,language,receivedAt,teamTime,doctolib:input.doctolib,context,assigned:Boolean(patient)});
 }

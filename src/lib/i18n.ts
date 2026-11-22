@@ -27,6 +27,8 @@ const translations: Record<string, { de: string; en: string; es?: string }> = {
   'animahost.late.notice.title': {de:'Rückfrage zu späterer Ankunft',en:'Later arrival needs a decision'},
   'animahost.late.notice.body': {de:'Bitte in den Nachrichten entscheiden, ob die spätere Ankunft für denselben Termin passt.',en:'Please use Messages to decide whether the later arrival works for the same appointment.'},
   'animahost.late.reminder.title': {de:'Erinnerung: spätere Ankunft noch offen',en:'Reminder: later arrival is still pending'},
+  'animahost.whatsapp.safety_ack': {de:'Danke für Ihre Nachricht. Das sieht sich unser Praxisteam persönlich an und meldet sich {when} bei Ihnen.',en:'Thank you for your message. Our practice team will look into it personally and get back to you {when}.',es:'Gracias por su mensaje. El equipo lo revisará personalmente y le responderá {when}.'},
+  'animahost.whatsapp.link_in_chat': {de:'Den Link finden Sie weiter oben im Chat.',en:'You’ll find the link earlier in this chat.',es:'Encontrará el enlace más arriba en este chat.'},
   'animahost.team.today': {de:'heute noch',en:'later today',es:'hoy mismo'},
   'animahost.team.onDay': {de:'am {day}',en:'on {day}',es:'el {day}'},
   'animahost.team.next': {de:'am nächsten Arbeitstag des Teams',en:'on the team’s next working day',es:'el próximo día de trabajo del equipo'},

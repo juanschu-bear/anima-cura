@@ -1,5 +1,6 @@
 import {generateText,Output} from 'ai';
 import {z} from 'zod';
+import {t} from '@/lib/i18n';
 import type {WhatsAppDecision} from './animahost-whatsapp';
 
 export const conversationHistorySchema=z.array(z.strictObject({
@@ -14,6 +15,42 @@ export function recentConversation(history:ConversationHistory,receivedAt:string
  return history.filter(item=>Date.parse(item.at)>=cutoff&&Date.parse(item.at)<=until)
   .sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)).slice(-20)
   .map(item=>({...item,text:item.text.replace(/https?:\/\/[^\s]+/gi,'[Link]')}));
+}
+
+// Context only resolves a real reference to the previous exchange. A standalone new topic needs no old messages.
+export function referenceHistory(text:string,history:ConversationHistory,receivedAt:string):ConversationHistory {
+ const value=text.trim();
+ const reference=/^(?:(?:ja|nein|okay|ok|also|yes|no|sí)\b[!,.: ]*)?(?:(?:aber|und|doch|but|pero)\s+)?(?:geht das|das (?:geht|klappt|funktioniert)|da komme ich|ich (?:komme|kann) (?:da |dort )|ich habe (?:aber )?kein profil|ohne (?:das|den|die)|wie (?:geht|mache ich) das|denn auch ohne|does that|without (?:it|that)|no me funciona)/i.test(value)||
+  /^(?:geht es wirklich|ich will aber|ich kann doch|ich kann nur|ich komme doch)\b/i.test(value)||
+  /^(?:nein,? |sorry,? )?(?:ich meinte|ich meine|da haben sie mich missverstanden|i meant|me refería)\b/i.test(value);
+ if(!reference)return [];
+ const at=Date.parse(receivedAt);
+ return history.filter(item=>at-Date.parse(item.at)<=30*60_000).slice(-2);
+}
+
+const normalizedReply=(value:string)=>value.normalize('NFC').replace(/\s+/g,' ').trim();
+const rawUrls=(value:string)=>value.match(/https:\/\/[^\s<>]+/g)??[];
+function canonicalUrl(value:string){
+ try{return new URL(value.replace(/[.,!?;)]$/,'')).href;}catch{return value;}
+}
+export function enforceConversationOutput(decision:WhatsAppDecision,history:ConversationHistory,language:string):WhatsAppDecision {
+ const sent=history.filter(item=>item.direction==='outgoing').sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));
+ const earlierLinks=new Set(sent.flatMap(item=>rawUrls(item.text).map(canonicalUrl)));
+ const used=new Set<string>();
+ let repeatsEarlier=false;
+ const singleLinks=decision.text.replace(/https:\/\/[^\s<>]+/g,url=>{
+  const id=canonicalUrl(url);
+  if(earlierLinks.has(id)){repeatsEarlier=true;return '';}
+  if(used.has(id))return '';
+  used.add(id);
+  return url;
+ }).replace(/ {2,}/g,' ').trim();
+ const prefix=singleLinks.replace(/:\s*$/,'').trim();
+ const text=repeatsEarlier?[prefix&&(/[.!?]$/.test(prefix)?prefix:prefix+'.'),t('animahost.whatsapp.link_in_chat',language)].filter(Boolean).join(' '):singleLinks;
+ const prior=sent.at(-1)?.text;
+ if(prior&&(normalizedReply(prior)===normalizedReply(text)||normalizedReply(prior)===normalizedReply(decision.text)))
+  return {action:decision.action==='notfall'?'notfall':'klaerfall',rule:'duplicate_reply_suppressed',text:''};
+ return {...decision,text};
 }
 
 const urls=(text:string)=>Array.from(new Set(text.match(/https:\/\/[^\s<>]+/g)??[])).map(url=>url.replace(/[.,!?;)]$/,'')).sort().join('\n');
@@ -39,14 +76,14 @@ export async function formulateConversationReply(input:{
   const drafted=await generateText({model,providerOptions:gatewayOptions,maxRetries:0,maxOutputTokens:440,
    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(Math.max(1,Math.min(4_000,input.deadline-Date.now()-900)))]),
    output:Output.object({schema:z.object({reply:z.string().min(1).max(1500)})}),
-   system:`Formuliere anhand der freigegebenen Antwort eine natürliche kurze WhatsApp-Antwort in der Sprache des Patienten, freundlich und konsequent in der angegebenen Anredeform. Greife dessen Anliegen oder Einwand in höchstens drei kurzen Sätzen auf. Beginne direkt mit der Antwort. Vermeide Anrede, Abschiedsgruß, Wiederholungen und unpassende Wünsche. Die freigegebene Antwort ist eine Faktenvorlage. Formuliere eigenständig und passe die Satzstruktur an den Verlauf an. Die ausdrücklich erlaubte Information darf sehr knapp, aber vollständig sein. Behalte sämtliche Fakten, Schritte und Grenzen bei. ${guard}`,
+   system:`Formuliere anhand der freigegebenen Antwort eine natürliche kurze WhatsApp-Antwort in der Sprache des Patienten, freundlich und konsequent in der angegebenen Anredeform. Greife dessen Anliegen oder Einwand in höchstens drei kurzen Sätzen auf. Das Thema ergibt sich nur aus der neuesten Nachricht. Der Verlauf erklärt ausschließlich Bezüge. Erkenne berechtigte Korrekturen an und beantworte dann die korrigierte Frage. Fasse mehrere aktuelle Anliegen zu einer widerspruchsfreien Antwort zusammen. Beginne direkt mit der Antwort. Vermeide Anrede, Abschiedsgruß, Wiederholungen und unpassende Wünsche. Die freigegebene Antwort ist eine Faktenvorlage. Formuliere eigenständig und passe die Satzstruktur an den Verlauf an. Die ausdrücklich erlaubte Information darf sehr knapp, aber vollständig sein. Behalte sämtliche Fakten, Schritte und Grenzen bei. ${guard}`,
    prompt:JSON.stringify(facts)});
   const candidate=drafted.output.reply.trim();
   if(candidate===decision.text||!withinReplyBounds(candidate,decision.text)||input.deadline-Date.now()<500)return decision;
   const checked=await generateText({model,providerOptions:gatewayOptions,maxRetries:0,maxOutputTokens:350,
    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(Math.max(1,Math.min(3_200,input.deadline-Date.now())))]),
    output:Output.object({schema:z.object({violations:z.array(z.enum([
-    'extra_commitment','missing_instruction','unsafe_advice','private_data','wrong_fact','wrong_language',
+    'extra_commitment','missing_instruction','unsafe_advice','private_data','wrong_fact','wrong_language','unrelated_topic',
    ])).max(6)})}),
    system:`Prüfe die vorgeschlagene Nachricht unabhängig gegen die Faktenvorlage. Gib nur konkrete Verstöße zurück, sonst violations=[]. Eine freundlichere Wortwahl oder ein sparsamer Bezug auf das Anliegen aus der aktuellen Nachricht sind erlaubt. Prüfe den Inhalt statt den genauen Wortlaut. Bei Deutsch gilt die angegebene Anredeform Du oder Sie. Die ausdrücklich erlaubte spätere Ankunft zum selben Termin ist keine Änderung im Kalender. Sichere Alternativformulierungen sind gültig, wenn alle wesentlichen Fakten, nächsten Schritte und die Wartezeit oder Rückfrage, falls vorgesehen, erhalten bleiben. ${guard}`,
    prompt:JSON.stringify({...facts,proposed:candidate})});
