@@ -1,6 +1,11 @@
 export type Lang = "de" | "en" | "es";
 
 const dict: Record<string, Record<Lang, string>> = {
+  "invoice.pdfDocument": {de:"Rechnung als PDF",en:"Invoice PDF",es:"Factura en PDF"},
+  "invoice.showPdf": {de:"PDF anzeigen ›",en:"Show PDF ›",es:"Ver PDF ›"},
+  "invoice.amountUnknown": {de:"Betrag siehe PDF",en:"See PDF for amount",es:"Importe en el PDF"},
+  "invoice.unavailable": {de:"Belege gerade nicht vollständig verfügbar. Bitte lade sie erneut.",en:"Invoice documents are not fully available right now. Please try loading them again.",es:"Los documentos no están disponibles por completo. Vuelve a cargarlos."},
+  "invoice.retry": {de:"Erneut laden",en:"Try again",es:"Volver a cargar"},
   // Header & Navigation
   "nav.start": { de: "Start", en: "Home", es: "Inicio" },
   "nav.journey": { de: "Verlauf", en: "Journey", es: "Progreso" },

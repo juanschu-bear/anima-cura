@@ -71,3 +71,11 @@ Dauerhafte lokale/CI-Prüfung: `node scripts/test-patient-invoice-authenticated.
 ## Bereitstellung bestätigt
 
 `20860ef` ist auf main und laut Vercel erfolgreich in Production bereitgestellt. Damit sind die oben ergänzten Verfügbarkeitsfelder und die interne Health-Route live im veröffentlichten Code. Die vorher bereits veröffentlichten Upload-/Zahlungsstatus bleiben erhalten. Die SQL-Audit-Ergänzung 100 ist davon unabhängig und noch einzuspielen. Der neue PostgreSQL-Test ist auch in GitHub Actions grün; der gesamte Production-Verify-Lauf scheitert derzeit an zwei anderen Live-RPC-Signaturen, siehe Reparaturbericht.
+
+## Ergänzung: Browserabsturz und Rückkehr nach Anmeldung
+
+Die Patientenoberfläche verarbeitet jetzt auch den vollständigen Upload-Vertrag: `beleg.quartal`, `beleg.art` und `betrag` dürfen `null` sein. Sie zeigt den Upload-Namen, „Betrag siehe PDF“ und den PDF-Zugriff ohne erfundene 0-Euro-Beträge oder Krankenkassen-Zuordnung. API-Felder kommen durch diese Korrektur nicht hinzu und entfallen nicht.
+
+Die Ansicht berücksichtigt `belegeStatus`, `hochgeladeneRechnungenStatus` und `zahlungsdatenStatus`; fehlgeschlagene HTTP-/Netzwerk-/JSON-Abrufe zeigen einen Hinweis und erneutes Laden. Verfügbare Teilbestände bleiben sichtbar. `section=rechnungen` übersteht die Anmeldung; das ältere `section=invoices` öffnet ebenfalls „Rechnungen“. `section=documents` öffnet weiterhin „Dokumente“.
+
+Dauerhafter Browser-Test: `npm run test:patient-portal-ui` (Chromium). Er prüft die echten React-Komponenten mit synthetischen Antworten, einschließlich PDF-Link, Nullwerten, wiederhergestelltem Tab, Ausfällen/Retry, Login-Ausnahmen und Rückweg von der Fehlerseite. Er ersetzt keine Prüfung einer echten Patientensitzung gegen Production. GitHub Actions führt ihn bei jedem Push auf main aus. Die Veröffentlichung dieser Ergänzung ist am zugehörigen Commit/Deployment zu prüfen.

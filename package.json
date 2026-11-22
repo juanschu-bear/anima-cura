@@ -55,7 +55,8 @@
     "repair:patient-duplicates": "tsx scripts/repair-patient-duplicates.ts",
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",
     "cron:reports": "tsx src/lib/services/report-generator.ts",
-    "test:scribe-workspace": "tsx --test src/lib/services/__tests__/scribe-workspace.test.ts"
+    "test:scribe-workspace": "tsx --test src/lib/services/__tests__/scribe-workspace.test.ts",
+    "test:patient-portal-ui": "node scripts/test-patient-portal-ui.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.150",

@@ -9,6 +9,12 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string; es?: string }> = {
   ...referenceTranslations,
+  "patientLogin.connectionError": {de:"Die Anmeldung konnte gerade nicht abgeschlossen werden. Bitte versuche es erneut.",en:"We could not complete sign-in. Please try again."},
+  "patientError.title": {de:"Diese Seite konnte nicht angezeigt werden",en:"This page could not be displayed"},
+  "patientError.body": {de:"Bitte lade die Seite erneut. Wenn der Fehler wieder auftritt, kannst du zur Startseite deines Portals zurückkehren oder die Praxis kontaktieren.",en:"Please reload this page. If the problem happens again, return to your portal home or contact the practice."},
+  "patientError.retry": {de:"Seite neu laden",en:"Reload page"},
+  "patientError.home": {de:"Zur Portal-Startseite",en:"Back to portal home"},
+  "patientError.contact": {de:"Praxis kontaktieren",en:"Contact the practice"},
   'animahost.late.accept_time': {de:'Kein Problem, dann sehen wir uns um {arrival} Uhr.',en:'No problem. We’ll see you at {arrival}.',es:'No hay problema. Nos vemos a las {arrival}.'},
   'animahost.late.accept_minutes': {de:'Kein Problem, Sie können {minutes} Minuten später kommen.',en:'No problem. You can come {minutes} minutes later.',es:'No hay problema. Puede llegar {minutes} minutos más tarde.'},
   'animahost.late.wait_time': {de:'Sie können um {arrival} Uhr kommen. Es kann sein, dass Sie etwas warten müssen.',en:'You can come at {arrival}. There may be a short wait.',es:'Puede llegar a las {arrival}. Es posible que tenga que esperar un poco.'},

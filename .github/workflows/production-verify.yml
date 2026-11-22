@@ -32,6 +32,12 @@ jobs:
       - name: Verify authenticated invoice access in PostgreSQL
         run: node scripts/test-patient-invoice-authenticated.mjs
 
+      - name: Install Chromium for patient browser regression tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify patient portal and login in browser
+        run: npm run test:patient-portal-ui
+
       - name: Tests
         run: npm run test
 

@@ -1,7 +1,7 @@
 const PATIENT_PORTAL_PATH = "/patient/portal";
 const SAFE_ORIGIN = "https://animacura.local";
 const DOCUMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ALLOWED_SECTIONS = new Set(["documents", "invoices"]);
+const ALLOWED_SECTIONS = new Set(["documents", "invoices", "rechnungen"]);
 
 type PortalTargetInput = {
   document?: string | null;

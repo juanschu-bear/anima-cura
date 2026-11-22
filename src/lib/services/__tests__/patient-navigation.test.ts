@@ -23,3 +23,8 @@ test("rejects external and lookalike redirect targets", () => {
   assert.equal(safePatientTarget("//example.com/patient/portal"), "/patient/portal");
   assert.equal(safePatientTarget("/patient/portal-malicious"), "/patient/portal");
 });
+
+
+test("invoice notification target survives patient login", () => {
+  assert.equal(safePatientTarget("/patient/portal?section=rechnungen"), "/patient/portal?section=rechnungen");
+});

@@ -190,56 +190,68 @@ export default function PatientLoginForm() {
     setLoading(true);
     setError("");
 
-    const supabase = createBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInError) {
-      setError("E-Mail oder Passwort ist falsch.");
-      setLoading(false);
-      return;
-    }
-
-    // Verify this is a patient account
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (isPatientAuthUser(user)) {
-      router.replace(target);
-      router.refresh();
-      return;
-    }
-
-    if (user) {
-      const repairResponse = await fetch("/api/patient/repair-access", {
-        method: "POST",
+    try {
+      const supabase = createBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
 
-      if (repairResponse.ok) {
+      if (signInError) {
+        setError("E-Mail oder Passwort ist falsch.");
+        setLoading(false);
+        return;
+      }
+
+      // Verify this is a patient account
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setError(t("patientLogin.connectionError"));
+        return;
+      }
+
+      if (isPatientAuthUser(user)) {
         router.replace(target);
         router.refresh();
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("role, patient_id")
-        .eq("id", user.id)
-        .maybeSingle();
+      if (user) {
+        const repairResponse = await fetch("/api/patient/repair-access", {
+          method: "POST",
+        });
 
-      if (!profile || profile.role !== "patient" || !profile.patient_id) {
-        await supabase.auth.signOut();
-        setError("Dieses Konto ist kein Patienten-Zugang.");
-        setLoading(false);
-        return;
+        if (repairResponse.ok) {
+          router.replace(target);
+          router.refresh();
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("role, patient_id")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!profile || profile.role !== "patient" || !profile.patient_id) {
+          await supabase.auth.signOut();
+          setError("Dieses Konto ist kein Patienten-Zugang.");
+          setLoading(false);
+          return;
+        }
       }
-    }
 
-    router.replace(target);
-    router.refresh();
+      router.replace(target);
+      router.refresh();
+    } catch {
+      setError(t("patientLogin.connectionError"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function openRecovery() {
