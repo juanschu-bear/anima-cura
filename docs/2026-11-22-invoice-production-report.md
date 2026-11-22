@@ -31,3 +31,15 @@ Gefundene Ursache: Der bisherige Nachfassplaner startete ausschließlich aus tat
 Nachgewiesen im lokalen Datenbanktest: 325 synthetische Rechnungen / 181 Personen werden einmalig aufgenommen; ein zweiter Lauf legt keinen Doppelauftrag an. Tests für Versand, PDF-Prüffehler und Stopp bei Öffnung/Zahlung/Abmeldung/manuellem Stopp bestehen. Das ist ein Code-Nachweis, noch kein Nachweis über 325 angelegte Produktionsaufträge.
 
 Produktionsabnahme: Der nächste tägliche Worker meldet `followupPlanning.initial` mit Kandidaten, neu geplanten und bereits erfassten Aufträgen. Die lesende Abfrage schlüsselt jede aktuell noch unbenachrichtigte Rechnung nach Auftrag/Prüfgrund/Stopp auf. Keine unerklärten `not_in_worker`-Fälle dürfen übrig bleiben. Versandannahme, Prüfbedarf und Stopp getrennt berichten. Die eine nachträglich korrekt zugeordnete Rechnung wird anschließend ebenfalls automatisch erfasst, sofern noch kein Versandnachweis besteht.
+
+## Bestätigte Übergabe an Claude
+
+Juan hat am 22.11.2026 bestätigt: „Claude führt den ergänzenden Abgleich aus“. Die ausschließlich lesende Datei liegt in `anima-leitstand/docs/2026-11-22-invoice-reconciliation-readonly.sql` auf `main`. Keine neue Migration und keine erneute Installation von 030/031 erforderlich.
+
+Rückmeldung ohne Patientennamen oder Zugangsdaten:
+
+1. Die konkrete Belegreferenz und der nachgewiesene Grund für die Differenz 1.947/1.946; Payload-Zählung, tatsächlichen Versand und aktuelle Sichtbarkeit getrennt ausweisen.
+2. Für die offene Rechnung: `part_id`, `batch_id`, aktuelle `revision`, Kandidaten-ID, `candidate_count` und die drei Identitätsprüfungen. Noch keine Zuordnung allein aus einem Kandidaten ableiten.
+3. Nach dem regulären Worker-Lauf: `followupPlanning.initial` und die Gruppierung nach `worker_state`, `initial_delivery`, `reason`, Rechnungs- und Personenzahl. Insbesondere alle `not_in_worker`-Fälle erklären; Versand, Prüfung und Stopp nicht zusammenzählen.
+
+Diese Bestätigung dokumentiert den Auftrag zum Abgleich. Ergebnisse, abgeschlossene Zuordnung und tatsächliche Produktionsaufnahme bleiben bis zur Rückmeldung offen.
