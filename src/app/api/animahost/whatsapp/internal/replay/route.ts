@@ -26,6 +26,8 @@ const bodySchema=z.strictObject({
  phone:z.string().regex(/^[1-9][0-9]{7,14}$/).nullable(),
  text:z.string().trim().min(1).max(4000),
  history:conversationHistorySchema,
+ /** Wann die Nachricht damals kam. Danach richten sich „heute“ und die Zeit, zu der das Team antwortet. */
+ at:z.string().datetime({offset:true}).optional(),
 });
 
 function authorized(header:string|null){
@@ -51,7 +53,7 @@ export async function POST(request:NextRequest){
   if(version.error||!rules.success)return NextResponse.json({code:'rulebook_unavailable'},{status:503,headers});
   const patients=input.phone?await phonePatients(db,input.phone).catch(()=>null)??[]:[];
   const confirmed=await db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid);
-  const now=new Date().toISOString();
+  const now=input.at??new Date().toISOString();
   const language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text)?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text)?'es':'de';
   const dossier=await loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)});
