@@ -190,3 +190,13 @@ test('Ein nur anders geschriebenes Datum gilt nicht als erfunden, ein neues scho
  assert.deepEqual(guardReply('Dann kommen Sie bitte am 15. Oktober.',said,flags,sources),['datum_nicht_in_quellen']);
  assert.deepEqual(guardReply('Dann kommen Sie bitte am 4.11.',said,flags,sources),['datum_nicht_in_quellen']);
 });
+
+test('Die Kette gibt dem Modell die Schreibweise der Praxis mit: kurz, ohne Gruß und ohne Unterschrift',async()=>{
+ const prompts:string[]=[],answers:unknown[]=[draft('Wir sind Dienstag bis Donnerstag für Sie da.'),fine];
+ const generate:Generate=async call=>{prompts.push(call.prompt);return answers.shift() as never;};
+ const result=await runChain(generate,input({message:'Wann haben Sie geöffnet?'}));
+ assert.equal(result.ok,true);
+ const sent=JSON.parse(prompts[0]);
+ assert.match(sent.schreibweise.laenge,/10 bis 30 Wörter/);
+ assert.match(sent.schreibweise.ende,/keine Unterschrift/);
+});

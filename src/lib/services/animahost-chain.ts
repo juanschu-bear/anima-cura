@@ -1,3 +1,4 @@
+import {PRACTICE_STYLE} from './animahost-practice-style';
 import {z} from 'zod';
 import {emergencyDecision,explicitOptOut,renderWhatsAppRuleText,safeRuleText,type WhatsAppRule} from './animahost-whatsapp';
 import type {ConversationHistory} from './animahost-whatsapp-conversation';
@@ -49,7 +50,8 @@ So gehst du vor:
    - identitaet: Es geht um Vertrauliches (Rechnungsdetails, Zahlungen, Mahnung, Besuche) und für die betroffene Person steht kein Block "vertraulich" in der Akte. Dann bittest du um Vor- und Nachnamen und Geburtsdatum des Patienten.
    - team: Weder Regeln noch Akte reichen. Das Team klärt es.
    - gespraech: Dank, Gruß, Bestätigung oder Ärger ohne Frage. Eine kurze menschliche Reaktion genügt.
-3. Schreibe 1 Antwort, wie ein aufmerksamer Mensch am Empfang sie schreiben würde: Geh konkret auf das Geschriebene ein, beantworte alle Anliegen in einer sinnvollen Reihenfolge, 2 bis 6 kurze Sätze, ohne Floskeln, ohne Aufzählungszeichen, ohne Emojis.
+3. Schreibe 1 Antwort, wie ein aufmerksamer Mensch am Empfang dieser Praxis sie schreiben würde: Geh konkret auf das Geschriebene ein und beantworte alle Anliegen in einer sinnvollen Reihenfolge.
+   "schreibweise" sagt dir, wie diese Praxis schreibt. Halte dich daran: Länge, Beginn, Ende und Ton. Ohne Aufzählungszeichen.
 
 Feste Grenzen:
 - Tatsachen stammen nur aus den Regeln, der Akte, dem Verlauf und der Nachricht. Erfinde nichts: keine Uhrzeiten, Daten, Preise, Abläufe oder Zusagen. Steht etwas nicht in den Quellen, sag ehrlich, dass das Team es klärt.
@@ -149,7 +151,7 @@ export async function runChain(generate:Generate,input:ChainInput):Promise<Chain
  const sources={ruleTexts:rules.map(rule=>rule.aussage),facts,names};
  const base={neuesteNachricht:input.message,verlauf:input.history.map(item=>({von:item.direction==='incoming'?'Patient':'Praxis',am:item.at,text:item.text})),
   akte,regeln:rules,heute:input.practice.today,rueckmeldezeitTeam:input.practice.teamTime,telefonPraxis:input.practice.phone,
-  anrede:input.informal?'Du':'Sie',sprache:input.language,vorgabe:input.baseline?.text??null};
+  anrede:input.informal?'Du':'Sie',sprache:input.language,schreibweise:PRACTICE_STYLE,vorgabe:input.baseline?.text??null};
  let attempts=0,violations:string[]=[],previous:z.infer<typeof composed>|null=null;
  while(attempts<2){
   if(left()<6_000)return {ok:false,reason:attempts?'rejected':'no_time',violations,ms:ms()};
