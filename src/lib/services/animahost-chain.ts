@@ -151,7 +151,7 @@ export async function runChain(generate:Generate,input:ChainInput):Promise<Chain
   attempts+=1;
   let draft:z.infer<typeof composed>;
   try{
-   draft=await generate({system:SYSTEM,schema:composed,maxOutputTokens:2000,temperature:0.4,timeoutMs:Math.min(14_000,Math.max(2_500,left()-3_500)),
+   draft=await generate({system:SYSTEM,schema:composed,maxOutputTokens:2000,temperature:0.4,timeoutMs:Math.min(Math.max(14_000,input.budgetMs*0.55),Math.max(2_500,left()-3_500)),
     prompt:JSON.stringify(previous?{...base,vorherigerEntwurf:previous.antwort,beanstandet:violations,auftrag:'Schreibe die Antwort neu und behebe genau die beanstandeten Punkte.'}:base)});
   }catch{return {ok:false,reason:'model_failed',violations,ms:ms()};}
   const reply=draft.antwort.trim();
@@ -160,7 +160,7 @@ export async function runChain(generate:Generate,input:ChainInput):Promise<Chain
   if(!violations.length){
    if(left()<2_500)return {ok:false,reason:'no_time',violations,ms:ms()};
    try{
-    const verdict=await generate({system:VERIFY,schema:checked,maxOutputTokens:600,temperature:0,timeoutMs:Math.min(9_000,Math.max(2_000,left()-500)),
+    const verdict=await generate({system:VERIFY,schema:checked,maxOutputTokens:600,temperature:0,timeoutMs:Math.min(Math.max(9_000,input.budgetMs*0.3),Math.max(2_000,left()-500)),
      prompt:JSON.stringify({...base,vorgeschlageneAntwort:reply,gibtAnsTeam:flags.team})});
     violations=verdict.verstoesse;
    }catch{return {ok:false,reason:'model_failed',violations,ms:ms()};}
