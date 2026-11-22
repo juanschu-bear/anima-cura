@@ -9,7 +9,7 @@ import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 import {loadDossier} from '@/lib/services/animahost-dossier';
 import {runChain} from '@/lib/services/animahost-chain';
-import {gatewayGenerate} from '@/lib/services/animahost-chain-model';
+import {gatewayGenerate,type ModelCall} from '@/lib/services/animahost-chain-model';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -57,14 +57,14 @@ export async function POST(request:NextRequest){
   const language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text)?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text)?'es':'de';
   const dossier=await loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)});
-  const failures:string[]=[];
-  const result=await runChain(gatewayGenerate(practice.model,request.signal,detail=>failures.push(detail)),{
+  const calls:ModelCall[]=[];
+  const result=await runChain(gatewayGenerate(practice.model,request.signal,call=>calls.push(call)),{
    message:maskBirthDates(input.text),language,informal:false,
    history:input.history.map(item=>({...item,text:maskBirthDates(item.text)})),dossier,rules:rules.data,
    practice:{doctolibUrl:practice.doctolib_url,phone:practice.practice_phone,today:appointmentLocalDate(now),
     teamTime:teamReplyTime(now,practice.team_reply_days,practice.closure_periods,language)},
    baseline:null,budgetMs:45_000});
   return NextResponse.json({result,file:{sender:dossier.sender,patients:dossier.patients.length,confirmed:dossier.patients.filter(patient=>patient.verified).length},
-   model:practice.model,failures,ms:Date.now()-started},{headers});
+   model:practice.model,calls,ms:Date.now()-started},{headers});
  }catch{return NextResponse.json({code:'replay_unavailable'},{status:503,headers});}
 }
