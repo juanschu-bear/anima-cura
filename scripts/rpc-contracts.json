@@ -409,7 +409,7 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "026a654777fae0eed4afcb02fb5e4fda5634a70fe584fcb76c60239ed66f3dfc",
+      "sha256": "96f12a405a1396a325fdbbdf60dd40e3cd51dc5786c1aaeb69e2c0bd8a38f7d4",
       "proof": "Verified cookie/JWT through createServerComponentClient and auth.getUser; authoritative patient profile required, never repaired from user metadata. Imported invoice and edition RPCs use only this authenticated session. Migration 099 scopes both with invoice_portal_jwt_uid and invoice_portal_patient_scope under the restricted definer. Public payment/upload queries use a separate service client, scoped to the verified profile and stored memberships; technical failures produce unavailable status. The service client records anonymous operational failures only and never retries an imported module RPC. No patient ID is accepted from the browser.",
       "calls": [
         {

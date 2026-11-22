@@ -9,6 +9,10 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string; es?: string }> = {
   ...referenceTranslations,
+  'invoiceRecord.unmatched': {de:'Diese Kurzfassungen sind keine vollständigen Rechnungen. Die Zuordnung zum vollständigen Beleg ist noch offen.',en:'These summaries are not complete invoices. Their association with the complete invoice is still unresolved.'},
+  'invoiceRecord.history': {de:'Frühere Fassungen',en:'Previous versions'},
+  'invoiceRecord.summary': {de:'Frühere Kurzfassung öffnen',en:'Open previous summary'},
+  'invoiceRecord.difference': {de:'Betrag weicht vom vollständigen Beleg ab',en:'Amount differs from the complete invoice'},
   'invoiceFollowup.unsubscribeTitle': {de:'Rechnungserinnerungen abbestellen',en:'Unsubscribe from invoice reminders'},
   'invoiceFollowup.unsubscribeBody': {de:'Wenn du bestätigst, erhältst du keine weiteren Rechnungserinnerungen an diese E-Mail-Adresse.',en:'Confirm to stop further invoice reminders to this email address.'},
   'invoiceFollowup.unsubscribeButton': {de:'Erinnerungen abbestellen',en:'Unsubscribe from reminders'},

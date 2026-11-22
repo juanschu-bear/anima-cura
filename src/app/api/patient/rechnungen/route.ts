@@ -1,3 +1,4 @@
+import {GET as invoiceRecordRead} from '@/app/api/rechnungsakte/route';
 import {patientInvoiceAvailability} from "@/lib/patient-invoice-availability";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
@@ -21,7 +22,7 @@ export async function GET() {
 
   const { data: memberships,error:membershipsError } = await supabase.from("patient_access_memberships").select("patient_id").eq("user_id", user.id);
   const patientIds = Array.from(new Set([patient.patientId, ...(memberships ?? []).map(row => row.patient_id)]));
-  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult, immediateResult] = await Promise.all([
+  const [postenResult, patientResult, directDebitResult, documentsResult, editionsResult, immediateResult, shared] = await Promise.all([
     supabase
       .from("offene_posten")
       .select("id, patient_id, typ, rechnung_datum, rechnung_nr, unser_zeichen, betrag, offen, gezahlt, status, bezahlt_am, mahnung_datum")
@@ -45,6 +46,7 @@ export async function GET() {
     session.rpc("patient_invoice_document_editions"),
     loadPatientImmediateInvoices(patientIds).then(items => ({items,status:"available" as const}))
       .catch(() => ({items:[],status:"unavailable" as const})),
+    invoiceRecordRead(new Request('https://animacura.io/api/rechnungsakte')).then(async response=>response.ok?await response.json():null).catch(()=>null),
   ]);
 
   const { data: posten, error } = postenResult;
@@ -74,11 +76,13 @@ export async function GET() {
   ));
 
   const editions=new Map<string,{delivered:"original"|"typeset";typesetAvailable:boolean}>(!editionsResult.error&&Array.isArray(editionsResult.data)?editionsResult.data.map((e:{id:string;delivered:"original"|"typeset";typesetAvailable:boolean})=>[e.id,{delivered:e.delivered,typesetAvailable:e.typesetAvailable}]):[]);
-  const documents:PatientInvoiceDocument[]=documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)}));
+  const historicalIds=new Set<string>([...(shared?.records??[]).flatMap((r:any)=>r.history.map((h:any)=>h.documentId)),...(shared?.unmatchedHistory??[]).map((h:any)=>h.id)]);
+  const commonDocuments:PatientInvoiceDocument[]|null=shared?.records?.map((r:any)=>({id:r.id,patientId:r.patientId,invoiceNumber:r.invoiceNumber,date:r.date,reference:r.reference??null,quarter:r.quarter,art:r.art,patientCents:r.amountCents,grossCents:r.amountCents,linkedOpenItemId:r.payment?.openItemId??null,positions:r.positions,reasons:r.reasons}));
+  const documents:PatientInvoiceDocument[]=commonDocuments??(documentsResult.error?[]:((documentsResult.data??[]) as PatientInvoiceDocument[]).map(d=>({...d,edition:editions.get(d.id)})));
   const uploads=await loadUploadedPatientInvoices(supabase,patientIds,new Set(documents.map(d=>d.id)))
     .then(items=>({items,status:"available" as const}))
     .catch(()=>({items:[],status:"unavailable" as const}));
-  const availability=patientInvoiceAvailability({documents:documentsResult.error,editions:editionsResult.error,memberships:membershipsError});
+  const availability=patientInvoiceAvailability({documents:commonDocuments?null:documentsResult.error,editions:commonDocuments?null:editionsResult.error,memberships:membershipsError});
   if(availability.status==="unavailable"){
     // Operational evidence only: no patient, invoice, JWT or database error text.
     const recorded=await supabase.from("audit_log").insert({id:crypto.randomUUID(),tabelle:"patient_invoice_read",
@@ -87,7 +91,10 @@ export async function GET() {
   }
   return NextResponse.json({
     belegVerfuegbarkeit:availability,
-    rechnungen: [...attachPatientInvoiceDocuments(guided, documents),...uploads.items],
+    rechnungen: [...attachPatientInvoiceDocuments(guided, documents).map((r:any)=>shared&&r.beleg?{...r,...((payment:any)=>payment?{betrag:payment.amountCents===null?null:payment.amountCents/100,offen:payment.openCents===null?null:payment.openCents/100,gezahlt:payment.paidCents===null?null:payment.paidCents/100,status:payment.status,paymentStatusKnown:[payment.amountCents,payment.openCents,payment.paidCents].every(Number.isFinite)}:{})(shared.records.find((a:any)=>a.id===r.beleg.id)?.payment),beleg:{...r.beleg,history:(shared.records.find((a:any)=>a.id===r.beleg.id)?.history??[]).map((h:any)=>({...h,pdfUrl:`/api/rechnungsakte?historyId=${h.documentId}`})),pdfUrl:`/api/rechnungsakte?documentId=${r.beleg.id}`}}:r),...uploads.items.filter(r=>!historicalIds.has(r.id))],
+    rechnungsaktenStatus:shared?'available':'unavailable',
+    rechnungsakten:shared?.records??[],
+    rechnungsverlaufOhneZuordnung:shared?.unmatchedHistory??[],
     hochgeladeneRechnungenStatus: uploads.status,
     zahlungsdatenStatus: paymentUnavailable?"unavailable":"available",
     sofortrechnungen: immediateResult.items,

@@ -18,7 +18,7 @@ const upload = {
 };
 const structured = {
   ...upload, id: `${id}-structured`, source: undefined, betrag: 123.45, rechnung_nr: 'TEST-1',
-  beleg: { ...upload.beleg, positionen:[{datum:'2026-09-30',nr:'TEST',text:'Kontrolle',region:null,anzahl:1,anzahlText:'1',punkte:null,faktor:null,eur:123.45,abschnitt:'Test',tarif:'BEMA',begruendungen:[]}], art: 'BEMA', quartal: '2026-Q3', pdfUrl: `/api/patient/rechnungen/${id}/pdf` },
+  beleg: { ...upload.beleg, history:[{documentId:'history',pdfUrl:'/api/rechnungsakte?historyId=history',comparison:'different'}], positionen:[{datum:'2026-09-30',nr:'TEST',text:'Kontrolle',region:null,anzahl:1,anzahlText:'1',punkte:null,faktor:null,eur:123.45,abschnitt:'Test',tarif:'BEMA',begruendungen:[]}], art: 'BEMA', quartal: '2026-Q3', pdfUrl: `/api/patient/rechnungen/${id}/pdf` },
 };
 const available = {
   rechnungen: [upload], belegeStatus: 'available', hochgeladeneRechnungenStatus: 'available',
@@ -140,6 +140,19 @@ try {
     await invoices.getByRole('button', { name: 'Positionen und PDF' }).click();
     assert.deepEqual((await event).postDataJSON(),{event:'invoice_opened',documentId:id});
     await invoices.getByText('Quartal 3/2026', { exact: false }).waitFor();
+    await invoices.getByText('Frühere Fassungen',{exact:true}).click();
+    await invoices.getByRole('link',{name:'Frühere Kurzfassung öffnen'}).waitFor();
+    await invoices.getByText('Betrag weicht vom vollständigen Beleg ab',{exact:false}).waitFor();
+  });
+  await test('unmatched historical summary stays in history, never an invoice card', async page => {
+    await page.route('**/api/patient/rechnungen', route => route.fulfill({json:{...available,rechnungen:[],rechnungsverlaufOhneZuordnung:[{id:'history',patient_id:id}]}}));
+    await page.goto(`${origin}/patient/portal?section=rechnungen`);
+    const invoices=page.locator('#portal-rechnungen');
+    await invoices.getByText('Frühere Fassungen',{exact:true}).click();
+    const link=invoices.getByRole('link',{name:'Frühere Kurzfassung öffnen'});
+    await link.waitFor();
+    assert.equal(await link.getAttribute('href'),'/api/rechnungsakte?historyId=history');
+    assert.equal(await invoices.getByRole('button',{name:'Positionen und PDF'}).count(),0);
   });
   for (const failure of ['belegeStatus', 'hochgeladeneRechnungenStatus', 'zahlungsdatenStatus', 'http', 'network', 'json']) {
     await test(`visible invoice failure and retry: ${failure}`, async page => {

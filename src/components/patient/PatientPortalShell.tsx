@@ -35,7 +35,7 @@ interface Tipp { id: string; titel: string; text: string }
 interface Zahlung { id: string; rate_nummer: number; betrag: number; faellig_am: string; bezahlt_am: string; status?: string; mahnstufe?: number }
 interface BelegPosition { datum: string | null; nr: string | null; text: string; region: string | null; anzahl: number; anzahlText: string; punkte: number | null; faktor: number | null; eur: number | null; abschnitt: string; tarif: string; begruendungen: string[] }
 /** Originalrechnung aus der Praxisabrechnung (Vertrag: Leitstand docs/2026-11-06-invoice-startbestand-contract.md). */
-interface Beleg { id: string; quartal: string | null; art: "BEMA" | "GOZ" | null; pdf: true; pdfUrl: string; positionen: BelegPosition[]; begruendungen: { key: string; text: string }[] }
+interface Beleg { history?: { documentId: string; pdfUrl: string; comparison: string }[]; id: string; quartal: string | null; art: "BEMA" | "GOZ" | null; pdf: true; pdfUrl: string; positionen: BelegPosition[]; begruendungen: { key: string; text: string }[] }
 interface Rechnung { source?: "patient_upload"; name?: string; documentType?: string | null; uploadedAt?: string | null; id: string; patientId?: string | null; typ: string | null; rechnung_datum: string | null; rechnung_nr: string | null; unser_zeichen: string | null; betrag: number | null; offen: number; gezahlt: number; status: string; bezahlt_am: string | null; mahnung_datum: string | null; guthaben_angerechnet: number; zahlbetrag: number; einzugsbetrag: number; zahlungsmodus: "paid" | "credit" | "direct_debit" | "manual"; manuelle_zahlung_erlaubt: boolean; beleg?: Beleg | null; paymentStatusKnown?: boolean; paymentActionAllowed?: boolean }
 type Tab = "home" | "journey" | "progress" | "chat" | "more";
 
@@ -100,6 +100,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tipps, setTipps] = useState<Tipp[]>([]);
   const [pays, setPays] = useState<Zahlung[]>([]);
+  const [rechnungsverlauf, setRechnungsverlauf] = useState<{id:string;patient_id:string}[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   // Verfügbarkeit (Codex' Vertrag 22.11.2026): Eine Störung darf nie wie „keine Rechnungen“ aussehen.
   const [rechnungsStand, setRechnungsStand] = useState<{ fehler: boolean; belege: boolean; hochgeladen: boolean; zahlungen: boolean }>({ fehler: false, belege: true, hochgeladen: true, zahlungen: true });
@@ -264,8 +265,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   };
 
   // Antwort von /api/patient/rechnungen übernehmen. null oder ohne Liste heißt: nicht ladbar, nie „keine Rechnungen“.
-  const uebernehmeRechnungen = useCallback((j: { rechnungen?: unknown; belegeStatus?: unknown; hochgeladeneRechnungenStatus?: unknown; zahlungsdatenStatus?: unknown } | null) => {
-    if (!j || !Array.isArray(j.rechnungen)) { setRechnungen([]); setRechnungsStand({ fehler: true, belege: true, hochgeladen: true, zahlungen: true }); return; }
+  const uebernehmeRechnungen = useCallback((j: { rechnungen?: unknown; rechnungsverlaufOhneZuordnung?: unknown; belegeStatus?: unknown; hochgeladeneRechnungenStatus?: unknown; zahlungsdatenStatus?: unknown } | null) => {
+    if (!j || !Array.isArray(j.rechnungen)) { setRechnungen([]); setRechnungsverlauf([]); setRechnungsStand({ fehler: true, belege: true, hochgeladen: true, zahlungen: true }); return; }
+    setRechnungsverlauf(Array.isArray(j.rechnungsverlaufOhneZuordnung)?j.rechnungsverlaufOhneZuordnung:[]);
     setRechnungen(j.rechnungen as Rechnung[]); setRechnungsStand(rechnungsStandAus(j));
   }, []);
   // Frisch laden: beim Öffnen aus der Benachrichtigung, über den Link und mit „Erneut laden“.
@@ -620,6 +622,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         <a href={b.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ justifySelf: "start", borderRadius: 999, padding: "10px 16px", background: grn, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
           {L("Rechnung als PDF", "Invoice as PDF", "Factura en PDF")}
         </a>
+        {!!b.history?.length && <details style={{fontSize:12,color:muted}}><summary>{tr("invoiceRecord.history",lang)}</summary>
+          {b.history.map(h=><div key={h.documentId} style={{marginTop:8}}><a href={h.pdfUrl} target="_blank" rel="noopener noreferrer">{tr("invoiceRecord.summary",lang)}</a>{h.comparison==="different"&&<span> · {tr("invoiceRecord.difference",lang)}</span>}</div>)}
+        </details>}
         <div style={{ fontSize: 11, color: muted }}>{L("Diese Rechnung kannst du bei deiner Versicherung einreichen.", "You can submit this invoice to your insurance.", "Puedes presentar esta factura a tu seguro.")}</div>
       </div>
     );
@@ -1372,7 +1377,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           )}
         </div>
       )}
-      {(rechnungen.length > 0 || rechnungsStoerung !== null) && (
+      {(rechnungen.length > 0 || rechnungsverlauf.length > 0 || rechnungsStoerung !== null) && (
         <div id="portal-rechnungen" style={{ marginBottom: 16, scrollMarginTop: 72 }}>
           <div style={{ padding: "0 20px" }}>
             <p style={{ ...hd, fontSize: 18, fontWeight: 800, marginBottom: 10, color: fg }}>
@@ -1392,12 +1397,16 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
               </div>
             )}
           </div>
+          {rechnungsverlauf.filter(h=>!kindFilter||h.patient_id===kindFilter).length>0&&<details style={{...card,margin:"0 20px 14px",padding:18}}><summary>{tr("invoiceRecord.history",lang)}</summary>
+            <p>{tr("invoiceRecord.unmatched",lang)}</p>
+            {rechnungsverlauf.filter(h=>!kindFilter||h.patient_id===kindFilter).map(h=><p key={h.id}><a href={`/api/rechnungsakte?historyId=${h.id}`} target="_blank" rel="noopener noreferrer">{tr("invoiceRecord.summary",lang)}</a></p>)}
+          </details>}
           <div style={{ ...card, margin: "0 20px 14px", padding: "4px 18px" }}>
             {rechnungsStoerung && <div role="status" style={{ padding: "14px 0", color: fg }}>
               <p style={{ margin: "0 0 10px", fontSize: 14, lineHeight: 1.5 }}>{tr(rechnungsStoerung === "ganz" ? "portal.invoices.unavailable" : rechnungsStoerung === "teilweise" ? "portal.invoices.partlyUnavailable" : "portal.invoices.paymentsUnavailable", lang)}</p>
               <button type="button" disabled={rechnungenLaden} onClick={() => void ladeRechnungen()} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid " + border, background: "transparent", color: fg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{rechnungenLaden ? tr("portal.invoices.loading", lang) : tr("portal.invoices.retry", lang)}</button>
             </div>}
-            {sichtbareRechnungen.length === 0 && rechnungsStoerung === null && (
+            {sichtbareRechnungen.length === 0 && !rechnungsverlauf.some(h=>!kindFilter||h.patient_id===kindFilter) && rechnungsStoerung === null && (
               <p style={{ margin: "14px 0", color: muted, fontSize: 14 }}>{lang === "en" ? "No invoices for this child yet." : lang === "es" ? "Aún no hay facturas para este niño." : "Für dieses Kind gibt es noch keine Rechnung."}</p>
             )}
             {sichtbareRechnungen.slice(rechnungSeite * 6, rechnungSeite * 6 + 6).map((r, i) => {
@@ -1898,7 +1907,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", margin: 8, borderRadius: 26, background: dk ? "rgba(17,21,17,0.97)" : "rgba(255,255,255,0.98)", border: `1px solid ${dk ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}`, padding: "14px 16px 16px" }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: dk ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.15)", margin: "0 auto 14px" }} />
             <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: fg, marginBottom: 12 }}>Finanzen</h3>
-            {(rechnungen.length > 0 || rechnungsStoerung !== null) && (
+            {(rechnungen.length > 0 || rechnungsverlauf.length > 0 || rechnungsStoerung !== null) && (
               <button onClick={() => { setBalanceView(false); setTab("progress"); setFinSheet(false); hapticLight(); window.setTimeout(() => document.getElementById("portal-rechnungen")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }} style={{ display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", cursor: "pointer", border: `1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderRadius: 18, padding: "15px 14px", marginBottom: 10, background: dk ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", fontFamily: "inherit" }}>
                 <span style={{ width: 44, height: 44, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: dk ? "rgba(74,222,128,0.12)" : "rgba(34,197,94,0.1)" }}>🧾</span>
                 <span><b style={{ display: "block", fontSize: 15, color: fg }}>{lang === "en" ? "Your invoices" : lang === "es" ? "Tus facturas" : "Deine Rechnungen"}</b><span style={{ fontSize: 12, color: muted }}>{lang === "en" ? "All items, PDF for your insurance" : lang === "es" ? "Todas las posiciones, PDF para tu seguro" : "Alle Positionen, PDF für die Versicherung"}</span></span>
