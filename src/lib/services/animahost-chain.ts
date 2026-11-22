@@ -80,6 +80,8 @@ Eine freundlichere oder kürzere Formulierung ist kein Verstoß. Prüfe den Inha
 const urls=(text:string)=>text.match(/https?:\/\/[^\s<>"')]+/g)?.map(url=>url.replace(/[.,;:!?]+$/,''))??[];
 const digits=(text:string)=>text.replace(/\D/g,'');
 /** Stunden aus Uhrzeiten („15 Uhr“, „9:30“, „halb 4“ zählt nicht), Tage und Monate aus Daten („30.11.“). */
+const MONTHS=['januar','februar','märz','april','mai','juni','juli','august','september','oktober','november','dezember',
+ 'january','february','march','april','may','june','july','august','september','october','november','december'];
 function numbersIn(text:string){
  const hours=new Set<number>(),dates=new Set<string>(),phones=new Set<string>(),money=new Set<string>();
  const all=(pattern:RegExp)=>Array.from(text.matchAll(pattern));
@@ -90,6 +92,9 @@ function numbersIn(text:string){
  });
  all(/\b(\d{1,2})\s*(?:Uhr|o.clock|h\b)/gi).forEach(hit=>hours.add(Number(hit[1])));
  all(/\b(\d{1,2})\.\s?(\d{1,2})\.(?:\s?(\d{2,4}))?/g).forEach(hit=>dates.add(`${Number(hit[1])}.${Number(hit[2])}`));
+ // „14. Oktober“, „14.10.“ und „2026-10-14“ sind dasselbe Datum. Sonst gälte ein nur anders geschriebenes Datum als erfunden.
+ all(new RegExp(`\\b(\\d{1,2})\\.?\\s*(${MONTHS.join('|')})(?![A-Za-zÄÖÜäöüß])`,'gi')).forEach(hit=>dates.add(`${Number(hit[1])}.${MONTHS.indexOf(hit[2].toLowerCase())%12+1}`));
+ all(/\b\d{4}-(\d{2})-(\d{2})\b/g).forEach(hit=>dates.add(`${Number(hit[2])}.${Number(hit[1])}`));
  all(/(?:\+|\b0)[\d\s/()-]{7,}\d/g).forEach(hit=>{const value=digits(hit[0]).replace(/^0+/,'');if(value.length>=7)phones.add(value.slice(-9));});
  all(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|euro|eur\b)|(?:€|eur\b)\s*(\d+(?:[.,]\d{1,2})?)/gi).forEach(hit=>money.add((hit[1]??hit[2]).replace(',','.')));
  return {hours,dates,phones,money};
@@ -108,7 +113,7 @@ export function guardReply(reply:string,input:ChainInput,flags:{team:boolean;ask
  if(text.length>1200)violations.push('zu_lang');
  if(/patientennummer|patient number|número de paciente/i.test(text))violations.push('patientennummer');
  const patientSide=[input.message,...input.history.map(item=>item.text)].join('\n');
- const everything=[patientSide,...sources.ruleTexts,input.baseline?.text??'',...sources.facts,input.practice.teamTime,input.practice.phone??'',input.practice.doctolibUrl??''].join('\n');
+ const everything=[patientSide,...sources.ruleTexts,input.baseline?.text??'',...sources.facts,input.practice.teamTime,input.practice.today,input.practice.phone??'',input.practice.doctolibUrl??''].join('\n');
  const allowedLinks=new Set(urls([...sources.ruleTexts,input.baseline?.text??'',input.practice.doctolibUrl??''].join('\n')));
  if(urls(text).some(url=>!allowedLinks.has(url)))violations.push('fremder_link');
  const said=numbersIn(text),known=numbersIn(everything);

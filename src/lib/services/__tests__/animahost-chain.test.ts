@@ -181,3 +181,12 @@ test('Jeder Schritt bekommt eine Frist in ganzen Millisekunden, auch im großen 
   assert.equal(result.ok,true);assert.equal(seen.length,2);assert.ok(seen.every(Number.isInteger));
  }
 });
+
+test('Ein nur anders geschriebenes Datum gilt nicht als erfunden, ein neues schon',()=>{
+ const flags={team:false,asksIdentity:false},sources={ruleTexts:[],facts:[],names:[]};
+ const said=input({message:'Wir können am 14. Oktober nicht kommen. Geht es am 3.11. auch?'});
+ assert.deepEqual(guardReply('Danke für die Nachricht zum 14.10. und zum 3. November.',said,flags,sources),[]);
+ assert.deepEqual(guardReply('Heute, am 22.11., ist die Praxis geschlossen.',said,flags,sources),[]);
+ assert.deepEqual(guardReply('Dann kommen Sie bitte am 15. Oktober.',said,flags,sources),['datum_nicht_in_quellen']);
+ assert.deepEqual(guardReply('Dann kommen Sie bitte am 4.11.',said,flags,sources),['datum_nicht_in_quellen']);
+});
