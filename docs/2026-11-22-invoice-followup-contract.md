@@ -2,11 +2,17 @@
 
 Juans Entscheidung: Rechnungsmail auch ohne Konto; alle drei Tage je bereits benachrichtigtem Beleg nachfassen, bis Rechnung geöffnet, PDF abgerufen, bezahlt, abbestellt, dauerhaft unzustellbar oder durch die Praxis gestoppt. Keine Höchstzahl. Keine neue Praxisoberfläche in diesem Commit; Claude baut sie gegen diesen Vertrag.
 
+## Freigabe an Claude
+
+**Juan hat am 22.11.2026 ausdrücklich „Für Claude zum Einspielen freigeben“ bestätigt.** Die Freigabe gilt ausschließlich für `030_invoice_followup.sql`, SHA-256 `52d169294204dd01a5bb01bee82d7b1d0e1ecdf32243f371508686861c93466a`, im Projekt `zymqxzhjbcxzhzvjqvbv`, Laufname `2026-11-22-invoice-followup-030`. Code und Deployments beider Repos sind erfolgreich; Cura Production Verify für `4a1e17a` ist grün. Leitstand enthält zusätzlich die Absicherung abgebrochener Worker in `81f76a4`.
+
+**Auftrag an Claude:** Datei unverändert über Juans bestehende Supabase-Sitzung einspielen, Ergebniszeile protokollieren und anschließend die unten beschriebene Produktionsabnahme durchführen. Die Installation wurde von Codex nicht ausgeführt. Freigabe ist kein Nachweis einer Installation. Zählungen ohne Namen zurückgeben: übernommene historische Serien, aktuell fällige Serien, Versandannahmen, Abschlüsse nach Grund, Prüffälle nach Grund, Anrufliste und dauerhafte Rückläufer. Keine weitere Codefreigabe erforderlich. Der nächste Worker kann nach Installation innerhalb des Tagesfensters echte Erinnerungen senden.
+
 ## Bereitstellung und Aktivierung
 
 - Patienten-App: Erfassung der tatsächlichen Belegöffnung, PDF-Abrufe, App-Installation; interne Vorprüfung und Zugangs-/Abbestelllinks.
 - Leitstand: Planung, Versand im vorhandenen Worker, Praxisdaten und auditierter Stoppbefehl.
-- **Die neue SQL-Datei ist vorbereitet, hier nicht in Production eingespielt. Erst nach Code-Deployment beider Repos und Juans SQL-Freigabe aktivieren.** Vor der Migration plant der Worker keine Erinnerungen. Fehlende neue Tabellen blockieren bestehende PDFs nicht; die Browserwarteschlange hält echte Öffnungsereignisse für einen erneuten Versuch zurück.
+- **Die neue SQL-Datei ist vorbereitet, hier nicht in Production eingespielt. Code-Deployment und Juans SQL-Freigabe liegen jetzt vor; die Ausführung durch Claude und die Produktionsabnahme stehen noch aus.** Vor der Migration plant der Worker keine Erinnerungen. Fehlende neue Tabellen blockieren bestehende PDFs nicht; die Browserwarteschlange hält echte Öffnungsereignisse für einen erneuten Versuch zurück.
 - Migration: `database/abrechnung/030_invoice_followup.sql` im Repo `anima-leitstand`.
 - Ziel: **Anima Cura**, Projekt **zymqxzhjbcxzhzvjqvbv**.
 - Laufname: **2026-11-22-invoice-followup-030**.
