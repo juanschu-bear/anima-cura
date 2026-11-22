@@ -388,7 +388,7 @@
     {
       "file": "src/app/api/patient/rechnungen/[id]/pdf/route.ts",
       "sha256": "12088a05df4646961cf9d6a301e490af5585f6d9840ffa480e92d6e4b39e8140",
-      "proof": "Imported invoice RPCs use only the authenticated cookie/JWT. Explicit uploads use a separate authorized profile-and-membership path and are never a privileged retry of the import RPC.",
+      "proof": "Imported invoice RPCs use only the authenticated cookie/JWT. Explicit uploads use a separate authorized profile-and-membership path and are never a privileged retry of the import RPC. After migration 099 the restricted definer reads JWT identity via invoice_portal_jwt_uid and verifies invoice_portal_patient_scope; RPC calls still use the authenticated session. Only the explicit patient_invoice_forbidden guard maps to HTTP 403; schema ACL errors map to HTTP 503. Uploaded PDFs use the separately verified profile/membership scope, never a privileged retry of module RPCs.",
       "calls": [
         {
           "name": "patient_invoice_document_pdf",
@@ -404,8 +404,8 @@
     },
     {
       "file": "src/app/api/patient/rechnungen/route.ts",
-      "sha256": "46d7f9c23d377b0cda5ee42e0b2bd9a1687d7c54e6f03eb35d5339fca7164acc",
-      "proof": "Reviewed authenticated session via createServerComponentClient; auth.getUser and the stored patient profile are required. No profile repair from user metadata. Only session.rpc reads invoice documents; the legacy service client reads only pre-existing public open items. The access RPC executes as a SECURITY DEFINER function, checks auth.uid() and verified patient memberships, and never accepts a patient ID. Edition RPC uses the same authenticated patient session and the same membership scope. No privileged retry.",
+      "sha256": "026a654777fae0eed4afcb02fb5e4fda5634a70fe584fcb76c60239ed66f3dfc",
+      "proof": "Verified cookie/JWT through createServerComponentClient and auth.getUser; authoritative patient profile required, never repaired from user metadata. Imported invoice and edition RPCs use only this authenticated session. Migration 099 scopes both with invoice_portal_jwt_uid and invoice_portal_patient_scope under the restricted definer. Public payment/upload queries use a separate service client, scoped to the verified profile and stored memberships; technical failures produce unavailable status. The service client records anonymous operational failures only and never retries an imported module RPC. No patient ID is accepted from the browser.",
       "calls": [
         {
           "name": "patient_invoice_documents_for_access",
@@ -597,7 +597,7 @@
       "calls": [
         {
           "name": "animahost_invoice_portal_visibility",
-          "signature": "public.animahost_invoice_portal_visibility(p_patient uuid,p_from date,p_through date)",
+          "signature": "public.animahost_invoice_portal_visibility(p_patient uuid, p_from date, p_through date)",
           "role": "service_role"
         }
       ]
@@ -678,7 +678,7 @@
     },
     {
       "file": "src/lib/patient-invoice-documents.ts",
-      "sha256": "f4831b8045bbb755f31a65424a87f18360573a7ec576de94d950a2f13581954c"
+      "sha256": "f779377ecb4cfa02c31b48a17c7fc930070ac9eb9b7b066f55189c2ef292c4b0"
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",

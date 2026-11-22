@@ -25,9 +25,9 @@ test('Verified selection, explicit original and missing-migration fallback use o
 });
 test('Forbidden and foreign/withdrawn invoice results never fall through to another access path',async()=>{
  const {resolvePatientInvoicePdf}=await import('../../patient-invoice-documents');
- for(const response of [{data:null,error:{code:'42501'}},{data:null,error:null}]){
+ for(const response of [{data:null,error:{code:'42501',message:'patient_invoice_forbidden'}},{data:null,error:null}]){
   let calls=0;const result=await resolvePatientInvoicePdf(async()=>{calls++;return response;},'id');
-  assert.equal(calls,1);assert.equal(result.status,response.error?403:404);assert.equal(result.bytes,undefined);
+  assert.equal(calls,response.error?1:2);assert.equal(result.status,response.error?403:404);assert.equal(result.bytes,undefined);
  }
  const result=attachPatientInvoiceDocuments([],[{...doc,edition:{delivered:'typeset',typesetAvailable:true}}]);
  assert.equal(result[0].beleg?.edition.delivered,'typeset');assert.ok(result[0].beleg?.edition.originalPdfUrl.endsWith('?original=1'));

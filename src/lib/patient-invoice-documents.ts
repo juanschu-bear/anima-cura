@@ -1,3 +1,4 @@
+import {invoiceReadDenied, type InvoiceReadError} from "./patient-invoice-availability";
 /** Patient API projection. Only the JWT-scoped RPC may supply these records. */
 export type PatientInvoiceDocument = {
   patientId?: string;
@@ -22,10 +23,10 @@ export function patientInvoiceProof(document: PatientInvoiceDocument) {
       pdfUrl:`/api/patient/rechnungen/${document.id}/pdf`,originalPdfUrl:`/api/patient/rechnungen/${document.id}/pdf?original=1`}};
 }
 /** Both calls use the authenticated patient client. Never retry with a privileged client. */
-export async function resolvePatientInvoicePdf(rpc:(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:{code?:string}|null}>,id:string,originalOnly=false){
+export async function resolvePatientInvoicePdf(rpc:(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:InvoiceReadError}>,id:string,originalOnly=false){
   if(!originalOnly){
     const result=await rpc("patient_invoice_document_edition",{document_id:id,original_only:false});
-    if(result.error?.code==="42501")return {error:"patient_invoice_forbidden" as const,status:403};
+    if(result.error?.code==="42501")return invoiceReadDenied(result.error)?{error:"patient_invoice_forbidden" as const,status:403}:{error:"invoice_source_unavailable" as const,status:503};
     if(!result.error){
       const value=result.data as {edition?:string;pdf?:string}|null;
       if(value&&(value.edition==="original"||value.edition==="typeset")&&typeof value.pdf==="string"){
@@ -35,7 +36,7 @@ export async function resolvePatientInvoicePdf(rpc:(name:string,args:Record<stri
     }
   }
   const result=await rpc("patient_invoice_document_pdf",{document_id:id});
-  if(result.error)return {error:result.error.code==="42501"?"patient_invoice_forbidden":"invoice_source_unavailable",status:result.error.code==="42501"?403:503};
+  if(result.error)return {error:invoiceReadDenied(result.error)?"patient_invoice_forbidden":"invoice_source_unavailable",status:invoiceReadDenied(result.error)?403:503};
   if(typeof result.data!=="string"||!result.data)return {error:"invoice_not_found",status:404};
   const bytes=Buffer.from(result.data,"base64");
   if(bytes.subarray(0,5).toString()!=="%PDF-")return {error:"invoice_source_unavailable",status:503};

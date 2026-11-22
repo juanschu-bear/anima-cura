@@ -20,3 +20,50 @@
 Beim Upload über `POST /api/patient/admin/dokumente` wird für `rechnung` und `erste_rechnung` ein PDF verlangt. Die Antwort enthält das bestehende `dokument` und `destination: "rechnungen"`. Die Bestandsanzeige der Praxis kann denselben Upload-Weg weiterverwenden.
 
 Der Knopf einer Rechnungsbenachrichtigung führt zu `/patient/portal?section=rechnungen`. Beim Öffnen die Rechnungsdaten neu laden. Bei einer Störung bleibt der Bereich sichtbar und bietet erneutes Laden an. Bei mehreren Kindern die betroffene Zuordnung anzeigen und nur anhand von `patientId` wechseln.
+
+## Ergänzung Codex: Fehlerstatus und historische PDFs
+
+Eingespielt laut Juan/Claude: `099_invoice_portal_visibility.sql`, SHA-256 `29383f2239d97b213cd81058e81101ae4fd7c1a082fe1e6276167597d7c54491`. Gemeinsame JWT-Identität, Patientengeltungsbereich, PDF-Auswahl und Versand-Vorprüfung. Noch vorzulegen/einzuspielen: `100_invoice_portal_function_audit.sql` zieht die exakten Fingerabdrücke aus 098/099 im Audit 082 nach und repariert die von 099 nicht ersetzte alte `patient_invoice_documents()`. Keine zusätzlichen Rechte auf `auth`.
+
+Bereits veröffentlicht: `source=patient_upload`, `hochgeladeneRechnungenStatus`, `zahlungsdatenStatus`, Typfilterung und historische Uploads (`86b90f1`; erfolgreiches Production-Deployment `21fddad` bestätigt). Die folgenden neuen Verfügbarkeits-/Health-Felder stammen aus diesem Auftrag; ihre Bereitstellung ist getrennt zu prüfen.
+
+`GET /api/patient/rechnungen` ergänzt `belegVerfuegbarkeit`:
+
+```json
+{
+  "status": "unavailable",
+  "code": "invoice_source_unavailable",
+  "editionsStatus": "unavailable",
+  "retryable": true,
+  "checkedAt": "2026-11-22T07:00:00.000Z"
+}
+```
+
+`status` und `editionsStatus` sind jeweils `available | unavailable`. Bei verfügbarem Hauptbestand ist `code: null`, `retryable: false`. `belegeStatus` bleibt als kompatibles Feld erhalten. Fehler beim Lesen der Mitgliedschaften machen den Hauptbestand ebenfalls `unavailable`, damit eine unvollständige Familienliste nicht als vollständig erscheint. Ein Fehler der Editionen verhindert die Anzeige vorhandener Originale nicht. Die Upload-, Zahlungs- und Sofortrechnungsstatus bleiben separat. Keine bestehenden Felder entfallen.
+
+Claude: Bei `belegeStatus=unavailable` „Belege gerade nicht verfügbar“ mit erneutem Laden anzeigen, niemals „Keine Rechnungen“. Bereits lesbare Teilbestände dürfen sichtbar bleiben. HTTP 503 mit `code=invoice_source_unavailable` beim PDF bedeutet eine technische Störung. HTTP 403 mit `patient_invoice_forbidden` bedeutet die ausdrückliche Patientenzugriffssperre. SQLSTATE 42501 allein ist kein Beweis für eine Patientensperre.
+
+Historische private PDFs mit `file_url=/api/patient/dokumente/<id>/datei` werden jetzt ebenfalls als `source=patient_upload` geliefert, bei erkannten veröffentlichten Altbelegen ohne Eintrag in `billing_invoices`; die übrigen privaten Bestandsbelege behalten ihre Prüfung auf ausgestellte Rechnungen. PDF-Ziel für Uploads ist `/api/patient/rechnungen/<id>/pdf?source=upload`. Die Abfrage ist vor dem Storagezugriff auf die Patientenzuordnungen der verifizierten Sitzung beschränkt. Einträge mit derselben ID wie ein importierter Beleg werden nur einmal angeboten; keine unsichere Zusammenführung anhand von Namen oder Beträgen. Die alten Datensätze werden als Belegnachweis erhalten und aus `/api/patient/dokumente` herausgefiltert. Dort keine neuen Felder, nur die bereits vereinbarte Typfilterung.
+
+## Praxiswarnung für den Leitstand
+
+Neue interne Route: `GET /api/patient/internal/invoice-access-health`, geschützt durch `x-invoice-worker-secret` mit dem vorhandenen `INVOICE_ACCESS_WORKER_SECRET`. Nur serverseitig aufrufen; Geheimnis niemals an den Browser weitergeben.
+
+```json
+{
+  "status": "recent_failure",
+  "code": "invoice_source_unavailable",
+  "lastFailureAt": "2026-11-22T07:00:00.000Z",
+  "checkedAt": "2026-11-22T07:01:00.000Z",
+  "windowHours": 24,
+  "patientAccessVerified": false
+}
+```
+
+Der Rechnungslisten-Endpunkt protokolliert technische Ausfälle in `audit_log` als `tabelle=patient_invoice_read`, ohne Patientenkennungen, Rechnungsnummern, Tokens oder rohe Fehlermeldungen. `recent_failure` heißt: in den letzten 24 Stunden hat ein tatsächlicher Listenabruf einen Ausfall festgestellt. Ohne Eintrag lautet der Status `unknown`, nicht „gesund“. Bei fehlender Beobachtbarkeit HTTP 503, `status=unknown`, `code=invoice_monitor_unavailable`. Es handelt sich um ein reaktives Signal, keinen aktiven Patientensitzungstest. Einzelne PDF-Ausfälle werden mit HTTP 503 zurückgegeben, derzeit nicht separat in diesem Aggregat erfasst. Claude baut die sichtbare Warnung und den Leitstand-Aufruf.
+
+## AnimaHost und Abnahme
+
+`recoverPatientInvoice()` schreibt keine Dokumente. Seit 099 liest es `animahost_invoice_portal_visibility`: gemeinsame Kontozuordnung/PDF-Auswahl; Fehler, fehlende oder mehrdeutige Zuordnung führen zu `manual_review`. Der Rollentest vergleicht diese Entscheidung mit dem authentifizierten App-RPC-Weg. Kein SQL-Preflight darf als beobachteter HTTP-/Browserzugriff bezeichnet werden. Die Antwort nennt Patient und „Rechnungen“; bei manueller Prüfung kommt der Team-Rückmeldezeitpunkt dazu.
+
+Dauerhafte lokale/CI-Prüfung: `node scripts/test-patient-invoice-authenticated.mjs`. Live-Abnahme: `INVOICE_SESSION_CASES_FILE=/privater/pfad/cases.json node scripts/verify-patient-invoice-sessions.mjs`. Drei bestehende, autorisierte Sitzungen; Konfiguration und Cookie-Dateien niemals versionieren. Der Test verlangt Einzelzugang, Geschwisterzugang und Mitgliedschaftszugang und ruft die echten App-Routen inklusive aller gelisteten PDFs auf. Er erzeugt keine Nutzer, setzt keine Passwörter zurück und verschickt nichts.

@@ -31,7 +31,7 @@ test('a patient denial never falls back to another document source',async()=>{
  const calls:string[]=[];
  const result=await resolvePatientInvoicePdf(async name=>{
   calls.push(name);
-  return {data:null,error:{code:'42501'}};
+  return {data:null,error:{code:'42501',message:'patient_invoice_forbidden'}};
  },'invoice');
  assert.deepEqual(calls,['patient_invoice_document_edition']);
  assert.equal(result.status,403);

@@ -1,3 +1,4 @@
+import {patientInvoiceAvailability} from "@/lib/patient-invoice-availability";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/db/supabase";
 import { resolveOpenItemAmount, resolvePaidItemAmount, resolveOpenItemStatus } from "@/lib/open-items";
@@ -77,13 +78,21 @@ export async function GET() {
   const uploads=await loadUploadedPatientInvoices(supabase,patientIds,new Set(documents.map(d=>d.id)))
     .then(items=>({items,status:"available" as const}))
     .catch(()=>({items:[],status:"unavailable" as const}));
+  const availability=patientInvoiceAvailability({documents:documentsResult.error,editions:editionsResult.error,memberships:membershipsError});
+  if(availability.status==="unavailable"){
+    // Operational evidence only: no patient, invoice, JWT or database error text.
+    const recorded=await supabase.from("audit_log").insert({id:crypto.randomUUID(),tabelle:"patient_invoice_read",
+      datensatz_id:crypto.randomUUID(),aktion:"INSERT",neue_werte:{code:availability.code,checkedAt:availability.checkedAt}});
+    if(recorded.error)console.error("patient_invoice_read_alert_unavailable");
+  }
   return NextResponse.json({
+    belegVerfuegbarkeit:availability,
     rechnungen: [...attachPatientInvoiceDocuments(guided, documents),...uploads.items],
     hochgeladeneRechnungenStatus: uploads.status,
     zahlungsdatenStatus: paymentUnavailable?"unavailable":"available",
     sofortrechnungen: immediateResult.items,
     sofortrechnungenStatus: immediateResult.status,
-    belegeStatus: documentsResult.error ? "unavailable" : "available",
+    belegeStatus: availability.status,
     zahlungsprofil: {
       guthaben: Math.max(0, credits.get(patient.patientId) ?? 0),
       lastschrift_aktiv: directDebitPatients.has(patient.patientId),
