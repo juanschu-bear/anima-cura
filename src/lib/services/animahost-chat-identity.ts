@@ -6,7 +6,8 @@ export type PhonePatient={id:string;vorname:string;nachname:string;geburtsdatum:
 export type SubjectTask='appointment'|'late_arrival'|'attendance_certificate'|'missing_invoice'|'financial';
 export type ChatContext={
  journey?:{kind:'appointment'|'portal';step:number;at:string};
- challenge?:{kind:'missing_invoice'|'financial';patientId?:string;question:string;attempts:number;at:string};
+ // `anyPatient`: Die Nachricht nannte ein Kind, das nicht an der Nummer hängt. Gesucht wird dann wie bei einer unbekannten Nummer in allen Akten.
+ challenge?:{kind:'missing_invoice'|'financial';patientId?:string;question:string;attempts:number;at:string;anyPatient?:boolean};
  subject?:{kind:SubjectTask;question:string;at:string;date?:string|null};
 };
 export function phoneLabels(patients:PhonePatient[]){

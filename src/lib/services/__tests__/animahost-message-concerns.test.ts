@@ -1,7 +1,9 @@
 import test from 'node:test';
 import {enforceConversationOutput} from '../animahost-whatsapp-conversation';
 import assert from 'node:assert/strict';
-import {applicableMessageRules,combinedMessageWorkflow,personRequest,personRequestReply,practiceMessageHandoff} from '../animahost-message-concerns';
+import {applicableMessageRules,combinedMessageWorkflow,personRequest,personRequestReply,practiceMessageHandoff,unlinkedAppointmentReply,unlinkedSubjectPlan} from '../animahost-message-concerns';
+import {qualityWorkflow} from '../animahost-quality-workflows';
+import type {ChatContext} from '../animahost-chat-identity';
 import {selectPhonePatient,type PhonePatient} from '../animahost-chat-identity';
 import {styleMessage,invoicePortalIntent} from '../animahost-quality-workflows';
 import {matchApprovedRuleFallback} from '../animahost-whatsapp-fallback';
@@ -99,4 +101,94 @@ test('a personal follow-up does not falsely claim that the assistant is stuck',(
  assert.equal(followup.rule,'quality:personal_team');
  assert.match(followup.text,/Ergänzung.*09:11.*vollständig.*Praxisteam/);
  assert.doesNotMatch(followup.text,/komme.*nicht weiter|Für .* gilt/);
+});
+
+// Juan, 22.11.2026: Schreibt jemand über ein Kind, das nicht an der Nummer hängt, soll AnimaHost weiterhelfen statt alles zu übergeben.
+// So war der Fall von 09:10 Uhr: Die Nummer kannte 1 Kind, die Nachricht ging um ein anderes.
+const tamio={id:'10000000-0000-4000-8000-000000000009',vorname:'Tamio',nachname:'Beispiel',geburtsdatum:'2015-02-01',geschlecht:'m',ivoris_nummer:'004799'};
+function familyDb(){
+ const calls:{name:string;args:unknown}[]=[],saved:unknown[]=[];
+ const db={
+  rpc:async(name:string,args:unknown)=>{calls.push({name,args});
+   const patient=(args as {p_patient:string|null}).p_patient;
+   return {data:patient?{cause:'already_available',invoiceDate:'2026-10-01'}:{cause:'no_invoice',invoiceDate:null},error:null};},
+  from(table:string){
+   let day='';
+   const chain={select:()=>chain,eq:(column:string,value:string)=>{if(column==='geburtsdatum')day=value;return chain;},
+    limit:async()=>({data:table==='patients'?[tamio].filter(p=>p.geburtsdatum===day):[],error:null}),
+    maybeSingle:async()=>({data:null,error:null}),upsert:async(row:unknown)=>{saved.push(row);return {error:null};}};
+   return chain;
+  }} as never;
+ return {db,calls,saved};
+}
+
+test('an unlinked child: invoice is settled by name and date of birth across all records, never against a sibling',async()=>{
+ const unknown='Hallo Frau Muster, die Rechnung für Tamio lässt sich in der App nicht öffnen.';
+ assert.equal(selectPhonePatient(children,unknown),null);
+ assert.equal(unlinkedSubjectPlan(unknown),'identify');
+ const {db,calls,saved}=familyDb();
+ const context:ChatContext={};
+ const base={...input,patient:null,context,unlinkedSubject:'Tamio'};
+ const first=await qualityWorkflow(db,{...base,text:unknown});
+ // Keine Frage „Milan oder Nora?“ und keine Prüfung gegen ein Geschwisterkind: AnimaHost fragt nach Name und Geburtsdatum.
+ assert.equal(first?.decision.rule,'identity:missing_invoice');
+ assert.equal(first?.decision.action,'antworten');
+ assert.match(first?.decision.text??'',/Vor- und Nachnamen und das Geburtsdatum/);
+ assert.doesNotMatch(first?.decision.text??'',/Milan|Nora|Team/);
+ assert.equal(context.challenge?.anyPatient,true);
+ assert.equal(calls.some(call=>children.some(child=>(call.args as {p_patient:string|null}).p_patient===child.id)),false);
+ // Die Antwort des Patienten in einem ganzen Satz: gefunden in allen Akten, geprüft wird genau dieses Kind.
+ const second=await qualityWorkflow(db,{...base,text:'Tamio Beispiel, geboren am 01.02.2015'});
+ assert.match(second?.decision.rule??'',/^invoice_portal:/);
+ assert.equal(second?.details?.patientId,tamio.id);
+ assert.deepEqual((calls.at(-1)?.args as {p_patient:string}).p_patient,tamio.id);
+ assert.equal((saved[0] as {patient_id:string}).patient_id,tamio.id);
+ assert.equal(context.challenge,undefined);
+});
+
+test('an unlinked child: a wrong name or date of birth never reveals anything and goes to the team',async()=>{
+ const {db}=familyDb();
+ const context:ChatContext={};
+ const base={...input,patient:null,context,unlinkedSubject:'Tamio'};
+ await qualityWorkflow(db,{...base,text:'Die Rechnung für Tamio lässt sich nicht öffnen.'});
+ for(const wrong of ['Tamio Beispiel, 02.02.2015','Timo Beispiel, 01.02.2015','Tamio, 01.02.2015']){
+  const result=await qualityWorkflow(db,{...base,text:wrong});
+  assert.equal(result?.decision.action,'klaerfall',wrong);
+  assert.equal(result?.details?.patientId,null,wrong);
+  assert.doesNotMatch(result?.decision.text??'',/Tamio|im Portal|verfügbar/,wrong);
+ }
+ // Ohne den Hinweis auf ein nicht verknüpftes Kind bleibt die Suche auf die Akten der Nummer begrenzt.
+ const linkedOnly:ChatContext={challenge:{kind:'missing_invoice',question:'Rechnung fehlt',attempts:0,at:opts.receivedAt}};
+ const result=await qualityWorkflow(db,{...input,patient:null,context:linkedOnly,text:'Tamio Beispiel, 01.02.2015'});
+ assert.equal(result?.details?.patientId,null);
+});
+
+test('an unlinked child: a plain appointment wish is answered at once and the practice gets the name and the full message',()=>{
+ const wish='Hallo, ich möchte Tamios Termin am Mittwoch auf die Woche ab 30.11. verschieben, ab 15 Uhr.';
+ assert.equal(unlinkedSubjectPlan(wish),'appointment');
+ const reply=unlinkedAppointmentReply(wish,rules,{receivedAt:opts.receivedAt,language:'de',doctolib:'https://example.invalid/termin'})!;
+ assert.equal(reply.decision.action,'antworten');
+ assert.equal(reply.decision.rule,'appointment_notice:reschedule:routine');
+ assert.match(reply.decision.text,/example.invalid\/termin/);
+ assert.doesNotMatch(reply.decision.text,/Milan|Nora|Tamio/);
+ assert.equal(reply.details?.requestedName,'Tamio');
+ assert.ok(reply.details?.practiceSummary?.endsWith(wish));
+ // Änderungen an Daten und alles Unklare bleiben beim Team.
+ assert.equal(unlinkedSubjectPlan('Bitte ändern Sie die Adresse von Tamio auf Musterweg 1.'),'team');
+ assert.equal(unlinkedSubjectPlan('Tamios Zahnspange ist gebrochen.'),'team');
+ assert.equal(unlinkedAppointmentReply('Tamios Zahnspange ist gebrochen.',rules,{receivedAt:opts.receivedAt,language:'de',doctolib:null}),null);
+});
+
+test('an unlinked child with appointment and invoice: answer, team note for the appointment, then the question the patient should answer',async()=>{
+ const {db}=familyDb();
+ const both=text.replace('Milans','Tamios');
+ const result=await combinedMessageWorkflow(db,{...input,text:both,patient:null,context:{},unlinkedSubject:'Tamio'},rules);
+ assert.equal(result?.decision.rule,'quality:multiple_concerns');
+ const parts=(result?.decision.text??'').split('\n\n');
+ assert.equal(parts.length,3);
+ assert.match(parts[0],/example.invalid\/termin/);
+ assert.match(parts[1],/Terminwunsch.*Praxisteam.*am Montag.*noch nicht geändert/);
+ assert.match(parts[2],/Vor- und Nachnamen und das Geburtsdatum/);
+ assert.doesNotMatch(result?.decision.text??'',/Milan|Nora|Rückmeldung zur Rechnung/);
+ assert.equal(result?.details?.requestedName,'Tamio');
 });

@@ -60,6 +60,8 @@ const OPEN_FAILS=new RegExp(`(?:kann|können|konnte|konnten|lässt sich|lassen s
 export function cannotOpenInvoice(text:string){
  return /rechnung|invoice|factura/i.test(text)&&OPEN_FAILS.test(text);
 }
+/** Frage zu Mahnung, Guthaben oder offenem Betrag: braucht einen eindeutig bestimmten Patienten. */
+export function financialIntent(text:string){return kindOf(text)==='financial';}
 export function invoicePortalIntent(text:string){
  if(cannotOpenInvoice(text))return 'missing';
  if(kindOf(text)==='missing_invoice'||/(?:rechnung|invoice|factura)[\s\S]{0,150}(?:nicht.{0,25}(?:abruf|öffn|oeffn|lad)|lässt sich nicht|cannot.{0,20}(?:open|download)|can.t.{0,20}(?:open|download)|no puedo)/i.test(text))return 'missing';
@@ -134,6 +136,8 @@ text:string;language:string;receivedAt:string;teamTime:string;doctolib:string|nu
 export async function qualityWorkflow(db:Db,input:{
  tenantId:string;from:string;phone:string;receivedAt:string;text:string;language:string;teamTime:string;
  patients:PhonePatient[];patient:PhonePatient|null;context:ChatContext;doctolib:string|null;closures:unknown;onlyInvoiceRouting?:boolean;phoneForPractice?:string|null;
+ /** Ausdrücklich genannte Person, die zu keiner Akte der Nummer passt. Dann fragt AnimaHost nach Name und Geburtsdatum, statt ein anderes Kind anzunehmen. */
+ unlinkedSubject?:string|null;
 }):Promise<Outcome|null>{
  const {text,language,teamTime,context,patients,patient,receivedAt}=input;
  const message=t('animahost.team.reply',language,{when:teamTime});
@@ -200,7 +204,7 @@ export async function qualityWorkflow(db:Db,input:{
   (parseBirthDate(text)||requested==='financial'||requested==='missing_invoice'))
   return {...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'identity_review',null)};
  if(question&&fresh(question.at)&&parseBirthDate(text)){
-  const verified=await identifyByBirthDate(db,text,patients,question.patientId);
+  const verified=await identifyByBirthDate(db,text,question.anyPatient?[]:patients,question.patientId);
   if(!verified){
    context.challenge={...question,attempts:question.attempts+1,at:receivedAt};
    return {...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'identity_review',null)};
@@ -221,7 +225,7 @@ export async function qualityWorkflow(db:Db,input:{
   if(subjectContext.kind==='appointment'&&cancellation.test(subjectContext.question))return labelMatch('appointment_notice:cancel:routine',
    translated(book?'cancel_subject':'cancel_without_link',{patient:patient.vorname}));
  }
- if(patients.length>1&&!patient&&(requested==='missing_invoice'||requested==='financial'||cancellation.test(text))){
+ if(patients.length>1&&!patient&&!input.unlinkedSubject&&(requested==='missing_invoice'||requested==='financial'||cancellation.test(text))){
   context.subject={kind:requested==='general'?'appointment':requested as SubjectTask,question:maskBirthDates(text),at:receivedAt};
   return labelMatch('identity:which_patient',translated('which_patient',{patients:new Intl.ListFormat(language,{type:'disjunction'}).format(patients.map(p=>p.vorname))}));
  }
@@ -234,7 +238,7 @@ export async function qualityWorkflow(db:Db,input:{
    return result;
   }
   const availability=await recoverPatientInvoice(db,null,{from:null,through:null});
-  const result=availability.checked?waiting({kind:'missing_invoice',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt}):
+  const result=availability.checked?waiting({kind:'missing_invoice',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt,...(input.unlinkedSubject?{anyPatient:true}:{})}):
    {...handoff('invoice_portal:manual_review','invoice_manual'),details:detail(null,'manual_review',null)};
   const prefix=searchingDocuments?translated('invoice_section'):corrected?translated('correction'):'';
   if(prefix)result.decision.text=prefix+' '+result.decision.text;
@@ -248,7 +252,7 @@ export async function qualityWorkflow(db:Db,input:{
  if(/(?:spange|schiene|aligner|retainer).{0,55}(?:verlor|verleg|lost|perd)|(?:verlor|verleg|lost|perd).{0,55}(?:spange|schiene|aligner|retainer)/i.test(text))
   return handoff('quality:device_lost',patient?'device_lost':'device_lost_identify');
  if(requested==='financial'){
-  if(!patient)return waiting({kind:'financial',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});
+  if(!patient)return waiting({kind:'financial',question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt,...(input.unlinkedSubject?{anyPatient:true}:{})});
   const verified=await db.from('animahost_whatsapp_verified_patients').select('patient_id')
    .eq('tenant_id',input.tenantId).eq('chat_jid',input.from).eq('phone',input.phone).eq('patient_id',patient.id).maybeSingle();
   if(verified.error||!verified.data)return waiting({kind:'financial',patientId:patient.id,question:maskBirthDates(text),attempts:question?.attempts??0,at:receivedAt});

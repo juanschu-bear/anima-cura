@@ -20,10 +20,10 @@ import {conversationHistorySchema,enforceConversationOutput,formulateConversatio
 
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 
-import {explicitlyOffersDu,maskBirthDates,phoneLabels,phonePatients,selectPhonePatient,type ChatContext} from '@/lib/services/animahost-chat-identity';
+import {explicitlyOffersDu,maskBirthDates,parseBirthDate,phoneLabels,phonePatients,selectPhonePatient,type ChatContext} from '@/lib/services/animahost-chat-identity';
 import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitReply,type ChatDetails} from '@/lib/services/animahost-quality-workflows';
 
-import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
+import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,unlinkedSubjectPlan,unlinkedAppointmentReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -164,9 +164,25 @@ export async function POST(request:NextRequest){
   }
   let details:ChatDetails|undefined;
   let qualityHandled=false;
+  let unlinkedSubject:string|null=null;
+  let unlinkedHandoff:ReturnType<typeof practiceMessageHandoff>=null;
   if(input.text&&!input.handoffOnly&&!explicitOptOut(input.text)&&!emergencyDecision(input.text)){
-   const handoff=practiceMessageHandoff(input.text,candidates,language,teamTime());
-   if(handoff){decision=handoff.decision;details=handoff.details;qualityHandled=true;}
+   // Antwortet der Patient gerade auf die Frage nach Name und Geburtsdatum, gehört die Nachricht in die Prüfung und nie in eine Übergabe.
+   const answeringIdentity=Boolean(preferences?.context.challenge&&parseBirthDate(input.text));
+   const handoff=answeringIdentity?null:practiceMessageHandoff(input.text,candidates,language,teamTime());
+   // Ein Kind, das nicht an der Nummer hängt: Rechnung und Zahlung klärt AnimaHost über Name und Geburtsdatum, einen reinen
+   // Terminwunsch beantwortet er sofort. Alles andere geht weiter ans Team, damit nie die Akte eines anderen Kindes getroffen wird.
+   const plan=handoff?unlinkedSubjectPlan(input.text):null;
+   let unlinkedReply:ReturnType<typeof unlinkedAppointmentReply>=null;
+   if(handoff&&plan==='appointment'&&automaticReplies&&practice.active_rulebook_version){
+    const version=await db.from('animahost_whatsapp_rulebook_versions').select('rules')
+     .eq('tenant_id',input.tenantId).eq('version',practice.active_rulebook_version).single();
+    const rules=whatsappRulesSchema.safeParse(version.data?.rules);
+    unlinkedReply=unlinkedAppointmentReply(input.text,rules.success?rules.data:[],{receivedAt:input.receivedAt,language,doctolib:practice.doctolib_url});
+   }
+   if(handoff&&plan==='identify'&&preferences&&trustedPhone){unlinkedSubject=handoff.details?.requestedName??null;unlinkedHandoff=handoff;}
+   else if(unlinkedReply){decision=unlinkedReply.decision;details=unlinkedReply.details;qualityHandled=true;}
+   else if(handoff){decision=handoff.decision;details=handoff.details;qualityHandled=true;}
    else if(personRequest(input.text)==='only'){
     // Wunsch nach einer Person ohne Anliegen: AnimaHost hilft zuerst selbst weiter. Der letzte Stand des Chats entscheidet über den Schritt.
     const last=await db.from('animahost_whatsapp_decisions').select('action,rule_id')
@@ -194,7 +210,7 @@ export async function POST(request:NextRequest){
    }else{
     const workflowInput={tenantId:input.tenantId,from:input.from,phone:trustedPhone,
      receivedAt:input.receivedAt,text:input.text,language,teamTime:teamTime(),patients:candidates,
-     patient,context:preferences.context,doctolib:practice.doctolib_url,closures:practice.closure_periods,phoneForPractice:practice.practice_phone,onlyInvoiceRouting:!automaticReplies};
+     patient,context:preferences.context,doctolib:practice.doctolib_url,closures:practice.closure_periods,phoneForPractice:practice.practice_phone,onlyInvoiceRouting:!automaticReplies,unlinkedSubject};
     let resolved;
     if(appointmentConcern(input.text)&&invoicePortalIntent(input.text)){
      const version=await db.from('animahost_whatsapp_rulebook_versions').select('rules')
@@ -205,6 +221,8 @@ export async function POST(request:NextRequest){
     if(resolved){decision=resolved.decision;details=resolved.details;qualityHandled=true;}
    }
   }
+  // Hat die Prüfung den Fall mit dem nicht verknüpften Kind nicht übernommen, bleibt es bei der sicheren Übergabe ans Team.
+  if(!qualityHandled&&unlinkedHandoff){decision=unlinkedHandoff.decision;details=unlinkedHandoff.details;qualityHandled=true;}
   if(!qualityHandled&&!preferences&&input.text&&!input.handoffOnly&&!explicitOptOut(input.text)&&!emergencyDecision(input.text)){
    const portalIntent=invoicePortalIntent(input.text);
    if(portalIntent==='missing'){

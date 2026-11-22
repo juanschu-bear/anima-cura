@@ -1,7 +1,7 @@
 import {t} from '@/lib/i18n';
 import {namedSubject,selectPhonePatient,type PhonePatient} from './animahost-chat-identity';
 import {appointmentNoticeDecision} from './animahost-appointment-notices';
-import {invoicePortalIntent,qualityWorkflow,type Outcome} from './animahost-quality-workflows';
+import {financialIntent,invoicePortalIntent,qualityWorkflow,type Outcome} from './animahost-quality-workflows';
 import {decisionFromRule,type WhatsAppRule} from './animahost-whatsapp';
 
 export {applicableMessageRules} from './animahost-whatsapp';
@@ -64,6 +64,34 @@ export function practiceMessageHandoff(text:string,patients:PhonePatient[],langu
    requestedName,concerns:messageConcerns(text),practiceSummary:practiceSummary(text)}};
 }
 
+/**
+ * Was AnimaHost selbst tun kann, wenn die Nachricht ein Kind nennt, das nicht an der Nummer hängt (Juan, 22.11.2026: nicht alles ans Team).
+ * `identify`: Rechnung oder Zahlung. AnimaHost fragt nach Name und Geburtsdatum und sucht damit in allen Akten, wie bei einer unbekannten Nummer.
+ * `appointment`: reiner Wunsch zu verschieben oder abzusagen. Dafür braucht es keine Akte, die Praxis bekommt den Vermerk mit dem genannten Namen.
+ * `team`: alles andere, vor allem Änderungen an Daten. Dort darf nie ein anderes Kind der Nummer getroffen werden.
+ */
+export function unlinkedSubjectPlan(text:string):'identify'|'appointment'|'team'{
+ if(invoicePortalIntent(text)||financialIntent(text))return 'identify';
+ return appointmentConcern(text)?'appointment':'team';
+}
+function appointmentAnswer(kind:'reschedule'|'cancel',rules:WhatsAppRule[],input:{receivedAt:string;language:string;doctolib:string|null}){
+ const matching=rules.filter(rule=>!rule.appointmentTypeId&&
+  (kind==='reschedule'?/verschieb|verleg|umbuch|reschedul/i:/absag|stornier|cancel/i).test(rule.topic));
+ const rule=matching.length===1?matching[0]:null;
+ const authored=rule?decisionFromRule(rule,input.doctolib):null;
+ return authored&&authored.rule!=='no_applicable_rule'?authored:
+  appointmentNoticeDecision({kind,appointmentDate:null,delayMinutes:null},input.receivedAt,input.language==='en'?'en':'de',null,input.doctolib)!;
+}
+/** Terminwunsch für ein Kind ohne Akte an dieser Nummer: freigegebene Antwort für den Patienten, Vermerk mit Namen und ganzer Nachricht für die Praxis. */
+export function unlinkedAppointmentReply(text:string,rules:WhatsAppRule[],input:{receivedAt:string;language:string;doctolib:string|null}):Outcome|null{
+ const kind=appointmentConcern(text);
+ if(!kind)return null;
+ const answer=appointmentAnswer(kind,rules,input);
+ return {decision:{action:'antworten',rule:`appointment_notice:${kind}:routine`,text:answer.text},
+  details:{patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:'identity_review',requestedName:namedSubject(text),
+   concerns:messageConcerns(text),practiceSummary:practiceSummary(text)}};
+}
+
 /** Run both workflows; the invoice result must never swallow the appointment request. */
 export async function combinedMessageWorkflow(db:Parameters<typeof qualityWorkflow>[0],
  input:Parameters<typeof qualityWorkflow>[1],rules:WhatsAppRule[]):Promise<Outcome|null>{
@@ -71,15 +99,13 @@ export async function combinedMessageWorkflow(db:Parameters<typeof qualityWorkfl
  if(!kind||!invoicePortalIntent(input.text))return null;
  const invoice=await qualityWorkflow(db,input);
  if(!invoice)return null;
- const matching=rules.filter(rule=>!rule.appointmentTypeId&&
-  (kind==='reschedule'?/verschieb|verleg|umbuch|reschedul/i:/absag|stornier|cancel/i).test(rule.topic));
- const rule=matching.length===1?matching[0]:null;
- const authored=rule?decisionFromRule(rule,input.doctolib):null;
- const appointment=authored&&authored.rule!=='no_applicable_rule'?authored:
-  appointmentNoticeDecision({kind,appointmentDate:null,delayMinutes:null},input.receivedAt,input.language==='en'?'en':'de',null,input.doctolib)!;
+ const appointment=appointmentAnswer(kind,rules,input);
+ // Fragt die Rechnungsprüfung erst nach Name und Geburtsdatum, steht diese Frage am Ende: Sie ist das Nächste, was der Patient tun soll.
+ const asksIdentity=invoice.decision.rule.startsWith('identity:');
  // Keep all requested dates/times in the practice case; never claim a booking changed.
- return {decision:{action:'klaerfall',rule:'quality:multiple_concerns',text:[appointment.text,invoice.decision.text,
-  t('animahost.quality.multiple_team',input.language,{when:input.teamTime})].join('\n\n')},
+ return {decision:{action:'klaerfall',rule:'quality:multiple_concerns',text:(asksIdentity?
+   [appointment.text,t('animahost.quality.multiple_team_appointment',input.language,{when:input.teamTime}),invoice.decision.text]:
+   [appointment.text,invoice.decision.text,t('animahost.quality.multiple_team',input.language,{when:input.teamTime})]).join('\n\n')},
   details:{patientId:input.patient?.id??null,firstName:input.patient?.vorname??null,lastName:input.patient?.nachname??null,
    invoiceDate:invoice.details?.invoiceDate??null,cause:invoice.details?.cause??'multiple_concerns',
    requestedName:namedSubject(input.text),concerns:messageConcerns(input.text),practiceSummary:practiceSummary(input.text)}};

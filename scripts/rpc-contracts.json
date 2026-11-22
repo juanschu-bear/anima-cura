@@ -580,7 +580,7 @@
     },
     {
       "file": "src/lib/services/animahost-chat-identity.ts",
-      "sha256": "d2c14c23d6e96f37bb76c9b374dbbabb94e7bb10064f2198db7a001ce05781ac",
+      "sha256": "a392f871080a5542b32e53b0f9ac321a22b56ca6a619e0b7e4ffb9ce0b37e93e",
       "proof": "The authenticated WhatsApp route passes its server client only after transport authentication. The lookup returns exact phone matches. Birth dates and gender remain inside the host service.",
       "calls": [
         {
@@ -682,7 +682,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "483d0d5626c0624fd6b424b63ab9fdb6f266e58cb38c38251b480bc921ae9081"
+      "sha256": "0d18c3f0cc6fc114e90d5da998c768014fed86c2d97d09ca3c5f0c3bc14f340e"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",
