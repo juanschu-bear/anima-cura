@@ -474,7 +474,7 @@
       "calls": [
         {
           "name": "record_immediate_invoice_payment",
-          "signature": "public.record_immediate_invoice_payment(p_command_id uuid,p_invoice_id uuid,p_patient_id uuid,p_actor_id uuid,p_amount_cents bigint,p_payment_method text,p_invoice_number text)",
+          "signature": "public.record_immediate_invoice_payment(p_command_id uuid, p_invoice_id uuid, p_patient_id uuid, p_actor_id uuid, p_amount_cents bigint, p_payment_method text, p_invoice_number text)",
           "role": "service_role"
         }
       ]
@@ -486,7 +486,7 @@
       "calls": [
         {
           "name": "set_patient_billing_mode",
-          "signature": "public.set_patient_billing_mode(p_patient_id uuid,p_mode text,p_reason text)",
+          "signature": "public.set_patient_billing_mode(p_patient_id uuid, p_mode text, p_reason text)",
           "role": "authenticated"
         }
       ]

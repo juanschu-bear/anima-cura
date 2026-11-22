@@ -8,6 +8,7 @@ const run=(sql,user)=>{const r=psql(sql,user);assert.equal(r.status,0,r.stderr);
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const session=(user,sql)=>`BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claims','${JSON.stringify({sub:id(user),role:'authenticated'})}',true); ${sql} ROLLBACK;`;
 const migration=readFileSync('supabase/migrations/099_invoice_portal_visibility.sql','utf8');
+const optimizedPdfLookup=readFileSync('supabase/migrations/101_invoice_portal_pdf_lookup.sql','utf8');
 try{
  container=execFileSync('docker',['run','--detach','--rm','--network','none','--memory','512m','--name',name,'--env','POSTGRES_HOST_AUTH_METHOD=trust','--env','POSTGRES_USER=test_root','--env','POSTGRES_DB=test','postgres:17.6-alpine'],{encoding:'utf8'}).trim();
  let ready=false;for(let i=0;i<40;i++){if(spawnSync('docker',['exec',container,'pg_isready','-h','127.0.0.1','-U','test_root','-d','test'],{stdio:'ignore'}).status===0){ready=true;break;}await new Promise(r=>setTimeout(r,250));}assert.ok(ready);
@@ -18,6 +19,7 @@ try{
  GRANT USAGE,CREATE ON SCHEMA public TO postgres; SET ROLE postgres;
  CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;`,'test_root');
  const wrong=psql(migration);assert.notEqual(wrong.status,0);assert.match(wrong.stderr,/Falsches Projekt/);
+ const wrongLookup=psql(optimizedPdfLookup);assert.notEqual(wrongLookup.status,0);assert.match(wrongLookup.stderr,/Falsches Projekt/);
  run(`CREATE TABLE public.user_profiles(id uuid,patient_id uuid,role text);
  CREATE TABLE public.patient_access_memberships(user_id uuid,patient_id uuid);
  CREATE TABLE public.invoice_access_contacts(id uuid,normalized_email text,auth_user_id uuid); CREATE TABLE public.animahost_whatsapp_chat_preferences(id uuid);
@@ -56,8 +58,10 @@ try{
  if(process.argv.includes('--fingerprints'))console.log(run("SELECT proname,md5(pg_get_functiondef(oid)) FROM pg_proc WHERE proname LIKE 'patient_invoice_%' OR proname LIKE 'invoice_portal_%' OR proname LIKE 'animahost_%' ORDER BY proname"));
  if(process.argv.includes('--fingerprints'))process.exitCode=0;
  else {
+ const missingAudit=psql(optimizedPdfLookup);assert.notEqual(missingAudit.status,0);assert.match(missingAudit.stderr,/Funktionsaudit fehlt/);
  run(readFileSync('supabase/migrations/100_invoice_portal_function_audit.sql','utf8'));
  run(readFileSync('supabase/migrations/100_invoice_portal_function_audit.sql','utf8'));
+ run(optimizedPdfLookup);
  for(const [user,patients] of [[1,[101]],[2,[102,103]],[3,[106]],[6,[107,108]]]){
   const sql=`DO $check$ DECLARE docs jsonb; d jsonb; pdf text; BEGIN
   docs := public.patient_invoice_documents_for_access();
@@ -85,10 +89,18 @@ try{
  assert.ok(visibility.includes('already_available'));
  for(const role of ['authenticated','anon','service_role'])assert.notEqual(psql(`SET ROLE ${role}; SELECT * FROM public.invoice_portal_delivery_preflight('[]');`,'test_root').status,0);
  for(const role of ['authenticated','anon'])assert.notEqual(psql(`SET ROLE ${role}; SELECT public.animahost_invoice_portal_visibility('${id(106)}',NULL,NULL);`,'test_root').status,0);
+ const documentTarget=JSON.stringify([{account_id:id(3),patient_id:id(106),document_id:id(1106)}]);
+ const documentPreflight=`SET ROLE abrechnung_runtime; SELECT status FROM public.invoice_portal_delivery_preflight('${documentTarget}'); RESET ROLE;`;
+ run(`UPDATE abrechnung.active_patient_invoice_documents SET content=convert_to('broken','UTF8') WHERE id='${id(1106)}';`);
+ assert.ok(run(documentPreflight,'test_root').split('\n').includes('visible'));
+ run('UPDATE abrechnung.invoice_edition_settings SET enabled=false;');
+ assert.ok(run(documentPreflight,'test_root').split('\n').includes('pdf_unavailable'));
+ run('UPDATE abrechnung.invoice_edition_settings SET enabled=true;');
+ run(`UPDATE abrechnung.active_patient_invoice_documents SET content=convert_to('%PDF-1.7 synthetic test','UTF8') WHERE id='${id(1106)}';`);
  run(`UPDATE abrechnung.verified_invoice_editions SET content=convert_to('broken','UTF8') WHERE part_id='${id(1106)}';`);
  assert.ok(run(session(3,`SELECT public.patient_invoice_document_edition('${id(1106)}',false)->>'edition';`)).includes('original'));
  run(`UPDATE abrechnung.active_patient_invoice_documents SET content=convert_to('broken','UTF8') WHERE id='${id(1106)}';`);
- assert.ok(run(`SET ROLE abrechnung_runtime; SELECT status FROM public.invoice_portal_delivery_preflight('[{"account_id":"${id(3)}","patient_id":"${id(106)}","document_id":"${id(1106)}"}]'); RESET ROLE;`,'test_root').includes('pdf_unavailable'));
+ assert.ok(run(documentPreflight,'test_root').split('\n').includes('pdf_unavailable'));
  assert.ok(run(`SET ROLE service_role; SELECT public.animahost_invoice_portal_visibility('${id(106)}',NULL,NULL)->>'cause'; RESET ROLE;`,'test_root').includes('manual_review'));
  for(const claims of ['{}',JSON.stringify({sub:id(5)}),JSON.stringify({sub:'invalid'})]){const r=psql(`BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claims','${claims}',true); SELECT public.patient_invoice_documents_for_access(); ROLLBACK;`);assert.notEqual(r.status,0);}
  assert.equal(run("SELECT has_schema_privilege('abrechnung_runtime','auth','USAGE') OR has_schema_privilege('abrechnung_runtime','public','CREATE')"),'f');

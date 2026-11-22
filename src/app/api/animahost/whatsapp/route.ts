@@ -191,6 +191,10 @@ export async function POST(request:NextRequest){
    }else if(portalIntent==='section'){
     decision={action:'antworten',rule:'quality:invoice_section',text:t('animahost.quality.invoice_section',language)};
     qualityHandled=true;
+   }else if(portalIntent==='location'){
+    decision={action:'antworten',rule:'quality:invoice_documents',text:t('animahost.quality.portal_invoice',language,
+     {portal:'https://animacura.io/patient/portal?section=rechnungen'})};
+    qualityHandled=true;
    }
   }
   let informal=preferences?.informal??false;

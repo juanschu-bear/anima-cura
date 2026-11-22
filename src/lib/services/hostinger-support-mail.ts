@@ -9,6 +9,7 @@ import { safeCreateCommunicationMessage, safeRecordCommunicationEvent } from "@/
 import { sendPatientAccessCode } from "@/lib/services/patient-access-code-delivery";
 import { generateGroundedSupportCore } from "@/lib/services/hostinger-support-ai";
 import { retrieveSupportKnowledge } from "@/lib/support/knowledge-base";
+import { t } from "@/lib/i18n";
 
 export const HOSTINGER_SUPPORT_WORKFLOW_ID = "31480537-b9a8-4b93-b4d1-c011dfab415f";
 export const HOSTINGER_SUPPORT_EVENT = "hostinger_support_message_received";
@@ -401,7 +402,7 @@ export function buildSupportReply(event: ParsedSupportEvent, classification: Sup
   } else if (classification.category === "login_password") {
     message = `${hello}\n\ndeinen Zugang kannst du direkt in Anima Cura wiederherstellen:\n\n1. Öffne „Passwort vergessen“.\n2. Gib deine persönliche Anima-Cura-Anmeldeadresse ein. Sie endet meist auf @animacura.de, dient aber nur als Benutzername und empfängt keine E-Mails.\n3. Den sechsstelligen Sicherheitscode erhältst du an deine bei der Praxis hinterlegte private Kontakt-E-Mail, zum Beispiel Gmail, GMX oder Web.de.\n4. Trage den Code in der geöffneten App ein und vergib dein neues Passwort zweimal.\n\nDanach führt dich Anima Cura direkt zu der zuvor geöffneten Rechnung zurück.\n\nPasswort jetzt neu einrichten:\n${PORTAL_RECOVERY_URL}${commonEnd}`;
   } else if (classification.category === "invoice_access") {
-    message = `${hello}\n\nöffne den Rechnungsbutton oder QR-Code erneut und melde dich in Anima Cura an. Nach der Anmeldung wird die passende Rechnung automatisch geöffnet. Bereits bereitgestellte Rechnungen findest du außerdem im Patientenportal unter „Dokumente“.\n\nFalls das Passwort nicht mehr funktioniert, wähle auf der Anmeldeseite „Passwort vergessen“.${commonEnd}`;
+    message = `${hello}\n\n${t('patientAccess.invoiceSupport','de')}${commonEnd}`;
   } else if (classification.category === "payment_method") {
     message = `${hello}\n\ndie Rechnung und die sicheren Zahlungswege findest du nach der Anmeldung in Anima Cura. Öffne dort die Rechnung oder den Zahlungsbereich und wähle Banking-QR oder normale Überweisung. Beide Wege sind möglich.\n\nBei Fragen zu einem konkreten Betrag wird deine Nachricht persönlich geprüft.${commonEnd}`;
   } else {

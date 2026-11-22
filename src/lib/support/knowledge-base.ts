@@ -83,7 +83,7 @@ export const SUPPORT_KNOWLEDGE: readonly SupportKnowledgeEntry[] = [
     title: "Bereitgestellte Rechnungen finden",
     categories: ["invoice_access"],
     keywords: ["rechnung", "dokument", "finden", "öffnen", "sehen", "abrufen", "app"],
-    content: "Bereits digital bereitgestellte Rechnungen sind nach der Anmeldung im geschützten Patientenportal im Bereich „Dokumente“ beziehungsweise „Rechnungen“ verfügbar. Der Rechnungsbutton aus der Benachrichtigungs-E-Mail führt über die Anmeldung zur passenden Rechnung.",
+    content: "Bereitgestellte Rechnungen findest du unter „Rechnungen“. Unter „Dokumente“ liegen Unterlagen wie Anamnesebögen, Behandlungspläne, Röntgenbilder, Bescheinigungen und Verträge. Der Rechnungsbutton aus der E-Mail führt über die Anmeldung zur passenden Rechnung.",
     kind: "procedure",
     answerScope: "Nennt ausschließlich die vorhandenen Fundstellen im Portal.",
   },
