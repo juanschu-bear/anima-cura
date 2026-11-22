@@ -6,13 +6,13 @@ Juans Entscheidung: Rechnungsmail auch ohne Konto; alle drei Tage je bereits ben
 
 **Juan hat am 22.11.2026 ausdrücklich „Für Claude zum Einspielen freigeben“ bestätigt.** Die Freigabe gilt ausschließlich für `030_invoice_followup.sql`, SHA-256 `52d169294204dd01a5bb01bee82d7b1d0e1ecdf32243f371508686861c93466a`, im Projekt `zymqxzhjbcxzhzvjqvbv`, Laufname `2026-11-22-invoice-followup-030`. Code und Deployments beider Repos sind erfolgreich; Cura Production Verify für `4a1e17a` ist grün. Leitstand enthält zusätzlich die Absicherung abgebrochener Worker in `81f76a4`.
 
-**Auftrag an Claude:** Datei unverändert über Juans bestehende Supabase-Sitzung einspielen, Ergebniszeile protokollieren und anschließend die unten beschriebene Produktionsabnahme durchführen. Die Installation wurde von Codex nicht ausgeführt. Freigabe ist kein Nachweis einer Installation. Zählungen ohne Namen zurückgeben: übernommene historische Serien, aktuell fällige Serien, Versandannahmen, Abschlüsse nach Grund, Prüffälle nach Grund, Anrufliste und dauerhafte Rückläufer. Keine weitere Codefreigabe erforderlich. Der nächste Worker kann nach Installation innerhalb des Tagesfensters echte Erinnerungen senden.
+**Installationsrückmeldung:** Juan bestätigt Claudes Installation von 030 und 031 mit Ergebnis „eingespielt“ und unveränderten Prüfsummen. Die nachfolgende Funktions- und Versandabnahme bleibt getrennt nachzuweisen. Zählungen ohne Namen zurückgeben: übernommene historische Serien, aktuell fällige Serien, Versandannahmen, Abschlüsse nach Grund, Prüffälle nach Grund, Anrufliste und dauerhafte Rückläufer. Keine weitere Codefreigabe erforderlich. Der nächste Worker kann nach Installation innerhalb des Tagesfensters echte Erinnerungen senden.
 
 ## Bereitstellung und Aktivierung
 
 - Patienten-App: Erfassung der tatsächlichen Belegöffnung, PDF-Abrufe, App-Installation; interne Vorprüfung und Zugangs-/Abbestelllinks.
 - Leitstand: Planung, Versand im vorhandenen Worker, Praxisdaten und auditierter Stoppbefehl.
-- **Die neue SQL-Datei ist vorbereitet, hier nicht in Production eingespielt. Code-Deployment und Juans SQL-Freigabe liegen jetzt vor; die Ausführung durch Claude und die Produktionsabnahme stehen noch aus.** Vor der Migration plant der Worker keine Erinnerungen. Fehlende neue Tabellen blockieren bestehende PDFs nicht; die Browserwarteschlange hält echte Öffnungsereignisse für einen erneuten Versuch zurück.
+- **030 und 031 sind laut Juans Produktionsrückmeldung installiert; die vollständige Funktions- und Versandabnahme bleibt offen.** Vor der Migration plant der Worker keine Erinnerungen. Fehlende neue Tabellen blockieren bestehende PDFs nicht; die Browserwarteschlange hält echte Öffnungsereignisse für einen erneuten Versuch zurück.
 - Migration: `database/abrechnung/030_invoice_followup.sql` im Repo `anima-leitstand`.
 - Ziel: **Anima Cura**, Projekt **zymqxzhjbcxzhzvjqvbv**.
 - Laufname: **2026-11-22-invoice-followup-030**.
@@ -143,3 +143,20 @@ Neue POST-Route `/api/patient/rechnungen/event`: `{event:"invoice_opened",docume
 ## Lokale Prüfung dieses Lieferstands
 
 Beide Production-Builds und Typprüfungen bestanden. Leitstand: vollständige Suite mit 458 erfolgreichen Tests; nach den abschließenden Änderungen erneut 18 gezielte Rechnungs-/Vorprüfungstests. Cura: vollständige Suite mit 490 erfolgreichen Tests, danach 112 Abrechnungstests einschließlich Familienhinweisen; 13 Browserfälle bestanden. Der lesende Live-RPC-Audit bestätigte 68 Aufrufstellen ohne Verletzung. SQL-Migration, Rollenrechte, historische Übernahme, Wiederholungen, parallele Stoppsignale, No-Account-Mail, Berliner Zeitfenster, Zahlung, Abbestellung, dauerhafte Rückläufer und verspätete Providerereignisse wurden in einer lokalen PostgreSQL-Engine geprüft. Dabei wurden keine Patientenmails versandt. Diese Prüfungen ersetzen nicht die Abnahme nach der freigegebenen Production-Migration.
+
+
+## Ergänzung: bisher nicht verschickte Rechnungen (Juan, 22.11.2026)
+
+030 und 031 sind laut Juans Rückmeldung durch Claude mit unveränderter Prüfsumme eingespielt. Die Produktionszählung weist 325 sichtbare Q1–Q3-Rechnungen bei 181 Personen ohne Versandnachweis aus. Der frühere Planer übernahm nur tatsächlich verschickte Mails; diese Lücke ist im Code geschlossen.
+
+Der tägliche Worker ruft weiterhin `planInvoiceFollowups()` auf. Zusätzlich werden alle freigegebenen Q1–Q3-Belege ohne Annahmenachweis aufgenommen, einschließlich später nachweislich zugeordneter Belege. Pro Patient/Beleg entsteht genau ein Auftrag mit `kind: invoice_reminder`, stabilem Scope `initial:<patientId>:<documentId>` und `payload.followup.initialDelivery: true`, `number: 0`. Das ist eine Erstzustellung, noch keine Erinnerung. Bestehende Versandaufträge, unklare Versandversuche und manuelle Stopps verhindern doppelte Aufträge. Frühere automatisch wegen fehlender Voraussetzungen gestoppte Erstzustellungen können wieder aufgenommen werden. Keine neue SQL-Migration nötig.
+
+Vor dem tatsächlichen Versand gelten dieselben aktuellen Konto-, Zuordnungs- und PDF-Prüfungen, persönlichen Zugangslinks und Stoppsignale wie bei Erinnerungen. Kein Konto ist kein Ausschluss. Versand nur 09:00 bis vor 19:00 Berlin, bei Konto zusätzlich App-Hinweis und Push. Ein bezahlter, bereits gelesener, abgemeldeter oder manuell gestoppter Beleg wird nicht erneut verschickt; dauerhafter Bounce wird zur Praxisaufgabe. Offene Prüfung ist keine Versandbestätigung.
+
+`first_mail_at` und `last_mail_at` bleiben bis zum tatsächlichen Annahmenachweis ungesetzt (vorher existiert nur der Auftrag). Nach Annahme wird die Nachfasszeile mit echten Zeitpunkten angelegt, `reminder_count: 0`, `last_reminder_at: null`; erste Erinnerung frühestens 72 Stunden später im Tagesfenster. Audit: `initial_delivery_accepted`. Unklarer externer Versand wird nicht automatisch wiederholt.
+
+Datenvertrag für Claude: `/api/abrechnung/notifications/followups` ergänzt `initialDeliveries[]` mit `jobId`, `patientId`, `documentId`, `state`, `reason`, `signals`, `scheduledAt`, `nextAttemptAt`, `reminderCount: 0`, `lastMailAt: null`. Dies zeigt den Erstzustellauftrag; nach Versand stehen die tatsächlichen Mailzeitpunkte in `people[].invoices[]`. Keine fiktiven Zeitpunkte anzeigen. Zustände `scheduled`, `sending`, `sent`, `delivery_failed`, `stopped` getrennt zeigen; bei Prüfung `reason` ausweisen.
+
+Lokaler PostgreSQL-Test: 325 synthetische Rechnungen / 181 Personen werden einmalig aufgenommen; erneuter Lauf erzeugt keinen Doppelauftrag. Produktionsaufnahme noch durch den nächsten Lauf und `docs/2026-11-22-invoice-reconciliation-readonly.sql` bestätigen. Die 325 sind die historische Prüfkohorte; nach Versand/Öffnung kann die aktuelle Restzahl kleiner werden. Nachweis erforderlich: keine unerklärten `not_in_worker`-Fälle.
+
+Der Worker-Rückgabewert ergänzt `followupPlanning.initial` mit `candidates`, `scheduled`, `alreadyTracked`. Diese Zahlen stammen aus dem konkreten Lauf; sie sind keine fest codierte Behauptung über die 325.
