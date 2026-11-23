@@ -52,7 +52,7 @@ Migration 103 unverändert. Die bereits vorhandene Folgemigration 104 ergänzt `
 
 Vollständigkeitsprüfung an der echten Importdatei: 51 Einträge, vier im Bereich Gespräch, acht offene Fragen, neun Freigabevermerke, elf referenzierte Quellen. Für **jeden** Eintrag werden `selbsthilfe`, `praxis`, `rezeption`, `warnzeichen`, `offen`, `quellen` und `freigabe` mit dem Importergebnis verglichen. Selbsthilfe/Praxis/Rezeption/Warnzeichen gehen als getrennte `guidance`-Felder in den Modellkontext; offene Fragen und Herkunfts-/Freigabevermerke bleiben redaktionelle Metadaten und werden nicht zu freigegebenem Wissen.
 
-**Datenbankstand geprüft:** `animahost_knowledge_versions` und `animahost_import_knowledge` fehlen auf Production. Migrationen 103 und 104 sind vorbereitet, wurden in diesem Auftrag nicht eingespielt. Daher noch kein Production-Import und keine Wissensfreigabe. Die obige Laufzeitreihe verwendet wie der alte Vergleich den damaligen freigegebenen Wissensstand, nicht den KFO-Entwurf.
+**Historischer Datenbankstand dieses Laufs:** Migrationen 103 und 104 waren bei dieser Messung noch nicht installiert. Inzwischen sind beide eingespielt; am 23.11.2026 wurden 51 Entwürfe importiert (51 created, 0 revised, 0 unchanged). Keine Wissensfreigabe. Der anschließende getrennte Lauf mit simuliert freigegebenen Entwürfen ist im [Import- und Probelaufbericht](2026-11-23-wissensimport-probelauf.md) dokumentiert. Die obige Laufzeitreihe bleibt der Vergleich mit dem damaligen freigegebenen Wissensstand.
 
 ## Reproduzieren und Validierung
 
