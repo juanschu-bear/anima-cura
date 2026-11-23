@@ -17,6 +17,7 @@ const {patientIsMinor,maskBirthDates}=require('./src/lib/services/animahost-chat
 const {teamReplyTime}=require('./src/lib/services/animahost-team-time.ts');
 const {appointmentLocalDate}=require('./src/lib/services/animahost-appointment-notices.ts');
 const {recentConversation}=require('./src/lib/services/animahost-whatsapp-conversation.ts');
+const {clarificationRound}=require('./src/lib/services/animahost-unclear-input.ts');
 
 const [sourcePath,outputPath,mode='approved',limitArg]=process.argv.slice(2);
 if(!sourcePath||!outputPath||!['approved','draft_preview'].includes(mode))throw Error('Usage: PRIVATE_INPUT PRIVATE_OUTPUT approved|draft_preview [LIMIT]');
@@ -70,8 +71,14 @@ async function evaluate(row:any){
  const seed={id:row.id,origin:row.origin,mode,at,input:sanitize(row,base.message),anrede,retrieved:empty(),answer:'',clarificationStage:null,
   sendDelaySeconds:null,sendStatus:'not_sent_dry_run'};
  try{
+  // Read decisions as of the historical input. Only actually delivered clarification
+  // text in the frozen history advances the stage.
+  const preflight=retrievalPreflight(base);
+  const prior=preflight?null:await db.from('animahost_whatsapp_decisions').select('rule_id,patient_text')
+   .eq('tenant_id',tenant).eq('sender_jid',row.jid).lte('created_at',at).order('created_at',{ascending:false}).limit(100);
+  if(prior?.error)throw Error('retrieval_context_failed');
   // Exclude the source chat from similar historical cases to avoid grading the original answer as a prediction.
-  const found=retrievalPreflight(base)?{documents:[]}:await retrieveSources(db,tenant,base.message,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text),base.preview,contentHash(row.jid));
+  const found=preflight?{documents:[]}:await retrieveSources(db,tenant,base.message,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text),base.preview,contentHash(row.jid));
   const recovery:any[]=[],calls:any[]=[];
   const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call));
   const result=await runRetrievalReply(async(call:any)=>{
@@ -87,7 +94,8 @@ async function evaluate(row:any){
      await delay(800*(attempt+1));
     }
    }
-  },{...base,documents:found.documents,budgetMs:Math.max(1000,60_000-(Date.now()-started))});
+  },{...base,clarificationRound:clarificationRound(prior?.data??[],row.history),documents:found.documents,
+   budgetMs:Math.max(1000,60_000-(Date.now()-started))});
   const {text:reply,teamSummary:ignored,error,clarificationStage:stage,...rest}=result;
   return {...seed,...rest,answer:sanitize(row,reply),anrede:result.anrede??anrede,clarificationStage:stage??null,
    status:error?'technical_error':result.rule,error:error??null,recoveredErrors:recovery,
