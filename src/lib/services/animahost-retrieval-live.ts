@@ -10,9 +10,10 @@ import {whatsappRulesSchema} from './animahost-whatsapp';
 import {gatewayGenerate,type ModelCall} from './animahost-chain-model';
 import {retrieveSources} from './animahost-retrieval';
 import {runRetrievalReply,retrievalPreflight,type RetrievalInput} from './animahost-retrieval-core';
+import type {OutboundTurn} from './animahost-retrieval-routing';
 type Db=ReturnType<typeof createServerClient>;
 export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;phone?:string|null;messageId:string;text:string|null;messageType:string;receivedAt:string;
- identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;hasPriorConversation?:boolean;hasPriorReply?:boolean;concernHistory?:ConcernHistory;readOnly?:boolean},practice:any,signal:AbortSignal,preview=false){
+ identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;lastOutbound?:OutboundTurn;hasPriorConversation?:boolean;hasPriorReply?:boolean;concernHistory?:ConcernHistory;readOnly?:boolean},practice:any,signal:AbortSignal,preview=false){
  const started=Date.now();
  const history=recentConversation(input.history??[],input.receivedAt).map(h=>({...h,text:maskBirthDates(h.text)}));
  const phone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
@@ -43,7 +44,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
-  history,dossier,patientSheet,chatName,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
+  history,dossier,patientSheet,chatName,lastOutbound:input.lastOutbound,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
   today:appointmentLocalDate(input.receivedAt),doctolibUrl:practice.doctolib_url,
   hasPriorConversation:input.hasPriorConversation===true||history.length>0,hasPriorReply:input.hasPriorReply===true||history.some(h=>h.direction==='outgoing'),
   identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,60000-(Date.now()-started))};

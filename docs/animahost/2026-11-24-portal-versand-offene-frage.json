@@ -1,0 +1,16 @@
+{
+  "version": "2026-11-24-portal-versand",
+  "stand": "2026-11-24",
+  "bereiche": ["praxisablauf"],
+  "quellen": {},
+  "eintraege": [
+    {
+      "id": "ablauf-rechnung-mail-ohne-portal",
+      "bereich": "praxisablauf",
+      "titel": "Rechnung per E-Mail ohne Portalzugang",
+      "quelle": "offen",
+      "inhalt": "Das Portal ist im Browser erreichbar. Für eine einzelne Rechnung bestätigt nur der belegte Zustellstatus, ob sie bereits per E-Mail verschickt wurde.",
+      "offen": "Wann verschickt die Praxis Rechnungen regulär per E-Mail, wenn der Portalzugang fehlt oder abgelehnt wird? Bitte je Rechnungsart festhalten, ob der Versand automatisch erfolgt, wer ihn auslöst und wann ein Original oder ein Ersatzweg angeboten wird."
+    }
+  ]
+}

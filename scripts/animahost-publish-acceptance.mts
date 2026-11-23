@@ -11,6 +11,10 @@ import type {RetrievalEvidence,RetrievalKind} from '../src/lib/services/animahos
 import type {ModelFailure} from '../src/lib/services/animahost-model-failure';
 
 const [mapPath,draftPath,approvedPath]=process.argv.slice(2);
+const reportDate=process.env.ANIMAHOST_ACCEPTANCE_DATE??'2026-11-23';
+const rulebookVersion=Number(process.env.ANIMAHOST_ACCEPTANCE_RULEBOOK??9);
+const codeCommit=process.env.ANIMAHOST_ACCEPTANCE_COMMIT??'cc615c4';
+if(!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)||!Number.isSafeInteger(rulebookVersion)||!(/^[a-f0-9]{7,40}$/.test(codeCommit)))throw Error('invalid_run_metadata');
 const redactWith=process.env.ANIMAHOST_REDACTION_MODEL??'anthropic/claude-haiku-5.5';
 const reviewWith=process.env.ANIMAHOST_REVIEW_MODEL;
 if(!mapPath||!draftPath||!approvedPath||!process.env.AI_GATEWAY_API_KEY||!reviewWith||reviewWith===redactWith)
@@ -25,7 +29,8 @@ const knowledge=JSON.parse(readFileSync(docs+'wissensbasis-kfo-v1.json','utf8'))
 type Mode='draft_preview'|'approved';
 type Row={ref:string;at:string;input:string;answer:string;retrieved:Record<RetrievalKind,RetrievalEvidence[]>;status:string;
  anrede:'du'|'Sie';clarificationStage:1|2|3|null;timing:{generationMs:number|null;totalMs:number};error:ModelFailure|null;
- recoveredErrors:ModelFailure[];priorErrors:ModelFailure[];sendDelaySeconds:null;sendStatus:'not_sent_dry_run'};
+ recoveredErrors:ModelFailure[];priorErrors:ModelFailure[];sendDelaySeconds:null;sendStatus:'not_sent_dry_run';
+ patientSheetAccess?:'confirmed'|'unconfirmed'|'ambiguous'|'unlinked';identityQuestion?:boolean};
 type ReplayCall=Pick<ModelCall,'inputTokens'|'outputTokens'|'failure'>&Partial<Pick<ModelCall,'costUsd'>>;
 function measuredCost(calls:ReplayCall[]){
  let costUsd=0,receipts=0,fromTokenCounts=0,unpriced=0,rejected=0;
@@ -48,8 +53,8 @@ function readRun(path:string,mode:Mode):Row[]{
   const row=JSON.parse(line);
   const ref=refs[row.id];
   if(!ref||row.mode!==mode||!Number.isFinite(Date.parse(row.at))||!['du','Sie'].includes(row.anrede))throw Error('invalid_case_record');
-  const {at,input,answer,retrieved,status,anrede,clarificationStage,timing,error,recoveredErrors=[],priorErrors=[]}=row;
-  latest.set(ref,{ref,at,input,answer,retrieved,status,anrede,clarificationStage,timing,error,recoveredErrors,priorErrors,sendDelaySeconds:null,sendStatus:'not_sent_dry_run'});
+  const {at,input,answer,retrieved,status,anrede,clarificationStage,timing,error,recoveredErrors=[],priorErrors=[],patientSheetAccess,identityQuestion}=row;
+  latest.set(ref,{ref,at,input,answer,retrieved,status,anrede,clarificationStage,timing,error,recoveredErrors,priorErrors,patientSheetAccess,identityQuestion,sendDelaySeconds:null,sendStatus:'not_sent_dry_run'});
  }
  if(latest.size!==239)throw Error(mode+'_incomplete_'+latest.size);
  return [...latest.values()].sort((a,b)=>a.ref.localeCompare(b.ref,undefined,{numeric:true}));
@@ -120,19 +125,24 @@ await batches([...draft,...approved].filter(row=>row.answer.trim()),10,async bat
  });
 });
 
-const completedAt=new Date().toISOString(),runId=`retrieval-v9-${randomUUID()}`;
+const completedAt=new Date().toISOString(),runId=`retrieval-v${rulebookVersion}-${randomUUID()}`;
 const summarize=(rows:Row[])=>{
  const counts:Record<string,number>={};
  for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
  const ms=rows.filter(r=>r.answer.trim()).map(r=>r.timing.generationMs).filter((v):v is number=>v!==null).sort((a,b)=>a-b);
- return {counts,answers:ms.length,generationMedianMs:ms.length?(ms[Math.floor((ms.length-1)/2)]+ms[Math.floor(ms.length/2)])/2:null};
+ const known=rows.filter(r=>r.patientSheetAccess==='confirmed'||r.patientSheetAccess==='unconfirmed');
+ return {counts,answers:ms.length,generationMedianMs:ms.length?(ms[Math.floor((ms.length-1)/2)]+ms[Math.floor(ms.length/2)])/2:null,
+  knownCases:known.length,identityQuestionsForKnown:known.filter(r=>r.identityQuestion&&r.answer.trim()).length,
+  markedAnswers:rows.filter(r=>reviews.get(r)?.patterns.length).length};
 };
 const stats={draft_preview:summarize(draft),approved:summarize(approved)};
 const publish=(rows:Row[])=>rows.map(row=>({...row,quality:reviews.has(row)?{score:reviews.get(row)!.score,patterns:reviews.get(row)!.patterns}:null}));
-const result={runId,completedAt,mode:'draft_preview',knowledge:'Entwurfswissen nur im Probelauf',codeCommit:'cc615c4',rulebookVersion:9,
+const result={runId,completedAt,mode:'draft_preview',knowledge:'Entwurfswissen nur im Probelauf',codeCommit,rulebookVersion,
  planned:239,completed:239,complete:true,technicalErrors:(stats.draft_preview.counts.technical_error??0)+(stats.approved.counts.technical_error??0),
  qualityFindings:[...reviews.values()].filter(r=>r.patterns.length).length,stats,costs,cases:publish(draft),approvedCases:publish(approved)};
-const validForAcceptance=result.technicalErrors===0&&result.qualityFindings===0;
+const patternGate=rulebookVersion>=10?9:0;
+const validForAcceptance=result.technicalErrors===0&&namesForGate().every(s=>s.markedAnswers<=patternGate&&s.identityQuestionsForKnown===0);
+function namesForGate(){return Object.values(stats);}
 const names:[Mode,Row[]][]=[['draft_preview',draft],['approved',approved]];
 const causes={
  generic_handoff:'Konkrete Hilfe fehlt vor der Übergabe. Die Antwort zuerst auf das lösbare Anliegen und danach auf die echte Aufgabe fürs Team prüfen.',
@@ -140,10 +150,10 @@ const causes={
  portal_access_boilerplate:'Eine Systemgrenze wird ohne Hilfestellung beschrieben. Den echten Zugriffspfad oder den konkreten nächsten Schritt nennen.',
  reply_time_boilerplate:'Die Rückmeldezeit ist ein Standardsatz. Angeben, was das Team bis dahin tatsächlich klärt.',
 };
-let report=`# AnimaHost · Abnahme mit Regelbuch 9\n\nLauf \`${runId}\` · ${completedAt}. Antwortlogik \`cc615c4\`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand.\n\n**${result.technicalErrors===0&&result.qualityFindings===0?'Abnahmefähig nach den Kriterien dieses Laufs.':'Abnahme offen.'}** Technische Fehler ${result.technicalErrors}. Antworten mit alten Mustern ${result.qualityFindings}.\n\n| Status | Entwurf | Freigegeben |\n| --- | ---: | ---: |\n`;
+let report=`# AnimaHost · Abnahme mit Regelbuch ${rulebookVersion}\n\nLauf \`${runId}\` · ${completedAt}. Antwortlogik \`${codeCommit}\`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand.\n\n**${validForAcceptance?'Abnahmefähig nach den Kriterien dieses Laufs.':'Abnahme offen.'}** Technische Fehler ${result.technicalErrors}. Antworten mit alten Mustern ${result.qualityFindings}.\n\n| Status | Entwurf | Freigegeben |\n| --- | ---: | ---: |\n`;
 for(const status of [...new Set(names.flatMap(([mode])=>Object.keys(stats[mode].counts)))].sort())report+=`| ${status} | ${stats.draft_preview.counts[status]??0} | ${stats.approved.counts[status]??0} |\n`;
 report+='\nMedian der Erzeugungszeit nur für vorhandene Antworttexte, ohne Versandzeit oder unbeantwortete Fälle.\n\n';
-for(const [mode] of names)report+=`- \`${mode}\` · ${stats[mode].generationMedianMs??'offen'} ms bei ${stats[mode].answers} Antworten\n`;
+for(const [mode] of names)report+=`- \`${mode}\` · ${stats[mode].generationMedianMs??'offen'} ms bei ${stats[mode].answers} Antworten. ${stats[mode].markedAnswers} Antworten mit mindestens einem Muster. Identitätsfragen bei bekannten Patienten ${stats[mode].identityQuestionsForKnown} unter ${stats[mode].knownCases} ausgewerteten bekannten Fällen.\n`;
 report+='\n## Modellkosten\n\n';
 report+='Beträge in USD. Für ältere Aufrufe ohne Einzelpreis wurden gemessene Eingabe- und Ausgabetokens zum anhand echter Gateway-Belege geprüften EU-Tarif bewertet. Thinking ist in der SDK-Ausgabetokenzahl enthalten. Fehlende Preisbelege und nicht erfasste abgebrochene Aufrufe können den Rechnungsbetrag erhöhen. Die Redaktion und Zweitbewertung sind separat gekennzeichnet.\n\n';
 report+='| Wissensstand | Erfassung aller Versuche | Ohne Preisbeleg | Zusätzliche Durchläufe über denselben Fall | Hochrechnung je 30 Tage |\n| --- | ---: | ---: | ---: | ---: |\n';
@@ -167,6 +177,6 @@ for(const [label,examples] of [['Zehn stärkste Antworten',ranking.slice(0,10)],
  report+=`\n## ${label}\n\n`;
  for(const {mode,row,review} of examples)report+=`**${mode}/${row.ref} · ${review.score}/10**\n\nEingang\n\n${row.input.split('\n').map(l=>('> '+l).trimEnd()).join('\n')}\n\nAntwort\n\n${row.answer.split('\n').map(l=>('> '+l).trimEnd()).join('\n')}\n\n`;
 }
-writeFileSync(docs+'2026-11-23-acceptance-run.json',JSON.stringify({...result,validForAcceptance},null,2)+'\n');
-writeFileSync(docs+'2026-11-23-retrieval-239-abnahme.md',report.trimEnd()+'\n');
+writeFileSync(docs+reportDate+'-acceptance-run.json',JSON.stringify({...result,validForAcceptance},null,2)+'\n');
+writeFileSync(docs+reportDate+'-retrieval-239-abnahme.md',report.trimEnd()+'\n');
 console.log({runId,technicalErrors:result.technicalErrors,qualityFindings:result.qualityFindings,stats});

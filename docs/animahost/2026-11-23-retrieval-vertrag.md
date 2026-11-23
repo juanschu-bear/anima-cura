@@ -107,3 +107,13 @@ Der Ersatzlauf liefert zusätzlich `anrede` (`du` oder `Sie`), `clarificationSta
 Unklare Eingänge: `conversation:clarify_first`, dann `conversation:clarify_second`, erst danach `conversation:outside_scope` mit ausgesprochener Übergabe ans Team. Zähler berücksichtigt tatsächlich im Verlauf versendete Nachfragen; eine inhaltliche Antwort setzt ihn zurück. Reaktionen/Dank bleiben still.
 
 Regelbuch v9 beschreibt Anrede und Ton. Das aus Patientenblatt und Nachricht gewählte `anrede` wird in den Modellkontext geschrieben. Eltern und erwachsene Begleitpersonen erhalten Sie, selbst schreibende Patienten du. Bei unklarer Rolle beginnt die Unterhaltung mit Sie. Nach der ersten Antwort richtet sich die Anrede nach dem Gegenüber. Ein einzelnes Emoji ist im lockeren Du erlaubt. Bei Schmerzen, Notfällen, Absagen und Rechnungen bleibt der Ton warm und gerade. Vier Goldbeispiele decken Link mit du, Link mit Sie, Huhu und die zweite Nachfrage ab.
+
+## Praxis übernimmt den Gesprächsfaden und Anlass jetzt vor Ort
+
+AnimaLine sendet im internen Aufruf optional `lastOutbound:{source:"practice"|"animahost",at}` und dieselbe Quelle bei protokollierten ausgehenden Verlaufsnachrichten. Praxishandy und Leitstand zählen als `practice`. Fehlt eine bestätigte Quelle im Archiv, bleibt sie offen.
+
+`conversation:practice_reply` ist `action:"klaerfall"`, `skipSend:true`, leerer Text, `details.practiceSummary:"Antwort an eure Nachricht"`. Bei einem Praxiseingang innerhalb von 24 Stunden seit der letzten menschlichen ausgehenden Nachricht und bei reinen Einwortkorrekturen oder kurzen Zustimmungen bleibt der Fall unter „Wartet auf euch“. Reaktionen und Dank bleiben still. Der Kern behandelt akute Notfälle und Anliegen direkt vor Ort vor der Gesprächsübergabe.
+
+`conversation:immediate_practice` ist `action:"klaerfall"` mit einer direkten Antwort in einem Satz und einer wichtigen Meldung an den Empfang. AnimaLine plant den Versand sofort. Klingel und Festnetz richten sich nach dem Anlass. Für die 5-Minuten-Verspätung bleibt der Termin unverändert. Das Festnetz ist auf der [Praxiswebsite](https://www.schubert-holi-dontics.de/) veröffentlicht.
+
+Mit `patientSheet.access:"confirmed"|"unconfirmed"` verbieten Erzeugung und Prüfung jede Identitätsfrage. Nur bei `unlinked` oder `ambiguous` und einer ohne Zuordnung nicht beantwortbaren persönlichen Frage ist eine ans Anliegen gebundene Identitätsfrage zulässig. Der Kern hängt niemals automatisch eine Identitätsfrage oder eine Rückmeldezeit an. Kontostand, Portalzugang, sichtbare Rechnungen und Versandstatus bleiben getrennte Fakten. Der abweichende Versandablauf ohne Portalzugang steht als offene Frage in der Wissensbasis.

@@ -18,6 +18,8 @@ const {teamReplyTime}=require('./src/lib/services/animahost-team-time.ts');
 const {appointmentLocalDate}=require('./src/lib/services/animahost-appointment-notices.ts');
 const {recentConversation}=require('./src/lib/services/animahost-whatsapp-conversation.ts');
 const {clarificationRound}=require('./src/lib/services/animahost-unclear-input.ts');
+const {workflowRules}=require('./src/lib/services/animahost-retrieval-routing.ts');
+const {loadPatientSheet}=require('./src/lib/services/animahost-patient-sheet.ts');
 
 const [sourcePath,outputPath,mode='approved',limitArg]=process.argv.slice(2);
 if(!sourcePath||!outputPath||!['approved','draft_preview'].includes(mode))throw Error('Usage: PRIVATE_INPUT PRIVATE_OUTPUT approved|draft_preview [LIMIT]');
@@ -29,13 +31,14 @@ try{writeFileSync(lock,String(process.pid),{flag:'wx',mode:0o600});}
 catch(error){if((error as NodeJS.ErrnoException).code==='EEXIST')throw Error('acceptance_output_locked');throw error;}
 process.once('exit',()=>unlinkSync(lock));
 const data=JSON.parse(readFileSync(sourcePath,'utf8')),db=createServerClient();
+const wire=process.env.ANIMAHOST_REPLAY_WIRE_FILE?JSON.parse(readFileSync(process.env.ANIMAHOST_REPLAY_WIRE_FILE,'utf8')):null;
 const tenant=data.practice.tenant_id;
 const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).single();
-if(settings.error||settings.data.active_rulebook_version!==9)throw Error('expected_active_rulebook_9');
+if(settings.error||![9,10].includes(settings.data.active_rulebook_version))throw Error('unexpected_rulebook_version');
 const practice=settings.data;
-const rulebook=await db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',tenant).eq('version',9).single();
+const rulebook=await db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',tenant).eq('version',practice.active_rulebook_version).single();
 if(rulebook.error)throw Error('rulebook_unavailable');
-const rules=whatsappRulesSchema.parse(rulebook.data.rules);
+const rules=whatsappRulesSchema.parse([...rulebook.data.rules.filter((rule:any)=>!workflowRules.some((r:any)=>r.id===rule.id)),...workflowRules]);
 const previous=new Map<string,any>();
 try{
  for(const line of readFileSync(destination,'utf8').trim().split('\n').filter(Boolean)){
@@ -44,7 +47,8 @@ try{
   previous.set(row.id,row);
  }
 }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
-const pending=data.rows.filter((r:any)=>!previous.has(r.id)||previous.get(r.id).status==='technical_error')
+const recheck=process.env.ANIMAHOST_REPLAY_RECHECK_FILE?new Set(JSON.parse(readFileSync(process.env.ANIMAHOST_REPLAY_RECHECK_FILE,'utf8'))):null;
+const pending=data.rows.filter((r:any)=>recheck?recheck.has(r.id):!previous.has(r.id)||previous.get(r.id).status==='technical_error')
  .slice(0,limitArg?Number(limitArg):undefined);
 const commonNames=[...(data.additionalNames??[]),...(data.names??[]).flatMap((p:any)=>[p.vorname??'',p.nachname??'']),
  ...(data.archive??[]).map((h:any)=>h.display_name??''),...(data.clinical??[]).flatMap((p:any)=>[p.vorname??'',p.nachname??''])];
@@ -58,16 +62,24 @@ process.once('SIGTERM',()=>{blocked=true;});
 async function evaluate(row:any){
  const started=Date.now(),at=new Date(row.at).toISOString(),today=appointmentLocalDate(at);
  const phone=row.phone_e164??(row.jid.endsWith('@s.whatsapp.net')?row.jid.split('@')[0]:null);
- const linked=[...new Map([...row.labels,...data.patients.filter((p:any)=>p.phone===phone).map((p:any)=>({id:p.id,firstName:p.vorname,lastName:p.nachname}))].map((p:any)=>[p.id,p])).values()] as any[];
- const patients=linked.map((p:any)=>{const extra=data.clinical.find((x:any)=>x.id===p.id);const verified=data.verified.some((x:any)=>x.chat_jid===row.jid&&x.patient_id===p.id&&Date.parse(x.verified_at)<=Date.parse(at));return {
-  id:p.id,firstName:p.firstName??'',lastName:p.lastName??'',minor:patientIsMinor(extra?.geburtsdatum??null,today),verified,treatment:verified?extra?.behandlung??null:null,appAccount:null,openedInvoicesInApp:null,invoices:'unclear',
+ const historicalLinks=(wire?.links??[]).filter((p:any)=>p.chat_jid===row.jid&&Date.parse(p.confirmed_at)<=Date.parse(at));
+ const linked=[...new Map([...(historicalLinks.map((p:any)=>({id:p.patient_id}))),...row.labels,...data.patients.filter((p:any)=>p.phone===phone).map((p:any)=>({id:p.id,firstName:p.vorname,lastName:p.nachname}))].map((p:any)=>[p.id,p])).values()] as any[];
+ const patients=linked.map((p:any)=>{const extra=data.clinical.find((x:any)=>x.id===p.id);const verified=(wire?.verified??data.verified).some((x:any)=>x.chat_jid===row.jid&&x.patient_id===p.id&&Date.parse(x.verified_at)<=Date.parse(at))||
+  historicalLinks.some((link:any)=>link.patient_id===p.id&&link.confirmed_by&&link.confirmed_by!=='00000000-0000-4000-8000-000000000001');return {
+  id:p.id,firstName:p.firstName??extra?.vorname??'',lastName:p.lastName??extra?.nachname??'',minor:patientIsMinor(extra?.geburtsdatum??null,today),verified,treatment:verified?extra?.behandlung??null:null,appAccount:null,openedInvoicesInApp:null,invoices:'unclear',
   ...(verified?{confidential:{newestInvoiceDate:null,lastVisits:[],reminders:[],installmentPlan:null,nextInstallmentDue:null,nextAppointments:[]}}:{})};});
- const history=recentConversation(row.history.map((h:any)=>({...h,text:maskBirthDates(h.text??'')})),at);
+ const history=recentConversation(row.history.map((h:any)=>{
+  const matched=h.direction==='outgoing'&&(wire?.out??[]).find((w:any)=>w.chat_jid===row.jid&&w.body===h.text&&Math.abs(Date.parse(w.sent_at)-Date.parse(h.at))<2000);
+  return {...h,text:maskBirthDates(h.text??''),...(matched?{source:matched.source==='animahost'?'animahost':'practice'}:{})};
+ }),at);
+ const latestWire=(wire?.out??[]).filter((w:any)=>w.chat_jid===row.jid&&Date.parse(w.sent_at)<=Date.parse(at)).sort((a:any,b:any)=>Date.parse(b.sent_at)-Date.parse(a.sent_at))[0];
+ const lastHistorical=history.filter(h=>h.direction==='outgoing').at(-1);
+ const lastOutbound=latestWire&&(!lastHistorical||Date.parse(latestWire.sent_at)+1500>=Date.parse(lastHistorical.at))?
+  {source:latestWire.source==='animahost'?'animahost' as const:'practice' as const,at:latestWire.sent_at}:undefined;
  const priorReply=row.history.some((h:any)=>h.direction==='outgoing');
  const role=patients.length===1&&patients[0].verified&&patients[0].minor===false?'Patient':undefined;
  const base={message:maskBirthDates(row.body??''),messageType:row.message_type??'text',jid:row.jid,phone,practicePhone:practice.practice_phone,teamPhones:data.staffPhones.join(','),
-  history,dossier:{sender:role?'patient':'unknown',patients},documents:[],rules,receivedAt:at,
-  ...(role?{patientSheet:{access:'confirmed',asOf:at,fields:{schreibendePerson:'filled'},context:{schreibendePerson:{rolle:role}}}}:{}),
+  history,lastOutbound,dossier:{sender:role?'patient':'unknown',patients},documents:[],rules,receivedAt:at,
   teamTime:teamReplyTime(at,practice.team_reply_days,practice.closure_periods,'de'),today,doctolibUrl:practice.doctolib_url,
   hasPriorConversation:row.history.length>0,hasPriorReply:priorReply,
   identityAsked:row.history.some((h:any)=>h.direction==='outgoing'&&/welchen Patienten|um wen|Vor- und Nachnamen|Geburtsdatum|welchem Namen/i.test(h.text)),
@@ -78,14 +90,17 @@ async function evaluate(row:any){
  try{
   // Read decisions as of the historical input. Only actually delivered clarification
   // text in the frozen history advances the stage.
-  const preflight=retrievalPreflight(base);
+  const phonePatients=patients.map(p=>({id:p.id,vorname:p.firstName,nachname:p.lastName,geburtsdatum:null,geschlecht:null}));
+  const patientSheet=await loadPatientSheet(db,{tenantId:tenant,patients:phonePatients,verifiedIds:patients.filter(p=>p.verified).map(p=>p.id),
+   message:base.message,today,at,chatJid:row.jid,phone});
+  const preflight=retrievalPreflight({...base,patientSheet});
   const prior=preflight?null:await db.from('animahost_whatsapp_decisions').select('rule_id,patient_text')
    .eq('tenant_id',tenant).eq('sender_jid',row.jid).lte('created_at',at).order('created_at',{ascending:false}).limit(100);
   if(prior?.error)throw Error('retrieval_context_failed');
   // Exclude the source chat from similar historical cases to avoid grading the original answer as a prediction.
   const found=preflight?{documents:[]}:await retrieveSources(db,tenant,base.message,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text),base.preview,contentHash(row.jid));
   const recovery:any[]=[],calls:any[]=[];
-  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call),{tags:['animahost-acceptance',mode]});
+  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call),{tags:['animahost-acceptance-20261124',mode]});
   const result=await runRetrievalReply(async(call:any)=>{
    for(let attempt=0;;attempt++){
     try{return await model(call);}
@@ -99,10 +114,10 @@ async function evaluate(row:any){
      await delay(800*(attempt+1));
     }
    }
-  },{...base,clarificationRound:clarificationRound(prior?.data??[],row.history),documents:found.documents,
+  },{...base,patientSheet,clarificationRound:clarificationRound(prior?.data??[],row.history),documents:found.documents,
    budgetMs:Math.max(1000,60_000-(Date.now()-started))});
   const {text:reply,teamSummary:ignored,error,clarificationStage:stage,...rest}=result;
-  return {...seed,...rest,answer:sanitize(row,reply),anrede:result.anrede??anrede,clarificationStage:stage??null,
+  return {...seed,...rest,patientSheetAccess:patientSheet.access,answer:sanitize(row,reply),anrede:result.anrede??anrede,clarificationStage:stage??null,
    status:error?'technical_error':result.rule,error:error??null,recoveredErrors:recovery,
    timing:{generationMs:result.ms,totalMs:Date.now()-started},calls};
  }catch{

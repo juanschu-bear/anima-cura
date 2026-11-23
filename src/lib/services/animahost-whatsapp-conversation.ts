@@ -4,7 +4,7 @@ import {t} from '@/lib/i18n';
 import type {WhatsAppDecision} from './animahost-whatsapp';
 
 export const conversationHistorySchema=z.array(z.strictObject({
- direction:z.enum(['incoming','outgoing']),text:z.string().max(1200),at:z.string().datetime({offset:true}),
+ direction:z.enum(['incoming','outgoing']),text:z.string().max(1200),at:z.string().datetime({offset:true}),source:z.enum(['practice','animahost']).optional(),
 })).max(20);
 export type ConversationHistory=z.infer<typeof conversationHistorySchema>;
 export const gatewayOptions={gateway:{inferenceRegion:{scope:'zone' as const,geoRegion:'eu'},zeroDataRetention:true}};

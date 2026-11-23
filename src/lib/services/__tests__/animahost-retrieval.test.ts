@@ -7,7 +7,7 @@ import {anonymizeRetrieval} from '../animahost-retrieval-privacy';
 import {historyPairDocuments,type ArchiveMessage} from '../animahost-history-pairs';
 const input=(over:Partial<RetrievalInput>={}):RetrievalInput=>({message:'Kunststoff ab, tut weh. Online erst im Dezember.',messageType:'text',jid:'4915100000000@s.whatsapp.net',phone:'4915100000000',practicePhone:'4915100000001',
  history:[],dossier:{sender:'unknown',patients:[]},documents:[],rules:[],teamTime:'heute noch',today:'2026-11-23',doctolibUrl:'https://example.invalid/termin',hasPriorConversation:false,hasPriorReply:false,identityAsked:false,preview:false,budgetMs:17000,...over});
-const answer=(over:Record<string,unknown>={})=>({answer:'Das ist unangenehm. Bitte rufen Sie bei Schmerzen direkt in der Praxis an. Für welchen Patienten schreiben Sie?',team:true,summary:'Defekte Apparatur, Schmerzen, früheren Termin klären.',identityQuestion:true,substantive:true,nonPatient:false,closing:false,...over});
+const answer=(over:Record<string,unknown>={})=>({answer:'Das ist unangenehm. Bitte rufen Sie bei Schmerzen direkt in der Praxis an. Der Empfang prüft, ob ein früherer Termin frei ist.',team:true,summary:'Ob ein früherer Termin frei ist prüfen.',identityQuestion:false,substantive:true,nonPatient:false,closing:false,...over});
 const valid={hard:[],repair:[]};
 function model(...answers:unknown[]){const calls:any[]=[];const generate:Generate=async call=>{calls.push(call);return call.schema.parse(answers.shift());};return {generate,calls};}
 test('anbieterbedingte Antwortausfälle sind bei Erstellung und Prüfung unterscheidbar',async()=>{
@@ -28,25 +28,25 @@ test('unlinked pain patient is not excluded; only configured team, groups and no
  assert.equal(retrievalPreflight(input()),null);
  for(const over of [{teamPhones:'4915100000000'},{jid:'123456@g.us'},{nonPatientPhones:'4915100000000'}])assert.equal(retrievalPreflight(input(over))?.excluded,true);
  const m=model(answer(),valid);const result=await runRetrievalReply(m.generate,input());
- assert.equal(result.excluded,false);assert.equal(result.substantive,true);assert.equal(result.identityQuestion,true);
- assert.match(result.text,/heute noch/);assert.equal(result.text.match(/\?/g)?.length,1);
+ assert.equal(result.excluded,false);assert.equal(result.substantive,true);assert.equal(result.identityQuestion,false);
+ assert.match(result.text,/früherer Termin/);assert.doesNotMatch(result.text,/heute noch|Namen/);
 });
 test('empty, reaction and acknowledgments never call the model; stickers reach clarification',async()=>{
  const fail:Generate=async()=>{throw Error('must not call model');};
- for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke'],['text','Ok']]){
+ for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke']]){
   const result=await runRetrievalReply(fail,input({messageType,message,hasPriorConversation:true,hasPriorReply:true}));
   assert.equal(result.skipSend,true);assert.equal(result.action,'antworten');assert.equal(result.text,'');
  }
  assert.equal(retrievalPreflight(input({message:'',messageType:'sticker'})),null);
 });
-test('system answers are not facts; missing team time is repaired before checking, no rule classifier',async()=>{
+test('previous system answers are not facts and no team time is appended',async()=>{
  const m=model(answer(),valid);
  const result=await runRetrievalReply(m.generate,input({history:[{direction:'outgoing',text:'UNTRUSTED BOOKING CLAIM',at:'2026-11-23T10:00:00Z'},{direction:'incoming',text:'Es gibt noch keine Uhrzeit.',at:'2026-11-23T10:01:00Z'}]}));
- assert.match(result.text,/heute noch/);assert.doesNotMatch(m.calls[0].prompt,/UNTRUSTED/);assert.match(m.calls[0].prompt,/keine Uhrzeit/);
+ assert.doesNotMatch(result.text,/heute noch/);assert.doesNotMatch(m.calls[0].prompt,/UNTRUSTED/);assert.match(m.calls[0].prompt,/keine Uhrzeit/);
  assert.deepEqual(m.calls.map(c=>c.stage),['compose','verify']);
 });
 test('repairable critique gets exactly one repair; medical and invented booking output never passes',async()=>{
- const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team. Für welchen Patienten schreiben Sie?'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Ich gebe Ihren Wunsch nach einem früheren Termin konkret ans Team. Für welchen Patienten schreiben Sie?'}),valid);
+ const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Der Empfang prüft, ob ein früherer Termin frei ist.'}),valid);
  const result=await runRetrievalReply(m.generate,input());assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);
  const bad=model(answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}),answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}));
  assert.equal((await runRetrievalReply(bad.generate,input())).skipSend,true);
@@ -94,7 +94,7 @@ test('the source ledger reflects the structured input, including when the verifi
 });
 
 test('a repairable review gets one rewrite without a citation requirement',async()=>{
- const m=model(answer({team:false,answer:'Das Team meldet sich bei Ihnen. Für welchen Patienten schreiben Sie?'}),{hard:[],repair:[{issue:'team_handoff',quote:'Das Team meldet sich bei Ihnen.'}]},answer(),valid);
+ const m=model(answer({team:false,answer:'Das Team meldet sich bei Ihnen.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Das Team meldet sich bei Ihnen.'}]},answer(),valid);
  const result=await runRetrievalReply(m.generate,input());
  assert.equal(result.skipSend,undefined);
  assert.equal(result.repairs,1);
@@ -146,14 +146,55 @@ test('an unsafe draft may be rewritten once, but only the independently checked 
  assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);assert.doesNotMatch(result.text,/gebucht/);
 });
 
-test('unknown patients get one identity question even when the useful draft asks none',async()=>{
- const m=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
- const result=await runRetrievalReply(m.generate,input());
- assert.equal(result.identityQuestion,true);assert.equal(result.text.match(/\?/g)?.length,1);
- assert.match(result.text,/Unter welchem Namen sind Sie bei uns angemeldet\?/);
- const already=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
- const second=await runRetrievalReply(already.generate,input({identityAsked:true}));
- assert.doesNotMatch(second.text,/Für welchen Patienten/);
+test('a confirmed or unconfirmed patient never receives an identity question, even if the model does not flag it',async()=>{
+ for(const access of ['confirmed','unconfirmed'] as const){
+  const patientSheet={access,asOf:'2026-11-23T20:00:00Z',context:{portalzugang:true,rechnungsakteMitZustellstand:[{patientVisible:true}]},fields:{}};
+  const m=model(answer({answer:'Welchen Namen darf ich zu Ihrer Rechnung notieren?',identityQuestion:true}),answer({answer:'Öffnen Sie im Browser den Bereich Rechnungen.',team:false}),valid);
+  const result=await runRetrievalReply(m.generate,input({message:'Welche meiner Rechnungen habe ich bereits bezahlt?',patientSheet}));
+  assert.equal(result.repairs,1);assert.equal(result.identityQuestion,false);
+  assert.equal(JSON.parse(m.calls[0].prompt).identitaetsfrageErlaubt,false);
+  assert.match(m.calls[0].prompt,/rechnungsakteMitZustellstand/);
+ }
+});
+
+test('billing portal replies use only confirmed facts and name a concrete check if needed',()=>{
+ const sheet={access:'confirmed' as const,asOf:'2026-11-23T20:00:00Z',context:{portalzugang:true,
+  rechnungsakteMitZustellstand:[{patientVisible:true}]},fields:{}};
+ const msg='Meine Rechnung ist nicht im Portal sichtbar';
+ assert.equal(retrievalPreflight(input({message:msg,patientSheet:sheet}))?.rule,'billing:portal_visible');
+ const denied=retrievalPreflight(input({message:msg,patientSheet:{...sheet,access:'unconfirmed'}}));
+ assert.equal(denied?.rule,'billing:portal_missing');
+ assert.match(denied?.teamSummary??'',/Freigabe, Kontozuordnung/);
+ assert.doesNotMatch(denied?.text??'',/sind für Ihr Konto sichtbar|meldet sich/);
+ assert.equal(retrievalPreflight(input({message:'Ist ein Download der App nötig?'}))?.rule,'billing:portal_browser');
+});
+
+test('an unlinked patient gets identity asked only for a personal matter, never appended after useful general guidance',async()=>{
+ const ready=model(answer({answer:'Sie können auch im Browser auf das Portal zugreifen.',team:false}),valid);
+ const general=await runRetrievalReply(ready.generate,input({message:'Wie melde ich mich im Browser an?'}));
+ assert.equal(general.identityQuestion,false);assert.doesNotMatch(general.text,/Namen/);
+ const ask=model(answer({answer:'Auf welchen Namen ist die Rechnung ausgestellt, damit wir ihren Versand prüfen können?',identityQuestion:true,team:false}),valid);
+ const personal=await runRetrievalReply(ask.generate,input({message:'Meine Rechnung ist nicht angekommen.'}));
+ assert.equal(personal.identityQuestion,true);
+ assert.match(personal.text,/Rechnung/);
+});
+
+test('human turn, correction and agreement wait without sending; door and small current delay are urgent',()=>{
+ const at='2026-11-23T20:00:00Z';
+ const human={direction:'outgoing' as const,source:'practice' as const,text:'Der Zahn schmerzt seit wann?',at:'2026-11-23T19:00:00Z'};
+ for(const msg of ['Seit gestern.','Hätte*','Alles klar','Ok.']){
+  const result=retrievalPreflight(input({message:msg,receivedAt:at,history:[human]}));
+  assert.equal(result?.rule,'conversation:practice_reply');assert.equal(result?.skipSend,true);assert.equal(result?.teamSummary,'Antwort an eure Nachricht');
+ }
+ assert.equal(retrievalPreflight(input({message:'Danke!',receivedAt:at,history:[human]}))?.rule,'social:acknowledged');
+ assert.equal(retrievalPreflight(input({message:'Seit gestern.',receivedAt:at,history:[{...human,source:'animahost'}]})),null);
+ assert.equal(retrievalPreflight(input({message:'Seit gestern.',receivedAt:at,history:[{...human,at:'2026-11-22T19:59:59Z'}]})),null);
+ for(const msg of ['Ich bin im Treppenhaus', 'Komme fünf Minuten später', 'Kannst du die Tür öffnen?']){
+  const result=retrievalPreflight(input({message:msg,receivedAt:at,history:[human]}));
+  assert.equal(result?.rule,'conversation:immediate_practice');
+  assert.match(result?.text??'',/0341 9806457/);assert.doesNotMatch(result?.text??'',/meldet sich/);
+ }
+ assert.equal(retrievalPreflight(input({message:'Komme morgen fünf Minuten später',receivedAt:at})),null);
 });
 
 test('a punctuation-only follow-up question is not a thank-you or closing',()=>{

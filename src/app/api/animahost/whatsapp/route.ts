@@ -19,6 +19,7 @@ import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,pl
 import {latestAppointmentCase,openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {conversationHistorySchema,enforceConversationOutput,formulateConversationReply,gatewayOptions,recentConversation,referenceHistory} from '@/lib/services/animahost-whatsapp-conversation';
 import {measureReplyUsage} from '@/lib/services/animahost-usage';
+import {immediateRule,practiceReplyRule,shortPracticeFollowup} from '@/lib/services/animahost-retrieval-routing';
 
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 
@@ -45,6 +46,7 @@ const inputSchema=z.object({
  receivedAt:z.string().datetime({offset:true}),
  hasPriorConversation:z.boolean().optional(),hasPriorReply:z.boolean().optional(),
  identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),concernHistory:concernHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
+ lastOutbound:z.object({source:z.enum(['practice','animahost']),at:z.string().datetime({offset:true})}).optional(),
 }).strict();
 type StoredDecision={action:'antworten'|'klaerfall'|'notfall';patient_text:string;rule_id:string;case_details?:ChatDetails|null};
 const lookupSchema=z.strictObject({action:z.literal('phone_lookup'),tenantId:z.string().uuid(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/)});
@@ -77,7 +79,7 @@ async function notifyPractice(db:ReturnType<typeof createServerClient>,
   (/^late_arrival:(accept|wait)$/.test(decision.rule)?{kind:'late',urgent:false}:null);
  const certificate=decision.rule==='attendance_certificate_issued';
  const budgetFailure=details?.modelFailure?.code==='model_budget_exhausted';
- const important=budgetFailure||/^(?:quality:complaint|quality:late_review)$/.test(decision.rule);
+ const important=budgetFailure||decision.rule===immediateRule||/^(?:quality:complaint|quality:late_review)$/.test(decision.rule);
  if(decision.action==='antworten'&&!notice&&!certificate&&!important)return;
  const urgent=decision.action==='notfall'||notice?.urgent||important;
  const key=decision.action==='notfall'?'emergency':'clarify';
@@ -99,7 +101,7 @@ function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'t
  const note=(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
- return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
+ return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'||decision.rule===practiceReplyRule?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
   ...(note?{disposition:'vermerk'}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 
@@ -125,7 +127,8 @@ export async function POST(request:NextRequest){
  const past=recentConversation(input.history??[],input.receivedAt);
  const social=socialReply({...input,clarifyUnclear:process.env.ANIMAHOST_RETRIEVAL_PASSED==='true',hasPriorConversation:input.hasPriorConversation===true||past.length>0,
   hasPriorReply:input.hasPriorReply===true||past.some(item=>item.direction==='outgoing')});
- if(social&&silentSocialRule.test(social))return decisionResponse({action:'antworten',rule:social,text:''});
+ if(social&&silentSocialRule.test(social)&&!(process.env.ANIMAHOST_RETRIEVAL_PASSED==='true'&&social==='social:acknowledged'&&shortPracticeFollowup(input.text??'')))
+  return decisionResponse({action:'antworten',rule:social,text:''});
  const db=createServerClient();
  const deadline=Date.now()+17_000;
  const history=past.map(item=>({...item,text:maskBirthDates(item.text)}));
