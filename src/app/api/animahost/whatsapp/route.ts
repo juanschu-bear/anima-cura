@@ -29,6 +29,7 @@ import {silentSocialRule,socialReply} from '@/lib/services/animahost-conversatio
 import {runChain} from '@/lib/services/animahost-chain';
 import {gatewayGenerate} from '@/lib/services/animahost-chain-model';
 import {loadDossier} from '@/lib/services/animahost-dossier';
+import {retrievalAnswer} from '@/lib/services/animahost-retrieval-live';
 import {activeKnowledge} from '@/lib/services/animahost-knowledge';
 
 export const runtime='nodejs';
@@ -122,7 +123,6 @@ export async function POST(request:NextRequest){
  const social=socialReply({...input,hasPriorConversation:input.hasPriorConversation===true||past.length>0,
   hasPriorReply:input.hasPriorReply===true||past.some(item=>item.direction==='outgoing')});
  if(social&&silentSocialRule.test(social))return decisionResponse({action:'antworten',rule:social,text:''});
- if(input.text)input.messageType='text';
  const db=createServerClient();
  const deadline=Date.now()+17_000;
  const history=past.map(item=>({...item,text:maskBirthDates(item.text)}));
@@ -131,6 +131,37 @@ export async function POST(request:NextRequest){
   const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',input.tenantId).maybeSingle();
   if(settings.error||!settings.data)return NextResponse.json({code:'tenant_not_configured'},{status:503});
   const practice=settings.data;
+  // The retrieval architecture bypasses every legacy classifier/workflow gate. Enable only after Juan's acceptance.
+  if(process.env.ANIMAHOST_RETRIEVAL_PASSED==='true'){
+   if(input.handoffOnly)return decisionResponse({action:'klaerfall',rule:'sender:unknown_handoff',text:''});
+   const existing=await db.from('animahost_whatsapp_decisions').select('action,patient_text,rule_id,case_details')
+    .eq('tenant_id',input.tenantId).eq('message_id',input.messageId).maybeSingle();
+   if(existing.error)throw Error('decision_read_failed');
+   if(existing.data){
+    const saved=existing.data;
+    return decisionResponse({action:saved.action,text:saved.patient_text,rule:saved.rule_id},undefined,undefined,saved.case_details);
+   }
+   const answer=await retrievalAnswer(db,input,practice,request.signal);
+   const result=answer.result;
+   // Quiet conversational signals create neither a practice notification nor a clarification case.
+   if(result.skipSend&&result.action==='antworten')return NextResponse.json({...result,optOut:false},{headers:{'Cache-Control':'no-store'}});
+   const details={patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:result.rule,
+    practiceSummary:result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,architecture:'retrieval-v1'};
+   const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
+    sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
+   if(saved.error&&saved.error.code!=='23505')throw Error('decision_store_failed');
+   if(saved.error?.code==='23505'){
+    const duplicate=await db.from('animahost_whatsapp_decisions').select('action,patient_text,rule_id,case_details').eq('tenant_id',input.tenantId).eq('message_id',input.messageId).single();
+    if(duplicate.error)throw Error('decision_read_failed');
+    return decisionResponse({action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id},undefined,undefined,duplicate.data.case_details);
+   }
+   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:answer.timings});
+   if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
+   if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
+   return NextResponse.json({...result,details,phoneMatches:'phoneMatches' in answer?answer.phoneMatches:undefined,replyStyle:'formulated',optOut:result.rule==='opt_out',
+    replySchedule:{teamReplyDays:practice.team_reply_days,closurePeriods:practice.closure_periods}},{headers:{'Cache-Control':'no-store'}});
+  }
+  if(input.text)input.messageType='text';
   const qualityAvailable=Array.isArray(practice.team_reply_days);
   const replySchedule={teamReplyDays:practice.team_reply_days??[1,2,3,4,5],closurePeriods:practice.closure_periods??[]};
   const trustedPhone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;

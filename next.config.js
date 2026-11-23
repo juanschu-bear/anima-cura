@@ -2,8 +2,15 @@
 const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
-    serverComponentsExternalPackages: ["@sparticuz/chromium", "playwright-core"],
+    serverComponentsExternalPackages: ["@sparticuz/chromium", "playwright-core", "@huggingface/transformers", "onnxruntime-node"],
+    outputFileTracingExcludes: {
+      "*": ["./node_modules/onnxruntime-node/bin/napi-v3/darwin/**/*", "./node_modules/onnxruntime-node/bin/napi-v3/win32/**/*", "./node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/**/*"],
+    },
     outputFileTracingIncludes: {
+      "/api/animahost/whatsapp": ["./.model-assets/**/*"],
+      "/api/animahost/whatsapp/internal/replay": ["./.model-assets/**/*"],
+      "/api/animahost/whatsapp/internal/control": ["./.model-assets/**/*"],
+      "/api/cron/animahost-retrieval": ["./.model-assets/**/*"],
       "/api/kasse/beleg/[id]/pdf": ["./node_modules/@sparticuz/chromium/**/*"],
     },
   },

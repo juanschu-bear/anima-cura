@@ -481,7 +481,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "912ef77c7bee18e30e3cba50a81b48496a1f34c05a04d0c5a8c98a6f14c12c38",
+      "sha256": "49e151411d1f7aa5160559fd85906cc08000ffc0f9584c26b2caf55a3e02cc30",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -492,6 +492,26 @@
         {
           "name": "animahost_whatsapp_publish_rules",
           "signature": "public.animahost_whatsapp_publish_rules(p_tenant uuid, p_expected_version integer, p_rules jsonb, p_actor uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_mark_gold",
+          "signature": "public.animahost_mark_gold(p_tenant uuid, p_actor uuid, p_ref text, p_question text, p_answer text, p_context text, p_at timestamp with time zone)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_knowledge_open_questions",
+          "signature": "public.animahost_knowledge_open_questions(p_tenant uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_import_knowledge",
+          "signature": "public.animahost_import_knowledge(p_tenant uuid, p_actor uuid, p_entries jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_change_knowledge",
+          "signature": "public.animahost_change_knowledge(p_tenant uuid, p_id uuid, p_expected integer, p_actor uuid, p_action text, p_entry jsonb)",
           "role": "service_role"
         }
       ]
@@ -589,6 +609,35 @@
           "role": "service_role"
         }
       ]
+    },
+    {
+      "file": "src/lib/services/animahost-retrieval.ts",
+      "sha256": "2f9dcb7ab3a8955092abf831909a41b3a8ffa037fd6b3d6fe59634e0d1075c10",
+      "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
+      "calls": [
+        {
+          "name": "animahost_retrieval_match",
+          "signature": "public.animahost_retrieval_match(p_tenant uuid, p_vector public.vector, p_model text, p_preview boolean, p_day date, p_exclude_chat text)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-knowledge.ts",
+      "sha256": "ed7617102c145016631742745eeb56406ffcee252475345c1a605b6facd01601",
+      "proof": "Reviewed injected createServerClient service client from authenticated AnimaHost routes; detailed knowledge RPC introduced by migration 104, with existing service-only fallback.",
+      "calls": [
+        {
+          "name": "animahost_active_knowledge_details",
+          "signature": "public.animahost_active_knowledge_details(p_tenant uuid, p_day date)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_active_knowledge",
+          "signature": "public.animahost_active_knowledge(p_tenant uuid, p_day date)",
+          "role": "service_role"
+        }
+      ]
     }
   ],
   "proofs": [
@@ -670,7 +719,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "0d18c3f0cc6fc114e90d5da998c768014fed86c2d97d09ca3c5f0c3bc14f340e"
+      "sha256": "9b66c502eeaf309a484b42db8009fc93cc47ae2d842241fa5fdec4474b6355da"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

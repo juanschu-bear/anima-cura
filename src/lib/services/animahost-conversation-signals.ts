@@ -6,13 +6,13 @@ export function socialReply(input:{messageType:string;text:string|null;hasPriorC
  const type=input.messageType.replace(/^view_once_/,'');
  const text=(input.text??'').trim();
  if(type==='reaction')return 'social:reaction';
- if(type==='unsupported'&&!text)return 'social:unreadable';
+ if((type==='unsupported'||type==='text')&&!text)return 'social:unreadable';
  if(type==='sticker'&&!text)return input.hasPriorConversation?'social:acknowledged':'begruessung-ohne-anliegen';
  if(type!=='text'&&type!=='unsupported')return null;
  const stripped=text.replace(emoji,'');
  const words=stripped.replace(/[\u200D\uFE0F]/g,'').trim();
  if(text!==stripped&&!words)return input.hasPriorConversation?'social:acknowledged':'begruessung-ohne-anliegen';
- if(input.hasPriorReply&&acknowledgments.test(words.toLocaleLowerCase('de-DE').replace(/[.!?,…]+$/,'').replace(/\s+/g,' ').trim()))
+ if(acknowledgments.test(words.toLocaleLowerCase('de-DE').replace(/[.!?,…]+$/,'').replace(/\s+/g,' ').trim()))
   return 'social:acknowledged';
  return null;
 }

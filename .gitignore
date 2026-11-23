@@ -17,3 +17,6 @@ test.mp3
 
 # Private patient outreach audits (contact details must never enter Git)
 output/patient-outreach-*.private.json
+
+# Pinned inference weights are downloaded at build time, never patient data
+.model-assets/
