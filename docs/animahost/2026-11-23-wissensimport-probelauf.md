@@ -83,6 +83,24 @@ Die Belegprüfung unterscheidet ungültige Quellen-/Versions-/Textbelege (`wisse
 
 Juan hat das Zitierverfahren nach diesem Lauf abgelöst. Diese Messung bleibt der Vorher-Stand für die Retrieval-Abnahme. Der neue Kern protokolliert serverseitig die an das Modell übergebenen Goldbeispiele, Wissenseinträge, Regeln und früheren Praxisfälle. Die Prüfentscheidung verwendet dafür keine Zitate. Das Laufzeitziel mit Wissensbasis liegt bei einem Median unter 8 Sekunden.
 
+## Vergleich mit Retrieval ohne Zitate
+
+Versandfreie Wiederholung mit denselben 139 Nachrichten und den 51 Wissenseinträgen als Kandidaten für die Entwurfs-Vorschau. Der Index enthielt 1.699 anonymisierte frühere Frage-Antwort-Paare und wurde während dieses Laufs parallel aktualisiert. Alle 117 Modellfälle erhielten acht Wissenseinträge. Die Auswahl schließt den jeweiligen Prüfchat aus den früheren Praxisfällen aus.
+
+| Kennzahl | Vorher | Retrieval |
+|---|---:|---:|
+| Modellfälle | 110 | 117 |
+| Median Modellkette | 11,63 s | 3,47 s |
+| Median einschließlich Suche | – | 4,07 s |
+| Automatische Prüfung bestanden | 41 | 96 |
+| Inhaltlich zurückgehalten | 50 | 16 |
+| Technisch gescheitert | 19 | 3 |
+| Über 17 Sekunden | 30 | 0 |
+
+Für die 99 Fälle, die in beiden Läufen das Modell erreichten, ging der Median der Modellkette von 12,03 auf 3,37 Sekunden zurück. Der frühere Probelauf konnte langsame Aufrufe bis zu 42 Sekunden beobachten, der Retrieval-Lauf verwendete 17 Sekunden als Arbeitsbudget. Unter den 96 automatisch akzeptierten Antworten hat der Kern 83 als inhaltlich hilfreich eingestuft. Insgesamt wurden fünf Absender ausgeschlossen, davon zwei erst durch den Modellaufruf.
+
+Die drei technischen Fehler waren Schemafehler. Die Quellenliste protokolliert die mitgegebenen Inhalte. Die frühere Kennzahl „bestätigte Wissenszitate“ entfällt. Das Laufzeitziel ist in dieser Wiederholung erreicht. Die fachliche Freigabe für den automatischen Versand steht weiter aus.
+
 ## Nachweise und Reproduktion
 
 [Messwerte aller 139 Fälle](2026-11-23-wissensimport-probelauf-messwerte.json): nur Fallkürzel, Status, Zeiten, technische Spuren und Wissensreferenzen; keine Patientenkennungen oder Nachrichtentexte. Private Eingaben und Ausgaben bleiben außerhalb von Git.
