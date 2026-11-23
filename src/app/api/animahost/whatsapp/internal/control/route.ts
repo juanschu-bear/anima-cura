@@ -1,4 +1,4 @@
-import acceptanceRun from '../../../../../../../docs/animahost/2026-11-23-acceptance-run.json';
+import acceptanceRun from '../../../../../../../docs/animahost/2026-11-24-acceptance-run.json';
 import {timingSafeEqual} from 'node:crypto';
 import {contentHash,upsertRetrievalDocuments} from '@/lib/services/animahost-retrieval';
 import {remainingPersonNames} from '@/lib/services/animahost-retrieval-redaction';

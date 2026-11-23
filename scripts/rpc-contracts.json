@@ -481,7 +481,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "54be901f91696f6306a94b6e9060f6dd778d445c00c549f9187d776fd62a7df7",
+      "sha256": "7a805f5a15b138d615c8c26ce5916b6ba9ac2c25c93096523a792fe49fe61bfb",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
