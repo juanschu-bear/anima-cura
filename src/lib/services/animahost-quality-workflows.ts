@@ -8,7 +8,8 @@ import {identifyByBirthDate,maskBirthDates,parseBirthDate,patientIsMinor,useDu,
 import {recoverPatientInvoice} from './animahost-invoice-recovery';
 
 type Db=ReturnType<typeof createServerClient>;
-export type ChatDetails={patientId:string|null;firstName:string|null;lastName:string|null;invoiceDate:string|null;cause:string;requestedName?:string|null;practiceSummary?:string;concerns?:string[]};
+export type ChatDetails={patientId:string|null;firstName:string|null;lastName:string|null;invoiceDate:string|null;cause:string;requestedName?:string|null;practiceSummary?:string;concerns?:string[];
+ responseQuality?:'content'|'handoff_only'|'withheld';usedRuleIds?:string[];usedKnowledge?:import('./animahost-chain').UsedKnowledge[];violations?:string[]};
 export type Outcome={decision:WhatsAppDecision;details?:ChatDetails};
 const portal='https://animacura.io';
 const labelMatch=(rule:string,text:string,action:WhatsAppDecision['action']='antworten'):Outcome=>({decision:{action,rule,text}});

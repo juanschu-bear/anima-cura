@@ -3,13 +3,14 @@ import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerClient} from '@/lib/db/supabase';
 import {whatsappRulesSchema} from '@/lib/services/animahost-whatsapp';
-import {conversationHistorySchema} from '@/lib/services/animahost-whatsapp-conversation';
+import {conversationHistorySchema,recentConversation} from '@/lib/services/animahost-whatsapp-conversation';
 import {maskBirthDates,phonePatients} from '@/lib/services/animahost-chat-identity';
 import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices';
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 import {loadDossier} from '@/lib/services/animahost-dossier';
 import {runChain} from '@/lib/services/animahost-chain';
 import {gatewayGenerate,type ModelCall} from '@/lib/services/animahost-chain-model';
+import {activeKnowledge} from '@/lib/services/animahost-knowledge';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -52,19 +53,22 @@ export async function POST(request:NextRequest){
   const rules=whatsappRulesSchema.safeParse(version.data?.rules);
   if(version.error||!rules.success)return NextResponse.json({code:'rulebook_unavailable'},{status:503,headers});
   const patients=input.phone?await phonePatients(db,input.phone).catch(()=>null)??[]:[];
-  const confirmed=await db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid);
   const now=input.at??new Date().toISOString();
+  const confirmed=await db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid).lte('verified_at',now);
   const language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text)?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text)?'es':'de';
-  const dossier=await loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)});
+  const [dossier,knowledge]=await Promise.all([
+   loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)}),
+   activeKnowledge(db,tenant,appointmentLocalDate(new Date().toISOString())),
+  ]);
   const calls:ModelCall[]=[];
   const result=await runChain(gatewayGenerate(practice.model,request.signal,call=>calls.push(call)),{
    message:maskBirthDates(input.text),language,informal:false,
-   history:input.history.map(item=>({...item,text:maskBirthDates(item.text)})),dossier,rules:rules.data,
+   history:recentConversation(input.history,now).map(item=>({...item,text:maskBirthDates(item.text)})),dossier,rules:rules.data,approvedKnowledge:knowledge.entries,
    practice:{doctolibUrl:practice.doctolib_url,phone:practice.practice_phone,today:appointmentLocalDate(now),
-    teamTime:teamReplyTime(now,practice.team_reply_days,practice.closure_periods,language)},
+    closurePeriods:practice.closure_periods,teamTime:teamReplyTime(now,practice.team_reply_days,practice.closure_periods,language)},
    baseline:null,budgetMs:45_000});
   return NextResponse.json({result,file:{sender:dossier.sender,patients:dossier.patients.length,confirmed:dossier.patients.filter(patient=>patient.verified).length},
-   model:practice.model,calls,ms:Date.now()-started},{headers});
+   model:practice.model,rulebookVersion:practice.active_rulebook_version,knowledgeAvailable:knowledge.available,calls,ms:Date.now()-started},{headers});
  }catch{return NextResponse.json({code:'replay_unavailable'},{status:503,headers});}
 }

@@ -60,15 +60,16 @@ test('the dossier keeps confidential details out unless the person is confirmed,
  const loaded=await loadDossier(db,{patients:[mia,jonas],verifiedIds:[jonas.id,'99999999-0000-4000-8000-000000000009'],today:'2026-11-22'});
  assert.equal(loaded.sender,'guardian');
  const [first,second]=loaded.patients;
- // Unbestätigt: Zugang, Behandlung und „Rechnungen abrufbar“, aber kein Datum, keine Besuche, keine Mahnung.
- assert.deepEqual(first,{id:mia.id,firstName:'Mia',lastName:'Beispiel',minor:true,verified:false,treatment:'Feste Zahnspange',appAccount:true,openedInvoicesInApp:false,invoices:'available'});
+ // Ohne bestätigte Identität wird die Rechnungsverfügbarkeit nicht gelesen.
+ assert.deepEqual(first,{id:mia.id,firstName:'Mia',lastName:'Beispiel',minor:true,verified:false,treatment:'Feste Zahnspange',appAccount:true,openedInvoicesInApp:false,invoices:'unclear'});
  assert.equal('confidential' in first,false);
  // Bestätigt: Besuche ohne Doppelte, Erinnerung, nächste Rate. Nicht Lesbares ist unbekannt und nie „keine“.
- assert.deepEqual(second.confidential,{newestInvoiceDate:null,lastVisits:['2026-11-10','2026-09-15'],reminders:[{invoiceDate:'2026-07-01',remindedOn:'2026-08-15'}],installmentPlan:null,nextInstallmentDue:'2026-12-01'});
+ assert.deepEqual(second.confidential,{newestInvoiceDate:null,lastVisits:['2026-11-10','2026-09-15'],nextAppointments:[],reminders:[{invoiceDate:'2026-07-01',remindedOn:'2026-08-15'}],installmentPlan:null,nextInstallmentDue:'2026-12-01'});
  assert.equal(second.invoices,'none');
  const forModel=dossierForModel(loaded);
  const text=JSON.stringify(forModel.akte);
  assert.doesNotMatch(text,/05\.10\.2026/);
+ assert.doesNotMatch(text,/Feste Zahnspange/);
  assert.match(text,/"ratenzahlung":"unbekannt"/);
  assert.deepEqual(forModel.facts.sort(),['01.07.2026','01.12.2026','10.11.2026','15.08.2026','15.09.2026']);
  // Ohne Akte an der Nummer wird nichts abgefragt.
@@ -83,6 +84,7 @@ test('the dossier keeps confidential details out unless the person is confirmed,
 test('fixed limits: links, times, dates, phone numbers, amounts and names must come from the sources',()=>{
  assert.deepEqual(guard('Wir sind Dienstag bis Donnerstag von 9 bis 13 Uhr und von 14 bis 18:30 Uhr für Sie da. Mias Termin wählen Sie bitte neu über https://example.invalid/termin.'),[]);
  assert.deepEqual(guard('Kommen Sie gern um 17:15 Uhr vorbei.'),['uhrzeit_nicht_in_quellen']);
+ assert.deepEqual(guard('Kommen Sie gern um 18:45 Uhr vorbei.'),['uhrzeit_nicht_in_quellen']);
  assert.deepEqual(guard('Der nächste freie Termin ist am 03.12.'),['datum_nicht_in_quellen']);
  assert.deepEqual(guard('Buchen Sie hier: https://example.invalid/anders'),['fremder_link']);
  assert.deepEqual(guard('Rufen Sie bitte 0341 9999999 an.'),['telefonnummer_nicht_in_quellen']);
@@ -99,7 +101,23 @@ test('fixed limits: links, times, dates, phone numbers, amounts and names must c
  assert.deepEqual(guard('Das klärt unser Praxisteam, es meldet sich bei Ihnen.'),['uebergabe_nicht_gemeldet']);
  assert.deepEqual(guard('Dafür brauche ich kurz Ihre Hilfe.',{},{team:false,asksIdentity:true}),['frage_nach_geburtsdatum_fehlt']);
  assert.deepEqual(guard('Schreiben Sie mir bitte Ihre Patientennummer.'),['patientennummer']);
+ assert.deepEqual(guard('Verwende ChatGPT.'),['technologiemarke']);
+ assert.deepEqual(guard('Der Termin wurde bestätigt.'),['terminzusage']);
+ assert.deepEqual(guard('Nehmen Sie Ibuprofen.'),['medizinischer_rat']);
+ assert.deepEqual(guard('Schick mir bitte deinen Termin.'),['falsche_anrede']);
  assert.deepEqual(guard('   '),['leer']);
+});
+
+test('the independent verifier must confirm the exact approved knowledge revision used in the answer',async()=>{
+ const note={id:'00000000-0000-4000-8000-000000000004',version:2,area:'praxisablauf' as const,title:'Unterlagen',
+  content:'Bringen Sie Ihre Unterlagen mit.',source:'praxis' as const};
+ const proof={id:note.id,version:note.version,claim:note.content};
+ const answer=draft(note.content,{wissensbelege:[proof]});
+ const query=input({message:'Was bringe ich mit?',approvedKnowledge:[note]});
+ const ok=await runChain(model(answer,{...fine,wissensbelege:[proof]}).generate,query);
+ assert.deepEqual(ok.ok&&ok.usedKnowledge,[proof]);
+ const noProof=await runChain(model(answer,fine,answer,fine).generate,query);
+ assert.deepEqual(!noProof.ok&&noProof.violations,['wissensbeleg_nicht_bestaetigt']);
 });
 
 test('the chain answers freely from rules and dossier and reports every concern',async()=>{

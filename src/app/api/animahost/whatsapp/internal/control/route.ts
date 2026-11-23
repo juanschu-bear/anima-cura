@@ -10,6 +10,8 @@ import {defaultTeamReplyDays,teamReplyDaysSchema} from '@/lib/services/animahost
 import {closurePeriodsSchema} from '@/lib/services/animahost-practice-closures';
 import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,validateNoticeTemplate,
  type ContactPatient} from '@/lib/services/animahost-contact-notices';
+import {activeKnowledge,knowledgeDraft,knowledgeRecord} from '@/lib/services/animahost-knowledge';
+import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -38,6 +40,10 @@ const bodySchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('preview_template'),patientId:z.string().uuid(),
   templateId:z.string().uuid(),version:z.number().int().positive(),
   date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),time:z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable()}),
+ z.strictObject({action:z.literal('save_knowledge_draft'),actorId:z.string().uuid(),id:z.string().uuid().nullable(),
+  expectedVersion:z.number().int().min(0),entry:knowledgeDraft}),
+ z.strictObject({action:z.literal('approve_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
+ z.strictObject({action:z.literal('deactivate_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
 ]);
 
 function authorized(header:string|null){
@@ -54,6 +60,25 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='knowledge'){
+  const search=request.nextUrl.searchParams;
+  const id=z.string().uuid().nullable().safeParse(search.get('id'));
+  const page=z.coerce.number().int().min(0).max(10_000).safeParse(search.get('page')??0);
+  if(!id.success||!page.success)return NextResponse.json({code:'knowledge_filter_invalid'},{status:400,headers});
+  const start=page.data*100;
+  let query=db.from('animahost_knowledge_versions').select('*').eq('tenant_id',tenant);
+  if(id.data)query=query.eq('id',id.data);
+  const result=await query.order('id').order('version',{ascending:false}).range(start,start+100);
+  if(['42P01','PGRST205'].includes(result.error?.code??''))
+   return NextResponse.json({knowledgeAvailable:false,versions:[],effective:[],nextPage:null},{headers});
+  if(result.error)return unavailable();
+  try{
+   const effective=await activeKnowledge(db,tenant,appointmentLocalDate(new Date().toISOString()));
+   return NextResponse.json({knowledgeAvailable:effective.available,versions:result.data.slice(0,100).map(knowledgeRecord),
+    effective:effective.entries.filter(entry=>!id.data||entry.id===id.data).map(({id,version})=>({id,version})),
+    nextPage:result.data.length>100?page.data+1:null},{headers});
+  }catch{return unavailable();}
+ }
  if(resource==='appointment_cases'){
   const chat=request.nextUrl.searchParams.get('chatJid');
   if(chat&&!/^\d{6,20}@(s\.whatsapp\.net|lid)$/.test(chat))
@@ -138,6 +163,22 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='save_knowledge_draft'||input.action==='approve_knowledge'||input.action==='deactivate_knowledge'){
+  const draft=input.action==='save_knowledge_draft';
+  if(draft&&((!input.id)!==(input.expectedVersion===0)))
+   return NextResponse.json({code:'knowledge_invalid'},{status:400,headers});
+  const operation=draft?'draft':input.action==='approve_knowledge'?'approve':'deactivate';
+  const result=await db.rpc('animahost_change_knowledge',{p_tenant:tenant,p_id:input.id??randomUUID(),p_expected:input.expectedVersion,
+   p_actor:input.actorId,p_action:operation,p_entry:draft?input.entry:null});
+  if(result.error){
+   const statuses:Record<string,number>={'40001':409,'42501':403,'P0002':404,'22023':422};
+   const status=statuses[result.error.code];
+   return status?NextResponse.json({code:result.error.message},{status,headers}):unavailable();
+  }
+  const version=Array.isArray(result.data)?result.data[0]:result.data;
+  if(!version)return unavailable();
+  return NextResponse.json({version:knowledgeRecord(version)},{status:draft?201:200,headers});
+ }
  if(input.action==='decide_appointment_case'){
   const settings=await db.from('animahost_whatsapp_settings').select('doctolib_url,model').eq('tenant_id',tenant).single();
   if(settings.error)return unavailable();

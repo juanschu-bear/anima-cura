@@ -25,6 +25,10 @@ import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitR
 
 import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,unlinkedSubjectPlan,unlinkedAppointmentReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
 import {classifySender,quietSenderRule,unknownSenderDecision} from '@/lib/services/animahost-sender-policy';
+import {runChain} from '@/lib/services/animahost-chain';
+import {gatewayGenerate} from '@/lib/services/animahost-chain-model';
+import {loadDossier} from '@/lib/services/animahost-dossier';
+import {activeKnowledge} from '@/lib/services/animahost-knowledge';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -89,7 +93,7 @@ function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'t
  const note=(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
- return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
+ return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||decision.rule==='chain:guard_rejected'?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
   ...(note?{disposition:'vermerk'}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 
@@ -188,6 +192,7 @@ export async function POST(request:NextRequest){
   }
   let details:ChatDetails|undefined;
   let qualityHandled=false;
+  let composedReply=false;
   let unlinkedSubject:string|null=null;
   let unlinkedHandoff:ReturnType<typeof practiceMessageHandoff>=null;
   if(input.text&&!input.handoffOnly&&!explicitOptOut(input.text)&&!emergencyDecision(input.text)){
@@ -301,6 +306,39 @@ export async function POST(request:NextRequest){
      if(selfService){decision=selfService.decision;qualityHandled=true;}
     }
    }
+  }
+  const readOnlyReply=/^quality:(?:attachment|walk_in|appliance_visit)$/.test(decision.rule);
+  if((!qualityHandled||readOnlyReply)&&plainText&&input.text&&input.senderPolicy===1&&process.env.ANIMAHOST_REPLY_CORE_PASSED==='true'&&
+   !explicitLater&&!lateLanguage&&!appointmentConcern(input.text)&&!invoicePortalIntent(input.text)&&
+   !mayBeAttendanceRequest(input.text)&&!/(?:adresse|telefonnummer|e.mail|rechnungsempfänger|zugangscode|passwort|geburtsdatum|mahnung|guthaben|rechn(?:ung|ungen)|payment|invoice|address|contraseña|factura)/i.test(input.text)){
+   const today=appointmentLocalDate(input.receivedAt);
+   try{
+    const [version,knowledge,confirmed]=await Promise.all([
+     db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',input.tenantId).eq('version',practice.active_rulebook_version).single(),
+     activeKnowledge(db,input.tenantId,today),
+     trustedPhone?db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',input.tenantId)
+      .eq('chat_jid',input.from).eq('phone',trustedPhone).lte('verified_at',input.receivedAt):Promise.resolve({data:[],error:null}),
+    ]);
+    const rules=whatsappRulesSchema.safeParse(version.data?.rules);
+    if(version.error||confirmed.error||!rules.success||!knowledge.available)throw Error('reply_core_context_unavailable');
+    const verifiedIds=(confirmed.data??[]).map(row=>row.patient_id);
+    if(input.identity?.phone===trustedPhone)verifiedIds.push(input.identity.patientId);
+    const dossier=await loadDossier(db,{patients:candidates,verifiedIds,today});
+    const result=await runChain(gatewayGenerate(practice.model,request.signal),{message:maskBirthDates(input.text),language,informal:false,
+     history,dossier,rules:rules.data,approvedKnowledge:knowledge.entries,
+     practice:{doctolibUrl:practice.doctolib_url,phone:practice.practice_phone,today,teamTime:teamTime(),closurePeriods:practice.closure_periods},
+     baseline:null,budgetMs:Math.max(0,deadline-Date.now())});
+    details={patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:result.ok?'reply_core':result.reason,
+     ...(result.ok?{practiceSummary:result.teamSummary??undefined,concerns:result.concerns.map(item=>item.topic),usedRuleIds:result.usedRuleIds,
+      usedKnowledge:result.usedKnowledge,responseQuality:result.concerns.some(item=>['regel','akte','gespraech'].includes(item.way))?'content':'handoff_only'}:
+      {responseQuality:'withheld',violations:result.violations,practiceSummary:t('animahost.whatsapp.chain_review','de',{reason:result.reason})})};
+    decision=result.ok?{action:result.action,text:result.text,rule:result.rule}:{action:'klaerfall',text:'',rule:'chain:guard_rejected'};
+   }catch{
+    decision={action:'klaerfall',text:'',rule:'chain:guard_rejected'};
+    details={patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:'reply_core_context_unavailable',responseQuality:'withheld',
+     practiceSummary:t('animahost.whatsapp.chain_review','de',{reason:'reply_core_context_unavailable'})};
+   }
+   qualityHandled=true;composedReply=true;
   }
   if(!qualityHandled){
   if(input.messageType==='text'&&input.text){
@@ -536,22 +574,22 @@ export async function POST(request:NextRequest){
    decision=fallbackDecision({topic,appointment:false,language,teamTime:teamTime(),
     doctolibUrl:practice.doctolib_url});
   }
-   decision=styleMessage(decision,qualityAvailable?patient:null,{language,receivedAt:input.receivedAt,
+  if(!composedReply)decision=styleMessage(decision,qualityAvailable?patient:null,{language,receivedAt:input.receivedAt,
    firstReply:!history.some(item=>item.direction==='outgoing'),informal,teamTime:teamTime(),incoming:input.text??''});
   if(preferences){
    const saved=await db.from('animahost_whatsapp_chat_preferences').upsert({tenant_id:input.tenantId,chat_jid:input.from,
     informal:preferences.informal,context:preferences.context,updated_at:input.receivedAt},{onConflict:'tenant_id,chat_jid'});
    if(saved.error)throw Error('chat_preferences_unavailable');
   }
-  let replyStyle:'formulated'|'template'='template';
-  if(freeForm&&automaticReplies&&input.text&&decision.action!=='notfall'&&!decision.rule.startsWith('fallback:')&&!details?.practiceSummary){
+  let replyStyle:'formulated'|'template'=composedReply&&decision.text?'formulated':'template';
+  if(!composedReply&&freeForm&&automaticReplies&&input.text&&decision.action!=='notfall'&&!decision.rule.startsWith('fallback:')&&!details?.practiceSummary){
    const approved=decision.text;
    decision=await formulateConversationReply({model:practice.model,decision,text:maskBirthDates(input.text),history:references,language:replyLanguage,informal,
     verifiedIdentity:Boolean(input.identity),signal:request.signal,deadline});
    if(decision.text!==approved)replyStyle='formulated';
   }
   const sentThrough=input.history?.filter(turn=>Date.parse(turn.at)<=Date.parse(input.receivedAt))??[];
-  decision=enforceConversationOutput(decision,sentThrough,language,{teamTime:teamTime(),receivedAt:input.receivedAt,informal,
+  if(!composedReply)decision=enforceConversationOutput(decision,sentThrough,language,{teamTime:teamTime(),receivedAt:input.receivedAt,informal,
    keepLinks:/^(?:access_|attendance_|invoice_recipient_|contact_change_)/.test(decision.rule)});
   const inserted=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,
    message_id:input.messageId,sender_jid:input.from,action:decision.action,
