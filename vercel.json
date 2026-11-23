@@ -1,4 +1,5 @@
 {
+  "installCommand": "ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci",
   "crons": [
     {
       "path": "/api/workflows/execute-all?group=patient-access",
