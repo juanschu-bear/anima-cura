@@ -11,6 +11,7 @@ import {loadDossier} from '@/lib/services/animahost-dossier';
 import {runChain} from '@/lib/services/animahost-chain';
 import {gatewayGenerate,type ModelCall} from '@/lib/services/animahost-chain-model';
 import {activeKnowledge} from '@/lib/services/animahost-knowledge';
+import {bundledKfoPreview} from '@/lib/services/animahost-kfo-import';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -29,6 +30,7 @@ const bodySchema=z.strictObject({
  history:conversationHistorySchema,
  /** Wann die Nachricht damals kam. Danach richten sich „heute“ und die Zeit, zu der das Team antwortet. */
  at:z.string().datetime({offset:true}).optional(),
+ knowledgeMode:z.enum(['approved','draft_preview']).default('approved'),
 });
 
 function authorized(header:string|null){
@@ -57,18 +59,21 @@ export async function POST(request:NextRequest){
   const confirmed=await db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid).lte('verified_at',now);
   const language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text)?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text)?'es':'de';
+  const draft=input.knowledgeMode==='draft_preview'?bundledKfoPreview():null;
   const [dossier,knowledge]=await Promise.all([
    loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)}),
-   activeKnowledge(db,tenant,appointmentLocalDate(new Date().toISOString())),
+   draft?Promise.resolve({available:true,entries:draft.entries}):activeKnowledge(db,tenant,appointmentLocalDate(new Date().toISOString())),
   ]);
   const calls:ModelCall[]=[];
   const result=await runChain(gatewayGenerate(practice.model,request.signal,call=>calls.push(call)),{
    message:maskBirthDates(input.text),language,informal:false,
    history:recentConversation(input.history,now).map(item=>({...item,text:maskBirthDates(item.text)})),dossier,rules:rules.data,approvedKnowledge:knowledge.entries,
+   knowledgeMode:input.knowledgeMode,
    practice:{doctolibUrl:practice.doctolib_url,phone:practice.practice_phone,today:appointmentLocalDate(now),
     closurePeriods:practice.closure_periods,teamTime:teamReplyTime(now,practice.team_reply_days,practice.closure_periods,language)},
    baseline:null,budgetMs:45_000});
   return NextResponse.json({result,file:{sender:dossier.sender,patients:dossier.patients.length,confirmed:dossier.patients.filter(patient=>patient.verified).length},
-   model:practice.model,rulebookVersion:practice.active_rulebook_version,knowledgeAvailable:knowledge.available,calls,ms:Date.now()-started},{headers});
+   model:practice.model,rulebookVersion:practice.active_rulebook_version,knowledgeAvailable:knowledge.available,
+   knowledgeMode:input.knowledgeMode,knowledgeFileVersion:draft?.fileVersion??null,calls,ms:Date.now()-started},{headers});
  }catch{return NextResponse.json({code:'replay_unavailable'},{status:503,headers});}
 }

@@ -11,6 +11,7 @@ import {closurePeriodsSchema} from '@/lib/services/animahost-practice-closures';
 import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,validateNoticeTemplate,
  type ContactPatient} from '@/lib/services/animahost-contact-notices';
 import {activeKnowledge,knowledgeDraft,knowledgeRecord} from '@/lib/services/animahost-knowledge';
+import {bundledKfoImport} from '@/lib/services/animahost-kfo-import';
 import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices';
 
 export const runtime='nodejs';
@@ -44,6 +45,7 @@ const bodySchema=z.discriminatedUnion('action',[
   expectedVersion:z.number().int().min(0),entry:knowledgeDraft}),
  z.strictObject({action:z.literal('approve_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
  z.strictObject({action:z.literal('deactivate_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
+ z.strictObject({action:z.literal('import_kfo_knowledge'),actorId:z.string().uuid()}),
 ]);
 
 function authorized(header:string|null){
@@ -60,6 +62,13 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='knowledge_open_questions'){
+  const result=await db.rpc('animahost_knowledge_open_questions',{p_tenant:tenant});
+  if(['PGRST202','42883'].includes(result.error?.code??''))return NextResponse.json({knowledgeImportAvailable:false,questions:[]},{headers});
+  if(result.error)return unavailable();
+  return NextResponse.json({knowledgeImportAvailable:true,questions:result.data.map((row:{id:string;external_id:string|null;version:number;area:string;title:string;question:string})=>
+   ({id:row.id,externalId:row.external_id,version:row.version,area:row.area,title:row.title,question:row.question}))},{headers});
+ }
  if(resource==='knowledge'){
   const search=request.nextUrl.searchParams;
   const id=z.string().uuid().nullable().safeParse(search.get('id'));
@@ -163,10 +172,27 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='import_kfo_knowledge'){
+  const catalog=bundledKfoImport();
+  const result=await db.rpc('animahost_import_knowledge',{p_tenant:tenant,p_actor:input.actorId,p_entries:catalog.entries});
+  if(result.error){
+   if(['PGRST202','42883'].includes(result.error.code))return NextResponse.json({code:'knowledge_import_not_installed'},{status:503,headers});
+   if(result.error.code==='42501')return NextResponse.json({code:'knowledge_actor_forbidden'},{status:403,headers});
+   if(result.error.code==='23505')return NextResponse.json({code:'knowledge_import_id_conflict'},{status:409,headers});
+   return unavailable();
+  }
+  return NextResponse.json({...result.data,fileVersion:catalog.fileVersion,fileDate:catalog.fileDate,
+   openQuestions:catalog.entries.filter(item=>item.metadata.openQuestion!==null).length},{headers});
+ }
  if(input.action==='save_knowledge_draft'||input.action==='approve_knowledge'||input.action==='deactivate_knowledge'){
   const draft=input.action==='save_knowledge_draft';
   if(draft&&((!input.id)!==(input.expectedVersion===0)))
    return NextResponse.json({code:'knowledge_invalid'},{status:400,headers});
+  if(draft&&(input.entry.sources!==undefined||input.entry.guidance!==undefined||input.entry.openQuestion!==undefined||
+   input.entry.area==='gespraech'||input.entry.source==='offen')){
+   const schema=await db.from('animahost_knowledge_versions').select('metadata').eq('tenant_id',tenant).limit(0);
+   if(schema.error)return NextResponse.json({code:'knowledge_import_not_installed'},{status:503,headers});
+  }
   const operation=draft?'draft':input.action==='approve_knowledge'?'approve':'deactivate';
   const result=await db.rpc('animahost_change_knowledge',{p_tenant:tenant,p_id:input.id??randomUUID(),p_expected:input.expectedVersion,
    p_actor:input.actorId,p_action:operation,p_entry:draft?input.entry:null});

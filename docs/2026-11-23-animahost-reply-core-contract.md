@@ -13,21 +13,30 @@ Die Absenderprüfung erkennt Teamnummern, Gruppen, bekannte Nicht-Patienten und 
 ```ts
 type KnowledgeDraft = {
   area: 'apparatur' | 'problem' | 'selbsthilfe' | 'warnzeichen' |
-        'behandlungsphase' | 'praxisablauf' | 'begriff'
+        'behandlungsphase' | 'praxisablauf' | 'begriff' | 'gespraech'
   title: string
   content: string
-  source: 'fachlich' | 'praxis'
+  source: 'fachlich' | 'praxis' | 'offen'
   validFrom: string // YYYY-MM-DD
+  sources?: {key: string; name: string; url: string}[]
+  guidance?: {selfHelp?: string; practice?: string; reception?: string; warningSigns?: string}
+  openQuestion?: string | null
 }
 
 type KnowledgeVersion = KnowledgeDraft & {
   id: string
   version: number
+  status: 'draft' | 'approved' | 'deactivated'
   active: boolean
   approvedAt: string | null
   approvedBy: string | null
   createdAt: string
   createdBy: string
+  externalId: string | null
+  hasOpenQuestion: boolean
+  sourceApprovalNote: string | null
+  importVersion: string | null
+  importDate: string | null
 }
 ```
 
@@ -41,11 +50,17 @@ type KnowledgeVersion = KnowledgeDraft & {
 
 Bei `409 knowledge_version_conflict` die Versionen neu laden. `422 knowledge_not_draft` oder `knowledge_not_active` erklärt eine unzulässige Aktion. `403` steht für fehlende Berechtigung. `503 animahost_unavailable` weist auf ein technisches Problem hin. Eine fehlende Migration liefert beim Lesen `knowledgeAvailable:false`.
 
-Die fachliche Importdatei und die Antworten aus dem Praxisfragebogen nutzen je einen Entwurf pro Eintrag. Sie tragen `source:'fachlich'` oder `source:'praxis'`. Die Praxis prüft und veröffentlicht sie. Ein veröffentlichtes Datum in der Zukunft ändert die Modellgrundlage erst ab diesem Tag. Beim Deaktivieren bleibt die vollständige Historie erhalten. Neue Freigaben wirken ohne Bereitstellung.
+`POST /api/animahost/control` mit `{action:'import_kfo_knowledge'}` importiert die mit dem Server bereitgestellte JSON-Datei `docs/animahost/wissensbasis-kfo-v1.json`. Es gibt keinen Upload aus der Browseransicht. Rückgabe `200 {fileVersion,fileDate,created,revised,unchanged,openQuestions}`. Der Eintrag behält seine feste `id`, abgeleitet aus dem fachlichen `externalId`. Identische Importdaten ergeben keine weitere Version und überschreiben keine Änderung der Praxis. Geänderter Inhalt, eine geänderte Quellenangabe oder ein neuer Stand der Datei erzeugen eine neue Entwurfsfassung. Die gesamte Datei wird in einer Transaktion verarbeitet. Ein Importversuch vor Migration 104 liefert `503 knowledge_import_not_installed`.
+
+Alle 51 Zeilen der Fassung v1.2 starten als `draft` mit `active:false`, `approvedAt:null` und `approvedBy:null`. `sourceApprovalNote` übernimmt einen Freigabevermerk aus der Datei als Herkunftshinweis. Für die Modellfreigabe gilt der gesonderte Klick der angemeldeten Praxis. `effective` zeigt die zum aktuellen Berliner Stichtag für das Live-Modell wirksamen Paare. Ein Datum in der Zukunft wirkt erst ab diesem Tag. Beim Deaktivieren bleibt die vollständige Historie erhalten. Neue Freigaben wirken ohne Bereitstellung.
+
+`GET /api/animahost/control?resource=knowledge_open_questions` liefert `{knowledgeImportAvailable,questions}`. `questions[]` enthält `{id,externalId,version,area,title,question}` aus der jeweils jüngsten Fassung. `hasOpenQuestion` steht auch an der normalen Zeile. Die Frage wird mit einem versionierten Entwurf geändert und mit `entry.openQuestion:null` als geklärt entfernt. Ausgelassene Metadaten bleiben erhalten. Ein übergebenes `entry.guidance` ersetzt das bisherige Objekt. Der Text der offenen Frage und die redaktionelle Freigabenotiz werden dem Modell nicht als Wissen angeboten.
 
 ## Welche Quellen eine Antwort belegen
 
 `POST /api/animaline/replay` ist der bestehende Probelauf im Leitstand für `admin`. Für die Antwort liefert Anima Cura jetzt `rulebookVersion`, `knowledgeAvailable` und `result.usedKnowledge`. Jeder Beleg ist `{id,version,claim}`. `claim` ist die Aussage im geprüften Antworttext. Ein zweiter Aufruf prüft die Belege gegen die verwendeten Versionen. Die Detailansicht lädt die betreffende Fassung über `resource=knowledge&id=...`. Allein das Laden eines Wissenseintrags macht ihn noch nicht zum Beleg.
+
+Der optionale Parameter `knowledgeMode:'draft_preview'` nutzt für den Probelauf den gebündelten Entwurf aus der JSON-Datei. Die Antwort kennzeichnet das mit `knowledgeMode:'draft_preview'` und `knowledgeFileVersion`. Die Belege beziehen sich in diesem Modus auf die unveränderliche Dateifassung mit `version:1` als Kennung für den erstmalig eingelesenen Entwurf. Die Zuordnung zu `externalId` erfolgt über die stabile ID. Die normale Einstellung `approved` liest ausschließlich wirksame Freigaben aus der Datenbank. Der Live-Versand hat keinen Zugang zum Entwurfsmodus.
 
 Der Bericht verwendet pro Nachricht `eventId`, `origin` (`live` oder `archive`), `at`, `before`, `beforeSource`, `after`, `status`, `rulebookVersion`, `usedRuleIds` und `usedKnowledge`. `beforeSource` unterscheidet die im Versand gespeicherte Antwort, einen Versandbeleg ohne separate Textzeile und die erste historische Antwort. Fehlt ein belastbarer Bezug zu einer Antwort, ist `before:null`. Bei einem abgelehnten Entwurf ist `after:null`. `violations` und `ms` erklären die Ablehnung und die Rechenzeit. Für Regelbuch und Fachwissen verwendet der Probelauf den zum Prüftag verfügbaren Stand. Die Zeitangaben zur Rückmeldung werden aus dem Empfangszeitpunkt der Nachricht berechnet.
 

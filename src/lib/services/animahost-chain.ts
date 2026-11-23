@@ -21,6 +21,7 @@ export type ChainInput={
  message:string;language:'de'|'en'|'es';informal:boolean;history:ConversationHistory;dossier:Dossier;rules:WhatsAppRule[];
  practice:{doctolibUrl:string|null;phone:string|null;teamTime:string;today:string;closurePeriods?:unknown;timeZone?:string};
  approvedKnowledge?:ApprovedKnowledge[];
+ knowledgeMode?:'approved'|'draft_preview';
  /** Bisherige, freigegebene Antwort. Für das Anliegen, das sie beantwortet, ist ihr Inhalt verbindlich. */
  baseline:{action:'antworten'|'klaerfall';rule:string;text:string}|null;
  budgetMs:number;
@@ -170,9 +171,9 @@ export async function runChain(generate:Generate,input:ChainInput):Promise<Chain
  const rules=knowledge(input.rules,input.practice.doctolibUrl);
  const approved=matchingKnowledge(input.approvedKnowledge??[],[input.message,...input.history.slice(-4).map(item=>item.text)].join(' '));
  const {akte,facts,names}=dossierForModel(input.dossier);
- const sources={ruleTexts:rules.map(rule=>rule.aussage),facts:[...facts,...approved.map(entry=>entry.content)],names};
+ const sources={ruleTexts:rules.map(rule=>rule.aussage),facts:[...facts,...approved.flatMap(entry=>[entry.content,...Object.values(entry.guidance??{})])],names};
  const base={neuesteNachricht:input.message,verlauf:input.history.map(item=>({von:item.direction==='incoming'?'Patient':'Praxis',am:item.at,text:item.text})),
-  akte,regeln:rules,wissen:approved,heute:input.practice.today,rueckmeldezeitTeam:input.practice.teamTime,telefonPraxis:input.practice.phone,
+  akte,regeln:rules,wissen:approved,wissensstand:input.knowledgeMode??'approved',heute:input.practice.today,rueckmeldezeitTeam:input.practice.teamTime,telefonPraxis:input.practice.phone,
   schliesstage:input.practice.closurePeriods??[],zeitzone:input.practice.timeZone??'Europe/Berlin',buchungslink:input.practice.doctolibUrl,
   anrede:input.informal?'Du':'Sie',sprache:input.language,schreibweise:PRACTICE_STYLE,vorgabe:input.baseline?.text??null};
  let attempts=0,violations:string[]=[],previous:z.infer<typeof composed>|null=null;
