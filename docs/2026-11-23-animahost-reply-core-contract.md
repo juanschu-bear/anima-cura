@@ -57,13 +57,34 @@ Alle 51 Zeilen der Fassung v1.2 starten als `draft` mit `active:false`, `approve
 
 `GET /api/animahost/control?resource=knowledge_open_questions` liefert `{knowledgeImportAvailable,questions}`. `questions[]` enthält `{id,externalId,version,area,title,question}` aus der jeweils jüngsten Fassung. `hasOpenQuestion` steht auch an der normalen Zeile. Die Frage wird mit einem versionierten Entwurf geändert und mit `entry.openQuestion:null` als geklärt entfernt. Ausgelassene Metadaten bleiben erhalten. Ein übergebenes `entry.guidance` ersetzt das bisherige Objekt. Der Text der offenen Frage und die redaktionelle Freigabenotiz werden dem Modell nicht als Wissen angeboten.
 
-## Welche Quellen eine Antwort belegen
+## Quellen im Retrieval-Probelauf
 
-`POST /api/animaline/replay` ist der bestehende Probelauf im Leitstand für `admin`. Für die Antwort liefert Anima Cura jetzt `rulebookVersion`, `knowledgeAvailable` und `result.usedKnowledge`. Jeder Beleg ist `{id,version,claim}`. `claim` ist die Aussage im geprüften Antworttext. Ein zweiter Aufruf prüft die Belege gegen die verwendeten Versionen. Die Detailansicht lädt die betreffende Fassung über `resource=knowledge&id=...`. Allein das Laden eines Wissenseintrags macht ihn noch nicht zum Beleg.
+`POST /api/animaline/replay` bleibt der Probelauf für die Praxisleitung. In der Antwort mit `architecture:"retrieval-v1"` enthält `result.retrieved` die Referenzen, deren Inhalte der Server dem Antwortmodell übergeben hat.
 
-Der optionale Parameter `knowledgeMode:'draft_preview'` nutzt für den Probelauf den gebündelten Entwurf aus der JSON-Datei. Die Antwort kennzeichnet das mit `knowledgeMode:'draft_preview'` und `knowledgeFileVersion`. Die Belege beziehen sich in diesem Modus auf die unveränderliche Dateifassung mit `version:1` als Kennung für den erstmalig eingelesenen Entwurf. Die Zuordnung zu `externalId` erfolgt über die stabile ID. Die normale Einstellung `approved` liest ausschließlich wirksame Freigaben aus der Datenbank. Der Live-Versand hat keinen Zugang zum Entwurfsmodus.
+```ts
+type SourceRef = {
+  kind: 'gold' | 'knowledge' | 'rule' | 'history'
+  ref: string
+  version: number
+  date: string
+  preview: boolean
+}
 
-Der Bericht verwendet pro Nachricht `eventId`, `origin` (`live` oder `archive`), `at`, `before`, `beforeSource`, `after`, `status`, `rulebookVersion`, `usedRuleIds` und `usedKnowledge`. `beforeSource` unterscheidet die im Versand gespeicherte Antwort, einen Versandbeleg ohne separate Textzeile und die erste historische Antwort. Fehlt ein belastbarer Bezug zu einer Antwort, ist `before:null`. Bei einem abgelehnten Entwurf ist `after:null`. `violations` und `ms` erklären die Ablehnung und die Rechenzeit. Für Regelbuch und Fachwissen verwendet der Probelauf den zum Prüftag verfügbaren Stand. Die Zeitangaben zur Rückmeldung werden aus dem Empfangszeitpunkt der Nachricht berechnet.
+type RetrievedSources = {
+  gold: SourceRef[]
+  knowledge: SourceRef[]
+  rule: SourceRef[]
+  history: SourceRef[]
+}
+```
+
+Die Gruppen enthalten in Auswahlreihenfolge bis zu drei Goldbeispiele, acht passende Wissenseinträge, sechs passende Regeln und fünf frühere Praxisfälle. Wissenseinträge gehen als getrennte Felder `titel`, `inhalt`, `selbsthilfe`, `praxis`, `rezeption` und `warnzeichen` in den Modellaufruf. Einträge mit `preview:true` stammen aus der Entwurfs-Vorschau. Der normale Antwortweg verwendet ausschließlich gültiges, freigegebenes Wissen.
+
+Die Auswertung zeigt „Dem Modell mitgegeben“. Bei einer zurückgehaltenen Antwort bleibt die Liste des versuchten Modellaufrufs sichtbar. Fälle ohne Modellaufruf liefern leere Gruppen. Aus den Referenzen lässt sich allein keine Aussage über die tatsächliche Verwendung eines Eintrags in der Antwort ableiten.
+
+Der gespeicherte Leseweg `resource=reply_evidence&messageId=<provider-message-id>` liefert `{answerEvidence:{architecture,created_at,evidence,timings}|null}`. `evidence` entspricht `RetrievedSources`. Die betreffende Fassung lässt sich über `resource=retrieval_document&kind=...&ref=...&version=...` laden. Der neue Prüfer bewertet harte Grenzen und ermöglicht einen einzelnen Korrekturversuch bei behebbaren Mängeln.
+
+Der [Probelauf mit den Wissensentwürfen](animahost/2026-11-23-wissensimport-probelauf.md) dokumentiert den Vorher-Stand mit 11,63 Sekunden Median, 50 inhaltlich zurückgehaltenen Antworten und null bestätigten Zitaten. Die bisherigen Felder `usedKnowledge` und `claim` gehören zu diesem alten Lauf. Für den Vergleich zählen vor allem Laufzeit und die Zahl der tatsächlich hilfreichen, zur Prüfung freigegebenen Antworten.
 
 ## Tägliche Antwortqualität
 
