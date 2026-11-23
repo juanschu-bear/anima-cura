@@ -11,15 +11,17 @@ function acknowledgmentWords(text:string){
  return value.replace(/ für (?:ihre |die |eure )?(?:hilfe|antwort|rückmeldung|information(?:en)?|info)$/,'').replace(/\s+/g,' ').trim();
 }
 
-export function socialReply(input:{messageType:string;text:string|null;hasPriorConversation:boolean;hasPriorReply:boolean}){
+export function socialReply(input:{messageType:string;text:string|null;hasPriorConversation:boolean;hasPriorReply:boolean;clarifyUnclear?:boolean}){
  const type=input.messageType.replace(/^view_once_/,'');
  const text=(input.text??'').trim();
  if(type==='reaction')return 'social:reaction';
  if(['unsupported','text','system','protocol','edit'].includes(type)&&!text)return 'social:unreadable';
+ if(type==='sticker'&&!text&&input.clarifyUnclear)return null;
  if(type==='sticker'&&!text)return input.hasPriorConversation?'social:acknowledged':'begruessung-ohne-anliegen';
  if(type!=='text'&&type!=='unsupported')return null;
  const stripped=text.replace(emoji,'');
  const words=stripped.replace(/[\u200D\uFE0F]/g,'').trim();
+ if(text!==stripped&&!words&&input.clarifyUnclear)return null;
  if(text!==stripped&&!words)return input.hasPriorConversation?'social:acknowledged':'begruessung-ohne-anliegen';
  if(acknowledgments.test(acknowledgmentWords(words)))
   return 'social:acknowledged';

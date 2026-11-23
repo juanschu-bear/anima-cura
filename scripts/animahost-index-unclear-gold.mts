@@ -1,0 +1,10 @@
+import nextEnv from '@next/env';
+nextEnv.loadEnvConfig(process.cwd());
+const {createServerClient}=await import('../src/lib/db/supabase');
+const {bundledGoldDocuments,upsertRetrievalDocuments}=await import('../src/lib/services/animahost-retrieval');
+const tenant=process.env.ANIMAHOST_TENANT_ID;
+if(!tenant)throw Error('tenant_not_configured');
+const docs=bundledGoldDocuments().filter(d=>d.ref.startsWith('gold-unklar-'));
+if(docs.length!==3)throw Error('expected_three_unclear_examples');
+await upsertRetrievalDocuments(createServerClient(),tenant,docs);
+console.log({indexed:docs.length,refs:docs.map(d=>d.ref)});

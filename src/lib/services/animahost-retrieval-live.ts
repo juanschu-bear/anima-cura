@@ -1,3 +1,4 @@
+import {clarificationRound} from './animahost-unclear-input';
 import {resolveChatName,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
 import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient} from './animahost-chat-identity';
@@ -18,7 +19,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const [patients,confirmed,prior,version]=await Promise.all([
   phone?phonePatients(db,phone).then(p=>p??[]):Promise.resolve([]),
   phone?db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',input.tenantId).eq('chat_jid',input.from).eq('phone',phone).lte('verified_at',input.receivedAt):Promise.resolve({data:[],error:null}),
-  db.from('animahost_whatsapp_decisions').select('case_details,rule_id').eq('tenant_id',input.tenantId).eq('sender_jid',input.from).lte('created_at',input.receivedAt).order('created_at',{ascending:false}).limit(100),
+  db.from('animahost_whatsapp_decisions').select('case_details,rule_id,patient_text').eq('tenant_id',input.tenantId).eq('sender_jid',input.from).lte('created_at',input.receivedAt).order('created_at',{ascending:false}).limit(100),
   db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',input.tenantId).eq('version',practice.active_rulebook_version).single(),
  ]);
  if(confirmed.error||prior.error||version.error)throw Error('retrieval_context_unavailable');
@@ -42,7 +43,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
-  history,dossier,patientSheet,chatName,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
+  history,dossier,patientSheet,chatName,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
   today:appointmentLocalDate(input.receivedAt),doctolibUrl:practice.doctolib_url,
   hasPriorConversation:input.hasPriorConversation===true||history.length>0,hasPriorReply:input.hasPriorReply===true||history.some(h=>h.direction==='outgoing'),
   identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,60000-(Date.now()-started))};

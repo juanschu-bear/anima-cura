@@ -121,7 +121,7 @@ export async function POST(request:NextRequest){
  if(process.env.ANIMAHOST_TENANT_ID&&input.tenantId!==process.env.ANIMAHOST_TENANT_ID)
   return NextResponse.json({code:'not_authorized'},{status:403});
  const past=recentConversation(input.history??[],input.receivedAt);
- const social=socialReply({...input,hasPriorConversation:input.hasPriorConversation===true||past.length>0,
+ const social=socialReply({...input,clarifyUnclear:process.env.ANIMAHOST_RETRIEVAL_PASSED==='true',hasPriorConversation:input.hasPriorConversation===true||past.length>0,
   hasPriorReply:input.hasPriorReply===true||past.some(item=>item.direction==='outgoing')});
  if(social&&silentSocialRule.test(social))return decisionResponse({action:'antworten',rule:social,text:''});
  const db=createServerClient();

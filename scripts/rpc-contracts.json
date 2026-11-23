@@ -481,7 +481,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "837ce720807cf2e95534bfa1b062d093f53c269007d70488df36398cc03f147e",
+      "sha256": "7234e97c36009b85ce6ff305ec2ad129c5517108ca1a3f2e5623c1b56bf54644",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
         {
@@ -617,7 +617,7 @@
     },
     {
       "file": "src/lib/services/animahost-retrieval.ts",
-      "sha256": "d2c37da1c97cf5f074dbc7fb082f59e6381100e77f81a6c1483596396826baba",
+      "sha256": "4f91605f604c7c2e92cde3a15227c510aaba839298a7aed91deefcba38683e3d",
       "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
       "calls": [
         {
@@ -724,7 +724,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "b355818068b198116ff4aa61564ef5c63ddfa4b1c57acc6ece63c7e64476914f"
+      "sha256": "c1492bee8296ceaa4a55151fb61a2e17e58216bfd4fddcd7be7f3e3e2d52eff5"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

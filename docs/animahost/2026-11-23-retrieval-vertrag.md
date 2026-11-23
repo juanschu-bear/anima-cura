@@ -67,3 +67,13 @@ Stille Reaktionen, leere Nachrichten und Abschlüsse sind erwartete Ergebnisse, 
 Cura: `ANIMAHOST_RETRIEVAL_PASSED=true`. AnimaLine-Daemon: `ANIMALINE_RETRIEVAL_POLICY=1` (keine alten Themen-Fallbacks oder automatischen Folgeantworten). Beide bleiben bis zur Freigabe aus. Der bisherige Kern bleibt nur für die noch aktive Strecke und als Rücknahmeweg im Code. Die neue Strecke umgeht dessen Klassifikation, Workflows und Nachbearbeitung vollständig. Ein Fehler erzeugt keinen erfundenen Ersatztext.
 
 Die Architektur benötigt keine Neukopplung von WhatsApp. Historienimport und Reaktionen bleiben vom automatischen Antwortversand getrennt.
+
+## Letzter vollständiger 239er-Probelauf (23.11., Abendfreigabe)
+
+`GET /api/animahost/whatsapp/internal/control?resource=acceptance_run`; AnimaDesk leitet unter `GET /api/animahost/control?resource=acceptance_run` für admin/verwaltung weiter. Private/no-store, bestehende Authentifizierung.
+
+Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `complete`, `cases`, `approvedCases`. `cases` ist der letzte vollständige Lauf mit vorläufigem Entwurfswissen (`draft_preview`); `approvedCases` enthält den getrennten Lauf nur mit freigegebenem Wissen. Je 239 Einträge. Diese Ressource stellt den historischen Lauf dar, keinen neuen Test des inzwischen ergänzten Patientenblatts.
+
+Je Fall: `ref`, `at` (Zeitpunkt des Eingangs), `input` (anonymisiert), `answer` (anonymisiert), `retrieved:{gold,knowledge,rule,history}`, `status`, `sendDelaySeconds`, `sendStatus`. Quellen behalten Referenz, Version und Datum. Es wurde im Probelauf nichts gesendet: `sendDelaySeconds:null`, `sendStatus:not_sent_dry_run`; Erzeugungslaufzeit niemals als Versandverzögerung anzeigen. Rohkennungen, Namen und Telefonnummern sind nicht enthalten.
+
+Unklare Eingänge: `conversation:clarify_first`, dann `conversation:clarify_second`, erst danach `conversation:outside_scope` mit ausgesprochener Übergabe ans Team. Zähler berücksichtigt tatsächlich im Verlauf versendete Nachfragen; eine inhaltliche Antwort setzt ihn zurück. Reaktionen/Dank bleiben still.

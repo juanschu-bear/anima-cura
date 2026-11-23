@@ -1,3 +1,4 @@
+import {unclearInput} from './animahost-unclear-input';
 import {createHash} from 'node:crypto';
 import type {createServerClient} from '@/lib/db/supabase';
 import gold from '../../../docs/animahost/goldbeispiele-v1.json';
@@ -12,9 +13,9 @@ export type RetrievalEvidence={kind:RetrievalKind;ref:string;version:number;date
 export const evidence=(d:RetrievalDocument):RetrievalEvidence=>({kind:d.kind,ref:d.ref,version:d.version,date:d.source_at,preview:d.draft});
 export const contentHash=(text:string)=>createHash('sha256').update(text).digest('hex');
 export function bundledGoldDocuments():RetrievalDocument[]{
- return gold.beispiele.map(entry=>{const payload={question:entry.anliegen,context:entry.kontext,answer:entry.antwort,knowledge:entry.wissen};
+ return gold.beispiele.map(entry=>{const payload={question:entry.anliegen,context:entry.kontext,answer:entry.antwort,knowledge:entry.wissen,area:'area' in entry?entry.area:null,topic:'topic' in entry?entry.topic:null};
  const content=[entry.anliegen,entry.kontext,entry.antwort??''].join('\n');
- return {kind:'gold',ref:entry.id,version:1,source_at:gold.stand+'T00:00:00Z',title:entry.id,content,payload,draft:false,content_hash:contentHash(content)};});
+ return {kind:'gold',ref:entry.id,version:1,source_at:('stand' in entry?String(entry.stand):gold.stand)+'T00:00:00Z',title:entry.id,content,payload,draft:false,content_hash:contentHash(content)};});
 }
 export async function upsertRetrievalDocuments(db:Db,tenant:string,documents:RetrievalDocument[]){
  for(let start=0;start<documents.length;start+=32){
@@ -73,6 +74,11 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  }
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));
+ if(unclearInput(message,'text')||!message.trim()){
+  const examples=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).in('ref',['gold-unklar-link','gold-unklar-huhu','gold-unklar-zweite-runde']);
+  if(examples.error)throw Error('retrieval_gold_unavailable');
+  for(const doc of examples.data as RetrievalDocument[]){const i=documents.findIndex(d=>d.kind==='gold'&&d.ref===doc.ref);if(i>=0)documents.splice(i,1);documents.unshift(doc);}
+ }
  if(companion){const index=documents.findIndex(d=>d.kind==='knowledge'&&d.ref===companion!.ref);if(index>=0)documents.splice(index,1);documents.unshift(companion);}
  return {documents,timings:{embeddingMs:embedded-start,searchMs:Date.now()-embedded}};
 }

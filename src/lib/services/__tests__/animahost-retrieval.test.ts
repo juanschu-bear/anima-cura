@@ -17,13 +17,13 @@ test('unlinked pain patient is not excluded; only configured team, groups and no
  assert.equal(result.excluded,false);assert.equal(result.substantive,true);assert.equal(result.identityQuestion,true);
  assert.match(result.text,/heute noch/);assert.equal(result.text.match(/\?/g)?.length,1);
 });
-test('empty, reaction and acknowledgments never call the model, first sticker greets once',async()=>{
+test('empty, reaction and acknowledgments never call the model; stickers reach clarification',async()=>{
  const fail:Generate=async()=>{throw Error('must not call model');};
- for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke'],['text','Ok'],['sticker','']]){
+ for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke'],['text','Ok']]){
   const result=await runRetrievalReply(fail,input({messageType,message,hasPriorConversation:true,hasPriorReply:true}));
   assert.equal(result.skipSend,true);assert.equal(result.action,'antworten');assert.equal(result.text,'');
  }
- assert.match(retrievalPreflight(input({message:'',messageType:'sticker'}))!.text,/Worum geht/);
+ assert.equal(retrievalPreflight(input({message:'',messageType:'sticker'})),null);
 });
 test('system answers are not facts; missing team time is repaired before checking, no rule classifier',async()=>{
  const m=model(answer(),valid);

@@ -1,3 +1,4 @@
+import acceptanceRun from '../../../../../../../docs/animahost/2026-11-23-acceptance-run.json';
 import {timingSafeEqual} from 'node:crypto';
 import {contentHash,upsertRetrievalDocuments} from '@/lib/services/animahost-retrieval';
 import {remainingPersonNames} from '@/lib/services/animahost-retrieval-redaction';
@@ -70,6 +71,7 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='acceptance_run')return NextResponse.json(acceptanceRun,{headers});
  if(resource==='chat_identity_links'){
   const patient=z.string().uuid().safeParse(request.nextUrl.searchParams.get('patientId'));
   if(!patient.success)return NextResponse.json({code:'patient_invalid'},{status:400,headers});
