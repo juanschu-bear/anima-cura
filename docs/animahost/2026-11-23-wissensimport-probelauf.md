@@ -81,7 +81,7 @@ Die Belegprüfung unterscheidet ungültige Quellen-/Versions-/Textbelege (`wisse
 
 **Keine Umschaltung.** Die Anforderung „keine Überschreitungen“ ist nicht erfüllt. Außerdem sind Quellenbelege, technische Schemafehler und die genannten inhaltlichen Fehlfreigaben zu beheben. Ein höheres Zeitlimit oder das Abschalten der unabhängigen Prüfung wäre keine Erfüllung dieser Abnahme.
 
-Für die nächste Arbeit: zuerst Quellenbelege mit gültiger ID/Version und wörtlichem Antwortausschnitt zuverlässig erzeugen und prüfen; technische Schemafehler separat diagnostizieren; Modell-/Gateway-Zeitüberschreitungen mit Stufendauer untersuchen. Anschließend dieselben 139 Fälle erneut und den Production-Endpunkt einschließlich Kontextabruf messen. Freigaben der acht Praxisfragen und der Wissenseinträge bleiben redaktionelle Entscheidungen der Praxis.
+Juan hat das Zitierverfahren nach diesem Lauf abgelöst. Diese Messung bleibt der Vorher-Stand für die Retrieval-Abnahme. Der neue Kern protokolliert serverseitig die an das Modell übergebenen Goldbeispiele, Wissenseinträge, Regeln und früheren Praxisfälle. Die Prüfentscheidung verwendet dafür keine Zitate. Das Laufzeitziel mit Wissensbasis liegt bei einem Median unter 8 Sekunden.
 
 ## Nachweise und Reproduktion
 
