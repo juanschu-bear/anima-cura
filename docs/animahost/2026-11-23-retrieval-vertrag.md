@@ -1,6 +1,6 @@
 # AnimaHost Retrieval v1 – Vertrag für Claude
 
-Stand: 23.11.2026. Der neue Produktionsschalter `ANIMAHOST_RETRIEVAL_PASSED` bleibt **aus**. Der Probelauf verwendet den neuen Kern unabhängig davon. Die Oberfläche baut Claude; keine neue Navigation oder Darstellung wurde hier eingebaut.
+Stand: 23.11.2026. Der neue Kern ist in Production aktiv. Der Probelauf verwendet denselben Antwortkern unabhängig vom Produktionsschalter.
 
 ## Antwort und Quellen
 
@@ -26,6 +26,8 @@ Die Quellen werden unabhängig von der Anzeige gespeichert. Abruf mit bestehende
 - `GET /api/animahost/control?resource=gold_examples`: `{examples:[...]}`, aktive Goldbeispiele einschließlich `indexed_at`; noch nicht indexierte Beispiele sind erkennbar.
 
 Referenzen als undurchsichtige Zeichenketten behandeln und URL-kodieren. Keine Telefon-/Patienten-/Archivkennungen aus Referenzen ableiten. `date` ist das Datum der jeweiligen Quelle, kein Terminangebot. Historische Antworttexte niemals als ungeprüfte aktuelle Empfehlung darstellen. Die Originalkennungen der Archivpaare bleiben serverseitig und werden nicht an das Modell oder diese Anzeige geliefert.
+
+Bei HTTP 402 oder 429 des Modellanbieters bleibt der Eingang unter „Wartet auf euch“. Im Chat steht `rule:chain:guard_rejected` mit `details.modelFailure:{code:"model_budget_exhausted",stage:"compose"|"verify",httpStatus:402|429}`. AnimaDesk zeigt „Eingang ohne Antwort“ mit „Modellbudget erschöpft“. Der Fall löst eine wichtige Praxisbenachrichtigung aus. Der Live-Bericht zählt diese Eingänge separat von den tatsächlich gesendeten Antworten.
 
 ## „Als Goldbeispiel übernehmen“
 
@@ -68,13 +70,15 @@ Cura: `ANIMAHOST_RETRIEVAL_PASSED=true`. AnimaLine-Daemon: `ANIMALINE_RETRIEVAL_
 
 Die Architektur benötigt keine Neukopplung von WhatsApp. Historienimport und Reaktionen bleiben vom automatischen Antwortversand getrennt.
 
-## Letzter vollständiger 239er-Probelauf (23.11., Abendfreigabe)
+## 239er-Probelauf
 
 `GET /api/animahost/whatsapp/internal/control?resource=acceptance_run`; AnimaDesk leitet unter `GET /api/animahost/control?resource=acceptance_run` für admin/verwaltung weiter. Private/no-store, bestehende Authentifizierung.
 
-Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `complete`, `cases`, `approvedCases`. `cases` ist der letzte vollständige Lauf mit vorläufigem Entwurfswissen (`draft_preview`); `approvedCases` enthält den getrennten Lauf nur mit freigegebenem Wissen. Je 239 Einträge. Diese Ressource stellt den historischen Lauf dar, keinen neuen Test des inzwischen ergänzten Patientenblatts.
+Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `complete`, `validForAcceptance`, `cases`, `approvedCases`. `cases` enthält den Lauf mit vorläufigem Entwurfswissen (`draft_preview`). `approvedCases` enthält den getrennten Lauf nur mit freigegebenem Wissen. Je 239 Einträge. Aktuell ist die historische Datei mit `validForAcceptance:false` und `replacementStatus:"provider_credit_required"` gekennzeichnet.
 
 Je Fall: `ref`, `at` (Zeitpunkt des Eingangs), `input` (anonymisiert), `answer` (anonymisiert), `retrieved:{gold,knowledge,rule,history}`, `status`, `sendDelaySeconds`, `sendStatus`. Quellen behalten Referenz, Version und Datum. Es wurde im Probelauf nichts gesendet: `sendDelaySeconds:null`, `sendStatus:not_sent_dry_run`; Erzeugungslaufzeit niemals als Versandverzögerung anzeigen. Rohkennungen, Namen und Telefonnummern sind nicht enthalten.
+
+Der Ersatzlauf liefert zusätzlich `anrede` (`du` oder `Sie`), `clarificationStage` (1, 2, 3 oder null), `error` (Fehlercode, gegebenenfalls Erzeugungsschritt und HTTP-Status, sonst null), `recoveredErrors`, `priorErrors`, `timing` und `quality`. In `quality.patterns` stehen erkannte alte Sprachmuster. `validForAcceptance` setzt null terminale technische Fehler und null erkannte alte Muster voraus.
 
 Unklare Eingänge: `conversation:clarify_first`, dann `conversation:clarify_second`, erst danach `conversation:outside_scope` mit ausgesprochener Übergabe ans Team. Zähler berücksichtigt tatsächlich im Verlauf versendete Nachfragen; eine inhaltliche Antwort setzt ihn zurück. Reaktionen/Dank bleiben still.
 

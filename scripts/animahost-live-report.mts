@@ -25,13 +25,18 @@ let redactionPending=false;
 if(replies.length){try{const settings=await query('zymqxzhjbcxzhzvjqvbv',`select model from animahost_whatsapp_settings where tenant_id=${quoted(tenant)}`);tokens.push(...await remainingPersonNames(replies.flatMap(r=>[anonymizeRetrieval(r.incoming??'',tokens),anonymizeRetrieval(r.answer??'',tokens)]),settings[0].model));}catch{redactionPending=true;}}
 const clean=(value:string)=>redactionPending?'[Text bis zur abgeschlossenen Namensprüfung zurückgehalten]':maskBirthDates(anonymizeRetrieval(value??'',tokens)).replace(/\|/g,'\\|');
 const evidence=replies.length?await query('zymqxzhjbcxzhzvjqvbv',`select message_id,architecture,evidence,timings from animahost_reply_evidence where tenant_id=${quoted(tenant)} and message_id in (${replies.map(r=>quoted(r.wamid)).join(',')})`):[];
+const budgetIncidents=await query('zymqxzhjbcxzhzvjqvbv',`select created_at,case_details->'modelFailure'->>'httpStatus' as status
+ from animahost_whatsapp_decisions where tenant_id=${quoted(tenant)} and rule_id='chain:guard_rejected'
+ and created_at>=${quoted(new Date(since).toISOString())} and case_details->'modelFailure'->>'code'='model_budget_exhausted' order by created_at`);
 const berlin=(value:string)=>new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',dateStyle:'short',timeStyle:'medium'}).format(new Date(value));
 let report=`# Erste zehn Live-Antworten des neuen Kerns\n\nAktiviert: ${berlin(since)} (Europe/Berlin). Stand: ${berlin(new Date().toISOString())}.\n\nErfasst: **${replies.length}/10 tatsächlich versendete Antworten**. Nur echte Eingänge, keine künstlichen Patientennachrichten. Fehlende Antworten werden nicht durch Probeläufe ersetzt.\n\nProduction: ANIMAHOST_RETRIEVAL_PASSED=true und ANIMALINE_RETRIEVAL_POLICY=1. Keine Nachtpause. Vier Goldbeispiele für unklare Eingänge.\n\n`;
 if(!replies.length)report+='\nNoch kein tatsächlicher Versand seit der Aktivierung beobachtet. Architektur und Patientenblatt sind deshalb noch nicht anhand einer Live-Antwort bestätigt.\n';
+report+=`\n## Eingänge ohne Antwort\n\nModellbudget erschöpft: **${budgetIncidents.length}**.\n`;
+for(const failure of budgetIncidents)report+=`- ${berlin(failure.created_at)} · Modellbudget erschöpft (HTTP ${failure.status==='402'||failure.status==='429'?failure.status:'unbekannt'})\n`;
 for(const [i,r] of replies.entries()){
  const proof=evidence.find(e=>e.message_id===r.wamid);const sheet=proof?.timings?.patientSheet;
  report+=`\n## Antwort ${i+1}\n\nEingang: ${berlin(r.received_at)}. Versand: ${berlin(r.sent_at)}. Tatsächliche Verzögerung: ${r.delay_seconds} Sekunden; geplant: ${berlin(r.send_at)} (${r.reason.kind}, Ziel ${r.reason.delaySeconds} Sekunden).\n\nEingangstext: ${clean(r.incoming)}\n\nAntwort: ${clean(r.answer)}\n\nArchitektur im Beleg: ${proof?.architecture??'Beleg fehlt'}. Patientenblatt: ${sheet?.access??'Nachweis fehlt'}. Gefüllte Felder: ${Object.entries(sheet?.fields??{}).filter(([,v])=>v==='filled').map(([k])=>k).join(', ')||'keine'}.\n\n`;
  for(const kind of ['gold','knowledge','rule','history'])report+=`${kind}: ${(proof?.evidence?.[kind]??[]).map((e:any)=>`${e.ref} (v${e.version}, ${e.date})`).join('; ')||'keine'}.\n\n`;
 }
 writeFileSync(destination,report);
-console.log(JSON.stringify({captured:replies.length,redactionPending,architectureVerified:replies.filter(r=>evidence.some(e=>e.message_id===r.wamid&&e.architecture==='retrieval-v1')).length,patientSheetLogged:evidence.filter(e=>e.timings?.patientSheet).length}));
+console.log(JSON.stringify({captured:replies.length,budgetIncidents:budgetIncidents.length,redactionPending,architectureVerified:replies.filter(r=>evidence.some(e=>e.message_id===r.wamid&&e.architecture==='retrieval-v1')).length,patientSheetLogged:evidence.filter(e=>e.timings?.patientSheet).length}));

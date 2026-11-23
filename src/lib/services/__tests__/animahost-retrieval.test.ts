@@ -10,6 +10,20 @@ const input=(over:Partial<RetrievalInput>={}):RetrievalInput=>({message:'Kunstst
 const answer=(over:Record<string,unknown>={})=>({answer:'Das ist unangenehm. Bitte rufen Sie bei Schmerzen direkt in der Praxis an. Für welchen Patienten schreiben Sie?',team:true,summary:'Defekte Apparatur, Schmerzen, früheren Termin klären.',identityQuestion:true,substantive:true,nonPatient:false,closing:false,...over});
 const valid={hard:[],repair:[]};
 function model(...answers:unknown[]){const calls:any[]=[];const generate:Generate=async call=>{calls.push(call);return call.schema.parse(answers.shift());};return {generate,calls};}
+test('anbieterbedingte Antwortausfälle sind bei Erstellung und Prüfung unterscheidbar',async()=>{
+ for(const [stage,httpStatus] of [['compose',402],['verify',429]] as const){
+  const generate:Generate=async call=>{
+   if(call.stage===stage)throw Object.assign(new Error('provider failure'),{statusCode:httpStatus});
+   return call.schema.parse(answer());
+  };
+  const result=await runRetrievalReply(generate,input());
+  assert.equal(result.action,'klaerfall');
+  assert.equal(result.rule,'chain:guard_rejected');
+  assert.equal(result.skipSend,true);
+  assert.equal(result.text,'');
+  assert.deepEqual(result.error,{code:'model_budget_exhausted',stage,httpStatus});
+ }
+});
 test('unlinked pain patient is not excluded; only configured team, groups and non-patients are excluded',async()=>{
  assert.equal(retrievalPreflight(input()),null);
  for(const over of [{teamPhones:'4915100000000'},{jid:'123456@g.us'},{nonPatientPhones:'4915100000000'}])assert.equal(retrievalPreflight(input(over))?.excluded,true);

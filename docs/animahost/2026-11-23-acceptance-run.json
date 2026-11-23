@@ -6,6 +6,8 @@
   "planned": 239,
   "completed": 239,
   "complete": true,
+  "validForAcceptance": false,
+  "replacementStatus": "provider_credit_required",
   "cases": [
     {
       "ref": "L01",

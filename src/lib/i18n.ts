@@ -147,6 +147,8 @@ const translations: Record<string, { de: string; en: string; es?: string }> = {
   'animahost.whatsapp.sender_group': {de:'Eine Nachricht aus einer WhatsApp-Gruppe. Das Praxisteam übernimmt.',en:'A WhatsApp group message for the practice team.'},
   'animahost.whatsapp.sender_non_patient': {de:'Diese Nummer gehört zu einem Kontakt außerhalb der Patientenbetreuung.',en:'This number belongs to a contact outside patient care.'},
   'animahost.whatsapp.sender_unknown': {de:'Diese Nummer ist keiner Patientenakte zugeordnet. Bitte prüfen, wer schreibt und worum es geht.',en:'This number has no patient record. Please check who is writing and what they need.'},
+  'animahost.whatsapp.model_budget.title': {de:'Eingang ohne Antwort',en:'Incoming message without a reply'},
+  'animahost.whatsapp.model_budget.body': {de:'Modellbudget erschöpft',en:'Model budget exhausted'},
   'animahost.whatsapp.chain_review': {de:'Die vorgeschlagene Antwort wurde zurückgehalten. Bitte übernehmen Sie die Nachricht. Prüfgrund: {reason}',en:'The proposed answer was withheld. Please take over this message. Review reason: {reason}'},
   'animahost.whatsapp.doctolib': {de:'Für diese Terminart können Sie den passenden Termin hier auswählen: {url}',en:'You can choose this appointment type here: {url}'},
   'animahost.whatsapp.emergency': {de:'Bei Atemnot, starker Blutung oder akuter Gefahr rufen Sie bitte sofort die 112.',en:'If you have trouble breathing, are bleeding heavily or are in immediate danger, call 112 now.'},

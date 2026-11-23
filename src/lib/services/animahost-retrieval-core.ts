@@ -1,3 +1,4 @@
+import {classifyModelFailure,type ModelFailure} from './animahost-model-failure';
 import {replyRegister,replyVoiceViolations,straightTone} from './animahost-reply-voice';
 import {unclearInput,unclearReply} from './animahost-unclear-input';
 import {z} from 'zod';
@@ -21,7 +22,7 @@ export type RetrievalInput={message:string;messageType:string;jid:string;phone:s
  doctolibUrl:string|null;hasPriorConversation:boolean;hasPriorReply:boolean;identityAsked:boolean;clarificationRound?:number;receivedAt?:string;preview:boolean;budgetMs:number};
 export type RetrievalResult={action:'antworten'|'klaerfall'|'notfall';rule:string;text:string;skipSend?:boolean;teamSummary?:string|null;
  substantive:boolean;identityQuestion:boolean;retrieved:Record<RetrievalKind,RetrievalEvidence[]>;
- ms:number;repairs:number;violations:string[];excluded:boolean};
+ ms:number;repairs:number;violations:string[];excluded:boolean;error?:ModelFailure;anrede?:'du'|'Sie';clarificationStage?:1|2|3};
 const emptyRetrieval=():RetrievalResult['retrieved']=>({gold:[],knowledge:[],rule:[],history:[]});
 const SYSTEM=`Unklare Eingänge (Link ohne Anliegen, Einzelwort, Zahlencode, Sticker, abgebrochener Satz) sind weder nonPatient noch closing. Setzen Sie unclear=true, wenn auch mit dem Patientenverlauf kein Anliegen erkennbar ist. Links niemals öffnen. Eine sinnvolle knappe Antwort auf eine vorherige Frage ist nicht unklar. Für unclear übernimmt die Gesprächsklärung die Antwort; keine Zuordnungsfrage.
 Das Patientenblatt ist eine aktuelle, nur lesende Quelle für den bestätigten Patienten. Nutzen Sie es aktiv: Terminwünsche mit dem nächsten Termin vergleichen, einen vorhandenen Termin diese Woche mit Datum/Uhrzeit nennen und anbieten, das aktuelle Problem dort mit anzusehen (keine Änderung oder zusätzliche Leistung als schon gebucht bestätigen). Bei Schmerzen zusätzlich sofortige Kontaktmöglichkeit anbieten. Wiederholte Probleme anhand der bisherigen Anliegen benennen: Zählungen sind Nachrichten/Thementage des gesamten Chats, keine bewiesenen Defekte. In Mehrkind-Chats niemals alle Vorkommnisse einem Kind zurechnen. Alte Anliegen nur aufgreifen, wenn sie zur aktuellen Nachricht gehören. Rechnungsfragen anhand des tatsächlichen Zahlungs-/Zustellstands beantworten; unbekannt ist weder unbezahlt noch nicht zugestellt. Bei Mehrkind-Familien nur das ausgewählte bestätigte Kind nennen. Teamnotizen sind Kontext, keine wörtlich weiterzugebenden Texte. Interne Feldnamen niemals in Patiententext schreiben. Immer echte Umlaute und ß (z. B. Rückmeldung, für, Grüße), nie rueckmeldezeit, fuer oder Gruesse.
@@ -71,7 +72,7 @@ export async function runRetrievalReply(generate:Generate,input:RetrievalInput):
  const round=input.clarificationRound??0;
  const clarification=(kind:string,retrieved:RetrievalResult['retrieved']):RetrievalResult=>({...unclearReply({kind,
   round,teamTime:input.teamTime,at:input.receivedAt,register,serious,name:writerName}),
-  substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:0,violations:[],excluded:false});
+  substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:0,violations:[],excluded:false,anrede:register,clarificationStage:round>=2?3:round===1?2:1});
  const eligible=input.documents.filter(doc=>!doc.draft||input.preview&&doc.kind==='knowledge');
  const select=(kind:RetrievalKind,limit:number)=>eligible.filter(doc=>doc.kind===kind).slice(0,limit);
  const documents={gold:select('gold',3),knowledge:select('knowledge',8),rule:select('rule',6),history:select('history',5)};
@@ -101,14 +102,15 @@ export async function runRetrievalReply(generate:Generate,input:RetrievalInput):
   const source=eligible.find(doc=>doc.kind==='gold'&&doc.ref===reference);
   return clarification(unclearKind,{...emptyRetrieval(),gold:source?[evidence(source)]:[]});
  }
- let previous:z.input<typeof retrievalDraft>|undefined,violations:string[]=[],repairs=0;
+ let previous:z.input<typeof retrievalDraft>|undefined,violations:string[]=[],repairs=0,error:ModelFailure|undefined,stage:ModelFailure['stage']='compose';
  for(let attempt=0;attempt<3;attempt++){
-  if(remaining()<1500){violations=['budget_exhausted'];break;}
+  if(remaining()<1500){error={code:'model_timeout',stage};violations=[error.code];break;}
   try{
    repairs=attempt;
    retrieved={gold:documents.gold.map(evidence),knowledge:documents.knowledge.map(evidence),
     rule:documents.rule.map(evidence),history:documents.history.map(evidence)};
-   const draft=await generate({stage:'compose',reasoning:'low',system:SYSTEM,prompt:JSON.stringify({...context,...(previous?{vorherigerEntwurf:previous,korrektur:violations}:{}),abschliessenderAuftrag:'Bearbeiten Sie ausschließlich aktuelleNachricht. Deren reine Zustimmung, Dank, Gute-Wünsche oder Terminannahme beendet die Antwort: closing=true, keine alten Anliegen aus patientenVerlauf wiederholen oder erneut weitergeben. Ein neuer Wunsch, eine sachliche neue Information, eine Frage (auch nur ein Fragezeichen), Widerspruch, Unzufriedenheit, ironischer Dank, eine fehlende Angabe oder die Erwartung einer noch ausstehenden Teamantwort sind NICHT closing. closing nur bei einem eindeutigen freundlichen Abschluss ohne offenes Anliegen. Bei einem Einwand oder einer fehlenden Angabe zu einem bereits besprochenen Termin nicht erneut auf Onlinebuchung verweisen. Eine knappe Bitte, einen Patiententermin einzutragen, ist nicht schon eine interne Teamnachricht. nonPatient nur bei eindeutig belegtem fremdem Zweck. Wenn antworten: alle aktuellen Anliegen, keine alten, und bei unbekannterNummer keine fachliche Rückfrage. Die Beispiele dürfen weder zwei Fragen noch frühere Zusagen in die Antwort übertragen.'}),schema:retrievalDraft,
+   stage='compose';
+   const draft=await generate({stage,reasoning:'low',system:SYSTEM,prompt:JSON.stringify({...context,...(previous?{vorherigerEntwurf:previous,korrektur:violations}:{}),abschliessenderAuftrag:'Bearbeiten Sie ausschließlich aktuelleNachricht. Deren reine Zustimmung, Dank, Gute-Wünsche oder Terminannahme beendet die Antwort: closing=true, keine alten Anliegen aus patientenVerlauf wiederholen oder erneut weitergeben. Ein neuer Wunsch, eine sachliche neue Information, eine Frage (auch nur ein Fragezeichen), Widerspruch, Unzufriedenheit, ironischer Dank, eine fehlende Angabe oder die Erwartung einer noch ausstehenden Teamantwort sind NICHT closing. closing nur bei einem eindeutigen freundlichen Abschluss ohne offenes Anliegen. Bei einem Einwand oder einer fehlenden Angabe zu einem bereits besprochenen Termin nicht erneut auf Onlinebuchung verweisen. Eine knappe Bitte, einen Patiententermin einzutragen, ist nicht schon eine interne Teamnachricht. nonPatient nur bei eindeutig belegtem fremdem Zweck. Wenn antworten: alle aktuellen Anliegen, keine alten, und bei unbekannterNummer keine fachliche Rückfrage. Die Beispiele dürfen weder zwei Fragen noch frühere Zusagen in die Antwort übertragen.'}),schema:retrievalDraft,
     temperature:0.2,maxOutputTokens:1800,timeoutMs:Math.max(1000,remaining()-2000)});
    if(draft.unclear)return clarification('unclear',retrieved);
    if(draft.nonPatient)return {action:'antworten',rule:'sender:non_patient',text:'',skipSend:true,excluded:true,substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:attempt,violations:[]};
@@ -127,16 +129,17 @@ export async function runRetrievalReply(generate:Generate,input:RetrievalInput):
    if(text.length>1600)violations.push('Antwort auf höchstens 1600 Zeichen kürzen.');
    if(!text)violations.push('Konkrete Hilfe für das aktuelle Patientenanliegen geben.');
    if(!violations.length){
-    const verdict=await generate({stage:'verify',reasoning:'none',system:VERIFY,prompt:JSON.stringify({...reviewContext,antwort:draft}),schema:check,temperature:0,maxOutputTokens:1000,timeoutMs:Math.max(1000,remaining())});
+    stage='verify';
+    const verdict=await generate({stage,reasoning:'none',system:VERIFY,prompt:JSON.stringify({...reviewContext,antwort:draft}),schema:check,temperature:0,maxOutputTokens:1000,timeoutMs:Math.max(1000,remaining())});
     violations=[...verdict.hard,...verdict.repair.filter(item=>!draft.team&&text.includes(item.quote)).map(()=>`Die angekündigte Weitergabe muss team=true setzen, alle Anliegen zusammenfassen und die Rückmeldezeit ${input.teamTime} enthalten.`)];
     // An unsafe draft is never sent. One rewrite is allowed, then checked again against every hard limit.
    }
    if(!violations.length){
     return {action:draft.team?'klaerfall':'antworten',rule:'retrieval:answered',text,teamSummary:draft.summary,substantive:draft.substantive,identityQuestion:draft.identityQuestion,
-     retrieved,ms:Date.now()-started,repairs:attempt,violations:[],excluded:false};
+     retrieved,ms:Date.now()-started,repairs:attempt,violations:[],excluded:false,anrede:register};
    }
    previous=draft;
-  }catch(error){violations=[error instanceof Error?error.name:'model_failed'];break;}
+  }catch(failure){error=classifyModelFailure(failure,stage);violations=[error.code];break;}
  }
- return {action:'klaerfall',rule:'chain:guard_rejected',text:'',skipSend:true,substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs,violations,excluded:false};
+ return {action:'klaerfall',rule:'chain:guard_rejected',text:'',skipSend:true,substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs,violations,excluded:false,anrede:register,...(error?{error}:{})};
 }

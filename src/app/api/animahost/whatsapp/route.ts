@@ -75,13 +75,14 @@ async function notifyPractice(db:ReturnType<typeof createServerClient>,
  const notice=decision.action==='notfall'?null:appointmentNoticeFromDecision(decision)||
   (/^late_arrival:(accept|wait)$/.test(decision.rule)?{kind:'late',urgent:false}:null);
  const certificate=decision.rule==='attendance_certificate_issued';
- const important=/^(?:quality:complaint|quality:late_review)$/.test(decision.rule);
+ const budgetFailure=details?.modelFailure?.code==='model_budget_exhausted';
+ const important=budgetFailure||/^(?:quality:complaint|quality:late_review)$/.test(decision.rule);
  if(decision.action==='antworten'&&!notice&&!certificate&&!important)return;
  const urgent=decision.action==='notfall'||notice?.urgent||important;
  const key=decision.action==='notfall'?'emergency':'clarify';
  const sourceKey=`animahost:${tenantId}:${messageId}:${notice||certificate?'vermerk':decision.action}`;
  const notices=['admin','verwaltung'].map(role=>({recipient_role:role,kind:urgent?'wichtig':'antwort',
-  title:t(notice?`animahost.whatsapp.notice.${notice.kind}.title`:certificate?'animahost.whatsapp.attendance.title':`animahost.whatsapp.${key}.title`,'de'),
+  title:t(budgetFailure?'animahost.whatsapp.model_budget.title':notice?`animahost.whatsapp.notice.${notice.kind}.title`:certificate?'animahost.whatsapp.attendance.title':`animahost.whatsapp.${key}.title`,'de'),
   body:details?.practiceSummary??t(notice?'animahost.whatsapp.notice.body':certificate?'animahost.whatsapp.attendance.recorded':`animahost.whatsapp.${key}.body`,'de'),
   link:'/praxis',source_key:sourceKey}));
  for(let attempt=0;attempt<2;attempt++){
@@ -140,25 +141,30 @@ export async function POST(request:NextRequest){
    if(existing.error)throw Error('decision_read_failed');
    if(existing.data){
     const saved=existing.data;
+    if(saved.case_details?.modelFailure?.code==='model_budget_exhausted')
+     await notifyPractice(db,input.tenantId,input.messageId,{action:saved.action,text:saved.patient_text,rule:saved.rule_id},saved.case_details);
     return decisionResponse({action:saved.action,text:saved.patient_text,rule:saved.rule_id},undefined,undefined,saved.case_details);
    }
    const answer=await retrievalAnswer(db,input,practice,request.signal);
    const result=answer.result;
    // Quiet conversational signals create neither a practice notification nor a clarification case.
    if(result.skipSend&&result.action==='antworten')return NextResponse.json({...result,optOut:false},{headers:{'Cache-Control':'no-store'}});
-   const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.rule,
-    practiceSummary:result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1'};
+   const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.error?.code??result.rule,modelFailure:result.error,
+    practiceSummary:result.error?.code==='model_budget_exhausted'?t('animahost.whatsapp.model_budget.body','de'):result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1'};
    const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
     sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
    if(saved.error&&saved.error.code!=='23505')throw Error('decision_store_failed');
    if(saved.error?.code==='23505'){
     const duplicate=await db.from('animahost_whatsapp_decisions').select('action,patient_text,rule_id,case_details').eq('tenant_id',input.tenantId).eq('message_id',input.messageId).single();
     if(duplicate.error)throw Error('decision_read_failed');
-    return decisionResponse({action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id},undefined,undefined,duplicate.data.case_details);
+    const savedDecision={action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id};
+    if(duplicate.data.case_details?.modelFailure?.code==='model_budget_exhausted')
+     await notifyPractice(db,input.tenantId,input.messageId,savedDecision,duplicate.data.case_details);
+    return decisionResponse(savedDecision,undefined,undefined,duplicate.data.case_details);
    }
-   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,patientSheet:'patientSheet' in answer?answer.patientSheet:null}});
-   if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
    if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
+   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null}});
+   if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
    return NextResponse.json({...result,details,phoneMatches:'phoneMatches' in answer?answer.phoneMatches:undefined,replyStyle:'formulated',optOut:result.rule==='opt_out',
     replySchedule:{teamReplyDays:practice.team_reply_days,closurePeriods:practice.closure_periods}},{headers:{'Cache-Control':'no-store'}});
   }
