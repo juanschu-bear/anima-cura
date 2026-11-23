@@ -146,3 +146,9 @@ test('a punctuation-only follow-up question is not a thank-you or closing',()=>{
  assert.equal(retrievalPreflight(input({message:'?',hasPriorConversation:true})),null);
  assert.equal(retrievalPreflight(input({message:'???',hasPriorConversation:true})),null);
 });
+
+test('unclear input addresses the known parent, never the child; no model or identity question',async()=>{
+ const fail:Generate=async()=>{throw Error('must not call model');};
+ const result=await runRetrievalReply(fail,input({message:'Huhu',chatName:{status:'matched',matchedName:'Leon',question:null},patientSheet:{access:'confirmed',asOf:'2026-11-23T20:00:00Z',context:{schreibendePerson:{rolle:'Elternteil',name:'Alex Beispiel',patient:'Leon Beispiel'}},fields:{}}}));
+ assert.match(result.text,/Alex Beispiel/);assert.doesNotMatch(result.text,/Leon|wer schreibt|angemeldet/);assert.equal(result.rule,'conversation:clarify_first');assert.equal(result.skipSend,undefined);
+});

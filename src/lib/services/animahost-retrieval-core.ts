@@ -63,8 +63,10 @@ export async function runRetrievalReply(generate:Generate,input:RetrievalInput):
  const {akte}=dossierForModel(input.dossier);
  const identified=input.patientSheet?input.patientSheet.access==='confirmed':input.dossier.patients.some(p=>p.verified);
  const needsIdentity=input.chatName?.status==='matched'?false:input.patientSheet?!identified:!input.dossier.patients.length;
+ const writer=input.patientSheet?.context.schreibendePerson as {rolle?:string;name?:string;patient?:string}|undefined;
+ const writerName=writer?.name||(writer?.rolle==='Patient'?writer.patient:input.chatName?.source==='chat'?input.chatName.matchedName:undefined);
  const unclearKind=unclearInput(input.message,input.messageType);
- const clarification=(kind:string,retrieved:RetrievalResult['retrieved']):RetrievalResult=>({...unclearReply({kind,round:input.clarificationRound??0,name:input.chatName?.status==='matched'?input.chatName.matchedName:undefined,teamTime:input.teamTime,at:input.receivedAt}),substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:0,violations:[],excluded:false});
+ const clarification=(kind:string,retrieved:RetrievalResult['retrieved']):RetrievalResult=>({...unclearReply({kind,round:input.clarificationRound??0,name:writerName,teamTime:input.teamTime,at:input.receivedAt}),substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:0,violations:[],excluded:false});
  const eligible=input.documents.filter(doc=>!doc.draft||input.preview&&doc.kind==='knowledge');
  const select=(kind:RetrievalKind,limit:number)=>eligible.filter(doc=>doc.kind===kind).slice(0,limit);
  const documents={gold:select('gold',3),knowledge:select('knowledge',8),rule:select('rule',6),history:select('history',5)};
