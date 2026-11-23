@@ -17,6 +17,7 @@ import {normalizeContactPhone,patientHasContactPhone,renderNoticeTemplate,valida
 import {activeKnowledge,knowledgeDraft,knowledgeRecord} from '@/lib/services/animahost-knowledge';
 import {bundledKfoImport} from '@/lib/services/animahost-kfo-import';
 import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices';
+import {readUsageMonth} from '@/lib/services/animahost-usage';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -72,6 +73,10 @@ export async function GET(request:NextRequest){
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
  if(resource==='acceptance_run')return NextResponse.json(acceptanceRun,{headers});
+ if(resource==='usage_month'){
+  try{return NextResponse.json(await readUsageMonth(db,tenant),{headers});}
+  catch{return NextResponse.json({code:'animahost_usage_unavailable'},{status:503,headers});}
+ }
  if(resource==='chat_identity_links'){
   const patient=z.string().uuid().safeParse(request.nextUrl.searchParams.get('patientId'));
   if(!patient.success)return NextResponse.json({code:'patient_invalid'},{status:400,headers});

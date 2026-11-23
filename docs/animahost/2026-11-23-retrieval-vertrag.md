@@ -62,6 +62,30 @@ Die Antwort enthält `architecture:retrieval-v1`, `knowledgeMode`, `result`, `ca
 
 `draft_preview` deutlich als „Probelauf mit vorläufig verwendetem Entwurfswissen“ kennzeichnen. Es ändert weder Freigabeperson noch Freigabezeit der 51 Einträge und darf nicht in Live-Versand umgedeutet werden. Der interne Probelauf schreibt keine Antwortentscheidung, keinen Fall und keine Benachrichtigung und versendet nichts.
 
+## Modellverbrauch pro Antwort und Monat
+
+`GET /api/animahost/control?resource=usage_month` für `admin` und `verwaltung`. Der Proxy leitet an den bestehenden internen Endpunkt weiter. Abrechnungsmonat in `Europe/Berlin`, Zeitraum `[from,to)`, Datenstand `asOf`. Währung `USD`. Beispiel für die Antwortform:
+
+```json
+{
+  "month": "2026-11", "timezone": "Europe/Berlin",
+  "from": "2026-10-31T23:00:00.000Z", "to": "2026-11-30T23:00:00.000Z",
+  "asOf": "2026-11-23T22:00:00.000Z", "currency": "USD",
+  "answerCount": 2, "costedAnswerCount": 2, "unmeteredAnswers": 0,
+  "totalCostUsd": 0.0024, "averageCostUsd": 0.0012,
+  "inputTokens": 4200, "outputTokens": 180,
+  "cacheReadTokens": 1600, "cacheWriteTokens": 1600,
+  "modelCalls": 4, "unpricedCalls": 0, "complete": true,
+  "creditBalanceUsd": 19.72, "creditScope": "gateway_team"
+}
+```
+
+`answerCount` zählt die Live-Entscheidungen mit Antworttext des Retrieval-Kerns. Versandbestätigungen werden getrennt erfasst. `totalCostUsd` summiert belegte Aufrufe einschließlich Prüfung, Überarbeitung und zurückgehaltener Entwürfe. `averageCostUsd` teilt die Monatssumme durch die erzeugten Antworten und ist bei null Antworten oder unvollständigen Belegen `null`. `complete:false` bedeutet, dass die Summe nur den belegten Teil abdeckt. Mit `unmeteredAnswers` und `unpricedCalls` lässt sich das in der Ansicht kennzeichnen. Probeläufe gehen nicht ein. `creditBalanceUsd` ist der gemeinsame Gateway-Kontostand oder `null`, wenn der Abruf fehlschlägt. Er ist kein Praxisbudget. HTTP 503 mit `animahost_usage_unavailable`, wenn die Antwortbelege nicht gelesen werden können. Identitäten oder Behandlungsdaten werden nicht ausgegeben.
+
+Im Antwortbeleg steht `answerEvidence.timings.usage` mit `model`, `answered`, `modelCalls`, `pricedCalls`, `unpricedCalls`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens` und `costUsd`. Bei älteren Belegen fehlt das Feld. Bei einem Modellaufruf ohne Preisbeleg kann `costUsd` null sein. Eine Antwort ohne Modellaufruf hat Kosten von 0 USD.
+
+Der Cache-Marker sitzt ausschließlich auf den festen Systemanweisungen der Erzeugung und Prüfung, einschließlich Ton, Anrede und fest verankerter Praxis- und Sicherheitsregeln. Änderungen an diesem Wortlaut ergeben einen neuen Cache-Schlüssel. Gefundene Regelbuch- und Wissenseinträge sind weiterhin fallabhängige Quellen. Nachricht, Patientenblatt, Verlauf und gefundene Quellen bleiben hinter dem Marker. Der Cache wird nur für die unterstützte Anthropic-Live-Strecke gesetzt, die Europa und Zero Data Retention beibehält. Aufrufe nach Ablauf des Fünf-Minuten-Caches können den Aufpreis für das erneute Schreiben verursachen.
+
 Stille Reaktionen, leere Nachrichten und Abschlüsse sind erwartete Ergebnisse, keine fehlgeschlagenen Antworten. Für die neue Darstellung nicht den alten Erklärungstext verwenden, dass anschließend eine bisherige Fallback-Antwort versendet werde: In der neuen Architektur gibt es diesen Ersatztext nicht.
 
 ## Aktivierung nach Juans Abnahme
@@ -74,7 +98,7 @@ Die Architektur benötigt keine Neukopplung von WhatsApp. Historienimport und Re
 
 `GET /api/animahost/whatsapp/internal/control?resource=acceptance_run`; AnimaDesk leitet unter `GET /api/animahost/control?resource=acceptance_run` für admin/verwaltung weiter. Private/no-store, bestehende Authentifizierung.
 
-Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `complete`, `validForAcceptance`, `cases`, `approvedCases`. `cases` enthält den Lauf mit vorläufigem Entwurfswissen (`draft_preview`). `approvedCases` enthält den getrennten Lauf nur mit freigegebenem Wissen. Je 239 Einträge. Aktuell ist die historische Datei mit `validForAcceptance:false` und `replacementStatus:"provider_credit_required"` gekennzeichnet.
+Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `complete`, `validForAcceptance`, `technicalErrors`, `qualityFindings`, `stats`, `costs`, `cases`, `approvedCases`. `cases` enthält den Lauf mit vorläufigem Entwurfswissen (`draft_preview`). `approvedCases` enthält den getrennten Lauf nur mit freigegebenem Wissen. Je 239 Einträge. `complete` bestätigt die Vollständigkeit der Berechnung. Über die Qualitätsfreigabe informiert `validForAcceptance`.
 
 Je Fall: `ref`, `at` (Zeitpunkt des Eingangs), `input` (anonymisiert), `answer` (anonymisiert), `retrieved:{gold,knowledge,rule,history}`, `status`, `sendDelaySeconds`, `sendStatus`. Quellen behalten Referenz, Version und Datum. Es wurde im Probelauf nichts gesendet: `sendDelaySeconds:null`, `sendStatus:not_sent_dry_run`; Erzeugungslaufzeit niemals als Versandverzögerung anzeigen. Rohkennungen, Namen und Telefonnummern sind nicht enthalten.
 

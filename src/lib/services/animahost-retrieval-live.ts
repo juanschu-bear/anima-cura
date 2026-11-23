@@ -52,6 +52,6 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
  const calls:ModelCall[]=[];
- const result=await runRetrievalReply(gatewayGenerate(practice.model,signal,call=>calls.push(call)),{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
+ const result=await runRetrievalReply(gatewayGenerate(practice.model,signal,call=>calls.push(call),{cacheStatic:!input.readOnly&&!preview,tags:['animahost-retrieval']}),{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
  return {result,calls,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,phoneMatches:chatName?.source==='chat'?undefined:phoneLabels(patients),timings:{contextMs,...retrieved.timings,modelMs:result.ms,totalMs:Date.now()-started}};
 }

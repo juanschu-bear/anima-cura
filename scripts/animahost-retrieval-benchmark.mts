@@ -1,5 +1,5 @@
 // Read-only production retrieval and frozen cases. Private inputs and intermediate outputs stay outside Git.
-import {readFileSync,appendFileSync} from 'node:fs';
+import {readFileSync,appendFileSync,writeFileSync,unlinkSync} from 'node:fs';
 import {resolve,relative,isAbsolute} from 'node:path';
 import {createRequire} from 'node:module';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -24,6 +24,10 @@ if(!sourcePath||!outputPath||!['approved','draft_preview'].includes(mode))throw 
 if(!process.env.AI_GATEWAY_API_KEY)throw Error('acceptance_key_missing');
 const destination=resolve(outputPath),path=relative(process.cwd(),destination);
 if(!path.startsWith('..')&&!isAbsolute(path))throw Error('Private output must stay outside Git');
+const lock=destination+'.lock';
+try{writeFileSync(lock,String(process.pid),{flag:'wx',mode:0o600});}
+catch(error){if((error as NodeJS.ErrnoException).code==='EEXIST')throw Error('acceptance_output_locked');throw error;}
+process.once('exit',()=>unlinkSync(lock));
 const data=JSON.parse(readFileSync(sourcePath,'utf8')),db=createServerClient();
 const tenant=data.practice.tenant_id;
 const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).single();
@@ -50,6 +54,7 @@ function sanitize(row:any,text:string|null){
 }
 const empty=()=>({gold:[],knowledge:[],rule:[],history:[]});
 let next=0,completed=0,blocked=false;
+process.once('SIGTERM',()=>{blocked=true;});
 async function evaluate(row:any){
  const started=Date.now(),at=new Date(row.at).toISOString(),today=appointmentLocalDate(at);
  const phone=row.phone_e164??(row.jid.endsWith('@s.whatsapp.net')?row.jid.split('@')[0]:null);
@@ -80,7 +85,7 @@ async function evaluate(row:any){
   // Exclude the source chat from similar historical cases to avoid grading the original answer as a prediction.
   const found=preflight?{documents:[]}:await retrieveSources(db,tenant,base.message,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text),base.preview,contentHash(row.jid));
   const recovery:any[]=[],calls:any[]=[];
-  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call));
+  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call),{tags:['animahost-acceptance',mode]});
   const result=await runRetrievalReply(async(call:any)=>{
    for(let attempt=0;;attempt++){
     try{return await model(call);}

@@ -1,5 +1,7 @@
 # AnimaHost · Abnahme mit Regelbuch 9 unterbrochen
 
+Historischer Zwischenstand. Der [vollständige Folgelauf](2026-11-23-retrieval-239-abnahme.md) liegt vor.
+
 Der alte API-Stand ist als nicht abnahmefähig gekennzeichnet. Die neue Abnahme nutzt Antwortlogik `cc615c4`, Regelbuch 9 und beide Wissensstände. Es wurde nichts gesendet.
 
 | Ergebnis | Entwurfswissen | Freigegebenes Wissen |

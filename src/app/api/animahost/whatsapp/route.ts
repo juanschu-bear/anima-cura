@@ -18,6 +18,7 @@ import {changeChatInvoiceRecipient,changeChatPatientContact,chatContactChangeInt
 import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,planLateArrival,recoverLateTimes,knownVisitType,statesLaterArrival,type LateState} from '@/lib/services/animahost-appointment-tolerance';
 import {latestAppointmentCase,openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {conversationHistorySchema,enforceConversationOutput,formulateConversationReply,gatewayOptions,recentConversation,referenceHistory} from '@/lib/services/animahost-whatsapp-conversation';
+import {measureReplyUsage} from '@/lib/services/animahost-usage';
 
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 
@@ -163,7 +164,9 @@ export async function POST(request:NextRequest){
     return decisionResponse(savedDecision,undefined,undefined,duplicate.data.case_details);
    }
    if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
-   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null}});
+   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,
+    modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null,
+    usage:measureReplyUsage(practice.model,answer.calls,Boolean(result.text)&&!result.skipSend)}});
    if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
    return NextResponse.json({...result,details,phoneMatches:'phoneMatches' in answer?answer.phoneMatches:undefined,replyStyle:'formulated',optOut:result.rule==='opt_out',
     replySchedule:{teamReplyDays:practice.team_reply_days,closurePeriods:practice.closure_periods}},{headers:{'Cache-Control':'no-store'}});
