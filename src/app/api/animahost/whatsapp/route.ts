@@ -2,6 +2,7 @@ import {timingSafeEqual} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
 import {generateText,Output} from 'ai';
 import {z} from 'zod';
+import {concernHistorySchema} from '@/lib/services/animahost-patient-sheet';
 import {createServerClient} from '@/lib/db/supabase';
 import {t} from '@/lib/i18n';
 import {decisionFromRule,emergencyDecision,resolveEmergency,explicitOptOut,mandatoryAppointmentClarification,
@@ -34,7 +35,7 @@ import {activeKnowledge} from '@/lib/services/animahost-knowledge';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
-export const maxDuration=60;
+export const maxDuration=90;
 
 const inputSchema=z.object({
  tenantId:z.string().uuid(),messageId:z.string().min(1).max(200),
@@ -42,7 +43,7 @@ const inputSchema=z.object({
  messageType:z.enum(['text','image','audio','document','sticker','video','album','reaction','edit','poll','view_once_image','view_once_audio','view_once_video','view_once_document','view_once_sticker','view_once_unsupported','unsupported']),
  receivedAt:z.string().datetime({offset:true}),
  hasPriorConversation:z.boolean().optional(),hasPriorReply:z.boolean().optional(),
- identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
+ identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),concernHistory:concernHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
 }).strict();
 type StoredDecision={action:'antworten'|'klaerfall'|'notfall';patient_text:string;rule_id:string;case_details?:ChatDetails|null};
 const lookupSchema=z.strictObject({action:z.literal('phone_lookup'),tenantId:z.string().uuid(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/)});
@@ -145,8 +146,8 @@ export async function POST(request:NextRequest){
    const result=answer.result;
    // Quiet conversational signals create neither a practice notification nor a clarification case.
    if(result.skipSend&&result.action==='antworten')return NextResponse.json({...result,optOut:false},{headers:{'Cache-Control':'no-store'}});
-   const details={patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:result.rule,
-    practiceSummary:result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,architecture:'retrieval-v1'};
+   const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.rule,
+    practiceSummary:result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1'};
    const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
     sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
    if(saved.error&&saved.error.code!=='23505')throw Error('decision_store_failed');
@@ -155,7 +156,7 @@ export async function POST(request:NextRequest){
     if(duplicate.error)throw Error('decision_read_failed');
     return decisionResponse({action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id},undefined,undefined,duplicate.data.case_details);
    }
-   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:answer.timings});
+   const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,patientSheet:'patientSheet' in answer?answer.patientSheet:null}});
    if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
    if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
    return NextResponse.json({...result,details,phoneMatches:'phoneMatches' in answer?answer.phoneMatches:undefined,replyStyle:'formulated',optOut:result.rule==='opt_out',

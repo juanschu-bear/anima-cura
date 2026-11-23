@@ -1,7 +1,8 @@
+import {resolveChatName,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
-import {phonePatients,phoneLabels,maskBirthDates} from './animahost-chat-identity';
+import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient} from './animahost-chat-identity';
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
-import {loadDossier} from './animahost-dossier';
+import {loadPatientSheet,sheetLedger,type ConcernHistory} from './animahost-patient-sheet';
 import {teamReplyTime} from './animahost-team-time';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {whatsappRulesSchema} from './animahost-whatsapp';
@@ -10,7 +11,7 @@ import {retrieveSources} from './animahost-retrieval';
 import {runRetrievalReply,retrievalPreflight,type RetrievalInput} from './animahost-retrieval-core';
 type Db=ReturnType<typeof createServerClient>;
 export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;phone?:string|null;messageId:string;text:string|null;messageType:string;receivedAt:string;
- identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;hasPriorConversation?:boolean;hasPriorReply?:boolean},practice:any,signal:AbortSignal,preview=false){
+ identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;hasPriorConversation?:boolean;hasPriorReply?:boolean;concernHistory?:ConcernHistory;readOnly?:boolean},practice:any,signal:AbortSignal,preview=false){
  const started=Date.now();
  const history=recentConversation(input.history??[],input.receivedAt).map(h=>({...h,text:maskBirthDates(h.text)}));
  const phone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
@@ -26,20 +27,30 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  if(phone&&input.staffPatientIds?.length){
   const staff=await db.from('patients').select('id,vorname,nachname,geburtsdatum,geschlecht').in('id',input.staffPatientIds);
   if(staff.error)throw Error('retrieval_context_unavailable');
+  verifiedIds.push(...staff.data.map(patient=>patient.id));
   for(const patient of staff.data)if(!patients.some(p=>p.id===patient.id))patients.push(patient);
  }
- const dossier=await loadDossier(db,{patients,verifiedIds,today:appointmentLocalDate(input.receivedAt)});
+ let chatName:ChatNameContext|undefined;
+ const phoneSubject=selectPhonePatient(patients,input.text??'');
+ if(phoneSubject)chatName={status:'matched',matchedName:phoneSubject.vorname,patientId:phoneSubject.id,confirmed:verifiedIds.includes(phoneSubject.id),question:null};
+ if(phone&&!phoneSubject){
+  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:input.text??'',readOnly:input.readOnly,candidateIds:prior.data.find(r=>r.case_details?.chatName?.candidateIds?.length)?.case_details.chatName.candidateIds});
+  chatName=matched.context;
+  if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
+ }
+ const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients,verifiedIds,message:input.text??'',today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory});
+ const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
-  history,dossier,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
+  history,dossier,patientSheet,chatName,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
   today:appointmentLocalDate(input.receivedAt),doctolibUrl:practice.doctolib_url,
   hasPriorConversation:input.hasPriorConversation===true||history.length>0,hasPriorReply:input.hasPriorReply===true||history.some(h=>h.direction==='outgoing'),
-  identityAsked:prior.data.some(r=>r.rule_id==='sender:identify'||r.case_details?.identityQuestion===true),preview,budgetMs:Math.max(1000,17000-(Date.now()-started))};
+  identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,60000-(Date.now()-started))};
  const preflight=retrievalPreflight(base);
- if(preflight)return {result:preflight,calls:[] as ModelCall[],timings:{contextMs:Date.now()-started,embeddingMs:0,searchMs:0,modelMs:0,totalMs:Date.now()-started}};
+ if(preflight)return {result:preflight,calls:[] as ModelCall[],patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,timings:{contextMs:Date.now()-started,embeddingMs:0,searchMs:0,modelMs:0,totalMs:Date.now()-started}};
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
  const calls:ModelCall[]=[];
- const result=await runRetrievalReply(gatewayGenerate(practice.model,signal,call=>calls.push(call)),{...base,documents:retrieved.documents,budgetMs:Math.max(1000,17000-contextMs)});
- return {result,calls,phoneMatches:phoneLabels(patients),timings:{contextMs,...retrieved.timings,modelMs:result.ms,totalMs:Date.now()-started}};
+ const result=await runRetrievalReply(gatewayGenerate(practice.model,signal,call=>calls.push(call)),{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
+ return {result,calls,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,phoneMatches:chatName?.source==='chat'?undefined:phoneLabels(patients),timings:{contextMs,...retrieved.timings,modelMs:result.ms,totalMs:Date.now()-started}};
 }

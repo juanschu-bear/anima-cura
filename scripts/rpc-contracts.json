@@ -481,9 +481,14 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "9b4ff35a3e96a8ce2e2af5bb57ea34805a05a548783e2df90b2f30e34d981bd0",
+      "sha256": "837ce720807cf2e95534bfa1b062d093f53c269007d70488df36398cc03f147e",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
       "calls": [
+        {
+          "name": "animahost_decide_chat_identity",
+          "signature": "public.animahost_decide_chat_identity(p_tenant uuid, p_link uuid, p_actor uuid, p_confirm boolean)",
+          "role": "service_role"
+        },
         {
           "name": "animahost_publish_notice_template",
           "signature": "public.animahost_publish_notice_template(p_tenant uuid, p_template uuid, p_expected integer, p_kind text, p_title text, p_body text, p_active boolean, p_actor uuid)",
@@ -612,7 +617,7 @@
     },
     {
       "file": "src/lib/services/animahost-retrieval.ts",
-      "sha256": "ae8e07733b6e130e9d8bdf9edc302fca890f67cc6320aec88457eceebd8cffdd",
+      "sha256": "d2c37da1c97cf5f074dbc7fb082f59e6381100e77f81a6c1483596396826baba",
       "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
       "calls": [
         {
@@ -719,7 +724,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "9b66c502eeaf309a484b42db8009fc93cc47ae2d842241fa5fdec4474b6355da"
+      "sha256": "b355818068b198116ff4aa61564ef5c63ddfa4b1c57acc6ece63c7e64476914f"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",

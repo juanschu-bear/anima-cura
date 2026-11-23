@@ -62,7 +62,17 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  const result=await db.rpc('animahost_retrieval_match',{p_tenant:tenant,p_vector:JSON.stringify(vector),p_model:embeddingModel,p_preview:preview,p_day:new Date().toISOString().slice(0,10),p_exclude_chat:excludeChat??null})
   .select('kind,ref,version,source_at,title,content,payload,draft,content_hash').abortSignal(AbortSignal.timeout(4000));
  if(result.error)throw Error('retrieval_search_unavailable:'+result.error.code+':'+result.error.message);
+ // Explicit companion fact for apparatus problems, not a routing/fallback topic.
+ let companion:RetrievalDocument|null=null;
+ if(/draht|spange|schiene|aligner|bracket|attachment|apparatur/i.test(message)){
+  const versions=await db.from('animahost_knowledge_versions').select('id,version,approved_at,active,valid_from').eq('tenant_id',tenant).eq('external_id','ablauf-spontan').lte('valid_from',new Date().toISOString().slice(0,10)).order('version',{ascending:false});
+  if(versions.error)throw Error('retrieval_companion_unavailable');
+  const row=versions.data.find(r=>r.approved_at&&r.active||preview&&!r.approved_at);
+  if(row){const doc=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','knowledge').eq('ref',row.id).eq('version',row.version).maybeSingle();
+   if(doc.error)throw Error('retrieval_companion_unavailable');companion=doc.data as RetrievalDocument|null;}
+ }
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));
+ if(companion){const index=documents.findIndex(d=>d.kind==='knowledge'&&d.ref===companion!.ref);if(index>=0)documents.splice(index,1);documents.unshift(companion);}
  return {documents,timings:{embeddingMs:embedded-start,searchMs:Date.now()-embedded}};
 }

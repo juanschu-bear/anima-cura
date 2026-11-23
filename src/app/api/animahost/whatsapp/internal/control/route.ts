@@ -31,6 +31,7 @@ const settingsSchema=z.strictObject({
  closurePeriods:closurePeriodsSchema.optional(),appointmentTolerance:appointmentToleranceSchema.optional(),teamReplyDays:teamReplyDaysSchema.optional(),
 });
 const bodySchema=z.discriminatedUnion('action',[
+ z.strictObject({action:z.literal('decide_chat_identity'),actorId:z.string().uuid(),linkId:z.string().uuid(),confirm:z.boolean()}),
  z.strictObject({action:z.literal('publish_rules'),actorId:z.string().uuid(),expectedVersion:z.number().int().positive().nullable(),rules:whatsappRulesSchema}),
  z.strictObject({action:z.literal('update_settings'),actorId:z.string().uuid(),settings:settingsSchema}),
  z.strictObject({action:z.literal('decide_appointment_case'),actorId:z.string().uuid(),caseId:z.string().uuid(),
@@ -69,6 +70,12 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='chat_identity_links'){
+  const patient=z.string().uuid().safeParse(request.nextUrl.searchParams.get('patientId'));
+  if(!patient.success)return NextResponse.json({code:'patient_invalid'},{status:400,headers});
+  const result=await db.from('animahost_chat_identity_links').select('id,chat_jid,phone,matched_name,status,created_at,updated_at,decided_by').eq('tenant_id',tenant).eq('patient_id',patient.data);
+  return result.error?unavailable():NextResponse.json({links:result.data},{headers});
+ }
  if(resource==='reply_evidence'){
   const messageId=request.nextUrl.searchParams.get('messageId');
   if(!messageId||messageId.length>200)return NextResponse.json({code:'message_invalid'},{status:400,headers});
@@ -199,6 +206,10 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='decide_chat_identity'){
+  const result=await db.rpc('animahost_decide_chat_identity',{p_tenant:tenant,p_link:input.linkId,p_actor:input.actorId,p_confirm:input.confirm});
+  return result.error?unavailable():NextResponse.json({ok:true,status:input.confirm?'confirmed':'released'},{headers});
+ }
  if(input.action==='mark_gold_example'){
   // Redact locally before creating a searchable record. No raw patient data in embeddings.
   const names:string[]=[];

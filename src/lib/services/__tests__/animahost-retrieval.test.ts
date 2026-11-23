@@ -136,7 +136,7 @@ test('unknown patients get one identity question even when the useful draft asks
  const m=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
  const result=await runRetrievalReply(m.generate,input());
  assert.equal(result.identityQuestion,true);assert.equal(result.text.match(/\?/g)?.length,1);
- assert.match(result.text,/Für welchen Patienten schreiben Sie\?/);
+ assert.match(result.text,/Unter welchem Namen sind Sie bei uns angemeldet\?/);
  const already=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
  const second=await runRetrievalReply(already.generate,input({identityAsked:true}));
  assert.doesNotMatch(second.text,/Für welchen Patienten/);

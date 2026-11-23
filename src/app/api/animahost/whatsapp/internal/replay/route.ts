@@ -1,13 +1,14 @@
 import {timingSafeEqual} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
+import {concernHistorySchema} from '@/lib/services/animahost-patient-sheet';
 import {createServerClient} from '@/lib/db/supabase';
 import {conversationHistorySchema} from '@/lib/services/animahost-whatsapp-conversation';
 import {retrievalAnswer} from '@/lib/services/animahost-retrieval-live';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
-export const maxDuration=60;
+export const maxDuration=90;
 const headers={'Cache-Control':'private, no-store'};
 
 /**
@@ -20,7 +21,7 @@ const bodySchema=z.strictObject({
  phone:z.string().regex(/^[1-9][0-9]{7,14}$/).nullable(),
  text:z.string().max(4000),
  messageType:z.string().max(40).default('text'),hasPriorConversation:z.boolean().optional(),hasPriorReply:z.boolean().optional(),
- history:conversationHistorySchema,
+ history:conversationHistorySchema,concernHistory:concernHistorySchema.optional(),
  /** Wann die Nachricht damals kam. Danach richten sich „heute“ und die Zeit, zu der das Team antwortet. */
  at:z.string().datetime({offset:true}).optional(),
  knowledgeMode:z.enum(['approved','draft_preview']).default('approved'),
@@ -43,8 +44,8 @@ export async function POST(request:NextRequest){
   const db=createServerClient();
   const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).maybeSingle();
   if(settings.error||!settings.data?.active_rulebook_version)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
-  const answer=await retrievalAnswer(db,{tenantId:tenant,from:input.chatJid,phone:input.phone,messageId:'replay',text:input.text,
-   messageType:input.messageType,receivedAt:input.at??new Date().toISOString(),history:input.history,
+  const answer=await retrievalAnswer(db,{tenantId:tenant,from:input.chatJid,phone:input.phone,messageId:'replay',readOnly:true,text:input.text,
+   messageType:input.messageType,receivedAt:input.at??new Date().toISOString(),history:input.history,concernHistory:input.concernHistory,
    hasPriorConversation:input.hasPriorConversation,hasPriorReply:input.hasPriorReply},settings.data,request.signal,input.knowledgeMode==='draft_preview');
   return NextResponse.json({...answer,result:{...answer.result,ok:Boolean(answer.result.text)&&!answer.result.skipSend,
    reason:answer.result.skipSend?(answer.result.excluded?'sender_excluded':answer.result.rule.startsWith('social:')?'silent':'rejected'):null,
