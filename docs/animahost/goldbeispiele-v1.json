@@ -1,0 +1,42 @@
+{
+ "version": "goldbeispiele-v1",
+ "stand": "2026-11-23",
+ "hinweis": "Zielantworten auf Rezeptionsniveau, von Dr. Maria Elena Schubert im Vergleich als besser als die bisherigen Praxisantworten bewertet. Sie sind Vorbilder für Haltung, Aufbau und Länge. Anliegen sind echte Patientennachrichten ohne Namen und ohne Kennungen. Platzhalter: [Buchungslink], [Name], [Datum].",
+ "beispiele": [
+  {"id": "gold-draht-wunschtermin", "anliegen": "Guten Morgen, bei meinem Sohn sei wohl wieder ein Draht abgebrochen. Wäre es möglich, dass er donnerstags Nachmittag einen Termin bekommen könnte?",
+   "kontext": "Elternteil schreibt für Kind, feste Spange, wiederholtes Problem, Wunschtag ist nicht online buchbar.",
+   "wissen": ["prob-draht-abgebrochen", "prob-draht-sticht", "ablauf-spontan", "ablauf-telefon", "gespraech-eltern", "gespraech-grundhaltung"],
+   "antwort": "Guten Morgen, schon wieder, das ist ärgerlich. Heben Sie den Draht bitte auf und bringen Sie ihn mit. Drückt oder sticht gerade etwas, oder hat Ihr Sohn Schmerzen? Dann rufen Sie uns direkt an: 0179 5351813. Wenn nicht, haben Sie 2 Möglichkeiten: heute zu den Sprechzeiten spontan vorbeikommen, mit etwas Wartezeit, oder ein fester Termin. Donnerstagnachmittag gebe ich gleich ans Team weiter, es meldet sich heute noch mit einem Vorschlag. Was ist Ihnen lieber?",
+   "weitergabe": {"an": "team", "dringend": false, "inhalt": "Wunschtermin Donnerstagnachmittag, Draht abgebrochen, wiederholt"}},
+
+  {"id": "gold-attachment-spontan", "anliegen": "Hallo, bei mir ist ein Attachment abgegangen. Kann ich spontan in der Praxis vorbeikommen?",
+   "kontext": "Aligner-Patient, Freitagabend, nächster Praxistag Dienstag.",
+   "wissen": ["prob-attachment-ab", "ablauf-spontan", "ablauf-termine", "ablauf-telefon"],
+   "antwort": "Das kommt vor und lässt sich gut beheben. Tragen Sie die Schiene bis dahin einfach weiter und heben Sie das Attachment auf, falls Sie es noch haben. Sie können am Dienstag zu den Sprechzeiten spontan vorbeikommen, dann mit etwas Wartezeit, oder Sie buchen sich direkt einen festen Termin zur Aligner-Kontrolle: [Buchungslink]. Wenn etwas drückt oder wehtut, rufen Sie uns an: 0179 5351813.",
+   "weitergabe": null},
+
+  {"id": "gold-wann-termin", "anliegen": "Hallo liebe Praxis, ich weiß leider nicht, wann mein nächster Termin ist.",
+   "kontext": "Samstag, System kann Termine nicht einsehen.",
+   "wissen": ["ablauf-termine", "gespraech-grundhaltung"],
+   "antwort": "Ihre Termine kann ich hier im Chat nicht einsehen. Datum und Uhrzeit stehen in Ihrer Terminbestätigung per E-Mail und in Ihrem Doctolib-Konto. Wenn Sie dort nichts finden, schauen wir am Montag für Sie nach, dann melden wir uns.",
+   "weitergabe": {"an": "team", "dringend": false, "inhalt": "Patient findet Termin nicht, nur falls Rückmeldung ausbleibt"}},
+
+  {"id": "gold-widerspruch-onlinebuchung", "anliegen": "Ich habe den Termin immer direkt hier vereinbart, da dieser zeitnah sein muss.",
+   "kontext": "Patientin widerspricht dem vorherigen Hinweis auf Onlinebuchung. Regel nicht wiederholen, keinen Link erneut schicken.",
+   "wissen": ["gespraech-widerspruch", "ablauf-termine", "ablauf-telefon"],
+   "antwort": "Verstanden, dann machen wir es wie gewohnt. Worum geht es denn, damit das Team gleich den passenden Termin findet? Ich gebe Ihren Wunsch nach einem zeitnahen Termin direkt weiter, Rückmeldung am Montag im Laufe des Vormittags. Falls es akut ist: 0179 5351813.",
+   "weitergabe": {"an": "team", "dringend": false, "inhalt": "Zeitnaher Termin gewünscht, Patientin bucht nicht online"}},
+
+  {"id": "gold-teamnachricht", "anliegen": "Hier ist [Name], da wurde mit Sabine drüber geschrieben.",
+   "kontext": "Absender ist Teammitglied oder bezieht sich auf internen Vorgang.",
+   "wissen": ["gespraech-grenzen"],
+   "antwort": null,
+   "weitergabe": {"an": "team", "dringend": false, "inhalt": "Interne Nachricht, keine automatische Antwort"}},
+
+  {"id": "gold-schmerz-defekt-dezember", "anliegen": "Kunststoff Unterkiefer ab. Tut weh, nächstgelegener Termin ist im Dezember. Zu lange warten.",
+   "kontext": "Herausnehmbare Spange oder Schiene gebrochen, Schmerzen, online kein früher Termin. Absender ohne sichere Patientenzuordnung: trotzdem antworten, Zuordnung nebenbei klären.",
+   "wissen": ["prob-schiene-verloren-kaputt", "prob-spange-drueckt", "ablauf-spontan", "warn-praxis-anrufen", "ablauf-telefon", "gespraech-grundhaltung"],
+   "antwort": "Das tut mir leid. Bitte heben Sie alle Teile auf und bringen Sie sie mit, nicht selbst kleben. Wenn die Spange wehtut, lassen Sie sie bis zum Termin draußen. Bis Dezember müssen Sie nicht warten: Sie können Dienstag bis Donnerstag zu den Sprechzeiten ohne Termin vorbeikommen, dann mit Wartezeit, oder das Team sucht Ihnen einen früheren Termin und meldet sich heute noch. Was ist Ihnen lieber? Werden die Schmerzen stark oder stärker, rufen Sie bitte an: 0179 5351813.",
+   "weitergabe": {"an": "team", "dringend": true, "inhalt": "Defekte Apparatur mit Schmerzen, online erst Dezember frei, früheren Termin suchen"}}
+ ]
+}
