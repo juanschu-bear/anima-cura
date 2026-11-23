@@ -1,0 +1,5725 @@
+{
+  "complete": false,
+  "codeCommit": "119040f",
+  "summary": {
+    "approved": {
+      "completed": 99,
+      "planned": 239,
+      "modelCases": 76,
+      "medianMs": 6708.0,
+      "maxMs": 11107,
+      "over17": 0,
+      "requests": 54,
+      "missing": [
+        "L32",
+        "A06",
+        "A24",
+        "A35"
+      ],
+      "excludedLive": [
+        "L15",
+        "L18",
+        "L19",
+        "L20",
+        "L27"
+      ],
+      "technicalFailures": [
+        "A35"
+      ],
+      "closuresAnswered": [
+        "A12"
+      ]
+    },
+    "draft_preview": {
+      "completed": 55,
+      "planned": 239,
+      "modelCases": 42,
+      "medianMs": 7383.5,
+      "maxMs": 11289,
+      "over17": 0,
+      "requests": 34,
+      "missing": [
+        "A06"
+      ],
+      "excludedLive": [
+        "L15",
+        "L18",
+        "L19",
+        "L20",
+        "L27"
+      ],
+      "technicalFailures": [],
+      "closuresAnswered": [
+        "A12"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "case": "L01",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 1938,
+          "searchMs": 195,
+          "modelMs": 8809,
+          "totalMs": 11107
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 1947,
+          "searchMs": 180,
+          "modelMs": 9050,
+          "totalMs": 11289
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L02",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 2001,
+          "searchMs": 160,
+          "modelMs": 7675,
+          "totalMs": 10105
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 2005,
+          "searchMs": 243,
+          "modelMs": 7554,
+          "totalMs": 9994
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L03",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 123,
+          "searchMs": 127,
+          "modelMs": 7566,
+          "totalMs": 7919
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 175,
+          "searchMs": 245,
+          "modelMs": 7145,
+          "totalMs": 7686
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L04",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 64,
+          "searchMs": 91,
+          "modelMs": 6521,
+          "totalMs": 6779
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 80,
+          "searchMs": 212,
+          "modelMs": 7039,
+          "totalMs": 7475
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L05",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 64,
+          "searchMs": 253,
+          "modelMs": 6424,
+          "totalMs": 6828
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 59,
+          "searchMs": 154,
+          "modelMs": 7038,
+          "totalMs": 7377
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L06",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 40,
+          "searchMs": 161,
+          "modelMs": 6190,
+          "totalMs": 6530
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 71,
+          "searchMs": 206,
+          "modelMs": 8599,
+          "totalMs": 8984
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L07",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 36,
+          "searchMs": 343,
+          "modelMs": 7291,
+          "totalMs": 7811
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 35,
+          "searchMs": 198,
+          "modelMs": 7780,
+          "totalMs": 8110
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L08",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 33,
+          "searchMs": 106,
+          "modelMs": 5832,
+          "totalMs": 6057
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 38,
+          "searchMs": 148,
+          "modelMs": 7095,
+          "totalMs": 7390
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L09",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 60,
+          "searchMs": 117,
+          "modelMs": 7681,
+          "totalMs": 7987
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 45,
+          "searchMs": 112,
+          "modelMs": 8724,
+          "totalMs": 8972
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L10",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6761
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 34,
+          "searchMs": 128,
+          "modelMs": 6414,
+          "totalMs": 6822
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 88,
+          "searchMs": 144,
+          "modelMs": 6457,
+          "totalMs": 6790
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L11",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 86
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 102
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L12",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 20272
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 102,
+          "searchMs": 425,
+          "modelMs": 7846,
+          "totalMs": 8486
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 37,
+          "searchMs": 393,
+          "modelMs": 9675,
+          "totalMs": 10212
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L13",
+      "expected": "request",
+      "baseline": {
+        "status": "model_failed",
+        "ms": 4572
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 42,
+          "searchMs": 146,
+          "modelMs": 6992,
+          "totalMs": 7283
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 135,
+          "searchMs": 172,
+          "modelMs": 8334,
+          "totalMs": 8786
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L14",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8487
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 105,
+          "searchMs": 135,
+          "modelMs": 7412,
+          "totalMs": 7744
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 44,
+          "searchMs": 168,
+          "modelMs": 9474,
+          "totalMs": 9790
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L15",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "sender:non_patient",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 62,
+          "searchMs": 94,
+          "modelMs": 3644,
+          "totalMs": 3909
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "sender:non_patient",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 82,
+          "searchMs": 94,
+          "modelMs": 4680,
+          "totalMs": 4986
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L16",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 74,
+          "searchMs": 98,
+          "modelMs": 6969,
+          "totalMs": 7235
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 84,
+          "searchMs": 181,
+          "modelMs": 8125,
+          "totalMs": 8499
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L17",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 59,
+          "searchMs": 91,
+          "modelMs": 5141,
+          "totalMs": 5386
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 48,
+          "searchMs": 163,
+          "modelMs": 7216,
+          "totalMs": 7521
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L18",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 85
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 87
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L19",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 84
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 81
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L20",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 82
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "sender:team",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 86
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L21",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5911
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 23,
+          "searchMs": 179,
+          "modelMs": 6533,
+          "totalMs": 6869
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 30,
+          "searchMs": 134,
+          "modelMs": 3140,
+          "totalMs": 3429
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L22",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 16314
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 23,
+          "searchMs": 99,
+          "modelMs": 7957,
+          "totalMs": 8209
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 34,
+          "searchMs": 100,
+          "modelMs": 7678,
+          "totalMs": 7915
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L23",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8500
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 62,
+          "searchMs": 116,
+          "modelMs": 8941,
+          "totalMs": 9201
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 107,
+          "searchMs": 100,
+          "modelMs": 10980,
+          "totalMs": 11273
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L24",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6548
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 53,
+          "searchMs": 87,
+          "modelMs": 2741,
+          "totalMs": 2974
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 140,
+          "modelMs": 2973,
+          "totalMs": 3238
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L25",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5919
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 87,
+          "modelMs": 6927,
+          "totalMs": 7170
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 19,
+          "searchMs": 103,
+          "modelMs": 8268,
+          "totalMs": 8528
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L26",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 16239
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 33,
+          "searchMs": 89,
+          "modelMs": 3373,
+          "totalMs": 3629
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 24,
+          "searchMs": 114,
+          "modelMs": 7740,
+          "totalMs": 7988
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L27",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "rejected",
+        "ms": 16440
+      },
+      "approved": {
+        "status": "sender:non_patient",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 79,
+          "searchMs": 88,
+          "modelMs": 5237,
+          "totalMs": 5494
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "sender:non_patient",
+        "answered": false,
+        "substantive": false,
+        "excluded": true,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 163,
+          "modelMs": 4620,
+          "totalMs": 4941
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L28",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 21,
+          "searchMs": 143,
+          "modelMs": 6092,
+          "totalMs": 6384
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 14,
+          "searchMs": 146,
+          "modelMs": 5332,
+          "totalMs": 5622
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L29",
+      "expected": "closing",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 91
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 82
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L30",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 8096
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 22,
+          "searchMs": 102,
+          "modelMs": 6843,
+          "totalMs": 7055
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 24,
+          "searchMs": 130,
+          "modelMs": 5323,
+          "totalMs": 5605
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L31",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 83
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 85
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L32",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 7883
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 46,
+          "searchMs": 246,
+          "modelMs": 1000,
+          "totalMs": 1410
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 41,
+          "searchMs": 127,
+          "modelMs": 7118,
+          "totalMs": 7390
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L33",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 112
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 83
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L34",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 103
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 81
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L35",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 16,
+          "searchMs": 90,
+          "modelMs": 7872,
+          "totalMs": 8064
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 68,
+          "searchMs": 176,
+          "modelMs": 6654,
+          "totalMs": 6984
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "L36",
+      "expected": "closing",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 82
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 90
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L37",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:reaction",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 83
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:reaction",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 83
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L38",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:reaction",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 89
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:reaction",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 99
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "L39",
+      "expected": "request",
+      "baseline": {
+        "status": "sender_excluded",
+        "ms": null
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 68,
+          "searchMs": 214,
+          "modelMs": 3139,
+          "totalMs": 3576
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 28,
+          "searchMs": 160,
+          "modelMs": 3236,
+          "totalMs": 3534
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A01",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5307
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 213,
+          "modelMs": 6936,
+          "totalMs": 7263
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 36,
+          "searchMs": 222,
+          "modelMs": 7073,
+          "totalMs": 7447
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A02",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 2939
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 88
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 87
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "A03",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4361
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 23,
+          "searchMs": 104,
+          "modelMs": 1822,
+          "totalMs": 2066
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 25,
+          "searchMs": 103,
+          "modelMs": 1827,
+          "totalMs": 2086
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A04",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 14582
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 48,
+          "searchMs": 152,
+          "modelMs": 984,
+          "totalMs": 1272
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 48,
+          "searchMs": 97,
+          "modelMs": 1165,
+          "totalMs": 1437
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A05",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8000
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 9,
+          "searchMs": 135,
+          "modelMs": 1182,
+          "totalMs": 1412
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 14,
+          "searchMs": 95,
+          "modelMs": 2352,
+          "totalMs": 2589
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A06",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 10329
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 68,
+          "searchMs": 105,
+          "modelMs": 853,
+          "totalMs": 1109
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 80,
+          "searchMs": 140,
+          "modelMs": 3502,
+          "totalMs": 3851
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A07",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 11127
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 45,
+          "searchMs": 88,
+          "modelMs": 2659,
+          "totalMs": 2882
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 43,
+          "searchMs": 147,
+          "modelMs": 3541,
+          "totalMs": 3862
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A08",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4023
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 10,
+          "searchMs": 91,
+          "modelMs": 5887,
+          "totalMs": 6098
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 15,
+          "searchMs": 84,
+          "modelMs": 6126,
+          "totalMs": 6350
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A09",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 12175
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 66,
+          "searchMs": 78,
+          "modelMs": 2837,
+          "totalMs": 3080
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 43,
+          "searchMs": 75,
+          "modelMs": 2371,
+          "totalMs": 2592
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A10",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5463
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 77,
+          "modelMs": 3625,
+          "totalMs": 3859
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 33,
+          "searchMs": 84,
+          "modelMs": 4300,
+          "totalMs": 4520
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A11",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6144
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 82
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 83
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      }
+    },
+    {
+      "case": "A12",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 2999
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 100,
+          "searchMs": 72,
+          "modelMs": 7872,
+          "totalMs": 8129
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 105,
+          "searchMs": 115,
+          "modelMs": 6830,
+          "totalMs": 7179
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A13",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6942
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 28,
+          "searchMs": 71,
+          "modelMs": 8008,
+          "totalMs": 8204
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 34,
+          "searchMs": 133,
+          "modelMs": 8844,
+          "totalMs": 9129
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A14",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6486
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 36,
+          "searchMs": 99,
+          "modelMs": 7702,
+          "totalMs": 7963
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 35,
+          "searchMs": 146,
+          "modelMs": 6381,
+          "totalMs": 6646
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A15",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 14509
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 34,
+          "searchMs": 86,
+          "modelMs": 7788,
+          "totalMs": 8016
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 39,
+          "searchMs": 95,
+          "modelMs": 9634,
+          "totalMs": 9935
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A16",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6922
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 16,
+          "searchMs": 196,
+          "modelMs": 7490,
+          "totalMs": 7846
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 16,
+          "searchMs": 103,
+          "modelMs": 7055,
+          "totalMs": 7315
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 8,
+          "rule": 6,
+          "history": 5
+        }
+      }
+    },
+    {
+      "case": "A17",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6576
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 22,
+          "searchMs": 83,
+          "modelMs": 9290,
+          "totalMs": 9522
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A18",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4144
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 14,
+          "searchMs": 121,
+          "modelMs": 7102,
+          "totalMs": 7349
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A19",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4835
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 29,
+          "searchMs": 105,
+          "modelMs": 5836,
+          "totalMs": 6084
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A20",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5774
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 86,
+          "searchMs": 107,
+          "modelMs": 1728,
+          "totalMs": 2015
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A21",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3436
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 86
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A22",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 102
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A23",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4773
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 12,
+          "searchMs": 111,
+          "modelMs": 2569,
+          "totalMs": 2823
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A24",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5874
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 59,
+          "searchMs": 103,
+          "modelMs": 5716,
+          "totalMs": 5976
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A25",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7287
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 64,
+          "searchMs": 83,
+          "modelMs": 3289,
+          "totalMs": 3567
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A26",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 19539
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 36,
+          "searchMs": 80,
+          "modelMs": 7190,
+          "totalMs": 7408
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A27",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7920
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 69,
+          "searchMs": 82,
+          "modelMs": 6388,
+          "totalMs": 6637
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A28",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 12952
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 16,
+          "searchMs": 219,
+          "modelMs": 3081,
+          "totalMs": 3402
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A29",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7624
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 38,
+          "searchMs": 150,
+          "modelMs": 6935,
+          "totalMs": 7207
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A30",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 9575
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 45,
+          "searchMs": 104,
+          "modelMs": 2828,
+          "totalMs": 3093
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A31",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4575
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 16,
+          "searchMs": 118,
+          "modelMs": 1526,
+          "totalMs": 1744
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A32",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 11819
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 79
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A33",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6172
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 84
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A34",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8418
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 96,
+          "searchMs": 144,
+          "modelMs": 1044,
+          "totalMs": 1371
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A35",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 9068
+      },
+      "approved": {
+        "status": "chain:guard_rejected",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 88,
+          "searchMs": 111,
+          "modelMs": 10402,
+          "totalMs": 10685
+        },
+        "repairs": 0,
+        "failures": [
+          "AI_NoObjectGeneratedError"
+        ],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A36",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5859
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 18,
+          "searchMs": 179,
+          "modelMs": 7823,
+          "totalMs": 8135
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A37",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 14794
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 28,
+          "searchMs": 126,
+          "modelMs": 10175,
+          "totalMs": 10437
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A38",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "social:unreadable",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 90
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A39",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 8671
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 38,
+          "searchMs": 132,
+          "modelMs": 1589,
+          "totalMs": 1839
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A40",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3762
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 55,
+          "searchMs": 91,
+          "modelMs": 1356,
+          "totalMs": 1653
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A41",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 9620
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 47,
+          "searchMs": 111,
+          "modelMs": 6826,
+          "totalMs": 7104
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A42",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5653
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 48,
+          "searchMs": 118,
+          "modelMs": 8265,
+          "totalMs": 8514
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A43",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 11618
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 65,
+          "searchMs": 132,
+          "modelMs": 2982,
+          "totalMs": 3299
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A44",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 14740
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 91,
+          "searchMs": 81,
+          "modelMs": 2005,
+          "totalMs": 2340
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A45",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6728
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 28,
+          "searchMs": 136,
+          "modelMs": 9776,
+          "totalMs": 10068
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A46",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4119
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 92
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A47",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 4453
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 46,
+          "searchMs": 89,
+          "modelMs": 8353,
+          "totalMs": 8596
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A48",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4891
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 10,
+          "searchMs": 124,
+          "modelMs": 6903,
+          "totalMs": 7127
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A49",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5003
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 24,
+          "searchMs": 90,
+          "modelMs": 6369,
+          "totalMs": 6570
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A50",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 9249
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 54,
+          "searchMs": 414,
+          "modelMs": 1806,
+          "totalMs": 2360
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A51",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3210
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 87
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A52",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4772
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 45,
+          "searchMs": 103,
+          "modelMs": 1404,
+          "totalMs": 1684
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A53",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 12651
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 101,
+          "searchMs": 153,
+          "modelMs": 1933,
+          "totalMs": 2330
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A54",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 5602
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 109,
+          "searchMs": 163,
+          "modelMs": 6464,
+          "totalMs": 6819
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A55",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7554
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 18,
+          "searchMs": 170,
+          "modelMs": 2333,
+          "totalMs": 2649
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A56",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 16168
+      },
+      "approved": {
+        "status": "retrieval:answered",
+        "answered": true,
+        "substantive": true,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 63,
+          "searchMs": 72,
+          "modelMs": 6882,
+          "totalMs": 7158
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A57",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3018
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 82
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A58",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4279
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 18,
+          "searchMs": 120,
+          "modelMs": 1243,
+          "totalMs": 1498
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 3,
+          "knowledge": 0,
+          "rule": 6,
+          "history": 5
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A59",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 4309
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A60",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4647
+      },
+      "approved": {
+        "status": "social:acknowledged",
+        "answered": false,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 84
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A61",
+      "expected": "first_signal",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3950
+      },
+      "approved": {
+        "status": "begruessung-ohne-anliegen",
+        "answered": true,
+        "substantive": false,
+        "excluded": false,
+        "timings": {
+          "embeddingMs": 0,
+          "searchMs": 0,
+          "modelMs": 0,
+          "totalMs": 81
+        },
+        "repairs": 0,
+        "failures": [],
+        "sources": {
+          "gold": 0,
+          "knowledge": 0,
+          "rule": 0,
+          "history": 0
+        }
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A62",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6449
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A63",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 9094
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A64",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3363
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A65",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4995
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A66",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5387
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A67",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 4552
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A68",
+      "expected": "empty_or_reaction",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3769
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A69",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7973
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A70",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 9933
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A71",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 3260
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A72",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 15635
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A73",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6209
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A74",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 10593
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A75",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 12973
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A76",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 12203
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A77",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 9572
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A78",
+      "expected": "closing",
+      "baseline": {
+        "status": "rejected",
+        "ms": 12710
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A79",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 13035
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A80",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7120
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A81",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6965
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A82",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5090
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A83",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8286
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A84",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6112
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A85",
+      "expected": "media_without_text",
+      "baseline": {
+        "status": "fixed_media",
+        "ms": null
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A86",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5212
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A87",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6348
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A88",
+      "expected": "non_patient",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7156
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A89",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 8579
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A90",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7462
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A91",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7657
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A92",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7075
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A93",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5730
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A94",
+      "expected": "request",
+      "baseline": {
+        "status": "rejected",
+        "ms": 14384
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A95",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6932
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A96",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7386
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A97",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 13235
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A98",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 7911
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A99",
+      "expected": "request",
+      "baseline": {
+        "status": "simulated",
+        "ms": 6811
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "A100",
+      "expected": "closing",
+      "baseline": {
+        "status": "simulated",
+        "ms": 5471
+      },
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B01",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B02",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B03",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B04",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B05",
+      "expected": "non_patient",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B06",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B07",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B08",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B09",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B10",
+      "expected": "non_patient",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B11",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B12",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B13",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B14",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B15",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B16",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B17",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B18",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B19",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B20",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B21",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B22",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B23",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B24",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B25",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B26",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B27",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B28",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B29",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B30",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B31",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B32",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B33",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B34",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B35",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B36",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B37",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B38",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B39",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B40",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B41",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B42",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B43",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B44",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B45",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B46",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B47",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B48",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B49",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B50",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B51",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B52",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B53",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B54",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B55",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B56",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B57",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B58",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B59",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B60",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B61",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B62",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B63",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B64",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B65",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B66",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B67",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B68",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B69",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B70",
+      "expected": "first_signal",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B71",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B72",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B73",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B74",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B75",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B76",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B77",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B78",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B79",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B80",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B81",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B82",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B83",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B84",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B85",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B86",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B87",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B88",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B89",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B90",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B91",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B92",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B93",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B94",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B95",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B96",
+      "expected": "request",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B97",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B98",
+      "expected": "closing",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B99",
+      "expected": "non_patient",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    },
+    {
+      "case": "B100",
+      "expected": "empty_or_reaction",
+      "baseline": null,
+      "approved": {
+        "status": "not_run"
+      },
+      "draft_preview": {
+        "status": "not_run"
+      }
+    }
+  ]
+}
