@@ -11,7 +11,9 @@ export function modelFailure(error:unknown):string{
   const cause=error.cause instanceof Error?error.cause.name:'none';
   return `no_object:${error.finishReason??'unknown'}:${cause}`.slice(0,120);
  }
- return (error instanceof Error?error.name:'unknown').slice(0,60);
+ const status=(error as {statusCode?:unknown})?.statusCode;
+ const http=typeof status==='number'&&status>=400&&status<=599?':http_'+status:'';
+ return ((error instanceof Error?error.name:'unknown')+http).slice(0,80);
 }
 
 /** Die Kette spricht mit demselben Modellzugang wie der Rest von AnimaHost: Verarbeitung in der EU, ohne Speicherung beim Anbieter. */

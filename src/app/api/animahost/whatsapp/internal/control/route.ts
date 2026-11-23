@@ -1,5 +1,6 @@
 import {timingSafeEqual} from 'node:crypto';
 import {contentHash,upsertRetrievalDocuments} from '@/lib/services/animahost-retrieval';
+import {remainingPersonNames} from '@/lib/services/animahost-retrieval-redaction';
 import {anonymizeRetrieval} from '@/lib/services/animahost-retrieval-privacy';
 import {randomUUID} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
@@ -18,6 +19,7 @@ import {appointmentLocalDate} from '@/lib/services/animahost-appointment-notices
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
+export const maxDuration=60;
 const headers={'Cache-Control':'private, no-store'};
 const settingsSchema=z.strictObject({
  model:z.string().regex(/^[a-z0-9][a-z0-9./_-]{0,119}$/).optional(),
@@ -206,6 +208,10 @@ export async function POST(request:NextRequest){
    names.push(...page.data.flatMap(p=>[p.vorname??'',p.nachname??'']));
    if(page.data.length<1000)break;
   }
+  const model=await db.from('animahost_whatsapp_settings').select('model').eq('tenant_id',tenant).single();
+  if(model.error)return unavailable();
+  try{names.push(...await remainingPersonNames([input.question,input.answer,input.context].map(text=>anonymizeRetrieval(text,names)),model.data.model,AbortSignal.timeout(25000)));}
+  catch{return NextResponse.json({code:'gold_anonymization_unavailable'},{status:503,headers});}
   const result=await db.rpc('animahost_mark_gold',{p_tenant:tenant,p_actor:input.actorId,p_ref:'practice-'+contentHash(input.sourceRef).slice(0,32),
    p_question:anonymizeRetrieval(input.question,names),p_answer:anonymizeRetrieval(input.answer,names),p_context:anonymizeRetrieval(input.context,names),p_at:input.sourceAt});
   if(result.error)return result.error.code==='42501'?NextResponse.json({code:'gold_actor_forbidden'},{status:403,headers}):unavailable();

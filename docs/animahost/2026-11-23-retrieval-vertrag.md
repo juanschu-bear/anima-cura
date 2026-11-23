@@ -42,9 +42,9 @@ Referenzen als undurchsichtige Zeichenketten behandeln und URL-kodieren. Keine T
 }
 ```
 
-Grenzen: `sourceRef` 1–200, Frage 1–4000, Antwort 1–2000, Kontext höchstens 1000 Zeichen. Die Aktion setzt eine bewusste Auswahl der Praxis voraus. `actorId` wird ausschließlich aus der Sitzung ergänzt. Namen und Kontakt-/Patientenkennungen werden vor dem Indexieren lokal entfernt. Keine rohen Aktenauszüge als Kontext übertragen.
+Grenzen: `sourceRef` 1–200, Frage 1–4000, Antwort 1–2000, Kontext höchstens 1000 Zeichen. Die Aktion setzt eine bewusste Auswahl der Praxis voraus. `actorId` wird ausschließlich aus der Sitzung ergänzt. Namen und Kontakt-/Patientenkennungen werden vor dem Indexieren entfernt: zunächst lokal, anschließend mit einer zusätzlichen Namensprüfung über den bestehenden EU-/ZDR-Modellzugang. Die Prüfung liefert nur weitere zu entfernende Textstellen; sie schreibt keine Fakten um. Keine rohen Aktenauszüge als Kontext übertragen.
 
-Antwort: `{ref,version,sourceAt,indexed,status}`. HTTP 201 mit `status:indexed`: sofort suchbar. HTTP 202 mit `status:pending`: Auswahl dauerhaft gespeichert, Indexierung wird vom geschützten Fünf-Minuten-Abgleich wiederholt. Nicht erneut markieren, nur weil die Indexierung noch läuft. Erneutes Markieren derselben `sourceRef` erzeugt bewusst eine neue Version und ersetzt die aktive Version. Fehler `gold_actor_forbidden` (403), `control_invalid` (400), `control_unavailable`/`animahost_unavailable` (503).
+Antwort: `{ref,version,sourceAt,indexed,status}`. HTTP 201 mit `status:indexed`: sofort suchbar. HTTP 202 mit `status:pending`: Auswahl dauerhaft gespeichert, Indexierung wird vom geschützten Fünf-Minuten-Abgleich wiederholt. Nicht erneut markieren, nur weil die Indexierung noch läuft. Erneutes Markieren derselben `sourceRef` erzeugt bewusst eine neue Version und ersetzt die aktive Version. Bei `gold_anonymization_unavailable` (503) wurde noch nichts übernommen; Eingaben erhalten und erneut versuchen. Fehler `gold_actor_forbidden` (403), `control_invalid` (400), `control_unavailable`/`animahost_unavailable` (503).
 
 ## Probelauf
 

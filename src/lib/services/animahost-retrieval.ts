@@ -60,7 +60,7 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  const [vector]=await embedRetrieval([query],'query');
  const embedded=Date.now();
  const result=await db.rpc('animahost_retrieval_match',{p_tenant:tenant,p_vector:JSON.stringify(vector),p_model:embeddingModel,p_preview:preview,p_day:new Date().toISOString().slice(0,10),p_exclude_chat:excludeChat??null})
-  .select('kind,ref,version,source_at,title,content,payload,draft,content_hash');
+  .select('kind,ref,version,source_at,title,content,payload,draft,content_hash').abortSignal(AbortSignal.timeout(4000));
  if(result.error)throw Error('retrieval_search_unavailable:'+result.error.code+':'+result.error.message);
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));

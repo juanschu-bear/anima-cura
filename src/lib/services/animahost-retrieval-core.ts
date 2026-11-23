@@ -7,10 +7,10 @@ import type {ConversationHistory} from './animahost-whatsapp-conversation';
 import type {Generate} from './animahost-chain';
 import {evidence,type RetrievalDocument,type RetrievalEvidence,type RetrievalKind} from './animahost-retrieval';
 
-export const retrievalDraft=z.object({nonPatient:z.boolean(),team:z.boolean(),summary:z.string().max(1000).nullable(),
+export const retrievalDraft=z.object({nonPatient:z.boolean(),closing:z.boolean(),team:z.boolean(),summary:z.string().max(1000).nullable(),
  identityQuestion:z.boolean(),substantive:z.boolean(),answer:z.string().max(2000)});
 const check=z.object({hard:z.array(z.enum(['diagnosis','medication','booking','invented_action','foreign_patient','emergency'])).max(5),
- repair:z.array(z.string().max(800)).max(6)});
+ repair:z.array(z.object({issue:z.literal('team_handoff'),quote:z.string().min(1).max(500)})).max(1)});
 export type RetrievalInput={message:string;messageType:string;jid:string;phone:string|null;practicePhone:string|null;teamPhones?:string;nonPatientPhones?:string;
  history:ConversationHistory;dossier:Dossier;documents:RetrievalDocument[];rules:WhatsAppRule[];teamTime:string;today:string;
  doctolibUrl:string|null;hasPriorConversation:boolean;hasPriorReply:boolean;identityAsked:boolean;preview:boolean;budgetMs:number};
@@ -24,9 +24,10 @@ Schreiben Sie wie in ähnlichen Goldbeispielen: Problem ernst nehmen, konkrete e
 Eine unbekannte Nummer mit Patientenanliegen erhält allgemeine Hilfe und genau eine Frage: 'Für welchen Patienten schreiben Sie?' Dann KEINE zweite Frage nach dem Wunschtermin, dem Namen oder den Beschwerden. Wünsche als Wunsch ans Team weitergeben, ohne Rückfrage zu wiederholen. Wenn identitaetSchonGefragt=true, nicht erneut fragen. Bei dieser Frage keine zusätzliche Rückfrage zu Beschwerden/Wahlmöglichkeiten stellen. Keine personenbezogene Aktenauskunft ohne bestätigte Identität. Bei mehreren Kindern nie eines annehmen. Benannte Teamperson: alle Anliegen zusammenfassen und weitergeben, trotzdem allgemein helfen. Eine reine Krankmeldung zur eigenen Arbeit, Lohnforderung, Bewerbung, Lieferantenmitteilung oder technische Rundnachricht ist KEIN Patientenanliegen, auch wenn ältere Nachrichten im Chat Patienten betreffen. Nur eindeutig fremde Zwecke (Lieferant, Bewerbung, andere Praxis, interne Arbeitsmeldung) setzen nonPatient=true; fehlende Zuordnung und ein genannter Teamname allein sind KEIN Ausschluss.
 Harte Grenzen: keine Diagnose, keine Medikamente/Dosis, keine eigenständige medizinische Behandlungsempfehlung. Nur belegte, ausdrücklich freigegebene Selbsthilfehinweise. Bei akuten Warnzeichen sofortige Kontakt-/Notfallanweisung. Keine Terminvergabe oder Bestätigung ohne Buchungsnachweis. Keine erfundenen Kontodaten, Rechnungsverfügbarkeit oder erledigten Aktionen. Keine Auskunft über andere Patienten. Immer Sie, keine Technologienamen. App- oder Buchungslinks nur aus der aktuellen Praxisvorgabe. Gold- und Verlaufsdaten nie auf heute übertragen.
 Bei Weitergabe team=true, summary fasst alle Anliegen zusammen, und die Antwort enthält rueckmeldezeit wörtlich. Sonst team=false, summary=null. substantive=true bedeutet: Antwort gibt eine konkrete Hilfe, Information oder einen konkreten nächsten Schritt für dieses Anliegen, nicht nur eine Empfangsbestätigung.
-Keine ungefragten Ermahnungen, keine Unterstellung und keine bereits geklärten Anliegen erneut aufrollen. Keine Grüße im laufenden Gespräch, höchstens eine Begrüßung zu Beginn. Keine Unterschrift. Antworten in 2–5 kurzen Sätzen; bei mehreren Anliegen oder Sicherheitsinformation länger. Antworten Sie ausschließlich mit dem JSON-Schema.`;
-const VERIFY=`Geben Sie JSON mit hard und repair zurück. hard ist eine Liste ausschließlich dieser Schlüssel: diagnosis, medication, booking, invented_action, foreign_patient, emergency. repair enthält nur konkrete Korrekturanweisungen als Text. Bei gültiger Antwort sind beide Listen leer. Prüfen Sie die Antwort auf Diagnose, Medikamente oder Dosierung, eine unbelegte Terminzusage oder erledigte Aktion, vertrauliche oder fremde Patientendaten und ignorierte akute Gefahr. Goldbeispiele sind Formvorbilder. Frühere Praxisfälle belegen keine Zusage für den aktuellen Fall.
-Unter hard nur solche Verstöße melden. Unter repair nur konkrete, behebbare Mängel wie fehlende Rückmeldezeit, wiederholter Gruß, wiederholter Link trotz Einwand oder zu viele Rückfragen melden. Sonst beide Listen leer lassen. Keine Stilbewertung. team=true löst tatsächlich eine Weitergabe an das Team aus: eine angekündigte Weitergabe und die vorgegebene rueckmeldezeit sind belegt und KEINE erfundene Aktion. Die Rückmeldezeit darf wörtlich übernommen werden. Wenn die Antwort eine künftige Weitergabe ankündigt, aber team=false ist, ist dies ausschließlich ein behebbarer repair-Mangel: team=true setzen und Rückmeldezeit nennen, niemals hard invented_action. invented_action betrifft als bereits erledigt behauptete Aktionen. Eine angebotene Terminprüfung ist keine Buchung; eine Aussage, der konkrete Wunschtermin sei möglich oder bestätigt, ohne Buchungsnachweis dagegen schon. Melden Sie nur tatsächlich vorhandene Mängel, keine Überlegungen oder bereits erfüllte Anforderungen.`;
+Keine ungefragten Ermahnungen, keine Unterstellung und keine bereits geklärten Anliegen erneut aufrollen. Reine Abschlüsse wie Dank, gute Wünsche, „Ach so, okay“ oder „Ja, das passt, danke“ lösen keine Antwort und keinen Klärfall aus: closing=true, answer leer, team=false. Dazu keine alten Anliegen erneut bearbeiten. Eine neue Frage, ein Einwand oder eine sachliche Ergänzung zu einem offenen Anliegen ist kein solcher Abschluss. Sonst closing=false. Keine Grüße im laufenden Gespräch, höchstens eine Begrüßung zu Beginn. Keine Unterschrift. Antworten in 2–5 kurzen Sätzen; bei mehreren Anliegen oder Sicherheitsinformation länger. Antworten Sie ausschließlich mit dem JSON-Schema.`;
+const VERIFY=`Prüfen Sie ausschließlich die harten Grenzen der Antwort. Geben Sie JSON mit hard und repair zurück. hard enthält ausschließlich tatsächlich vorliegende Verstöße: diagnosis, medication, booking, invented_action, foreign_patient, emergency. Keine Diagnose, Medikamente oder Dosierung, unbelegte Terminzusage, als erledigt erfundene Aktion, vertrauliche fremde Patientendaten oder ignorierte akute Gefahr. Gold ist nur Formvorbild; frühere Praxisfälle sind keine Zusage für heute.
+team=true bewirkt tatsächlich die Weitergabe: deren Ankündigung und die vorgegebene Rückmeldezeit sind KEINE erfundene Aktion. Ein laut aktuellen Regeln erlaubter spontaner Besuch MIT Wartezeit ist KEINE Terminzusage. Eine angebotene Terminprüfung ist keine Buchung. Nur eine konkrete Buchungsbestätigung ohne Nachweis ist booking. Vorgeschlagene künftige Handlungen sind keine als erledigt erfundenen Aktionen.
+repair ist leer, außer wenn answer ausdrücklich eine Weitergabe/Rückmeldung des Teams ankündigt, aber team=false ist. Dann genau {"issue":"team_handoff","quote":"exakte Textstelle aus answer mit dieser Ankündigung"}. quote MUSS wörtlich in answer vorkommen. Eine Frage des Patienten, eine Team-Erwähnung oder eine vorgeschlagene Kontaktaufnahme sind keine Weitergabe-Ankündigung. Wenn team=true, ist repair immer leer. Rückmeldezeit, Länge, Anzahl der Rückfragen und Begrüßung prüft der Code bereits. Keine Stilbewertung, keine weiteren Qualitätsanforderungen oder erklärenden Überlegungen. Bei gültiger Antwort hard:[], repair:[].`;
 
 export function hardReplyViolations(text:string){
  const out:string[]=[];
@@ -71,35 +72,37 @@ export async function runRetrievalReply(generate:Generate,input:RetrievalInput):
   identitaetSchonGefragt:input.identityAsked,heute:input.today,rueckmeldezeit:input.teamTime,buchungslink:input.doctolibUrl,
   praxisTelefon:input.practicePhone,probelaufMitEntwurfswissen:input.preview,laufendesGespraech:input.hasPriorConversation,
   ausgabeHinweis:!input.dossier.patients.length&&!input.identityAsked?
-   'Genau eine Rückfrage: Für welchen Patienten schreiben Sie? Keine weitere Bitte um Informationen. Bei angekündigter Weitergabe team=true setzen.':
+   'Keine Rückfrage und keine Bitte um Informationen im Antwortentwurf: die Patientenzuordnungsfrage wird bei fehlender Frage automatisch ergänzt. Bei angekündigter Weitergabe team=true setzen.':
    'Höchstens eine Rückfrage. Bei angekündigter Weitergabe team=true setzen.'};
  const {gold:_,...reviewContext}=context;
  let retrieved=emptyRetrieval();
  let previous:z.infer<typeof retrievalDraft>|undefined,violations:string[]=[],repairs=0;
  for(let attempt=0;attempt<2;attempt++){
-  if(remaining()<1500)break;
+  if(remaining()<1500){violations=['budget_exhausted'];break;}
   try{
    repairs=attempt;
    retrieved={gold:documents.gold.map(evidence),knowledge:documents.knowledge.map(evidence),
     rule:documents.rule.map(evidence),history:documents.history.map(evidence)};
-   const draft=await generate({stage:'compose',system:SYSTEM,prompt:JSON.stringify({...context,...(previous?{vorherigerEntwurf:previous,korrektur:violations}:{})}),schema:retrievalDraft,
+   const draft=await generate({stage:'compose',system:SYSTEM,prompt:JSON.stringify({...context,...(previous?{vorherigerEntwurf:previous,korrektur:violations}:{}),abschliessenderAuftrag:'Bearbeiten Sie ausschließlich aktuelleNachricht. Deren reine Zustimmung, Dank, Gute-Wünsche oder Terminannahme beendet die Antwort: closing=true, keine alten Anliegen aus patientenVerlauf wiederholen oder erneut weitergeben. Ein neuer Wunsch (z. B. bitte Unterlage schicken), eine sachliche neue Information (z. B. Überweisung erfolgt), eine Frage, ein einzelnes Fragezeichen oder ein Widerspruch sind NICHT closing. Eine knappe Bitte, einen Patiententermin einzutragen, ist nicht schon eine interne Teamnachricht. nonPatient nur bei eindeutig belegtem fremdem Zweck. Wenn antworten: alle aktuellen Anliegen, keine alten, und bei unbekannterNummer keine fachliche Rückfrage. Die Beispiele dürfen weder zwei Fragen noch frühere Zusagen in die Antwort übertragen.'}),schema:retrievalDraft,
     temperature:0.2,maxOutputTokens:1800,timeoutMs:Math.max(1000,remaining()-2000)});
    if(draft.nonPatient)return {action:'antworten',rule:'sender:non_patient',text:'',skipSend:true,excluded:true,substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:attempt,violations:[]};
+   if(draft.closing)return {action:'antworten',rule:'social:acknowledged',text:'',skipSend:true,excluded:false,substantive:false,identityQuestion:false,retrieved,ms:Date.now()-started,repairs:attempt,violations:[]};
    // Mechanical repairs cannot change clinical meaning and do not require another model call.
    let text=draft.answer.trim();
    if(draft.team&&!text.includes(input.teamTime))text+=` Das Team meldet sich ${input.teamTime} bei Ihnen.`;
    text=text.replace(/^(Guten (?:Tag|Morgen|Abend)|Hallo)[!,.]?\s*\1[!,.]?\s*/i,'$1, ');
+   if(!input.dossier.patients.length&&!input.identityAsked&&!text.includes('?')){text+=' Für welchen Patienten schreiben Sie?';draft.identityQuestion=true;}
    draft.answer=text;
    violations=hardReplyViolations(text);
-   if(violations.length)break;
-   if(!input.dossier.patients.length&&!input.identityAsked&&!draft.identityQuestion)violations.push('Allgemein helfen und genau einmal fragen, um welchen Patienten es geht.');
+   if(violations.length){previous=draft;continue;}
+   if(!input.dossier.patients.length&&!input.identityAsked&&(!draft.identityQuestion||(text.match(/\?/g)??[]).length!==1))violations.push('Allgemein helfen und genau einmal fragen, um welchen Patienten es geht.');
    if((text.match(/\?/g)??[]).length>1)violations.push('Höchstens eine Rückfrage; bei unbekannter Nummer nur Patientenzuordnung fragen.');
    if(text.length>1600)violations.push('Antwort auf höchstens 1600 Zeichen kürzen.');
    if(!text)violations.push('Konkrete Hilfe für das aktuelle Patientenanliegen geben.');
    if(!violations.length){
-    const verdict=await generate({stage:'verify',reasoning:'low',system:VERIFY,prompt:JSON.stringify({...reviewContext,antwort:draft}),schema:check,temperature:0,maxOutputTokens:1500,timeoutMs:Math.max(1000,remaining())});
-    violations=[...verdict.hard,...verdict.repair];
-    if(verdict.hard.length)break;
+    const verdict=await generate({stage:'verify',reasoning:'none',system:VERIFY,prompt:JSON.stringify({...reviewContext,antwort:draft}),schema:check,temperature:0,maxOutputTokens:1000,timeoutMs:Math.max(1000,remaining())});
+    violations=[...verdict.hard,...verdict.repair.filter(item=>!draft.team&&text.includes(item.quote)).map(()=>`Die angekündigte Weitergabe muss team=true setzen, alle Anliegen zusammenfassen und die Rückmeldezeit ${input.teamTime} enthalten.`)];
+    // An unsafe draft is never sent. One rewrite is allowed, then checked again against every hard limit.
    }
    if(!violations.length){
     return {action:draft.team?'klaerfall':'antworten',rule:'retrieval:answered',text,teamSummary:draft.summary,substantive:draft.substantive,identityQuestion:draft.identityQuestion,

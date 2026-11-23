@@ -7,7 +7,7 @@ import {anonymizeRetrieval} from '../animahost-retrieval-privacy';
 import {historyPairDocuments,type ArchiveMessage} from '../animahost-history-pairs';
 const input=(over:Partial<RetrievalInput>={}):RetrievalInput=>({message:'Kunststoff ab, tut weh. Online erst im Dezember.',messageType:'text',jid:'4915100000000@s.whatsapp.net',phone:'4915100000000',practicePhone:'4915100000001',
  history:[],dossier:{sender:'unknown',patients:[]},documents:[],rules:[],teamTime:'heute noch',today:'2026-11-23',doctolibUrl:'https://example.invalid/termin',hasPriorConversation:false,hasPriorReply:false,identityAsked:false,preview:false,budgetMs:17000,...over});
-const answer=(over:Record<string,unknown>={})=>({answer:'Das ist unangenehm. Bitte rufen Sie bei Schmerzen direkt in der Praxis an. Für welchen Patienten schreiben Sie?',team:true,summary:'Defekte Apparatur, Schmerzen, früheren Termin klären.',identityQuestion:true,substantive:true,nonPatient:false,...over});
+const answer=(over:Record<string,unknown>={})=>({answer:'Das ist unangenehm. Bitte rufen Sie bei Schmerzen direkt in der Praxis an. Für welchen Patienten schreiben Sie?',team:true,summary:'Defekte Apparatur, Schmerzen, früheren Termin klären.',identityQuestion:true,substantive:true,nonPatient:false,closing:false,...over});
 const valid={hard:[],repair:[]};
 function model(...answers:unknown[]){const calls:any[]=[];const generate:Generate=async call=>{calls.push(call);return call.schema.parse(answers.shift());};return {generate,calls};}
 test('unlinked pain patient is not excluded; only configured team, groups and non-patients are excluded',async()=>{
@@ -19,7 +19,7 @@ test('unlinked pain patient is not excluded; only configured team, groups and no
 });
 test('empty, reaction and acknowledgments never call the model, first sticker greets once',async()=>{
  const fail:Generate=async()=>{throw Error('must not call model');};
- for(const [messageType,message] of [['text',''],['unsupported',''],['reaction','👍'],['text','Danke'],['text','Ok'],['sticker','']]){
+ for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke'],['text','Ok'],['sticker','']]){
   const result=await runRetrievalReply(fail,input({messageType,message,hasPriorConversation:true,hasPriorReply:true}));
   assert.equal(result.skipSend,true);assert.equal(result.action,'antworten');assert.equal(result.text,'');
  }
@@ -32,7 +32,7 @@ test('system answers are not facts; missing team time is repaired before checkin
  assert.deepEqual(m.calls.map(c=>c.stage),['compose','verify']);
 });
 test('repairable critique gets exactly one repair; medical and invented booking output never passes',async()=>{
- const m=model(answer(),{hard:[],repair:['Keine erneute Onlinebuchung anbieten.']},answer({answer:'Ich gebe Ihren Wunsch nach einem früheren Termin konkret ans Team. Für welchen Patienten schreiben Sie?'}),valid);
+ const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team. Für welchen Patienten schreiben Sie?'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Ich gebe Ihren Wunsch nach einem früheren Termin konkret ans Team. Für welchen Patienten schreiben Sie?'}),valid);
  const result=await runRetrievalReply(m.generate,input());assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);
  const bad=model(answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}),answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}));
  assert.equal((await runRetrievalReply(bad.generate,input())).skipSend,true);
@@ -63,13 +63,13 @@ test('the source ledger reflects the structured input, including when the verifi
  assert.equal(prompt.gold.length,1);
  assert.equal(prompt.praxisfaelle.length,1);
  assert.equal(withheld.skipSend,true);
- assert.equal(withheld.repairs,0);
+ assert.equal(withheld.repairs,1);
  assert.equal(withheld.retrieved.knowledge.length,8);
  assert.deepEqual(withheld.retrieved.knowledge[0],{kind:'knowledge',ref:'knowledge-0',version:3,date:'2026-11-23T00:00:00Z',preview:true});
  assert.equal(withheld.retrieved.gold[0]?.ref,'gold-1');
  assert.equal(withheld.retrieved.rule[0]?.ref,'rule-1');
  assert.equal(withheld.retrieved.history[0]?.ref,'history-1');
- assert.equal(simulation.calls[1].reasoning,'low');
+ assert.equal(simulation.calls[1].reasoning,'none');
  const verify=JSON.parse(simulation.calls[1].prompt);
  assert.equal('gold' in verify,false);
  assert.equal('used' in verify.antwort,false);
@@ -80,7 +80,7 @@ test('the source ledger reflects the structured input, including when the verifi
 });
 
 test('a repairable review gets one rewrite without a citation requirement',async()=>{
- const m=model(answer(),{hard:[],repair:['Entfernen Sie den wiederholten Buchungslink.']},answer(),valid);
+ const m=model(answer({team:false,answer:'Das Team meldet sich bei Ihnen. Für welchen Patienten schreiben Sie?'}),{hard:[],repair:[{issue:'team_handoff',quote:'Das Team meldet sich bei Ihnen.'}]},answer(),valid);
  const result=await runRetrievalReply(m.generate,input());
  assert.equal(result.skipSend,undefined);
  assert.equal(result.repairs,1);
@@ -102,9 +102,42 @@ test('an outgoing acknowledgment closes a historical pair, never borrows a later
  assert.equal(docs.length,0);
 });
 
-test('a detailed repair instruction is not a schema failure',async()=>{
- const m=model(answer(),{hard:[],repair:['Bitte die Antwort konkret korrigieren. '.repeat(8)]},answer(),valid);
+test('a repair needs a verbatim quote and cannot dispute an already enabled handoff',async()=>{
+ for(const draft of [answer(),answer({team:false})]){
+  const m=model(draft,{hard:[],repair:[{issue:'team_handoff',quote:'Dieses erfundene Zitat steht nicht in der Antwort.'}]});
+  const result=await runRetrievalReply(m.generate,input());
+  assert.equal(result.skipSend,undefined);assert.equal(result.repairs,0);
+ }
+});
+
+test('thanks with closing wishes stay quiet; a new request after thanks remains actionable',()=>{
+ for(const message of ['Vielen Dank! Ich wünsche Ihnen einen schönen Abend','Danke für Ihre Hilfe.','Danke, Ihnen auch!','Schönes Wochenende!']){
+  assert.equal(retrievalPreflight(input({message,hasPriorConversation:true}))?.rule,'social:acknowledged');
+ }
+ assert.equal(retrievalPreflight(input({message:'Danke! Der Draht piekst aber noch.'})),null);
+});
+
+
+test('a semantic closing recognized by the core stays quiet and creates no clarification case',async()=>{
+ const m=model(answer({closing:true,answer:'',team:false,summary:null,substantive:false,identityQuestion:false}));
+ const result=await runRetrievalReply(m.generate,input({message:'Perfekt, das trage ich mir so ein. Besten Dank!'}));
+ assert.equal(result.action,'antworten');assert.equal(result.rule,'social:acknowledged');assert.equal(result.skipSend,true);
+ assert.equal(m.calls.length,1);
+});
+
+
+test('an unsafe draft may be rewritten once, but only the independently checked safe answer is returned',async()=>{
+ const m=model(answer({answer:'Ich habe Ihren Termin gebucht.'}),answer(),valid);
  const result=await runRetrievalReply(m.generate,input());
- assert.equal(result.skipSend,undefined);
- assert.equal(result.repairs,1);
+ assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);assert.doesNotMatch(result.text,/gebucht/);
+});
+
+test('unknown patients get one identity question even when the useful draft asks none',async()=>{
+ const m=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
+ const result=await runRetrievalReply(m.generate,input());
+ assert.equal(result.identityQuestion,true);assert.equal(result.text.match(/\?/g)?.length,1);
+ assert.match(result.text,/Für welchen Patienten schreiben Sie\?/);
+ const already=model(answer({answer:'Bitte rufen Sie wegen der Schmerzen direkt in der Praxis an.',identityQuestion:false}),valid);
+ const second=await runRetrievalReply(already.generate,input({identityAsked:true}));
+ assert.doesNotMatch(second.text,/Für welchen Patienten/);
 });

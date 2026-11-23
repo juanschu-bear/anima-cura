@@ -9,7 +9,7 @@ const {syncRetrievalSources,upsertRetrievalDocuments}=await import('../src/lib/s
 const [sourcePath,tenant,humanBefore]=process.argv.slice(2);
 if(!sourcePath||!tenant||!Number.isFinite(Date.parse(humanBefore)))throw Error('Usage: PRIVATE_EXPORT TENANT HUMAN_BEFORE');
 const data=JSON.parse(readFileSync(sourcePath,'utf8'));
-const names=data.names.flatMap((p:any)=>[p.vorname??'',p.nachname??'']);
+const names=[...data.names.flatMap((p:any)=>[p.vorname??'',p.nachname??'']),...(data.additionalNames??[])];
 const source=data.archive??data.history;
 if(!Array.isArray(data.staffPhones))throw Error('Configured staffPhones must be included in the private export');
 if(!data.chatPhones)throw Error('LID phone mappings must be included in the private export');
