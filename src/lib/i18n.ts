@@ -124,6 +124,7 @@ const translations: Record<string, { de: string; en: string; es?: string }> = {
   'animahost.quality.financial_reminder_due':{de:'Die Erinnerung betrifft die Rechnung vom {date}. Sie war am {due} fällig. Den aktuellen Stand sehen Sie im Portal unter „Zahlungen“. Haben Sie inzwischen bezahlt, müssen Sie nichts weiter tun.',en:'The reminder is for the invoice dated {date}. It was due on {due}. You’ll find the current status under Payments in the portal.',es:'El aviso corresponde a la factura del {date}, con vencimiento el {due}. Puede consultar el estado en «Pagos».'},
   'animahost.whatsapp.clarify': {de:'Die Praxis prüft Ihre Nachricht und meldet sich.',en:'The practice will review your message and get back to you.'},
   'animahost.whatsapp.askTopic': {de:'Wie kann ich Ihnen helfen?',en:'How can I help you?'},
+  'animahost.whatsapp.first_signal_greeting': {de:'Guten Tag! Wie kann ich Ihnen helfen?',en:'Hello! How can I help you?',es:'¡Hola! ¿En qué puedo ayudarle?'},
   'animahost.whatsapp.identify_sender': {de:'Guten Tag, darf ich fragen, wer schreibt und worum es geht?',en:'Hello, may I ask who is writing and how we can help?',es:'Hola, ¿podría decirnos quién escribe y en qué podemos ayudarle?'},
   'animahost.whatsapp.sender_team': {de:'Eine Nachricht von einer Praxisnummer. Das Praxisteam übernimmt.',en:'A message from a practice number. The practice team will handle it.'},
   'animahost.whatsapp.sender_group': {de:'Eine Nachricht aus einer WhatsApp-Gruppe. Das Praxisteam übernimmt.',en:'A WhatsApp group message for the practice team.'},

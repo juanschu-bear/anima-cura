@@ -25,6 +25,7 @@ import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitR
 
 import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,unlinkedSubjectPlan,unlinkedAppointmentReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
 import {classifySender,quietSenderRule,unknownSenderDecision} from '@/lib/services/animahost-sender-policy';
+import {silentSocialRule,socialReply} from '@/lib/services/animahost-conversation-signals';
 import {runChain} from '@/lib/services/animahost-chain';
 import {gatewayGenerate} from '@/lib/services/animahost-chain-model';
 import {loadDossier} from '@/lib/services/animahost-dossier';
@@ -39,6 +40,7 @@ const inputSchema=z.object({
  from:z.string().min(3).max(254),text:z.string().max(4000).nullable(),
  messageType:z.enum(['text','image','audio','document','sticker','video','album','reaction','edit','poll','view_once_image','view_once_audio','view_once_video','view_once_document','view_once_sticker','view_once_unsupported','unsupported']),
  receivedAt:z.string().datetime({offset:true}),
+ hasPriorConversation:z.boolean().optional(),hasPriorReply:z.boolean().optional(),
  identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
 }).strict();
 type StoredDecision={action:'antworten'|'klaerfall'|'notfall';patient_text:string;rule_id:string;case_details?:ChatDetails|null};
@@ -93,7 +95,7 @@ function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'t
  const note=(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
- return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||decision.rule==='chain:guard_rejected'?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
+ return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
   ...(note?{disposition:'vermerk'}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 
@@ -116,11 +118,14 @@ export async function POST(request:NextRequest){
  const input={...parsed.data,text:parsed.data.text?.trim()||null};
  if(process.env.ANIMAHOST_TENANT_ID&&input.tenantId!==process.env.ANIMAHOST_TENANT_ID)
   return NextResponse.json({code:'not_authorized'},{status:403});
+ const past=recentConversation(input.history??[],input.receivedAt);
+ const social=socialReply({...input,hasPriorConversation:input.hasPriorConversation===true||past.length>0,
+  hasPriorReply:input.hasPriorReply===true||past.some(item=>item.direction==='outgoing')});
+ if(social&&silentSocialRule.test(social))return decisionResponse({action:'antworten',rule:social,text:''});
  if(input.text)input.messageType='text';
  const db=createServerClient();
  const deadline=Date.now()+17_000;
- const history=recentConversation(input.history??[],input.receivedAt)
-  .map(item=>({...item,text:maskBirthDates(item.text)}));
+ const history=past.map(item=>({...item,text:maskBirthDates(item.text)}));
  const references=referenceHistory(input.text??'',history,input.receivedAt);
  try{
   const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',input.tenantId).maybeSingle();
@@ -132,6 +137,11 @@ export async function POST(request:NextRequest){
   const earlySender=input.senderPolicy===1?classifySender({jid:input.from,trustedPhone,hasPatient:false,
    practicePhone:practice.practice_phone,teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES}):'patient';
   const quiet=earlySender==='team'||earlySender==='group'||earlySender==='non_patient';
+  if(social==='begruessung-ohne-anliegen'){
+   if(quiet||input.handoffOnly||/@g\.us$/.test(input.from))
+    return decisionResponse({action:'antworten',rule:'social:acknowledged',text:''});
+   return decisionResponse({action:'antworten',rule:social,text:t('animahost.whatsapp.first_signal_greeting','de')},'template');
+  }
   const patientMatches=!quiet&&qualityAvailable&&trustedPhone?await phonePatients(db,trustedPhone).catch(()=>null):null;
   const existing=await db.from('animahost_whatsapp_decisions')
    .select(qualityAvailable?'action,patient_text,rule_id,case_details':'action,patient_text,rule_id')
