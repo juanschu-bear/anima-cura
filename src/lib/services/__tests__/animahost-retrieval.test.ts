@@ -45,6 +45,15 @@ test('previous system answers are not facts and no team time is appended',async(
  assert.doesNotMatch(result.text,/heute noch/);assert.doesNotMatch(m.calls[0].prompt,/UNTRUSTED/);assert.match(m.calls[0].prompt,/keine Uhrzeit/);
  assert.deepEqual(m.calls.map(c=>c.stage),['compose','verify']);
 });
+test('a standard handoff is rewritten and the team interval is available only when asked',async()=>{
+ const m=model(answer({answer:'Ich gebe Ihren Wunsch an das Praxisteam weiter.'}),answer(),valid);
+ const result=await runRetrievalReply(m.generate,input());
+ assert.equal(result.repairs,1);assert.doesNotMatch(result.text,/weiter|heute noch/);
+ assert.equal(JSON.parse(m.calls[0].prompt).rueckmeldezeit,null);
+ const asked=model(answer({answer:'Der Empfang prüft die Terminverfügbarkeit und meldet sich heute noch.'}),valid);
+ await runRetrievalReply(asked.generate,input({message:'Wann meldet sich die Praxis wegen meines Termins?'}));
+ assert.equal(JSON.parse(asked.calls[0].prompt).rueckmeldezeit,'heute noch');
+});
 test('repairable critique gets exactly one repair; medical and invented booking output never passes',async()=>{
  const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Der Empfang prüft, ob ein früherer Termin frei ist.'}),valid);
  const result=await runRetrievalReply(m.generate,input());assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);
