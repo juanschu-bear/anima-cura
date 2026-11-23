@@ -20,7 +20,18 @@ test('the actual draft preserves every source, optional field and editorial iden
  assert.equal(entries.filter(item=>item.metadata.sourceApprovalNote).length,9);
  assert.equal(new Set(entries.flatMap(item=>item.metadata.sources??[]).map(ref=>ref.key)).size,11);
  assert.equal(entries.filter(item=>item.area==='gespraech').length,4);
- assert.equal(entries.filter(item=>item.source==='offen').length,1);
+ assert.equal(entries.filter(item=>item.source==='offen').length,0);
+ assert.equal(entries.find(item=>item.metadata.originalSource==='offen')?.source,'praxis');
+ for(const item of raw.eintraege){
+  const imported=entries.find(row=>row.externalId===item.id)!;
+  assert.equal(imported.metadata.guidance?.selfHelp,item.selbsthilfe);
+  assert.equal(imported.metadata.guidance?.practice,item.praxis);
+  assert.equal(imported.metadata.guidance?.reception,item.rezeption);
+  assert.equal(imported.metadata.guidance?.warningSigns,item.warnzeichen);
+  assert.equal(imported.metadata.openQuestion,item.offen??null);
+  assert.equal(imported.metadata.sourceApprovalNote,item.freigabe??null);
+  assert.deepEqual(imported.metadata.sources?.map(ref=>ref.key),[...new Set(item.quellen??[])]);
+ }
  const first=entries[0];
  assert.equal(first.metadata.guidance?.reception,raw.eintraege[0].rezeption);
  assert.deepEqual(parseKfoImport({...raw,eintraege:[...raw.eintraege].reverse()}).entries.map(item=>item.id).reverse(),entries.map(item=>item.id));

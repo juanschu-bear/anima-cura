@@ -30,12 +30,12 @@ export function parseKfoImport(input:unknown){
    if(!reference)throw Error('knowledge_reference_missing');
    return reference;
   });
-  const draft=knowledgeDraft.parse({area:item.bereich,title:item.titel,content:item.inhalt,source:item.quelle,
+  const draft=knowledgeDraft.parse({area:item.bereich,title:item.titel,content:item.inhalt,source:item.quelle==='offen'?'praxis':item.quelle,
    validFrom:source.stand,sources,guidance:{selfHelp:item.selbsthilfe,practice:item.praxis,reception:item.rezeption,warningSigns:item.warnzeichen},
    openQuestion:item.offen??null});
   return {id:rowId(item.id),externalId:item.id,area:draft.area,title:draft.title,content:draft.content,source:draft.source,
    validFrom:draft.validFrom,metadata:{sources:draft.sources,guidance:draft.guidance,openQuestion:draft.openQuestion,
-    sourceApprovalNote:item.freigabe??null,importVersion:source.version,importDate:source.stand}};
+    sourceApprovalNote:item.freigabe??null,originalSource:item.quelle,importVersion:source.version,importDate:source.stand}};
  });
  return {fileVersion:source.version,fileDate:source.stand,entries};
 }

@@ -26,9 +26,9 @@ const guard=(reply:string,over:Partial<ChainInput>={},flags={team:false,asksIden
 
 /** Ein gespieltes Modell: liefert der Reihe nach die vorbereiteten Antworten und merkt sich, was es gefragt wurde. */
 function model(...answers:unknown[]){
- const calls:{system:string;prompt:Record<string,unknown>}[]=[];
- const generate:Generate=async<T,>(call:{system:string;prompt:string;schema:z.ZodType<T>})=>{
-  calls.push({system:call.system,prompt:JSON.parse(call.prompt)});
+ const calls:{stage?:'compose'|'verify';system:string;prompt:Record<string,unknown>}[]=[];
+ const generate:Generate=async<T,>(call:{stage?:'compose'|'verify';system:string;prompt:string;schema:z.ZodType<T>})=>{
+  calls.push({stage:call.stage,system:call.system,prompt:JSON.parse(call.prompt)});
   const next=answers.shift();
   if(next instanceof Error)throw next;
   return call.schema.parse(next);
@@ -217,4 +217,16 @@ test('Die Kette gibt dem Modell die Schreibweise der Praxis mit: kurz, ohne GruÃ
  const sent=JSON.parse(prompts[0]);
  assert.match(sent.schreibweise.laenge,/10 bis 30 WÃ¶rter/);
  assert.match(sent.schreibweise.ende,/keine Unterschrift/);
+});
+
+
+test('fast composition still requires an independent verification before any reply is accepted',async()=>{
+ const candidate=model(draft('Hallo.'),fine);
+ const result=await runChain(candidate.generate,input({message:'Hallo'}));
+ assert.equal(result.ok,true);
+ assert.deepEqual(candidate.calls.map(call=>call.stage),['compose','verify']);
+ const failed=model(draft('Hallo.'),new Error('verifier unavailable'));
+ const withheld=await runChain(failed.generate,input({message:'Hallo'}));
+ assert.equal(withheld.ok,false);
+ assert.equal(!withheld.ok&&withheld.reason,'model_failed');
 });

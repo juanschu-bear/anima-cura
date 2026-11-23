@@ -33,5 +33,5 @@ export function knowledgeRecord(row:Record<string,unknown>){
   validFrom:row.valid_from,approvedAt:row.approved_at,approvedBy:row.approved_by,
   createdAt:row.created_at,createdBy:row.created_by,externalId:row.external_id??null,sources:metadata.sources??[],
   guidance:metadata.guidance??{},openQuestion:metadata.openQuestion??null,hasOpenQuestion:typeof metadata.openQuestion==='string',
-  sourceApprovalNote:metadata.sourceApprovalNote??null,importVersion:metadata.importVersion??null,importDate:metadata.importDate??null};
+  sourceApprovalNote:metadata.sourceApprovalNote??null,originalSource:metadata.originalSource??null,importVersion:metadata.importVersion??null,importDate:metadata.importDate??null};
 }

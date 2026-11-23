@@ -35,6 +35,7 @@ type KnowledgeVersion = KnowledgeDraft & {
   externalId: string | null
   hasOpenQuestion: boolean
   sourceApprovalNote: string | null
+  originalSource: string | null // ursprüngliche Quelle der Importdatei
   importVersion: string | null
   importDate: string | null
 }
@@ -77,3 +78,9 @@ Die Antwort liefert `counts` für `content`, `handoff_only`, `no_reply`, `unrate
 - Bei welchen Anliegen soll der Patient zwischen festem Termin, Besuch mit Wartezeit und Rückruf wählen können? Wer übernimmt den Rückruf, wenn ein Anliegen besonders dringend ist?
 
 Solange für eine Option keine freigegebene Quelle vorliegt, bekommt die Praxis den offenen Teil der Frage.
+
+## Ergänzung 23.11.: Import und Laufzeit
+
+`quelle:offen` wird beim Import als `source:praxis` gespeichert; `metadata.originalSource` und das gleichnamige Antwortfeld bewahren den ursprünglichen Wert. Wie alle Importe startet der Eintrag als Entwurf ohne Freigabe. `gespraech` bleibt ein eigener Bereich durch Migration 104; Migration 103 bleibt unverändert. Die getrennten `guidance`-Felder werden als strukturierte Objekte an das Modell gegeben. Quellen, offene Fragen und Freigabevermerke bleiben im versionierten Datensatz erhalten; sie werden nicht zu freigegebenen Tatsachen umgedeutet.
+
+Der Probelauf ergänzt `timings:{contextMs,modelMs}` und pro Modellaufruf `stage`, `reasoning`, `promptChars` und `systemChars`. Diese Angaben enthalten keine Nachrichtentexte. `contextMs` misst das Laden bis zum Modellstart, `modelMs` die gesamte Antwortkette einschließlich Gegenprüfung/Korrektur. `ms` bleibt die Gesamtdauer.

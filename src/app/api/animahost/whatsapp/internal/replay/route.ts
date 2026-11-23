@@ -48,22 +48,26 @@ export async function POST(request:NextRequest){
  const input=parsed.data,started=Date.now();
  try{
   const db=createServerClient();
-  const settings=await db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).maybeSingle();
+  const now=input.at??new Date().toISOString();
+  const [settings,patients,confirmed]=await Promise.all([
+   db.from('animahost_whatsapp_settings').select('*').eq('tenant_id',tenant).maybeSingle(),
+   input.phone?phonePatients(db,input.phone).then(value=>value??[]).catch(()=>[]):Promise.resolve([]),
+   db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid).lte('verified_at',now),
+  ]);
   if(settings.error||!settings.data?.active_rulebook_version)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
   const practice=settings.data;
-  const version=await db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',tenant).eq('version',practice.active_rulebook_version).single();
-  const rules=whatsappRulesSchema.safeParse(version.data?.rules);
-  if(version.error||!rules.success)return NextResponse.json({code:'rulebook_unavailable'},{status:503,headers});
-  const patients=input.phone?await phonePatients(db,input.phone).catch(()=>null)??[]:[];
-  const now=input.at??new Date().toISOString();
-  const confirmed=await db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',tenant).eq('chat_jid',input.chatJid).lte('verified_at',now);
+
   const language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text)?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text)?'es':'de';
   const draft=input.knowledgeMode==='draft_preview'?bundledKfoPreview():null;
-  const [dossier,knowledge]=await Promise.all([
+  const [dossier,knowledge,version]=await Promise.all([
    loadDossier(db,{patients,verifiedIds:(confirmed.data??[]).map(row=>row.patient_id),today:appointmentLocalDate(now)}),
    draft?Promise.resolve({available:true,entries:draft.entries}):activeKnowledge(db,tenant,appointmentLocalDate(new Date().toISOString())),
+   db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',tenant).eq('version',practice.active_rulebook_version).single(),
   ]);
+  const rules=whatsappRulesSchema.safeParse(version.data?.rules);
+  if(version.error||!rules.success)return NextResponse.json({code:'rulebook_unavailable'},{status:503,headers});
+  const contextMs=Date.now()-started;
   const calls:ModelCall[]=[];
   const result=await runChain(gatewayGenerate(practice.model,request.signal,call=>calls.push(call)),{
    message:maskBirthDates(input.text),language,informal:false,
@@ -74,6 +78,6 @@ export async function POST(request:NextRequest){
    baseline:null,budgetMs:45_000});
   return NextResponse.json({result,file:{sender:dossier.sender,patients:dossier.patients.length,confirmed:dossier.patients.filter(patient=>patient.verified).length},
    model:practice.model,rulebookVersion:practice.active_rulebook_version,knowledgeAvailable:knowledge.available,
-   knowledgeMode:input.knowledgeMode,knowledgeFileVersion:draft?.fileVersion??null,calls,ms:Date.now()-started},{headers});
+   knowledgeMode:input.knowledgeMode,knowledgeFileVersion:draft?.fileVersion??null,calls,timings:{contextMs,modelMs:result.ms},ms:Date.now()-started},{headers});
  }catch{return NextResponse.json({code:'replay_unavailable'},{status:503,headers});}
 }
