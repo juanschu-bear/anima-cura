@@ -24,6 +24,7 @@ import {explicitlyOffersDu,maskBirthDates,parseBirthDate,phoneLabels,phonePatien
 import {invoicePortalIntent,qualityWorkflow,selfServiceReply,styleMessage,visitReply,type ChatDetails} from '@/lib/services/animahost-quality-workflows';
 
 import {applicableMessageRules,practiceMessageHandoff,personRequest,personRequestReply,unlinkedSubjectPlan,unlinkedAppointmentReply,combinedMessageWorkflow,appointmentConcern,practiceSummary,messageConcerns} from '@/lib/services/animahost-message-concerns';
+import {classifySender,quietSenderRule,unknownSenderDecision} from '@/lib/services/animahost-sender-policy';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -34,7 +35,7 @@ const inputSchema=z.object({
  from:z.string().min(3).max(254),text:z.string().max(4000).nullable(),
  messageType:z.enum(['text','image','audio','document','sticker','video','album','reaction','edit','poll','view_once_image','view_once_audio','view_once_video','view_once_document','view_once_sticker','view_once_unsupported','unsupported']),
  receivedAt:z.string().datetime({offset:true}),
- identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),
+ identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
 }).strict();
 type StoredDecision={action:'antworten'|'klaerfall'|'notfall';patient_text:string;rule_id:string;case_details?:ChatDetails|null};
 const lookupSchema=z.strictObject({action:z.literal('phone_lookup'),tenantId:z.string().uuid(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/)});
@@ -88,7 +89,7 @@ function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'t
  const note=(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
- return NextResponse.json({...decision,...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
+ return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
   ...(note?{disposition:'vermerk'}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 
@@ -109,6 +110,8 @@ export async function POST(request:NextRequest){
  const parsed=inputSchema.safeParse(body);
  if(!parsed.success)return NextResponse.json({code:'invalid_request'},{status:400});
  const input={...parsed.data,text:parsed.data.text?.trim()||null};
+ if(process.env.ANIMAHOST_TENANT_ID&&input.tenantId!==process.env.ANIMAHOST_TENANT_ID)
+  return NextResponse.json({code:'not_authorized'},{status:403});
  if(input.text)input.messageType='text';
  const db=createServerClient();
  const deadline=Date.now()+17_000;
@@ -122,16 +125,38 @@ export async function POST(request:NextRequest){
   const qualityAvailable=Array.isArray(practice.team_reply_days);
   const replySchedule={teamReplyDays:practice.team_reply_days??[1,2,3,4,5],closurePeriods:practice.closure_periods??[]};
   const trustedPhone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
-  const patientMatches=qualityAvailable&&trustedPhone?await phonePatients(db,trustedPhone).catch(()=>null):null;
+  const earlySender=input.senderPolicy===1?classifySender({jid:input.from,trustedPhone,hasPatient:false,
+   practicePhone:practice.practice_phone,teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES}):'patient';
+  const quiet=earlySender==='team'||earlySender==='group'||earlySender==='non_patient';
+  const patientMatches=!quiet&&qualityAvailable&&trustedPhone?await phonePatients(db,trustedPhone).catch(()=>null):null;
   const existing=await db.from('animahost_whatsapp_decisions')
    .select(qualityAvailable?'action,patient_text,rule_id,case_details':'action,patient_text,rule_id')
    .eq('tenant_id',input.tenantId).eq('message_id',input.messageId).maybeSingle();
   if(existing.error)throw Error('decision_read_failed');
   if(existing.data){
+   if(quiet)return decisionResponse({action:'klaerfall',text:'',rule:`sender:${earlySender}`});
    const saved=existing.data as unknown as StoredDecision;
    const decision={action:saved.action,text:saved.patient_text,rule:saved.rule_id};
    await notifyPractice(db,input.tenantId,input.messageId,decision,saved.case_details);
    return decisionResponse(decision,undefined,patientMatches?phoneLabels(patientMatches):undefined,saved.case_details,replySchedule);
+  }
+  if(quiet||input.senderPolicy===1&&!(patientMatches?.length||input.staffPatientIds?.length||input.identity)){
+   let decision:WhatsAppDecision={action:'klaerfall',text:'',rule:`sender:${earlySender}`};
+   if(!quiet){
+    const prior=await db.from('animahost_whatsapp_decisions').select('rule_id').eq('tenant_id',input.tenantId)
+     .eq('sender_jid',input.from).eq('rule_id','sender:identify').limit(1).maybeSingle();
+    const locale=/\b(?:hello|please|hi|my|where)\b/i.test(input.text??'')?'en':/[¿¡]|\bhola\b/i.test(input.text??'')?'es':'de';
+    decision=unknownSenderDecision(Boolean(prior.error||prior.data||input.handoffOnly||(!patientMatches&&trustedPhone)),
+     t('animahost.whatsapp.identify_sender',locale));
+   }
+   const summary=t(`animahost.whatsapp.${quiet?'sender_'+earlySender:'sender_unknown'}`,'de');
+   const details:ChatDetails={patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:decision.rule,practiceSummary:summary};
+   const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
+    sender_jid:input.from,action:decision.action,patient_text:decision.text,rule_id:decision.rule,
+    rulebook_version:practice.active_rulebook_version,...(qualityAvailable?{case_details:details}:{})});
+   if(saved.error&&saved.error.code!=='23505')throw Error('decision_store_failed');
+   await notifyPractice(db,input.tenantId,input.messageId,decision,details);
+   return decisionResponse(decision,'template',undefined,details,replySchedule);
   }
   const tolerance=appointmentToleranceSchema.safeParse(practice.appointment_tolerance);
   const lateLanguage=/\b(?:später|verspät\w*|erst um|statt um|schaff.{0,18}nicht.{0,45}kann.{0,15}kommen|running late|minutes late|llegar.{0,20}tarde)/i.test(input.text??'');
