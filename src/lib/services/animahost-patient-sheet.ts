@@ -38,7 +38,8 @@ export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:Pho
  const put=(key:string,value:unknown)=>{sheet.context[key]=value??'unbekannt';sheet.fields[key]=value==null?'unavailable':Array.isArray(value)&&!value.length||value===''?'empty':'filled';};
  const normalize=(v:unknown)=>String(v??'').replace(/\D/g,'').replace(/^00/,'').replace(/^0/,'49');
  const parent=patient&&input.phone?[['versicherter',patient.versicherter_telefon],['eb2',patient.eb2_telefon]].find(([,phone])=>phone&&normalize(phone)===normalize(input.phone)):null;
- put('schreibendePerson',{rolle:parent?'Elternteil':dossier.sender==='patient'?'Patient':'Zuordnung als Elternteil nicht belegt',name:parent?[patient[parent[0]+'_vorname'],patient[parent[0]+'_nachname']].filter(Boolean).join(' '):null,patient:p.vorname+' '+p.nachname});
+ const ownPhone=patient&&input.phone&&[patient.telefon,patient.mobiltelefon].some(phone=>phone&&normalize(phone)===normalize(input.phone));
+ put('schreibendePerson',{rolle:parent?'Elternteil':ownPhone||dossier.sender==='patient'?'Patient':'Zuordnung als Elternteil nicht belegt',name:parent?[patient[parent[0]+'_vorname'],patient[parent[0]+'_nachname']].filter(Boolean).join(' '):null,patient:p.vorname+' '+p.nachname});
  put('akte',dossierForModel(dossier).akte);
  put('apparatur',patient?.behandlung||null);put('behandlungsart',patient?.behandlungsart||null);put('behandlungsphasen',phases);
  const planned=appointments?.filter((r:any)=>['geplant','erwartet','eingecheckt','in_behandlung'].includes(r.status)&&r.datum>=input.today).sort((a:any,b:any)=>(a.datum+' '+a.uhrzeit).localeCompare(b.datum+' '+b.uhrzeit));

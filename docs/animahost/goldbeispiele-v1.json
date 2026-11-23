@@ -100,35 +100,46 @@
       }
     },
     {
-      "id": "gold-unklar-link",
+      "id": "gold-unklar-link-du",
       "area": "gespraech",
       "topic": "unklarer Eingang",
       "anliegen": "https://beispiel.invalid",
-      "kontext": "Unklarer Eingang. Frau Beispiel ist ein Platzhalter. Nur bekannte Namen übernehmen. Links nicht öffnen. Nach zwei versendeten Nachfragen ans Team.",
+      "kontext": "Patient schreibt selbst. Du-Form. Lockerer Anlass. Link nie öffnen.",
       "wissen": [],
-      "antwort": "Guten Abend Frau Beispiel, da ist nur ein Link bei mir angekommen und ich öffne von mir aus nichts Fremdes. Erzählen Sie mir kurz, worum es geht? Ich bin ganz Ohr.",
+      "antwort": "Hey, bei mir ist nur ein Link angekommen und ich klicke aus Prinzip auf nichts, was ich nicht kenne, mein Chef hat mich so erzogen. Was steckt dahinter?",
       "weitergabe": null,
       "stand": "2026-11-23"
     },
     {
-      "id": "gold-unklar-huhu",
+      "id": "gold-unklar-link-sie",
+      "area": "gespraech",
+      "topic": "unklarer Eingang",
+      "anliegen": "https://beispiel.invalid",
+      "kontext": "Elternteil schreibt. Sie-Form. Lockerer Anlass. Abend. Link nie öffnen.",
+      "wissen": [],
+      "antwort": "Guten Abend! Bei mir kam nur ein Link an, und fremde Links öffne ich grundsätzlich nicht, da bin ich eigen. Worum geht es denn? Dann helfe ich gern weiter.",
+      "weitergabe": null,
+      "stand": "2026-11-23"
+    },
+    {
+      "id": "gold-unklar-huhu-du",
       "area": "gespraech",
       "topic": "unklarer Eingang",
       "anliegen": "Huhu",
-      "kontext": "Unklarer Eingang. Frau Beispiel ist ein Platzhalter. Nur bekannte Namen übernehmen. Links nicht öffnen. Nach zwei versendeten Nachfragen ans Team.",
+      "kontext": "Patient schreibt selbst. Du-Form. Lockerer Anlass.",
       "wissen": [],
-      "antwort": "Huhu zurück! Schön, dass Sie schreiben. Was kann ich für Sie tun, geht es um einen Termin, die Spange oder etwas ganz anderes?",
+      "antwort": "Huhu zurück 👋 Was gibt's? Termin, Spange zwickt, oder einfach mal Hallo sagen? Alles erlaubt.",
       "weitergabe": null,
       "stand": "2026-11-23"
     },
     {
-      "id": "gold-unklar-zweite-runde",
+      "id": "gold-unklar-zweite-runde-du",
       "area": "gespraech",
       "topic": "unklarer Eingang",
       "anliegen": "Weiterhin unklar nach erster Nachfrage",
-      "kontext": "Unklarer Eingang. Frau Beispiel ist ein Platzhalter. Nur bekannte Namen übernehmen. Links nicht öffnen. Nach zwei versendeten Nachfragen ans Team.",
+      "kontext": "Patient schreibt selbst. Du-Form. Lockerer Anlass. Erst danach als dritten Schritt ans Team.",
       "wissen": [],
-      "antwort": "Ich steh noch auf dem Schlauch, aber ich bin offen für Neues: Schreiben Sie mir einfach in 1 Satz, was Sie brauchen, dann kümmere ich mich.",
+      "antwort": "Okay, ich geb's zu, ich steh auf dem Schlauch. Schreib mir in einem Satz, was du brauchst, und ich leg los.",
       "weitergabe": null,
       "stand": "2026-11-23"
     }

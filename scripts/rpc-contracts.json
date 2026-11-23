@@ -617,7 +617,7 @@
     },
     {
       "file": "src/lib/services/animahost-retrieval.ts",
-      "sha256": "4f91605f604c7c2e92cde3a15227c510aaba839298a7aed91deefcba38683e3d",
+      "sha256": "6e8d02392ab0121903de90eda8a652f458736fd15b9cc9395d230110c0b95ea0",
       "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
       "calls": [
         {

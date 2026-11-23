@@ -75,7 +75,7 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));
  if(unclearInput(message,'text')||!message.trim()){
-  const examples=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).in('ref',['gold-unklar-link','gold-unklar-huhu','gold-unklar-zweite-runde']);
+  const examples=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).in('ref',['gold-unklar-link-du','gold-unklar-link-sie','gold-unklar-huhu-du','gold-unklar-zweite-runde-du']);
   if(examples.error)throw Error('retrieval_gold_unavailable');
   for(const doc of examples.data as RetrievalDocument[]){const i=documents.findIndex(d=>d.kind==='gold'&&d.ref===doc.ref);if(i>=0)documents.splice(i,1);documents.unshift(doc);}
  }

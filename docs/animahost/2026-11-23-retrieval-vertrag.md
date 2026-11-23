@@ -64,7 +64,7 @@ Stille Reaktionen, leere Nachrichten und Abschlüsse sind erwartete Ergebnisse, 
 
 ## Aktivierung nach Juans Abnahme
 
-Cura: `ANIMAHOST_RETRIEVAL_PASSED=true`. AnimaLine-Daemon: `ANIMALINE_RETRIEVAL_POLICY=1` (keine alten Themen-Fallbacks oder automatischen Folgeantworten). Beide bleiben bis zur Freigabe aus. Der bisherige Kern bleibt nur für die noch aktive Strecke und als Rücknahmeweg im Code. Die neue Strecke umgeht dessen Klassifikation, Workflows und Nachbearbeitung vollständig. Ein Fehler erzeugt keinen erfundenen Ersatztext.
+Cura: `ANIMAHOST_RETRIEVAL_PASSED=true`. AnimaLine-Daemon: `ANIMALINE_RETRIEVAL_POLICY=1` (keine alten Themen-Fallbacks oder automatischen Folgeantworten). Die Praxis hat beide Schalter am 23.11.2026 für Production freigegeben. Der bisherige Kern bleibt nur für die noch aktive Strecke und als Rücknahmeweg im Code. Die neue Strecke umgeht dessen Klassifikation, Workflows und Nachbearbeitung vollständig. Ein Fehler erzeugt keinen erfundenen Ersatztext.
 
 Die Architektur benötigt keine Neukopplung von WhatsApp. Historienimport und Reaktionen bleiben vom automatischen Antwortversand getrennt.
 
@@ -77,3 +77,5 @@ Antwort: `runId`, `completedAt`, `mode`, `knowledge`, `planned`, `completed`, `c
 Je Fall: `ref`, `at` (Zeitpunkt des Eingangs), `input` (anonymisiert), `answer` (anonymisiert), `retrieved:{gold,knowledge,rule,history}`, `status`, `sendDelaySeconds`, `sendStatus`. Quellen behalten Referenz, Version und Datum. Es wurde im Probelauf nichts gesendet: `sendDelaySeconds:null`, `sendStatus:not_sent_dry_run`; Erzeugungslaufzeit niemals als Versandverzögerung anzeigen. Rohkennungen, Namen und Telefonnummern sind nicht enthalten.
 
 Unklare Eingänge: `conversation:clarify_first`, dann `conversation:clarify_second`, erst danach `conversation:outside_scope` mit ausgesprochener Übergabe ans Team. Zähler berücksichtigt tatsächlich im Verlauf versendete Nachfragen; eine inhaltliche Antwort setzt ihn zurück. Reaktionen/Dank bleiben still.
+
+Regelbuch v9 beschreibt Anrede und Ton. Das aus Patientenblatt und Nachricht gewählte `anrede` wird in den Modellkontext geschrieben. Eltern und erwachsene Begleitpersonen erhalten Sie, selbst schreibende Patienten du. Bei unklarer Rolle beginnt die Unterhaltung mit Sie. Nach der ersten Antwort richtet sich die Anrede nach dem Gegenüber. Ein einzelnes Emoji ist im lockeren Du erlaubt. Bei Schmerzen, Notfällen, Absagen und Rechnungen bleibt der Ton warm und gerade. Vier Goldbeispiele decken Link mit du, Link mit Sie, Huhu und die zweite Nachfrage ab.

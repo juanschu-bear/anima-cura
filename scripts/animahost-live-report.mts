@@ -17,7 +17,7 @@ const replies=await query('yucpobkmfvjsuuwtffvr',`select e.wamid,e.received_at,p
  round(extract(epoch from (o.sent_at-e.received_at))::numeric,1) as delay_seconds
  from animaline_planned_replies p join events e on e.id=p.source_event_id
  join animaline_outbound_messages o on o.tenant_id=p.tenant_id and o.provider_message_id=p.provider_message_id
- where p.tenant_id=${quoted(tenant)} and p.created_at>=${quoted(new Date(since).toISOString())} and p.state='sent' order by o.sent_at limit 10`);
+ where p.tenant_id=${quoted(tenant)} and e.received_at>=${quoted(new Date(since).toISOString())} and p.created_at>=${quoted(new Date(since).toISOString())} and p.state='sent' order by o.sent_at limit 10`);
 const names=await query('zymqxzhjbcxzhzvjqvbv',`select vorname,nachname,versicherter_vorname,versicherter_nachname,eb2_vorname,eb2_nachname from patients`);
 const additional=process.env.ANIMAHOST_REDACTION_NAMES_FILE?JSON.parse(readFileSync(process.env.ANIMAHOST_REDACTION_NAMES_FILE,'utf8')):[];
 const tokens=[...names.flatMap(p=>Object.values(p)),...additional].filter((s):s is string=>typeof s==='string');
@@ -26,7 +26,7 @@ if(replies.length){try{const settings=await query('zymqxzhjbcxzhzvjqvbv',`select
 const clean=(value:string)=>redactionPending?'[Text bis zur abgeschlossenen Namensprüfung zurückgehalten]':maskBirthDates(anonymizeRetrieval(value??'',tokens)).replace(/\|/g,'\\|');
 const evidence=replies.length?await query('zymqxzhjbcxzhzvjqvbv',`select message_id,architecture,evidence,timings from animahost_reply_evidence where tenant_id=${quoted(tenant)} and message_id in (${replies.map(r=>quoted(r.wamid)).join(',')})`):[];
 const berlin=(value:string)=>new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',dateStyle:'short',timeStyle:'medium'}).format(new Date(value));
-let report=`# Erste zehn Live-Antworten des neuen Kerns\n\nAktiviert: ${berlin(since)} (Europe/Berlin). Stand: ${berlin(new Date().toISOString())}.\n\nErfasst: **${replies.length}/10 tatsächlich versendete Antworten**. Nur echte Eingänge, keine künstlichen Patientennachrichten. Fehlende Antworten werden nicht durch Probeläufe ersetzt.\n\nProduction: ANIMAHOST_RETRIEVAL_PASSED=true und ANIMALINE_RETRIEVAL_POLICY=1. Keine Nachtpause. Drei Goldbeispiele für unklare Eingänge indexiert.\n\nCodeprüfungen: 119 AnimaHost-, 64 AnimaLine- und 303 AnimaDesk-Tests; Builds und 74 RPC-Berechtigungsprüfungen bestanden.\n`;
+let report=`# Erste zehn Live-Antworten des neuen Kerns\n\nAktiviert: ${berlin(since)} (Europe/Berlin). Stand: ${berlin(new Date().toISOString())}.\n\nErfasst: **${replies.length}/10 tatsächlich versendete Antworten**. Nur echte Eingänge, keine künstlichen Patientennachrichten. Fehlende Antworten werden nicht durch Probeläufe ersetzt.\n\nProduction: ANIMAHOST_RETRIEVAL_PASSED=true und ANIMALINE_RETRIEVAL_POLICY=1. Keine Nachtpause. Vier Goldbeispiele für unklare Eingänge.\n\n`;
 if(!replies.length)report+='\nNoch kein tatsächlicher Versand seit der Aktivierung beobachtet. Architektur und Patientenblatt sind deshalb noch nicht anhand einer Live-Antwort bestätigt.\n';
 for(const [i,r] of replies.entries()){
  const proof=evidence.find(e=>e.message_id===r.wamid);const sheet=proof?.timings?.patientSheet;
