@@ -8,7 +8,7 @@ import {decisionFromRule,emergencyDecision,resolveEmergency,explicitOptOut,manda
  renderWhatsAppRuleText,whatsappRulesSchema,type WhatsAppDecision} from '@/lib/services/animahost-whatsapp';
 import {appointmentLocalDate,appointmentNoticeDecision,appointmentNoticeFromDecision,
  appointmentNoticeSchema} from '@/lib/services/animahost-appointment-notices';
-import {fallbackDecision,fallbackHints,fallbackTopics,matchApprovedRuleFallback,withRuleReplies,type FallbackTopic} from '@/lib/services/animahost-whatsapp-fallback';
+import {completeRuleReply,fallbackDecision,fallbackHints,fallbackTopics,matchApprovedRuleFallback,withRuleReplies,type FallbackTopic} from '@/lib/services/animahost-whatsapp-fallback';
 import {closureDecision} from '@/lib/services/animahost-practice-closures';
 import {accessReissuePurpose,reissueChatAccess,verifiedChatIdentitySchema} from '@/lib/services/animahost-access-reissue';
 import {attendanceArtworkVersion,attendanceProof,issueAttendanceFromChat,mayBeAttendanceRequest} from '@/lib/services/animahost-attendance';
@@ -139,7 +139,6 @@ export async function POST(request:NextRequest){
   const explicitLater=statesLaterArrival(input.text??'',explicitTimes);
   const hints=fallbackHints(input.text);
   let topic:FallbackTopic=hints.topic;
-  let appointment=hints.appointment;
   let language:'de'|'en'|'es'=/\b(?:where|when|please|daughter|what|appointment|speak|thank|my)\b/i.test(input.text??'')?'en':
    /[¿¡]|\b(?:hola|cita|factura|gracias|puedo|mañana)\b/i.test(input.text??'')?'es':'de';
   let replyLanguage:string=language;
@@ -358,7 +357,6 @@ export async function POST(request:NextRequest){
        language=chosen.language||'de';
        replyLanguage=chosen.replyLanguage??language;
        topic=hints.topic!=='other'&&hints.topic!=='appointment'?hints.topic:chosen.fallbackTopic??topic;
-       appointment=chosen.appointmentRelated||appointment||chosen.kind==='appointment'||chosen.kind==='appointment_notice';
        const reportedSymptoms=chosen.emergencyEvidence?.trim()??'';
        const hasEmergencyEvidence=reportedSymptoms.length>=4&&
         input.text.toLocaleLowerCase().includes(reportedSymptoms.toLocaleLowerCase())&&
@@ -374,14 +372,16 @@ export async function POST(request:NextRequest){
         (original.startsWith(quote)||original.includes(quote))&&/[?;,]|\bund\b|\band\b|\by\b/.test(original));
        const matchedRule=ruleIds.map(id=>validated.data.find(rule=>rule.id===id)).find(Boolean)??null;
        const selectedAnswer=matchedRule?.action==='antworten'?decisionFromRule(matchedRule,practice.doctolib_url):null;
-       const fallback=()=>fallbackDecision({topic,appointment:appointment&&topic!=='attachment',language,teamTime:teamTime(),safetyAck:!freeForm,
-        doctolibUrl:practice.doctolib_url});
        const late=chosen.lateArrival??(chosen.appointmentNotice?.kind==='late'?{
         appointmentDate:chosen.appointmentNotice.appointmentDate,originalTime:null,arrivalTime:null,
         delayMinutes:chosen.appointmentNotice.delayMinutes,appointmentTypeId:null,
        }:null);
        const sameVisit=explicitLater||chosen.kind==='late_arrival'||chosen.appointmentNotice?.kind==='late'||
         (lateLanguage&&(chosen.kind==='appointment'||chosen.appointmentNotice?.kind==='reschedule'));
+       const approvedBooking=chosen.kind==='appointment'&&validated.data.some(rule=>rule.appointmentTypeId&&
+        rule.appointmentTypeId===chosen.appointmentTypeId)&&!sameVisit&&!mandatoryAppointmentClarification(input.text);
+       const fallback=()=>fallbackDecision({topic,appointment:approvedBooking,language,teamTime:teamTime(),
+        doctolibUrl:practice.doctolib_url});
        const rebookRequested=recentRule?.startsWith('appointment_notice:cancel:')&&
         (chosen.kind==='rebook_after_cancel'||/^(?:ja|yes|s[ií])(?:[, ]+(?:bitte|gern(?:e)?|please|por favor))?[.!]?$/i.test(input.text.trim())||
          /(?:möchte|würde|bitte).{0,30}(?:neuen termin|new appointment|nueva cita)/i.test(input.text));
@@ -425,7 +425,7 @@ export async function POST(request:NextRequest){
           text:qualityAvailable&&pending?t('animahost.quality.late_pending',language,{when:teamTime(),arrival:lateState.arrivalTime??''}):
            lateState.outcome==='incomplete_review'?`${advice} ${t('animahost.team.reply',language,{when:teamTime()})}`:advice};
         }else{
-         decision=fallbackDecision({topic:'appointment',appointment:false,language,teamTime:teamTime(),safetyAck:!freeForm,doctolibUrl:null});
+         decision=fallbackDecision({topic:'appointment',appointment:false,language,teamTime:teamTime(),doctolibUrl:null});
         }
        }else if(rebookRequested){
         const link=renderWhatsAppRuleText('{doctolib_link}',practice.doctolib_url);
@@ -443,10 +443,9 @@ export async function POST(request:NextRequest){
           `${t('animahost.late.cancel_recorded',language)} ${t('animahost.late.cancel_prompt',language)}`};
        }else if(mandatoryAppointmentClarification(input.text)){
         topic=hints.topic==='attachment'?'attachment':'appointment';
-        appointment=true;
         decision=fallback();
        }else if(chosen.kind==='outside_scope'){
-        decision={action:'antworten',rule:'conversation:outside_scope',text:t('animahost.whatsapp.outside_scope',language)};
+        decision=ruleIds.length||topic!=='other'?fallback():{action:'antworten',rule:'conversation:outside_scope',text:t('animahost.whatsapp.outside_scope',language)};
        }else if(chosen.kind==='practice_closure'&&chosen.clear&&chosen.closureDate){
         decision=closureDecision(practice.closure_periods,chosen.closureDate,serviceLanguage)||decision;
        }else if(chosen.kind==='access_resend'&&chosen.clear&&chosen.accessPurpose){
@@ -488,13 +487,12 @@ export async function POST(request:NextRequest){
         else decision={...decisionFromRule(null),rule:'appointment_needs_practice'};
        }
        if(automaticReplies&&!input.handoffOnly&&!chosen.optOut&&!medicationQuestion&&!sameVisit&&!rebookRequested&&decision.action!=='notfall'){
-        const partial=freeForm&&hasIndependentQuestion&&chosen.fallbackTopic?fallback():null;
-        const primary=decision.action==='antworten'&&!partial?decision
-         : decision.action==='antworten'&&partial?{...partial,text:`${decision.text}\n\n${partial.text}`}
-         : partial||(decision.rule.startsWith('fallback:')?decision:null)||(!chosen.clear||chosen.kind==='clarify'||chosen.kind==='appointment'||chosen.kind!=='other'&&ruleIds.length===0?fallback():null);
-        const additional=ruleIds.filter(id=>id!==primary?.rule);
-        const uniqueRules=Array.from(new Set(additional));
-        decision=withRuleReplies(primary,chosen.clear?uniqueRules:[],validated.data,practice.doctolib_url)??fallback();
+        const excluded=mandatoryAppointmentClarification(input.text);
+        const primary=decision.rule==='no_applicable_rule'||decision.rule==='appointment_needs_practice'?null:decision;
+        const independent=hasIndependentQuestion&&chosen.fallbackTopic;
+        const needsTeam=Boolean(independent||!chosen.clear||chosen.kind==='clarify'||(!primary&&ruleIds.length===0));
+        const safeIds=excluded?ruleIds.filter(id=>!validated.data.find(rule=>rule.id===id)?.patientText.includes('{doctolib_link}')):ruleIds;
+        decision=completeRuleReply(primary,needsTeam?fallback():null,safeIds,validated.data,practice.doctolib_url)??fallback();
        }
       }catch{
        if(decision.action!=='notfall'){
@@ -510,7 +508,7 @@ export async function POST(request:NextRequest){
   }
   if(explicitLater&&decision.rule.startsWith('doctolib:'))decision=decisionFromRule(null);
   if(decision.rule==='no_applicable_rule'||(!automaticReplies&&decision.action==='klaerfall'&&!decision.rule.startsWith('invoice_portal:')&&!details?.practiceSummary)){
-   decision=fallbackDecision({topic,appointment:appointment&&!lateLanguage&&!explicitLater&&topic!=='attachment',language,teamTime:teamTime(),safetyAck:!freeForm,
+   decision=fallbackDecision({topic,appointment:false,language,teamTime:teamTime(),
     doctolibUrl:practice.doctolib_url});
   }
    decision=styleMessage(decision,qualityAvailable?patient:null,{language,receivedAt:input.receivedAt,

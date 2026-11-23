@@ -81,15 +81,24 @@ export function withRuleReplies(
   if (primary) {
     const extras = additional.filter(item => item.rule !== primary.rule);
     const action = primary.action === 'klaerfall' || extras.some(item => item.action === 'klaerfall') ? 'klaerfall' : 'antworten';
-    return { ...primary, action, text: Array.from(new Set([primary,...extras].map(item => item.text))).join('\n\n') };
+    const ordered = primary.rule.startsWith('fallback:') ? [...extras,primary] : [primary,...extras];
+    return { ...primary, action, text: Array.from(new Set(ordered.map(item => item.text))).join('\n\n') };
   }
-  const ordered = ['klaerfall', 'antworten'].flatMap(action => additional.filter(item => item.action === action));
+  const ordered = additional;
   const first = ordered[0];
   return first ? {
-    action: first.action,
+    action: ordered.some(item=>item.action==='klaerfall')?'klaerfall':'antworten',
     rule: ordered.map(item => item.rule).join('|'),
     text: Array.from(new Set(ordered.map(item => item.text))).join('\n\n'),
   } : null;
+}
+
+export function completeRuleReply(primary: WhatsAppDecision | null, fallback: WhatsAppDecision | null,
+ ruleIds: string[], rules: WhatsAppRule[], doctolibUrl: string | null): WhatsAppDecision | null {
+ const answered = withRuleReplies(primary,ruleIds,rules,doctolibUrl);
+ if(!answered)return fallback;
+ if(!fallback||answered.action==='notfall'||answered.rule===fallback.rule)return answered;
+ return {...answered,action:'klaerfall',text:[answered.text,fallback.text].join('\n\n')};
 }
 
 /** For a gateway failure, only use unambiguous, literally present rulebook cues. */

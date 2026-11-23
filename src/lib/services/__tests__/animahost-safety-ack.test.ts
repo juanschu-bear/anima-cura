@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {enforceConversationOutput,referenceHistory,type ConversationHistory} from '../animahost-whatsapp-conversation';
-import {fallbackDecision,type FallbackTopic} from '../animahost-whatsapp-fallback';
+import {completeRuleReply,fallbackDecision,type FallbackTopic} from '../animahost-whatsapp-fallback';
 import {teamReplyTime} from '../animahost-team-time';
 
 test('the emergency brake uses one neutral sentence with written practice days',()=>{
@@ -13,6 +13,17 @@ test('the emergency brake uses one neutral sentence with written practice days',
   assert.equal(answer.text,'Danke für Ihre Nachricht. Das sieht sich unser Praxisteam persönlich an und meldet sich am Montag, 23. November bei Ihnen.');
   assert.equal(answer.action,'klaerfall');
  }
+});
+
+test('matched rules answer first and a remaining question gets a timed handoff',()=>{
+ const link='https://example.invalid/termin';
+ const approved={id:'attachment',topic:'Attachment',keywords:['Knopf verloren'],action:'antworten' as const,
+  patientText:'Bringen Sie das gelöste Teil mit.'};
+ const handoff=fallbackDecision({topic:'appointment',language:'de',appointment:true,doctolibUrl:link,teamTime:'am Montag'});
+ const answer=completeRuleReply(null,handoff,['attachment'],[approved],link);
+ assert.equal(answer?.action,'klaerfall');
+ assert.match(answer?.text??'',/^Bringen Sie das gelöste Teil mit\.[\s\S]*Terminanfrage[\s\S]*am Montag[\s\S]*https:/);
+ assert.doesNotMatch(answer?.text??'',/Danke für Ihre Nachricht/);
 });
 
 test('a standalone new topic and a stale attachment do not share classification context',()=>{

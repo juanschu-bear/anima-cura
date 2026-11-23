@@ -136,7 +136,7 @@ const translations: Record<string, { de: string; en: string; es?: string }> = {
   'animahost.whatsapp.fallback.certificate': {de:'Ich leite Ihre Anfrage zur Bescheinigung ans Praxisteam weiter.',en:'I’ll pass your request for a certificate on to the practice team.'},
   'animahost.whatsapp.fallback.medical': {de:'Ich lege Ihre Frage dem Praxisteam vor, damit Sie eine verlässliche Antwort bekommen.',en:'I’ll ask the practice team to look at your question so you get an answer you can rely on.'},
   'animahost.whatsapp.fallback.practice': {de:'Ich frage für Sie beim Praxisteam nach.',en:'I’ll check with the practice team for you.'},
-  'animahost.whatsapp.fallback.other': {de:'Danke für Ihre Nachricht. Ich gebe sie ans Praxisteam weiter, damit es sich um Ihr Anliegen kümmern kann.',en:'Thanks for your message. I’ll pass it on to the practice team so they can look into it.'},
+  'animahost.whatsapp.fallback.other': {de:'Zu Ihrem Anliegen frage ich beim Praxisteam nach.',en:'I’ll check your question with the practice team.',es:'Consultaré su pregunta con el equipo de la consulta.'},
   'animahost.whatsapp.fallback.date': {de:'Sie bekommen am {day} eine Rückmeldung.',en:'You’ll hear back on {day}.'},
   'animahost.whatsapp.fallback.next': {de:'Sie bekommen am nächsten Praxistag eine Rückmeldung.',en:'You’ll hear back on the next day the practice is open.'},
   'animahost.whatsapp.fallback.link': {de:'Online buchbare Termine finden Sie hier: {link}',en:'You can see which appointments are available online here: {link}'},
