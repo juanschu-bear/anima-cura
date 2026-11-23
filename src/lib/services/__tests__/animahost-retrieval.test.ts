@@ -141,3 +141,8 @@ test('unknown patients get one identity question even when the useful draft asks
  const second=await runRetrievalReply(already.generate,input({identityAsked:true}));
  assert.doesNotMatch(second.text,/Für welchen Patienten/);
 });
+
+test('a punctuation-only follow-up question is not a thank-you or closing',()=>{
+ assert.equal(retrievalPreflight(input({message:'?',hasPriorConversation:true})),null);
+ assert.equal(retrievalPreflight(input({message:'???',hasPriorConversation:true})),null);
+});

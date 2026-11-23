@@ -5,8 +5,9 @@ const acknowledgments=/^(?:danke(?: schön| sehr)?|dankeschön|vielen dank|beste
 const closing=/(?:^|[.!?,…]\s*|\s+)(?:(?:ich wünsche ihnen (?:noch )?)?(?:einen |ein |noch einen |noch ein )?)?(?:schönen (?:abend|tag)|schönes wochenende|bis bald|bis dann|ihnen auch)[.!?,…\s]*$/i;
 function acknowledgmentWords(text:string){
  const original=text.toLocaleLowerCase('de-DE').trim();
- const value=original.replace(closing,'').replace(/[.!?,…]+$/,'').trim();
- if(value!==original&&!value)return 'danke';
+ const withoutClosing=original.replace(closing,'');
+ const value=withoutClosing.replace(/[.!?,…]+$/,'').trim();
+ if(withoutClosing!==original&&!value)return 'danke';
  return value.replace(/ für (?:ihre |die |eure )?(?:hilfe|antwort|rückmeldung|information(?:en)?|info)$/,'').replace(/\s+/g,' ').trim();
 }
 
