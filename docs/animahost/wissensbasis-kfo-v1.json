@@ -1,0 +1,608 @@
+{
+ "version": "wissensbasis-kfo-v1.2-entwurf",
+ "stand": "2026-11-23",
+ "hinweis": "Entwurf zur Freigabe durch Dr. Maria Elena Schubert. Quelle 'fachlich' = allgemeines kieferorthopädisches Praxiswissen auf Rezeptionsniveau, formuliert von Claude. Quelle 'praxis' = aus Regelbuch 8 oder Website der Praxis übernommen. Quelle 'offen' = muss die Praxis beantworten. Nichts davon ist eine medizinische Empfehlung; die Grenzen (keine Diagnose, keine Medikamente, Notfallregel) bleiben im Code.",
+ "bereiche": [
+  "apparatur",
+  "problem",
+  "selbsthilfe",
+  "warnzeichen",
+  "behandlungsphase",
+  "praxisablauf",
+  "begriff",
+  "gespraech"
+ ],
+ "eintraege": [
+  {
+   "id": "app-feste-spange",
+   "bereich": "apparatur",
+   "titel": "Feste Zahnspange (Brackets und Bogen)",
+   "quelle": "fachlich",
+   "inhalt": "Kleine Plättchen (Brackets) sind auf die Zähne geklebt, ein dünner Draht (Bogen) verbindet sie. Hinten sitzen oft Ringe (Bänder) um die Backenzähne. Der Bogen bewegt die Zähne langsam. Alle 4 bis 8 Wochen wird er in der Praxis nachgestellt oder getauscht.",
+   "rezeption": "Typische Meldungen: Bracket ab, Draht sticht, Bogen raus, Band locker, Gummis alle. Fast nie ein Notfall, aber zeitnah anschauen.",
+   "quellen": [
+    "gi",
+    "dgzmk"
+   ]
+  },
+  {
+   "id": "app-aligner",
+   "bereich": "apparatur",
+   "titel": "Durchsichtige Schienen (Aligner)",
+   "quelle": "fachlich",
+   "inhalt": "Dünne, durchsichtige Schienen, die etwa 22 Stunden am Tag getragen werden (tagsüber und nachts) und nur zum Essen und Zähneputzen rauskommen. Alle 1 bis 2 Wochen kommt die nächste Schiene aus dem Set, jede ist nummeriert und mit U (oben) oder L (unten) markiert; bei Kindern zeigt oft ein verblassender Farbpunkt den Wechsel an. Kleine Kunststoffnoppen auf den Zähnen (Attachments) geben der Schiene Halt.",
+   "rezeption": "Typische Meldungen: Attachment ab, Schiene passt nicht, Schiene verloren, Schiene gebrochen, Set zu Ende und keine neuen Schienen. Wichtigster Hinweis fast immer: aktuelle Schiene weitertragen, nie ohne Schiene bleiben.",
+   "quellen": [
+    "uka",
+    "vz_alig"
+   ]
+  },
+  {
+   "id": "app-herausnehmbar",
+   "bereich": "apparatur",
+   "titel": "Herausnehmbare Spange (Platte, Aktivator, Funktionsregler)",
+   "quelle": "fachlich",
+   "inhalt": "Kunststoffplatte mit Drahtklammern, vor allem bei Kindern im Wechselgebiss. Sie lenkt das Kieferwachstum und wird meist nachmittags und nachts getragen, so wie die Praxis es festgelegt hat. Eine kleine Schraube in der Platte wird zu Hause nach Anleitung gedreht.",
+   "rezeption": "Typische Meldungen: Spange passt nicht mehr, drückt, Klammer verbogen, Platte gebrochen, Spange verloren, Schraube weiß ich nicht weiter. Spange immer mitbringen."
+  },
+  {
+   "id": "app-retainer",
+   "bereich": "apparatur",
+   "titel": "Retainer (Haltedraht oder Halteschiene nach der Behandlung)",
+   "quelle": "fachlich",
+   "inhalt": "Nach der Behandlung hält ein dünner Draht hinter den Frontzähnen (fester Retainer) oder eine durchsichtige Schiene für die Nacht (herausnehmbarer Retainer) das Ergebnis. Ohne Retainer wandern Zähne zurück, oft schon innerhalb von Wochen.",
+   "rezeption": "Typische Meldungen: Retainer hat sich an einem Zahn gelöst, Retainer gebrochen, Halteschiene passt nicht mehr, Halteschiene verloren. Zügig Termin, weil sich sonst Zähne verschieben. Ist nur ein Zahn gelöst: Draht nicht selbst entfernen.",
+   "quellen": [
+    "gi",
+    "web"
+   ]
+  },
+  {
+   "id": "app-gummizuege",
+   "bereich": "apparatur",
+   "titel": "Gummizüge (Elastics)",
+   "quelle": "fachlich",
+   "inhalt": "Kleine Gummiringe, die der Patient selbst zwischen Ober- und Unterkiefer einhängt, meist rund um die Uhr, täglich frisch. Sie korrigieren den Biss. Ohne Gummis dauert die Behandlung länger.",
+   "rezeption": "Typische Meldungen: Gummis alle, Gummis reißen, welche Größe, Häkchen abgebrochen. Nachschub gibt es in der Praxis während der Sprechzeiten, kein Termin nötig."
+  },
+  {
+   "id": "app-headgear-sonstige",
+   "bereich": "apparatur",
+   "titel": "Außenbogen (Headgear) und seltene Geräte",
+   "quelle": "fachlich",
+   "inhalt": "Selten eingesetzt. Außenbogen mit Nackenband, Gaumennahterweiterung (GNE) mit Schraube im Gaumen, Herbst-Scharnier, Lippenbumper. Fragen dazu beantwortet die Praxis persönlich.",
+   "rezeption": "Nicht selbst erklären, nur sauber ans Team geben, mit Gerätename, Problem und Dringlichkeit."
+  },
+  {
+   "id": "prob-draht-sticht",
+   "bereich": "problem",
+   "titel": "Draht oder Bogen sticht, steht ab, ist hinten herausgerutscht",
+   "quelle": "praxis",
+   "inhalt": "Häufigstes Problem mit der festen Spange, besonders in den ersten Wochen und nach dem Nachstellen, weil die Zähne wandern und der Bogen hinten länger wird. Kein Notfall, solange es nur piekst.",
+   "selbsthilfe": "Stelle mit Schutzwachs aus der Praxis abdecken, notfalls ein Stück zuckerfreien Kaugummi. Steht das Drahtende ab, kann man es vorsichtig mit dem Fingernagel oder einem Wattestäbchen zum Zahn hin drücken. Ist der Draht hinten aus dem Bracket oder Band gerutscht, mit einer Pinzette zurückschieben oder unter das Bracket stecken. Nicht mit Zange oder Nagelknipser kürzen.",
+   "praxis": "Zeitnah Termin zur Kontrolle der festen Zahnspange über den Buchungslink, oder während der Sprechzeiten Di bis Do spontan vorbeikommen (mit Wartezeit).",
+   "warnzeichen": "Wunde Stelle, die blutet, oder Schmerzen, die nicht nachlassen: Notfallnummer 0179 5351813, am besten vorher kurz im Chat ankündigen. Bei kleinen Kindern bringt ein Elternteil das Wachs an; das System erklärt dem Elternteil, wie.",
+   "quellen": [
+    "web",
+    "ulm"
+   ]
+  },
+  {
+   "id": "prob-draht-abgebrochen",
+   "bereich": "problem",
+   "titel": "Draht oder Bogen abgebrochen",
+   "quelle": "fachlich",
+   "inhalt": "Ein Stück des Bogens ist ab oder der Bogen ist an einer Stelle gebrochen. Die Spange arbeitet dann an diesen Zähnen nicht weiter, das ist für ein paar Tage unproblematisch. Passiert oft beim Essen von Hartem oder Klebrigem.",
+   "selbsthilfe": "Abgebrochenes Stück aufheben und zum Termin mitbringen. Scharfe Enden mit Wachs abdecken. Weiche Kost, bis es repariert ist.",
+   "praxis": "Termin zur Kontrolle der festen Zahnspange zeitnah. Passiert es wiederholt, kurz nachfragen, ob harte oder klebrige Sachen gegessen wurden, und das dem Team mitgeben.",
+   "rezeption": "Bei 'schon wieder' anerkennen und nicht belehren. Rückfrage: Drückt oder sticht etwas, oder hat jemand Schmerzen? Dann die Wahl lassen: spontan vorbeikommen mit Wartezeit oder fester Termin.",
+   "warnzeichen": "Verschluckt, eingeatmet, blutende Wunde: Notfallregel."
+  },
+  {
+   "id": "prob-bracket-ab",
+   "bereich": "problem",
+   "titel": "Bracket hat sich gelöst oder wackelt",
+   "quelle": "praxis",
+   "inhalt": "Das Bracket hängt oft noch am Bogen und rutscht hin und her. Kein Notfall. Es wird in der Praxis neu geklebt, das dauert nur wenige Minuten, braucht aber einen Termin.",
+   "selbsthilfe": "Bracket so lassen, wie es ist, auch wenn es am Draht rutscht (Linie der Praxis). Fällt es ganz ab: aufheben und mitbringen. Reibt es, Wachs darüber. Keine Klebeversuche zu Hause.",
+   "praxis": "Zeitnah Termin zur Kontrolle der festen Zahnspange. Ist in den nächsten Tagen ohnehin ein Termin, reicht das meist, das Team entscheidet.",
+   "warnzeichen": "Schmerzen oder Verletzung: anrufen 0179 5351813.",
+   "quellen": [
+    "web",
+    "ulm",
+    "vz_def"
+   ],
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "prob-band-locker",
+   "bereich": "problem",
+   "titel": "Band (Ring um den Backenzahn) ist locker",
+   "quelle": "praxis",
+   "inhalt": "Das Band hat sich vom Zahn gelöst und wackelt. Kein Notfall, aber darunter sammeln sich Essensreste, deshalb nicht lange warten.",
+   "selbsthilfe": "Lässt es sich leicht mit Daumen und Zeigefinger abnehmen, abnehmen und mitbringen. Sonst dranlassen. Zahn darunter gut putzen.",
+   "praxis": "Termin zur Kontrolle der festen Zahnspange.",
+   "quellen": [
+    "web",
+    "vz_def"
+   ]
+  },
+  {
+   "id": "prob-attachment-ab",
+   "bereich": "problem",
+   "titel": "Attachment (Noppe auf dem Zahn) ist abgegangen",
+   "quelle": "praxis",
+   "inhalt": "Die Schiene hält an dieser Stelle weniger gut, funktioniert aber weiter. Kein Notfall. Das Attachment wird in der Praxis neu angebracht.",
+   "selbsthilfe": "Schiene unbedingt weitertragen wie gewohnt. Attachment aufheben ist nicht nötig, es wird neu modelliert.",
+   "praxis": "Termin zur Aligner-Kontrolle buchen, oder während der Sprechzeiten Di bis Do spontan vorbeikommen (mit Wartezeit). Steht der nächste Schienenwechsel kurz bevor, das dazuschreiben, dann plant das Team es zusammen.",
+   "quellen": [
+    "web"
+   ]
+  },
+  {
+   "id": "prob-schiene-passt-nicht",
+   "bereich": "problem",
+   "titel": "Schiene passt nicht, sitzt nicht ganz, hebt vorne ab",
+   "quelle": "fachlich",
+   "inhalt": "Meist wurde die Schiene zu wenig getragen oder zu früh gewechselt. Kein Notfall, aber nicht einfach weitermachen, sonst passt auch die nächste nicht.",
+   "selbsthilfe": "Zur vorherigen Schiene zurück, die passt, und diese tragen; alte Schienen deshalb nie wegwerfen. Mit den Kausticks (Chewies) mehrmals täglich die Schiene festbeißen. Wurde an einem Tag weniger als 20 Stunden getragen, die Schiene einen Tag länger tragen. Schiene nicht mit Gewalt aufdrücken.",
+   "praxis": "Termin zur Aligner-Kontrolle, alle bisherigen Schienen mitbringen. Das Team entscheidet, ob neu gescannt wird.",
+   "rezeption": "Rückfrage: Welche Schiene gerade, seit wann, passt die vorherige noch?",
+   "quellen": [
+    "uka",
+    "ulm"
+   ]
+  },
+  {
+   "id": "prob-schiene-verloren-kaputt",
+   "bereich": "problem",
+   "titel": "Schiene oder herausnehmbare Spange verloren oder gebrochen",
+   "quelle": "praxis",
+   "inhalt": "Kommt oft vor (Serviette im Restaurant, Hund, Schultasche). Je länger nichts getragen wird, desto eher verschieben sich die Zähne zurück.",
+   "selbsthilfe": "Bei Alignern: die vorherige Schiene tragen (oder die nächste, wenn die Praxis es sagt), bis geklärt ist, wie es weitergeht. Bei Platten: alle Teile aufheben und mitbringen, nicht selbst kleben. Fehlt nur ein kleines Stück und nichts stört, die Platte bis zum Termin weitertragen.",
+   "praxis": "Sofort melden, nicht bis zum nächsten regulären Termin warten, weil sich Zähne sonst zurückschieben. Das Team klärt, ob Ersatz bestellt oder repariert wird. Kosten: bei gesetzlich Versicherten übernimmt die Kasse Reparatur oder Neuanfertigung in der Regel; häufen sich Reparaturen oder Verluste, kann sie die Übernahme ablehnen, die Grenze legt jede Kasse selbst fest. Privat: je nach Tarif. Das System nennt keine Beträge; das Team klärt den Einzelfall.",
+   "offen": "Kosten für Ersatzschiene oder Reparatur: Wie läuft es in der Praxis konkret, was sagt das System dazu, wie lange dauert Ersatz?",
+   "quellen": [
+    "web",
+    "ulm",
+    "uka",
+    "vz_def"
+   ]
+  },
+  {
+   "id": "prob-spange-drueckt",
+   "bereich": "problem",
+   "titel": "Herausnehmbare Spange passt nicht mehr oder drückt",
+   "quelle": "praxis",
+   "inhalt": "Nach längerer Tragepause oder wenn neue Zähne durchkommen, passt die Platte oft nicht mehr. Druckstellen entstehen, wenn eine Kante reibt.",
+   "selbsthilfe": "Ist die Platte zu weit geworden, darf die Schraube 1 bis 2 Mal zurückgedreht werden. Scharfe Kunststoffkanten vorsichtig mit einer Nagelfeile glätten. Spange trotzdem so viel wie möglich tragen, außer sie verursacht eine wunde Stelle. Nicht selbst verbiegen.",
+   "praxis": "Termin zur Gerätekontrolle, Spange in jedem Fall mitbringen.",
+   "quellen": [
+    "web",
+    "ulm"
+   ],
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "prob-retainer-ab",
+   "bereich": "problem",
+   "titel": "Fester Retainer hat sich an einem Zahn gelöst oder ist gebrochen",
+   "quelle": "praxis",
+   "inhalt": "Der Draht hinter den Zähnen hält an einer Klebestelle nicht mehr. Kein Notfall, aber dringlich, weil sich der Zahn ohne Halt schnell verschiebt.",
+   "selbsthilfe": "Draht dranlassen, lose Enden nicht biegen und nicht selbst entfernen: Verbogene oder selbst entfernte Retainer müssen komplett ersetzt werden, gelöste Klebestellen lassen sich meist einfach wieder befestigen. Reibt er an der Zunge, Wachs oder zuckerfreien Kaugummi darüber. Gibt es noch die alte Halteschiene, nachts tragen.",
+   "praxis": "Termin zur Kleberetainerreparatur zeitnah. Neue Patienten: Termin Retainerreparatur für neue Patienten.",
+   "warnzeichen": "Sticht oder schmerzt: anrufen 0179 5351813.",
+   "quellen": [
+    "web",
+    "ulm",
+    "gi"
+   ]
+  },
+  {
+   "id": "prob-gummis-alle",
+   "bereich": "problem",
+   "titel": "Gummis, Wachs, Kausticks oder Spangendose fehlen",
+   "quelle": "praxis",
+   "inhalt": "Verbrauchsmaterial. Kein Termin nötig.",
+   "praxis": "Während der Sprechzeiten Di bis Do 9 bis 13 und 14 bis 18:30 am Empfang abholen, montags und freitags nach Absprache über den Chat. Gummis: dieselbe Größe wie bisher, Tütchen oder Packung mitbringen, falls unklar.",
+   "offen": "Postversand von Zubehör: möglich oder nicht?",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "prob-druckgefuehl-nach-nachstellen",
+   "bereich": "problem",
+   "titel": "Zähne tun weh nach dem Einsetzen oder Nachstellen",
+   "quelle": "fachlich",
+   "inhalt": "Normal nach dem Einsetzen, Nachstellen oder Schienenwechsel: Druckgefühl und empfindliche Zähne beim Beißen. Das lässt meist nach etwa 24 Stunden bis wenigen Tagen nach, beim Essen manchmal etwas länger. Es zeigt, dass die Zähne sich bewegen.",
+   "selbsthilfe": "Weiche Kost, kalt trinken, Schiene trotzdem tragen, neue Schiene am besten abends einsetzen. Bei wunden Stellen Wachs. Ob ein Schmerzmittel sinnvoll ist, bespricht der Patient mit der Praxis; das System nennt keines.",
+   "praxis": "Keine Besserung nach mehr als 3 Tagen oder starke Schmerzen: anrufen, Termin.",
+   "warnzeichen": "Starke, pochende Schmerzen an einem einzelnen Zahn, Schwellung, Fieber: nicht abwarten, anrufen 0179 5351813, außerhalb der Sprechzeiten zahnärztlicher Notdienst.",
+   "quellen": [
+    "gi",
+    "ulm",
+    "uka"
+   ]
+  },
+  {
+   "id": "prob-wunde-stelle",
+   "bereich": "problem",
+   "titel": "Wunde Stelle, Aphthe, Lippe oder Wange aufgescheuert",
+   "quelle": "fachlich",
+   "inhalt": "Häufig in den ersten Wochen. Die Schleimhaut gewöhnt sich meist innerhalb von 1 bis 2 Wochen.",
+   "selbsthilfe": "Wachs auf das reibende Bracket oder Drahtende, besonders in den ersten Wochen. Mund mit lauwarmem Salzwasser, Salbei- oder Kamillentee spülen. Sehr scharfe, saure oder heiße Speisen meiden.",
+   "praxis": "Heilt es nach einer Woche nicht oder reibt ein bestimmtes Teil immer wieder: Termin, dann wird es entschärft.",
+   "warnzeichen": "Starke Schwellung, Eiter, Fieber: anrufen.",
+   "quellen": [
+    "ulm"
+   ]
+  },
+  {
+   "id": "prob-schraube-platte",
+   "bereich": "problem",
+   "titel": "Schraube der Platte: wie oft drehen, verdreht, geht nicht",
+   "quelle": "fachlich",
+   "inhalt": "Die Praxis gibt bei der Eingliederung vor, wie oft gedreht wird (oft 1 bis 2 Mal pro Woche eine Vierteldrehung in Pfeilrichtung). Das steht meist auf dem Zettel oder im Patientenportal.",
+   "selbsthilfe": "Nicht häufiger drehen als angegeben. Zu weit gedreht oder Platte zu weit: 1 bis 2 Mal zurückdrehen und das Team informieren. Verbogener Schlüssel: Ersatz in der Praxis.",
+   "praxis": "Unsicher, wie oft: Team fragt nach, keine Vermutung durch das System.",
+   "offen": "Standard-Drehanweisung der Praxis, falls es eine gibt.",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "prob-spange-raus-wann",
+   "bereich": "problem",
+   "titel": "Wann kommt die Spange raus, wie lange noch",
+   "quelle": "praxis",
+   "inhalt": "Das entscheidet Dr. Schubert anhand des Behandlungsstands, nicht nach Kalender. Feste Spangen dauern typisch 24 bis 36 Monate. Den aktuellen Stand sieht der Patient im Patientenportal.",
+   "rezeption": "Freundlich erklären, dass es beim nächsten Termin besprochen wird. Keine Schätzung abgeben."
+  },
+  {
+   "id": "warn-notfall-sofort",
+   "bereich": "warnzeichen",
+   "titel": "Sofort 112",
+   "quelle": "praxis",
+   "inhalt": "Atemnot, starke Blutung, die nicht aufhört, Bewusstlosigkeit, Teil der Spange eingeatmet.",
+   "praxis": "Antwort ausschließlich: 112, dann Praxis informieren. Keine weiteren Fragen."
+  },
+  {
+   "id": "warn-praxis-anrufen",
+   "bereich": "warnzeichen",
+   "titel": "Sofort in der Praxis anrufen: 0179 5351813",
+   "quelle": "praxis",
+   "inhalt": "Starke oder zunehmende Schmerzen, Schwellung im Gesicht, Sturz oder Schlag auf die Zähne, lockerer oder ausgeschlagener Zahn, Teil der Spange verschluckt, blutende Verletzung durch Draht, Draht steckt in der Wange oder im Zahnfleisch fest.",
+   "praxis": "Zuerst die Nummer, dann kurz, was bis zum Anruf zu tun ist (ausgeschlagenen Zahn in Milch oder Zahnrettungsbox, nicht an der Wurzel anfassen). Keine Terminbuchung vorschlagen.",
+   "quellen": [
+    "web"
+   ]
+  },
+  {
+   "id": "warn-ausserhalb-sprechzeiten",
+   "bereich": "warnzeichen",
+   "titel": "Außerhalb der Sprechzeiten",
+   "quelle": "praxis",
+   "inhalt": "Im Notfall gilt 0179 5351813 auch außerhalb der Sprechzeiten, montags und freitags. Bei Atemnot, starker Blutung oder Bewusstlosigkeit: 112. Alles andere wartet bis zum nächsten Praxistag.",
+   "offen": "Soll zusätzlich der zahnärztliche Notdienst Leipzig genannt werden (z. B. nachts oder am Wochenende), und mit welcher Nummer?",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "phase-erstuntersuchung",
+   "bereich": "behandlungsphase",
+   "titel": "Erstuntersuchung",
+   "quelle": "praxis",
+   "inhalt": "Kostenlos und unverbindlich. Bei Kindern sinnvoll, sobald alle Milchzähne da sind; Behandlung von Zahnfehlstellungen beginnt meist zwischen 8 und 11 Jahren. Erwachsene jederzeit. Geprüft werden Kieferwachstum, Platz, Lippenschluss, Zunge, Schlucken, Gewohnheiten. Bei gesetzlich Versicherten ist die Erstuntersuchung Kassenleistung über die Versichertenkarte.",
+   "praxis": "Termin online: Erstuntersuchung Kind oder Erwachsener. Mitbringen: Versichertenkarte, vorhandene Unterlagen oder Röntgenbilder.",
+   "quellen": [
+    "web",
+    "vz_erst"
+   ]
+  },
+  {
+   "id": "phase-diagnostik-kostenplan",
+   "bereich": "behandlungsphase",
+   "titel": "Diagnostik und Kostenplan",
+   "quelle": "praxis",
+   "inhalt": "Nach der Erstuntersuchung folgen Abdrücke oder Scan, Fotos und Röntgen. Daraus entsteht der schriftliche Behandlungs- und Kostenplan. Bei Kindern und Jugendlichen unter 18 zahlt die gesetzliche Kasse ab Schweregrad KIG 3 (von 5), wenn sie den Plan vorher genehmigt hat. Die Eltern zahlen während der Behandlung einen Eigenanteil von 20 % (10 % ab dem 2. Kind in Behandlung) und bekommen ihn nach erfolgreichem Abschluss von der Kasse zurück, dafür braucht es die Abschlussbescheinigung der Praxis. Bei KIG 1 und 2 und bei Erwachsenen ist die Behandlung Privatleistung, außer bei schweren Kieferanomalien.",
+   "rezeption": "Das System darf diese Regeln erklären. Keine Beträge, keine Zusage, in welche KIG jemand fällt, keine Erstattungszusage. Unterlagen und Rechnungen aufbewahren, Abschlussbescheinigung kommt von der Praxis.",
+   "offen": "Wie lange dauert es von der Erstuntersuchung bis zum Kostenplan, und wie lange braucht die Kasse typischerweise?",
+   "quellen": [
+    "vz_kost",
+    "vz_erst",
+    "bund"
+   ]
+  },
+  {
+   "id": "phase-aktiv",
+   "bereich": "behandlungsphase",
+   "titel": "Aktive Behandlung",
+   "quelle": "fachlich",
+   "inhalt": "Regelmäßige Kontrolltermine alle 4 bis 8 Wochen (feste Spange) oder nach Plan (Aligner). Ausgelassene Termine verlängern die Behandlung. Mitarbeit (Gummis, Tragezeit, Putzen) bestimmt das Tempo.",
+   "rezeption": "Wer Termine schiebt: freundlich, aber klar auf die Folgen hinweisen und sofort neuen Termin anbieten. Text dafür gibt es im Regelbuch."
+  },
+  {
+   "id": "phase-retention",
+   "bereich": "behandlungsphase",
+   "titel": "Retention: Nach der Spange ist nicht Schluss",
+   "quelle": "praxis",
+   "inhalt": "Das Ergebnis muss lebenslang gehalten werden: fester Retainer (dünner Draht hinter den Zähnen, bleibt oft viele Jahre) oder Halteschiene für die Nacht. Ohne Retention wandern Zähne zurück, weil Körper und Kiefer sich weiter verändern. Kontrolle einmal im Jahr (Jahreskontrolle). Feste Retainer zahlt die gesetzliche Kasse nur in Ausnahmefällen.",
+   "praxis": "Termin Jahreskontrolle online.",
+   "quellen": [
+    "web",
+    "gi"
+   ]
+  },
+  {
+   "id": "ablauf-sprechzeiten",
+   "bereich": "praxisablauf",
+   "titel": "Sprechzeiten",
+   "quelle": "praxis",
+   "inhalt": "Dienstag bis Donnerstag 9:00 bis 13:00 und 14:00 bis 18:30 Uhr. Montag und Freitag nur nach gesonderter Vereinbarung. Schließzeiten (Urlaub, Feiertage) kommen aus dem Schließkalender der Praxis."
+  },
+  {
+   "id": "ablauf-spontan",
+   "bereich": "praxisablauf",
+   "titel": "Spontan vorbeikommen",
+   "quelle": "praxis",
+   "inhalt": "Während der Sprechzeiten Di bis Do möglich, dann mit längerer Wartezeit. Ohne Warten geht es nur mit Termin.",
+   "rezeption": "Bei Spangenproblemen immer als Option anbieten, neben dem Buchungslink, und den Patienten entscheiden lassen.",
+   "offen": "Gibt es Zeiten, in denen spontanes Kommen ungünstig ist (z. B. kurz vor 13 Uhr oder nach 18 Uhr)? Gilt es auch für Kinder mit herausnehmbarer Spange?",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "ablauf-termine",
+   "bereich": "praxisablauf",
+   "titel": "Terminarten, die der Patient selbst buchen kann",
+   "quelle": "praxis",
+   "inhalt": "Erstuntersuchung Kind, Erstuntersuchung Erwachsener, Kontrolle feste Zahnspange, Aligner-/Schienenkontrolle, Gerätekontrolle herausnehmbare Spange, Kleberetainerreparatur, Retainerreparatur für neue Patienten, Jahreskontrolle, Besprechung. Alles über Doctolib.",
+   "rezeption": "Nicht buchbar und deshalb Sache des Teams: Termine zum Behandlungsbeginn, Einsetzen, Herstellen, Abholen von Schienen, sowie Wunschtage und -zeiten. Dann: Antwort auf das Anliegen, Wunsch ans Team, Rückmeldezeit nennen."
+  },
+  {
+   "id": "ablauf-verspaetung",
+   "bereich": "praxisablauf",
+   "titel": "Verspätung und verpasster Termin",
+   "quelle": "praxis",
+   "inhalt": "Bis 15 Minuten: einfach kommen, eventuell Wartezeit. Bei langen Terminen (45 bis 60 Minuten, z. B. Brackets kleben oder Attachments anbringen) sollte es gar keine Verspätung geben, weil der Termin sonst nicht mehr passt. Mehr als 15 Minuten oder ohne Zeitangabe: Team entscheidet, ob es heute noch klappt, sonst neuer Termin. Verpasst: sofort neuen Termin buchen.",
+   "offen": "Absage am selben Tag und Ausfallhonorar werden noch über den Leitstand geregelt; bis dahin gibt das System dazu keine Auskunft und leitet ans Team.",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "ablauf-abholung-schienen",
+   "bereich": "praxisablauf",
+   "titel": "Abholung von Schienen oder Spangen",
+   "quelle": "offen",
+   "inhalt": "Patienten fragen, wann ihre Schienen oder die neue Spange fertig sind. Das System kann das heute nicht sehen.",
+   "rezeption": "Antwort: Status kann hier nicht eingesehen werden, Team prüft und meldet sich mit Rückmeldezeit. Wunsch nach Abholtermin direkt mitgeben.",
+   "offen": "Typische Dauer vom Scan bis zur Abholung (Aligner, Platten). Wird der Patient aktiv informiert, wenn etwas fertig ist? Kann das System den Laborstatus bekommen?"
+  },
+  {
+   "id": "ablauf-telefon",
+   "bereich": "praxisablauf",
+   "titel": "Telefon und Erreichbarkeit",
+   "quelle": "praxis",
+   "inhalt": "Angerufen wird nur im Notfall, dann unter 0179 5351813. Diese Nummer gilt auch Montag, Freitag und außerhalb der Sprechzeiten. Die Festnetznummer wird nicht mehr herausgegeben. Bei Kleinigkeiten nicht anrufen, da geht niemand ran; alles andere läuft im Chat. Einen Notfall-Anruf kann man vorher im Chat ankündigen.",
+   "rezeption": "Die Nummer nur bei Warnzeichen nennen, nie als allgemeine Kontaktmöglichkeit. Rückruf wird nicht angeboten.",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "ablauf-mitbringen",
+   "bereich": "praxisablauf",
+   "titel": "Was zum Termin mitbringen",
+   "quelle": "praxis",
+   "inhalt": "Versichertenkarte, Zahnspange oder alle Schienen, abgebrochene oder gelöste Teile, Zahnbürste ist nützlich. Neue Versichertenkarte nach Kassenwechsel.",
+   "quellen": [
+    "web"
+   ]
+  },
+  {
+   "id": "ablauf-portal",
+   "bereich": "praxisablauf",
+   "titel": "Patientenportal und Rechnungen",
+   "quelle": "praxis",
+   "inhalt": "Rechnungen, Zahlungen, Dokumente und Behandlungsstand stehen im Patientenportal (animacura.io, im Browser, keine App nötig). Zugang mit Patientennummer, Geburtsdatum und hinterlegter E-Mail, Code kommt per E-Mail. Passwort oder Code nie an die Praxis schicken.",
+   "rezeption": "Sieht jemand seine Rechnungen dort nicht: nicht abwimmeln, sondern Team prüft Zugang und Zuordnung, Rückmeldezeit nennen."
+  },
+  {
+   "id": "ablauf-bescheinigung",
+   "bereich": "praxisablauf",
+   "titel": "Bescheinigung für Schule oder Arbeit",
+   "quelle": "praxis",
+   "inhalt": "Für Termine, die stattgefunden haben, digital mit Stempel, Unterschrift und Prüfcode. Braucht Name und Besuchsdatum."
+  },
+  {
+   "id": "ablauf-kosten",
+   "bereich": "praxisablauf",
+   "titel": "Kosten, Kasse, Privat, Raten",
+   "quelle": "praxis",
+   "inhalt": "Behandelt werden gesetzlich und privat Versicherte und Selbstzahler. Kosten stehen im Kostenplan vor Beginn. Erstattung entscheidet die Versicherung. Ratenwunsch prüft das Team. Zu viel gezahltes Geld wird als Guthaben verrechnet oder auf Wunsch zurücküberwiesen.",
+   "rezeption": "Keine Beträge und keine Erstattungszusagen."
+  },
+  {
+   "id": "begriffe",
+   "bereich": "begriff",
+   "titel": "Wörterbuch Patient zu Praxis",
+   "quelle": "fachlich",
+   "inhalt": "Draht, Bogen = Bogen. Plättchen, Stein, Knöpfchen auf dem Zahn bei fester Spange = Bracket. Ring hinten = Band. Noppe, Knubbel, Knöpfchen bei Schienen = Attachment. Gummis = Gummizüge (Elastics) oder kleine Ligaturen um die Brackets. Haltedraht hinter den Zähnen = fester Retainer. Nachtschiene nach der Behandlung = herausnehmbarer Retainer. Kausticks = Chewies. Die Spange nachstellen, enger machen = Kontrolltermin mit Bogenwechsel. Klammer = Halteelement der herausnehmbaren Spange.",
+   "rezeption": "Patientenwörter nie korrigieren, nur verstehen."
+  },
+  {
+   "id": "gespraech-grundhaltung",
+   "bereich": "gespraech",
+   "titel": "So antwortet die Rezeption",
+   "quelle": "fachlich",
+   "inhalt": "Erst das Problem ernst nehmen (bei 'schon wieder' anerkennen), dann die eine wichtige Rückfrage, wenn sie etwas ändert (Schmerzen? welche Schiene? welches Kind?), dann konkrete Hilfe für jetzt (Wachs, aufheben, weitertragen), dann die Wahl lassen (spontan mit Wartezeit oder Termin), dann Weitergabe mit Rückmeldezeit für alles, was das Team entscheidet. Kurz, Sie-Form, kein zweites Grußwort im selben Gespräch, keine Floskeln."
+  },
+  {
+   "id": "gespraech-eltern",
+   "bereich": "gespraech",
+   "titel": "Eltern schreiben für Kinder",
+   "quelle": "fachlich",
+   "inhalt": "Meist schreibt ein Elternteil über das Kind. Das Kind beim Namen nennen, wenn es genannt wurde, Hinweise so formulieren, dass der Elternteil sie umsetzen kann ('Decken Sie das Drahtende bei Tim mit Wachs ab'). Bei mehreren Kindern in der Praxis nachfragen, um wen es geht."
+  },
+  {
+   "id": "gespraech-widerspruch",
+   "bereich": "gespraech",
+   "titel": "Patient widerspricht einer Regel",
+   "quelle": "fachlich",
+   "inhalt": "Sagt jemand 'das haben wir immer anders gemacht' oder 'das passt nicht', wird die Regel nicht wiederholt. Stattdessen: Verständnis, Rückfrage nach dem Anliegen, Weitergabe ans Team mit Rückmeldezeit. Das Team entscheidet Ausnahmen, nicht das System."
+  },
+  {
+   "id": "gespraech-grenzen",
+   "bereich": "gespraech",
+   "titel": "Was das System nie sagt",
+   "quelle": "praxis",
+   "inhalt": "Keine Diagnose, keine Medikamente oder Dosierungen, keine Einschätzung, ob etwas 'schlimm' ist, keine Terminzusage ohne Buchung, keine Auskunft über andere Patienten, keine Aussage zur Behandlungsdauer, keine Beträge, keine Erstattungszusagen, keine Technologienamen. Bei allem davon: freundlich ans Team mit Rückmeldezeit."
+  },
+  {
+   "id": "selbst-wachs",
+   "bereich": "selbsthilfe",
+   "titel": "Schutzwachs richtig benutzen",
+   "quelle": "fachlich",
+   "quellen": [
+    "ulm",
+    "web"
+   ],
+   "inhalt": "Ein kleines Stück Wachs (Erbsengröße) zwischen den Fingern weich kneten, die Stelle mit einem Tuch trocken tupfen und das Wachs auf das reibende Bracket oder Drahtende drücken. Zum Essen und Putzen entfernen, danach neu. Verschluckt man ein Stück, ist das harmlos. Ersatz: zuckerfreier Kaugummi.",
+   "praxis": "Wachs gibt es jederzeit am Empfang während der Sprechzeiten."
+  },
+  {
+   "id": "selbst-essen",
+   "bereich": "selbsthilfe",
+   "titel": "Essen mit Spange",
+   "quelle": "fachlich",
+   "quellen": [
+    "gi",
+    "uka"
+   ],
+   "inhalt": "Feste Spange: Hartes (Äpfel, Möhren, Brötchenkruste, Nüsse) klein schneiden, nicht abbeißen. Zähes und Klebriges (Karamell, Kaubonbons, Kaugummi mit Zucker) bleibt in Drähten hängen und löst Brackets. Aligner: mit Schiene nur Wasser trinken; heiße Getränke verformen die Schiene, Farbiges verfärbt sie; zum Essen raus, danach Zähne putzen oder zumindest ausspülen und Schiene wieder rein.",
+   "rezeption": "Bei wiederholten Draht- oder Bracketproblemen freundlich an diese Punkte erinnern, ohne zu belehren."
+  },
+  {
+   "id": "selbst-pflege",
+   "bereich": "selbsthilfe",
+   "titel": "Zahnpflege mit Spange",
+   "quelle": "fachlich",
+   "quellen": [
+    "gi",
+    "uka_mb",
+    "dgzmk"
+   ],
+   "inhalt": "Mit fester Spange ist Putzen aufwendiger, aber entscheidend: Zahnbürste (Hand oder elektrisch) oberhalb und unterhalb der Brackets ansetzen, dazu Interdentalbürstchen für den Bereich unter dem Bogen und zwischen den Brackets. Bei schlechter Pflege drohen weiße Entkalkungsflecken, Karies und Zahnfleischentzündung, die nach Abnahme der Spange sichtbar bleiben. Schienen täglich mit Bürste und kaltem Wasser reinigen, keine Zahnpasta (macht Kratzer), nicht heiß.",
+   "praxis": "Tipps für den Alltag stehen auch im Patientenportal. Bei Fragen zur Pflege kann das System diese Grundregeln nennen; Produkte und Versiegelung bespricht die Praxis."
+  },
+  {
+   "id": "selbst-aufbewahrung",
+   "bereich": "selbsthilfe",
+   "titel": "Herausnehmbare Spangen und Schienen aufbewahren",
+   "quelle": "praxis",
+   "quellen": [
+    "web",
+    "ulm"
+   ],
+   "inhalt": "Immer in der Spangendose, nie in Hose, Jacke, Tasche, Serviette oder Taschentuch: So gehen die meisten verloren oder landen im Müll. Von Hunden und Katzen fernhalten, die zerkauen sie. Beim Sport herausnehmbare Spangen und Schienen nicht tragen; mit fester Spange gibt es einen speziellen Mundschutz."
+  },
+  {
+   "id": "selbst-tragezeit-aligner",
+   "bereich": "selbsthilfe",
+   "titel": "Tragezeit bei Alignern einhalten",
+   "quelle": "fachlich",
+   "quellen": [
+    "uka",
+    "vz_alig"
+   ],
+   "inhalt": "Etwa 22 Stunden am Tag, auch nachts. Unter 20 Stunden gefährdet den Erfolg: Dann die Schiene einen Tag länger tragen, bevor gewechselt wird. Drückt die Schiene nach einer Woche noch deutlich, ebenfalls länger tragen statt wechseln. Neue Schiene abends einsetzen, dann ist der erste Druck über Nacht vorbei.",
+   "rezeption": "Wer schreibt, die Schiene passe nicht oder tue weh, bekommt zuerst diese Punkte und die Frage, welche Schiene gerade getragen wird."
+  },
+  {
+   "id": "prob-aligner-druckstelle",
+   "bereich": "problem",
+   "titel": "Schiene drückt am Zahnfleisch oder hat eine scharfe Kante",
+   "quelle": "fachlich",
+   "quellen": [
+    "ulm"
+   ],
+   "inhalt": "Eine Kante der Schiene reibt am Zahnfleisch, manchmal wird die Stelle weißlich. Kein Notfall.",
+   "selbsthilfe": "Vorherige Schiene tragen, wenn die aktuelle zu sehr drückt, und einen früheren Kontrolltermin ausmachen. Eine störende Kante darf um etwa 1 mm mit einer kleinen Nagelschere gekürzt und mit einer feinen Feile geglättet werden; das System erklärt das je nach Fall.",
+   "praxis": "Termin zur Aligner-Kontrolle, Schiene mitbringen, dann wird die Kante beschliffen.",
+   "freigabe": "Antwort Juan 23.11.2026"
+  },
+  {
+   "id": "prob-haeufige-reparaturen",
+   "bereich": "problem",
+   "titel": "Es geht immer wieder etwas kaputt",
+   "quelle": "fachlich",
+   "quellen": [
+    "vz_def"
+   ],
+   "inhalt": "Häufen sich gelöste Brackets, gebrochene Drähte oder verlorene Teile, muss die Praxis das bei gesetzlich Versicherten der Kasse melden, und die Kasse kann weitere Reparaturen ablehnen. Dann zahlt der Patient selbst. Eine feste Grenze gibt es nicht, jede Kasse entscheidet.",
+   "rezeption": "Bei „schon wieder“: anerkennen, kurz nach der Ursache fragen (hart oder klebrig gegessen?), die Essensregeln nennen, und dem Team mitgeben, dass es wiederholt passiert. Nicht drohen, nicht belehren."
+  },
+  {
+   "id": "ablauf-kasse-kinder",
+   "bereich": "praxisablauf",
+   "titel": "Was die Kasse bei Kindern zahlt",
+   "quelle": "fachlich",
+   "quellen": [
+    "vz_kost",
+    "bund",
+    "vz_erst"
+   ],
+   "inhalt": "Gesetzliche Kassen zahlen die Behandlung bis 18 ab KIG 3, nach Genehmigung des Plans. Die Praxis rechnet 80 % direkt mit der Kasse ab, 20 % zahlen die Eltern als Eigenanteil bei jedem Behandlungsschritt (10 % ab dem 2. Kind gleichzeitig in Behandlung). Nach erfolgreichem Abschluss erstattet die Kasse den Eigenanteil auf Antrag, mit Abschlussbescheinigung der Praxis und allen Eigenanteil-Rechnungen. Wird die Behandlung abgebrochen, gibt es den Eigenanteil nicht zurück. Zusatzleistungen (z. B. Keramikbrackets, bestimmte Schienen) sind privat.",
+   "rezeption": "Diese Regeln darf das System erklären. Keine Beträge, keine Einstufung, keine Erstattungszusage. Rechnungen aufbewahren, Abschlussbescheinigung gibt es am Ende von der Praxis."
+  },
+  {
+   "id": "ablauf-erwachsene-kosten",
+   "bereich": "praxisablauf",
+   "titel": "Kosten bei Erwachsenen",
+   "quelle": "fachlich",
+   "quellen": [
+    "vz_kost"
+   ],
+   "inhalt": "Ab 18 ist die Behandlung Privatleistung; die gesetzliche Kasse zahlt nur bei schweren Kieferanomalien, die Kiefer-OP und Kieferorthopädie zusammen erfordern. Private Versicherungen und Zusatzversicherungen zahlen je nach Tarif. Der Kostenplan vor Beginn zeigt alles.",
+   "rezeption": "Keine Beträge nennen; Erstattung klärt der Patient mit seiner Versicherung, die Rechnung dafür liegt als PDF im Patientenportal."
+  }
+ ],
+ "quellen": {
+  "ulm": [
+   "Uniklinik Ulm, Erste Hilfe bei Problemen mit der Zahnspange",
+   "https://uniklinik-ulm.de/en/orthodontics-and-orthodontics/first-aid-for-problems-with-braces.html"
+  ],
+  "gi": [
+   "gesundheitsinformation.de (IQWiG), Festsitzende Zahnspange",
+   "https://www.gesundheitsinformation.de/behandlung-mit-festsitzender-zahnspange.html"
+  ],
+  "vz_def": [
+   "Verbraucherzentrale, Beschädigung und Verlust von Zahnspangen",
+   "https://www.verbraucherzentrale.de/wissen/gesundheit-pflege/krankenversicherung/was-tun-bei-beschaedigung-und-verlust-von-zahnspangen-12864"
+  ],
+  "vz_kost": [
+   "Verbraucherzentrale, Eigenanteil und Kassenleistung",
+   "https://www.verbraucherzentrale.de/wissen/gesundheit-pflege/aerzte-und-kliniken/eigenanteil-kassenleistung-und-zusatzkosten-beim-kieferorthopaeden-12836"
+  ],
+  "vz_erst": [
+   "Verbraucherzentrale, Erstgespräch in der KFO-Praxis",
+   "https://www.verbraucherzentrale.de/wissen/gesundheit-pflege/aerzte-und-kliniken/das-erwartet-sie-beim-erstgespraech-in-der-kieferorthopaedischen-praxis-12862"
+  ],
+  "vz_alig": [
+   "Verbraucherzentrale, Zahnkorrektur mit Alignern",
+   "https://www.verbraucherzentrale.de/wissen/gesundheit-pflege/aerztinnen-und-kliniken/unsichtbare-zahnschienen-zahnkorrektur-mit-alignern-41380"
+  ],
+  "uka": [
+   "Uniklinik Aachen, Patientenflyer Aligner",
+   "https://www.ukaachen.de/fileadmin/files/klinik-kieferorthopaedie/20190809_FLY_MO_Invisalign_Erwachsene_WEB.pdf"
+  ],
+  "uka_mb": [
+   "Uniklinik Aachen, Patientenflyer feste Zahnspange",
+   "https://www.ukaachen.de/fileadmin/files/klinik-kieferorthopaedie/20190809_FLY_MO_Multibracket_Kind_WEB.pdf"
+  ],
+  "dgzmk": [
+   "DGZMK Patienteninformation Festsitzende Zahnspangen",
+   "https://www.dgzmk.de/documents/10165/1430990/Festsitzende%20Zahnspangen/f97197ba-766a-422d-b8e0-06c5ede233dd"
+  ],
+  "web": [
+   "Website der Praxis, Sofort-Hilfe und FAQ",
+   "https://www.schubert-holi-dontics.de/sofort-hilfe/"
+  ],
+  "bund": [
+   "verwaltung.bund.de, KFO-Behandlung für Krankenversicherte",
+   "https://verwaltung.bund.de/leistungsverzeichnis/de/leistung/99134013174000"
+  ]
+ }
+}
