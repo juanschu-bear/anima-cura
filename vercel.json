@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/scribe-inbox-mail",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/animahost-retrieval",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

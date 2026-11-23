@@ -19,8 +19,8 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
  return async call=>{
   const started=Date.now();
   const stage=call.stage??'compose';
-  // Drafting uses the supplied facts directly; the independent verifier retains a bounded reasoning pass.
-  const reasoning=stage==='verify'?'low' as const:'none' as const;
+  // The replay of the previous core retains its original settings.
+  const reasoning=call.reasoning??(stage==='verify'?'low':'none');
   const metrics={stage,reasoning,promptChars:call.prompt.length,systemChars:call.system.length};
   let finish='none',outputTokens:number|null=null,reasoningTokens:number|null=null,textChars:number|null=null,parts:string|null=null,inputTokens:number|null=null;
   try{

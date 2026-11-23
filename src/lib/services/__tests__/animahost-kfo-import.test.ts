@@ -30,7 +30,7 @@ test('the actual draft preserves every source, optional field and editorial iden
   assert.equal(imported.metadata.guidance?.warningSigns,item.warnzeichen);
   assert.equal(imported.metadata.openQuestion,item.offen??null);
   assert.equal(imported.metadata.sourceApprovalNote,item.freigabe??null);
-  assert.deepEqual(imported.metadata.sources?.map(ref=>ref.key),[...new Set(item.quellen??[])]);
+  assert.deepEqual(imported.metadata.sources?.map(ref=>ref.key),Array.from(new Set(item.quellen??[])));
  }
  const first=entries[0];
  assert.equal(first.metadata.guidance?.reception,raw.eintraege[0].rezeption);
@@ -59,11 +59,11 @@ test('atomic import is repeatable, retains approvals and puts open questions in 
   await db.exec(importSql);
   const importDraft=(items=entries,person=actor)=>db.query<{summary:object}>(
    'SELECT public.animahost_import_knowledge($1,$2,$3) AS summary',[tenant,person,JSON.stringify(items)]);
-  const questions=(selectedTenant=tenant)=>db.query('SELECT * FROM public.animahost_knowledge_open_questions($1)',[selectedTenant]);
+  const questions=(selectedTenant=tenant)=>db.query<any>('SELECT * FROM public.animahost_knowledge_open_questions($1)',[selectedTenant]);
   const active=()=>db.query<{version:number;title:string;guidance:object}>(
    'SELECT version,title,guidance FROM public.animahost_active_knowledge_details($1,$2)',[tenant,'2099-11-23']);
   const open=entries.find(item=>item.metadata.openQuestion)!;
-  const change=(expected:number,action:string,payload:unknown=null)=>db.query(
+  const change=(expected:number,action:string,payload:unknown=null)=>db.query<any>(
    'SELECT active,approved_at,approved_by,metadata FROM public.animahost_change_knowledge($1,$2,$3,$4,$5,$6)',
    [tenant,open.id,expected,actor,action,payload]);
   await db.exec('SET ROLE authenticated');
@@ -73,13 +73,13 @@ test('atomic import is repeatable, retains approvals and puts open questions in 
   await assert.rejects(importDraft(entries,patient),/knowledge_actor_forbidden/);
   const broken={...entries[50],area:'invented'} as unknown as typeof entries[number];
   await assert.rejects(importDraft([...entries.slice(0,50),broken]),/violates check constraint/);
-  assert.equal((await db.query('SELECT count(*) FROM animahost_knowledge_versions')).rows[0].count,0);
+  assert.equal((await db.query<any>('SELECT count(*) FROM animahost_knowledge_versions')).rows[0].count,0);
   assert.deepEqual((await importDraft()).rows[0].summary,{created:51,revised:0,unchanged:0});
   assert.deepEqual((await importDraft()).rows[0].summary,{created:0,revised:0,unchanged:51});
   assert.equal((await questions()).rows.length,8);
   assert.equal((await questions(foreignTenant)).rows.length,0);
   assert.deepEqual((await active()).rows,[]);
-  assert.equal((await db.query('SELECT count(*) FROM animahost_knowledge_versions WHERE active OR approved_at IS NOT NULL OR approved_by IS NOT NULL')).rows[0].count,0);
+  assert.equal((await db.query<any>('SELECT count(*) FROM animahost_knowledge_versions WHERE active OR approved_at IS NOT NULL OR approved_by IS NOT NULL')).rows[0].count,0);
   const approved=(await change(1,'approve')).rows[0];
   assert.ok(approved.approved_at);
   assert.equal(approved.approved_by,actor);
@@ -97,7 +97,7 @@ test('atomic import is repeatable, retains approvals and puts open questions in 
   assert.equal((await active()).rows[0].title,'Praxisfassung');
   await change(5,'deactivate');
   assert.deepEqual((await active()).rows,[]);
-  assert.equal((await db.query('SELECT count(*) FROM animahost_knowledge_versions WHERE id=$1',[open.id])).rows[0].count,6);
+  assert.equal((await db.query<any>('SELECT count(*) FROM animahost_knowledge_versions WHERE id=$1',[open.id])).rows[0].count,6);
  }finally{await db.close();}
 });
 

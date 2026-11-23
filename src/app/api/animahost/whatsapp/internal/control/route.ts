@@ -1,4 +1,6 @@
 import {timingSafeEqual} from 'node:crypto';
+import {contentHash,upsertRetrievalDocuments} from '@/lib/services/animahost-retrieval';
+import {anonymizeRetrieval} from '@/lib/services/animahost-retrieval-privacy';
 import {randomUUID} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
@@ -46,6 +48,9 @@ const bodySchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('approve_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
  z.strictObject({action:z.literal('deactivate_knowledge'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive()}),
  z.strictObject({action:z.literal('import_kfo_knowledge'),actorId:z.string().uuid()}),
+ z.strictObject({action:z.literal('mark_gold_example'),actorId:z.string().uuid(),sourceRef:z.string().min(1).max(200),
+  sourceAt:z.string().datetime({offset:true}),question:z.string().trim().min(1).max(4000),answer:z.string().trim().min(1).max(2000),context:z.string().max(1000).default('')}),
+
 ]);
 
 function authorized(header:string|null){
@@ -62,6 +67,26 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='reply_evidence'){
+  const messageId=request.nextUrl.searchParams.get('messageId');
+  if(!messageId||messageId.length>200)return NextResponse.json({code:'message_invalid'},{status:400,headers});
+  const result=await db.from('animahost_reply_evidence').select('architecture,created_at,evidence,timings').eq('tenant_id',tenant).eq('message_id',messageId).maybeSingle();
+  if(result.error)return unavailable();
+  return NextResponse.json({answerEvidence:result.data},{headers});
+ }
+ if(resource==='gold_examples'){
+  const result=await db.from('animahost_retrieval_documents').select('ref,version,source_at,title,payload,indexed_at,created_by').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).order('source_at',{ascending:false}).limit(500);
+  if(result.error)return unavailable();
+  return NextResponse.json({examples:result.data},{headers});
+ }
+ if(resource==='retrieval_document'){
+  const search=request.nextUrl.searchParams;
+  const key=z.object({kind:z.enum(['gold','knowledge','rule','history']),ref:z.string().min(1).max(200),version:z.coerce.number().int().positive()}).safeParse({kind:search.get('kind'),ref:search.get('ref'),version:search.get('version')});
+  if(!key.success)return NextResponse.json({code:'reference_invalid'},{status:400,headers});
+  const result=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,payload,draft').eq('tenant_id',tenant).eq('kind',key.data.kind).eq('ref',key.data.ref).eq('version',key.data.version).maybeSingle();
+  if(result.error)return unavailable();
+  return NextResponse.json({document:result.data},{headers});
+ }
  if(resource==='knowledge_open_questions'){
   const result=await db.rpc('animahost_knowledge_open_questions',{p_tenant:tenant});
   if(['PGRST202','42883'].includes(result.error?.code??''))return NextResponse.json({knowledgeImportAvailable:false,questions:[]},{headers});
@@ -172,6 +197,23 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='mark_gold_example'){
+  // Redact locally before creating a searchable record. No raw patient data in embeddings.
+  const names:string[]=[];
+  for(let offset=0;offset<100000;offset+=1000){
+   const page=await db.from('patients').select('vorname,nachname').order('id').range(offset,offset+999);
+   if(page.error)return unavailable();
+   names.push(...page.data.flatMap(p=>[p.vorname??'',p.nachname??'']));
+   if(page.data.length<1000)break;
+  }
+  const result=await db.rpc('animahost_mark_gold',{p_tenant:tenant,p_actor:input.actorId,p_ref:'practice-'+contentHash(input.sourceRef).slice(0,32),
+   p_question:anonymizeRetrieval(input.question,names),p_answer:anonymizeRetrieval(input.answer,names),p_context:anonymizeRetrieval(input.context,names),p_at:input.sourceAt});
+  if(result.error)return result.error.code==='42501'?NextResponse.json({code:'gold_actor_forbidden'},{status:403,headers}):unavailable();
+  const row=Array.isArray(result.data)?result.data[0]:result.data;
+  let indexed=false;
+  try{await upsertRetrievalDocuments(db,tenant,[row]);indexed=true;}catch{/* durable pending row; scheduled sync retries */}
+  return NextResponse.json({ref:row.ref,version:row.version,sourceAt:row.source_at,indexed,status:indexed?'indexed':'pending'}, {status:indexed?201:202,headers});
+ }
  if(input.action==='import_kfo_knowledge'){
   const catalog=bundledKfoImport();
   const result=await db.rpc('animahost_import_knowledge',{p_tenant:tenant,p_actor:input.actorId,p_entries:catalog.entries});
