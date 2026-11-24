@@ -10,7 +10,7 @@ test('one hard failure permits exactly one second draft with the checker hint',a
 test('second hard failure creates a reasoned case without replacement text',async()=>{const bad={...valid,passed:false,hard:[{kind:'confidential_unconfirmed',quote:'Befund',reason:'Unbestätigte Zuordnung'}]};const m=model('Befund',bad,'Befund',bad);const r=await runRetrievalReply(m.generate,input());assert.equal(m.calls.length,4);assert.equal(r.text,'');assert.equal(r.skipSend,true);assert.match(r.teamSummary!,/Unbestätigte/);});
 test('only reactions, plain thanks/ok/corrections and latest human reply within 24 hours are silent',()=>{for(const [message,messageType] of [['Danke!','text'],['Ok','text'],['Hätte*','text'],['👍','reaction']])assert.equal(retrievalPreflight(input({message,messageType}))?.skipSend,true);for(const message of ['Huhu','Ich komme Mittwoch 14:15','Tür aufmachen','12345','https://example.invalid',''])assert.equal(retrievalPreflight(input({message})),null);assert.equal(retrievalPreflight(input({lastOutbound:{source:'practice',at:'2026-11-23T10:15:00Z'}}))?.skipSend,true);assert.equal(retrievalPreflight(input({lastOutbound:{source:'practice',at:'2026-11-23T10:14:59Z'}})),null);assert.equal(retrievalPreflight(input({lastOutbound:{source:'animahost',at:'2026-11-24T10:14:59Z'}})),null);});
 test('context caps knowledge and gold at three and conversation at ten; archived cases are not a style source',()=>{const docs:any[]=[];for(const kind of ['gold','knowledge','rule','history'])for(let i=0;i<6;i++)docs.push({kind,ref:kind+i,version:1,source_at:'2026-11-24',title:kind,content:kind,payload:{question:'q',answer:'a'},draft:false,content_hash:'x'});const c=replyContext(input({documents:docs,history:Array.from({length:20},(_,i)=>({direction:'incoming' as const,text:String(i),at:'2026-11-24T10:00:00Z'}))}));assert.equal(c.selected.gold.length,3);assert.equal(c.selected.knowledge.length,3);assert.equal((c.fields.VERLAUF as unknown[]).length,10);assert.equal(c.retrieved.history.length,0);});
-test('a known-patient identity question is a hard failure; length and tone never add code violations',async()=>{const m=model('Unter welchem Namen sind Sie bei uns angemeldet?',{...valid,passed:false,hard:[{kind:'identity_known',quote:'Unter welchem Namen',reason:'Patient bereits bekannt'}]},'Für Ihren Termin prüft das Team den gewünschten Tag.',valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);});
+test('a known-patient identity question prompts one improvement; length and tone never block',async()=>{const m=model('Unter welchem Namen sind Sie bei uns angemeldet?',{...valid,passed:false,hard:[{kind:'identity_known',quote:'Unter welchem Namen',reason:'Patient bereits bekannt'}]},'Für Ihren Termin prüft das Team den gewünschten Tag.',valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);});
 
 test('a dueAt-backed callback and a neutral team check survive false findings and still create the team task',async()=>{
  const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
@@ -30,7 +30,7 @@ test('a dueAt-backed callback and a neutral team check survive false findings an
  assert.equal((result.checks?.[0] as {exempted?:unknown[]}).exempted?.length,2);
 });
 
-test('callback exemptions never clear an invented treatment appointment, protected invoice state or forbidden sentence',async()=>{
+test('confidential invoice state blocks; other findings are improvement hints',async()=>{
  const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
  const time='17 Uhr';
  const invoice='Alex hat noch 100 € offen';
@@ -43,8 +43,8 @@ test('callback exemptions never clear an invented treatment appointment, protect
  const result=await runRetrievalReply(m.generate,input({message:'Was ist mit Alex’ Rechnung?',deadline}));
  assert.equal(result.repairs,1);
  const first=result.checks?.[0] as {violations:string[]};
- assert.equal(first.violations.length,3);
- assert.match(first.violations.join(','),/forbidden_sentence/);
+ assert.equal(first.violations.length,1);
+ assert.match(first.violations.join(','),/confidential_unconfirmed/);
  assert.doesNotMatch(result.text,/100 €|17 Uhr/);
 });
 
@@ -67,3 +67,8 @@ test('an unconfirmed sender can hear the general invoice flow and their own repo
  assert.equal(result.text,draft);
  assert.equal(result.repairs,0);
 });
+test('identity_known may improve once but can never suppress the second non-confidential answer',async()=>{const warning={...valid,passed:false,hard:[{kind:'identity_known',quote:'Danke',reason:'Zuordnung ist bekannt'}]};const m=model('Danke für das Datum.',warning,'Danke, die Zuordnung ist jetzt eindeutig.',warning);const r=await runRetrievalReply(m.generate,input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]'}));assert.equal(r.skipSend,undefined);assert.equal(r.text,'Danke, die Zuordnung ist jetzt eindeutig.');assert.match(m.calls[0].system,/erneuteNamensOderGeburtsdatumFrageNötig\\?":false/);});
+
+test('a repeated birthday question is corrected once even if the model checker missed it',async()=>{const m=model('Bitte nennen Sie Ihr Geburtsdatum.',valid,'Danke, Mira, das Team prüft die Vollmacht.',valid);const r=await runRetrievalReply(m.generate,input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]'}));assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);assert.equal(r.text,'Danke, Mira, das Team prüft die Vollmacht.');});
+
+test('a masked birthday remains meaningful input instead of an empty placeholder',async()=>{const m=model('Danke, Ihre Angaben sind angekommen.',valid);await runRetrievalReply(m.generate,input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]'}));assert.match(m.calls[0].prompt,/Antwort auf die Geburtsdatumsfrage/);assert.doesNotMatch(m.calls[0].prompt,/\[Datum\]/);});

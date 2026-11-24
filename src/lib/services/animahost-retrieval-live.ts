@@ -1,7 +1,7 @@
 import {clarificationRound} from './animahost-unclear-input';
-import {resolveChatName,type ChatNameContext} from './animahost-name-match';
+import {resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
-import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversationPhoneProof} from './animahost-chat-identity';
+import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversationPhoneProof,mentionsPatient} from './animahost-chat-identity';
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
 import {loadPatientSheet,sheetLedger,type ConcernHistory} from './animahost-patient-sheet';
 import {localizeInbound} from './animahost-inbound-language';
@@ -39,7 +39,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
   localization,
  ]);
  if(confirmed.error||prior.error||version.error)throw Error('retrieval_context_unavailable');
- const provisional=phone?conversationPhoneProof(patients,input.text??'',input.history??[],input.receivedAt):null;
+ const provisional=phone&&(senderNameText(input.text??'')===(input.text??'')||selfNameClaim(input.text??''))?conversationPhoneProof(patients,input.text??'',input.history??[],input.receivedAt):null;
  const verifiedIds=(confirmed.data??[]).map(r=>r.patient_id);
  if(phone&&input.identity?.phone===phone)verifiedIds.push(input.identity.patientId);
  if(phone&&input.staffPatientIds?.length){
@@ -53,14 +53,16 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const translations=Object.fromEntries(localized.filter(entry=>entry.id&&entry.translation).map(entry=>[entry.id,entry.translation]));
  const language={translation:localized.at(-1)?.translation??null,translations,translated};
  let chatName:ChatNameContext|undefined;
- const phoneSubject=provisional??selectPhonePatient(patients,joined);
+ const senderText=selfNameClaim(joined)??senderNameText(joined);
+ const phoneSubject=selfNameClaim(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])&&!selfNameClaim(joined)?null:selectPhonePatient(patients,senderText));
  if(phoneSubject)chatName={status:'matched',matchedName:phoneSubject.vorname,patientId:phoneSubject.id,confirmed:Boolean(provisional)||verifiedIds.includes(phoneSubject.id),question:null};
  if(phone&&!phoneSubject){
   const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly,candidateIds:prior.data.find(r=>r.case_details?.chatName?.candidateIds?.length)?.case_details.chatName.candidateIds});
   chatName=matched.context;
   if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
  }
- const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients,verifiedIds,conversationPatientId:provisional?.id,message:joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory});
+ const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients,verifiedIds,conversationPatientId:provisional?.id,message:selfNameClaim(joined)??joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory});
+ if(chatName?.status==='matched'&&patientSheet.access!=='confirmed')patientSheet.access='unconfirmed';
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),translation:language.translation,translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,

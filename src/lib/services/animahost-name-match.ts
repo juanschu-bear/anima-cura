@@ -3,8 +3,12 @@ import type {createServerClient} from '@/lib/db/supabase';
 export type NamePatient={id:string;vorname:string;nachname:string;geburtsdatum?:string|null;geschlecht?:string|null;versicherter_vorname?:string|null;versicherter_nachname?:string|null;eb2_vorname?:string|null;eb2_nachname?:string|null};
 const words=(value:string)=>value.toLocaleLowerCase('de').replace(/ß/g,'ss').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u').normalize('NFD').replace(new RegExp('\\p{M}','gu'),'').match(new RegExp('\\p{L}+','gu'))??[];
 const ordinary=new Set('hallo guten tag morgen abend danke viele grusse liebe herr frau ich mein meine sohn tochter kind termin montag dienstag mittwoch donnerstag freitag samstag sonntag mai juni juli'.split(' '));
+/** Subject mentions (consent, relatives, children) are not sender declarations. */
+export function senderNameText(message:string){return message.replace(/\b(?:mein(?:e[mnr]?)?|unser(?:e[mnr]?)?)\s+(?:Bruder|Mutter|Vater|Sohn|Tochter|Schwester|Kind|Mann|Frau|Partner(?:in)?|Enkel(?:in)?)\b[^.!?\n]*(?:[.!?]|$)/gi,' ');}
+export function selfNameClaim(message:string){return /(?:mein Name ist|ich heiße|ich heisse|ich bin|hier ist)\s+([^.!?,\n]+)/i.exec(senderNameText(message))?.[1]??null;}
 /** Name matching establishes a provisional conversational link, NEVER proof of identity. */
 export function matchChatNames(message:string,patients:NamePatient[]){
+ message=selfNameClaim(message)??senderNameText(message);
  const tokens=new Set(words(message));const standalone=words(message).length<=3;
  const hits=patients.flatMap(p=>{
   const variants=[[p.vorname,p.nachname,'patient'],[p.versicherter_vorname,p.versicherter_nachname,'parent'],[p.eb2_vorname,p.eb2_nachname,'parent']];
@@ -19,7 +23,7 @@ export function matchChatNames(message:string,patients:NamePatient[]){
   }).sort((a,b)=>b.score-a.score);
   return names.length?[{patient:p,...names[0]}]:[];
  });
- // Explicitly naming the child disambiguates a shared parent name; no arbitrary first child.
+ // A sender matching a patient directly outranks a shared parent name; never select an arbitrary sibling.
  const direct=hits.filter(h=>h.role==='patient');const pool=direct.length?direct:hits;const best=Math.max(0,...pool.map(h=>h.score));
  return pool.filter(h=>h.score===best);
 }
@@ -28,7 +32,7 @@ export async function resolveChatName(db:ReturnType<typeof createServerClient>,i
  const existing=await db.from('animahost_chat_identity_links').select('*').eq('tenant_id',input.tenant).eq('chat_jid',input.chat).eq('phone',input.phone);
  if(existing.error)throw Error('chat_identity_unavailable');
  const usable=existing.data.filter(r=>r.status!=='released');
- if(usable.length===1&&!namedSubject(input.message)&&!/(?:ich bin|ich heiße|hier ist|grüße|gruss)/i.test(input.message)){const link=usable[0];const p=await db.from('patients').select('id,vorname,nachname,geburtsdatum,geschlecht').eq('id',link.patient_id).single();if(p.error)throw Error('chat_identity_unavailable');
+ if(usable.length===1&&!namedSubject(input.message)&&!selfNameClaim(input.message)&&!/(?:grüße|gruss)/i.test(input.message)){const link=usable[0];const p=await db.from('patients').select('id,vorname,nachname,geburtsdatum,geschlecht').eq('id',link.patient_id).single();if(p.error)throw Error('chat_identity_unavailable');
   return {context:{status:'matched',matchedName:link.matched_name,patientId:link.patient_id,question:null,source:'chat',confirmed:link.status==='confirmed'} as ChatNameContext,patient:p.data};}
  const patients:NamePatient[]=[];
  for(let start=0;;start+=1000){const page=await db.from('patients').select('id,vorname,nachname,geburtsdatum,geschlecht,versicherter_vorname,versicherter_nachname,eb2_vorname,eb2_nachname').order('id').range(start,start+999);
