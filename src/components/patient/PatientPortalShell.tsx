@@ -1,4 +1,5 @@
 "use client";
+import {patientHasFinancialData} from '@/lib/patient-setup-state';
 import {queuePatientInvoiceEvent,startPatientInvoiceTracking} from "@/lib/patient-invoice-engagement";
 import { trackEvent } from "@/lib/useTracking";
 import { explainPosition } from "@/lib/patient-position-explanations";
@@ -881,7 +882,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
 
   // ═══ NEW PATIENT DETECTION ═══
-  const hasFinancialData = Boolean(rp?.has_financial_data) || pays.length > 0;
+  const hasFinancialData = patientHasFinancialData({reportedFinancialData:rp?.has_financial_data,paymentCount:pays.length,invoiceCount:rechnungen.length,invoiceHistoryCount:rechnungsverlauf.length});
   const isNewPatient = !loading && phasen.length === 0 && !hasFinancialData && (!rp || !rp.plan);
 
   // ═══ WELCOME TIMELINE (shown when no treatment data yet) ═══
