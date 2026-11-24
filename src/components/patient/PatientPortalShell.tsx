@@ -882,8 +882,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
 
 
   // ═══ NEW PATIENT DETECTION ═══
-  const hasFinancialData = patientHasFinancialData({reportedFinancialData:rp?.has_financial_data,paymentCount:pays.length,invoiceCount:rechnungen.length,invoiceHistoryCount:rechnungsverlauf.length});
-  const isNewPatient = !loading && phasen.length === 0 && !hasFinancialData && (!rp || !rp.plan);
+  const hasFinancialData = Boolean(rp?.has_financial_data) || pays.length > 0;
+  const hasExistingFinancialData = patientHasFinancialData({reportedFinancialData:hasFinancialData,paymentCount:pays.length,invoiceCount:rechnungen.length,invoiceHistoryCount:rechnungsverlauf.length});
+  const isNewPatient = !loading && phasen.length === 0 && !hasExistingFinancialData && (!rp || !rp.plan);
 
   // ═══ WELCOME TIMELINE (shown when no treatment data yet) ═══
   const WelcomeTimeline = (
