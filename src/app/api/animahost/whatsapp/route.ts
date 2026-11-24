@@ -19,7 +19,7 @@ import {appointmentToleranceSchema,lateIntentSchema,lateReply,lateStateSchema,pl
 import {latestAppointmentCase,openAppointmentCase} from '@/lib/services/animahost-appointment-cases';
 import {conversationHistorySchema,enforceConversationOutput,formulateConversationReply,gatewayOptions,recentConversation,referenceHistory} from '@/lib/services/animahost-whatsapp-conversation';
 import {measureReplyUsage} from '@/lib/services/animahost-usage';
-import {immediateRule,practiceReplyRule,shortPracticeFollowup} from '@/lib/services/animahost-retrieval-routing';
+import {immediateRule,practiceReplyRule} from '@/lib/services/animahost-retrieval-routing';
 
 import {teamReplyTime} from '@/lib/services/animahost-team-time';
 
@@ -46,6 +46,7 @@ const inputSchema=z.object({
  receivedAt:z.string().datetime({offset:true}),
  hasPriorConversation:z.boolean().optional(),hasPriorReply:z.boolean().optional(),
  identity:verifiedChatIdentitySchema.optional(),phone:z.string().regex(/^[1-9][0-9]{7,14}$/).optional(),staffPatientIds:z.array(z.string().uuid()).max(10).optional(),handoffOnly:z.boolean().optional(),history:conversationHistorySchema.optional(),concernHistory:concernHistorySchema.optional(),senderPolicy:z.literal(1).optional(),
+ eventId:z.string().uuid().optional(),practiceHeld:z.boolean().optional(),entries:z.array(z.object({id:z.string().uuid(),text:z.string().max(4000)})).max(20).optional(),
  lastOutbound:z.object({source:z.enum(['practice','animahost']),at:z.string().datetime({offset:true})}).optional(),
 }).strict();
 type StoredDecision={action:'antworten'|'klaerfall'|'notfall';patient_text:string;rule_id:string;case_details?:ChatDetails|null};
@@ -127,7 +128,7 @@ export async function POST(request:NextRequest){
  const past=recentConversation(input.history??[],input.receivedAt);
  const social=socialReply({...input,clarifyUnclear:process.env.ANIMAHOST_RETRIEVAL_PASSED==='true',hasPriorConversation:input.hasPriorConversation===true||past.length>0,
   hasPriorReply:input.hasPriorReply===true||past.some(item=>item.direction==='outgoing')});
- if(social&&silentSocialRule.test(social)&&!(process.env.ANIMAHOST_RETRIEVAL_PASSED==='true'&&social==='social:acknowledged'&&shortPracticeFollowup(input.text??'')))
+ if(social&&silentSocialRule.test(social)&&process.env.ANIMAHOST_RETRIEVAL_PASSED!=='true')
   return decisionResponse({action:'antworten',rule:social,text:''});
  const db=createServerClient();
  const deadline=Date.now()+17_000;
@@ -139,7 +140,6 @@ export async function POST(request:NextRequest){
   const practice=settings.data;
   // The retrieval architecture bypasses every legacy classifier/workflow gate. Enable only after Juan's acceptance.
   if(process.env.ANIMAHOST_RETRIEVAL_PASSED==='true'){
-   if(input.handoffOnly)return decisionResponse({action:'klaerfall',rule:'sender:unknown_handoff',text:''});
    const existing=await db.from('animahost_whatsapp_decisions').select('action,patient_text,rule_id,case_details')
     .eq('tenant_id',input.tenantId).eq('message_id',input.messageId).maybeSingle();
    if(existing.error)throw Error('decision_read_failed');
@@ -151,9 +151,8 @@ export async function POST(request:NextRequest){
    }
    const answer=await retrievalAnswer(db,input,practice,request.signal);
    const result=answer.result;
-   // Quiet conversational signals create neither a practice notification nor a clarification case.
-   if(result.skipSend&&result.action==='antworten')return NextResponse.json({...result,optOut:false},{headers:{'Cache-Control':'no-store'}});
    const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.error?.code??result.rule,modelFailure:result.error,
+    eventId:input.eventId,translation:answer.translation,translations:answer.translations,dueAt:'dueAt' in result?result.dueAt:undefined,safeFallback:'safeFallback' in result?result.safeFallback:undefined,
     practiceSummary:result.error?.code==='model_budget_exhausted'?t('animahost.whatsapp.model_budget.body','de'):result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1'};
    const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
     sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
@@ -168,9 +167,9 @@ export async function POST(request:NextRequest){
    }
    if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
    const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,
-    modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null,
+    eventId:input.eventId,modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null,
     usage:measureReplyUsage(practice.model,answer.calls,Boolean(result.text)&&!result.skipSend)}});
-   if(recorded.error&&recorded.error.code!=='23505')throw Error('reply_evidence_store_failed');
+   if(recorded.error&&recorded.error.code!=='23505')console.error('reply_evidence_store_failed',{eventId:input.eventId});
    return NextResponse.json({...result,details,phoneMatches:'phoneMatches' in answer?answer.phoneMatches:undefined,replyStyle:'formulated',optOut:result.rule==='opt_out',
     replySchedule:{teamReplyDays:practice.team_reply_days,closurePeriods:practice.closure_periods}},{headers:{'Cache-Control':'no-store'}});
   }

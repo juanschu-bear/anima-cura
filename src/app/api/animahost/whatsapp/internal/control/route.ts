@@ -88,7 +88,14 @@ export async function GET(request:NextRequest){
   if(!messageId||messageId.length>200)return NextResponse.json({code:'message_invalid'},{status:400,headers});
   const result=await db.from('animahost_reply_evidence').select('architecture,created_at,evidence,timings').eq('tenant_id',tenant).eq('message_id',messageId).maybeSingle();
   if(result.error)return unavailable();
-  return NextResponse.json({answerEvidence:result.data},{headers});
+  if(result.data||!z.string().uuid().safeParse(messageId).success)return NextResponse.json({answerEvidence:result.data},{headers});
+  const byEvent=await db.from('animahost_reply_evidence').select('architecture,created_at,evidence,timings').eq('tenant_id',tenant).eq('timings->>eventId',messageId).maybeSingle();
+  if(byEvent.error)return unavailable();
+  if(byEvent.data)return NextResponse.json({answerEvidence:byEvent.data},{headers});
+  const snapshot=await db.from('animahost_whatsapp_decisions').select('created_at,case_details').eq('tenant_id',tenant).eq('case_details->>eventId',messageId).maybeSingle();
+  if(snapshot.error)return unavailable();
+  const details=snapshot.data?.case_details;
+  return NextResponse.json({answerEvidence:details?.answerEvidence?{architecture:details.architecture,created_at:snapshot.data?.created_at,evidence:details.answerEvidence,timings:{eventId:messageId,patientSheet:details.patientSheet,modelFailure:details.modelFailure}}:null},{headers});
  }
  if(resource==='gold_examples'){
   const result=await db.from('animahost_retrieval_documents').select('ref,version,source_at,title,payload,indexed_at,created_by').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).order('source_at',{ascending:false}).limit(500);

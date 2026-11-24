@@ -18,9 +18,9 @@ test('anbieterbedingte Antwortausfälle sind bei Erstellung und Prüfung untersc
   };
   const result=await runRetrievalReply(generate,input());
   assert.equal(result.action,'klaerfall');
-  assert.equal(result.rule,'chain:guard_rejected');
-  assert.equal(result.skipSend,true);
-  assert.equal(result.text,'');
+  assert.equal(result.rule,'retrieval:safe_fallback');
+  assert.equal(result.safeFallback,true);
+  assert.ok(result.text);
   assert.deepEqual(result.error,{code:'model_budget_exhausted',stage,httpStatus});
  }
 });
@@ -33,11 +33,12 @@ test('unlinked pain patient is not excluded; only configured team, groups and no
 });
 test('empty, reaction and acknowledgments never call the model; stickers reach clarification',async()=>{
  const fail:Generate=async()=>{throw Error('must not call model');};
- for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['unsupported',''],['reaction','👍'],['text','Danke']]){
+ for(const [messageType,message] of [['text',''],['system',''],['protocol',''],['reaction','👍'],['text','Danke']]){
   const result=await runRetrievalReply(fail,input({messageType,message,hasPriorConversation:true,hasPriorReply:true}));
   assert.equal(result.skipSend,true);assert.equal(result.action,'antworten');assert.equal(result.text,'');
  }
  assert.equal(retrievalPreflight(input({message:'',messageType:'sticker'})),null);
+ assert.match(retrievalPreflight(input({message:'',messageType:'unsupported'}))!.text,/Deutsch oder Englisch/);
 });
 test('previous system answers are not facts and no team time is appended',async()=>{
  const m=model(answer(),valid);
@@ -58,7 +59,8 @@ test('repairable critique gets exactly one repair; medical and invented booking 
  const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Der Empfang prüft, ob ein früherer Termin frei ist.'}),valid);
  const result=await runRetrievalReply(m.generate,input());assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);
  const bad=model(answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}),answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}));
- assert.equal((await runRetrievalReply(bad.generate,input())).skipSend,true);
+ const safe=await runRetrievalReply(bad.generate,input());
+ assert.equal(safe.safeFallback,true);assert.doesNotMatch(safe.text,/Ibuprofen|400 mg/);
  assert.ok(hardReplyViolations('Ich habe Ihren Termin gebucht.').includes('booking'));
 });
 test('names and identifiers are removed before indexing; human pairs do not consume later bot answers',()=>{
@@ -69,7 +71,7 @@ test('names and identifiers are removed before indexing; human pairs do not cons
  assert.equal(docs.length,1);assert.doesNotMatch(docs[0].content,/Fabian|491510/);assert.equal(docs[0].payload.factsOnly,true);
 });
 
-test('the source ledger reflects the structured input, including when the verifier withholds the answer',async()=>{
+test('the source ledger reflects the structured input, including when a checked fallback replaces an unsafe answer',async()=>{
  const document=(kind:RetrievalDocument['kind'],number:number,draft=false):RetrievalDocument=>({
   kind,ref:kind+'-'+number,version:3,source_at:'2026-11-23T00:00:00Z',title:'Titel '+number,content:'Suchindex',
   payload:kind==='knowledge'?{content:'Geprüfter Inhalt',guidance:{selfHelp:'A',practice:'B',reception:'C',warningSigns:'D'}}:
@@ -85,7 +87,7 @@ test('the source ledger reflects the structured input, including when the verifi
  assert.equal(prompt.regeln.length,1);
  assert.equal(prompt.gold.length,1);
  assert.equal(prompt.praxisfaelle.length,1);
- assert.equal(withheld.skipSend,true);
+ assert.equal(withheld.safeFallback,true);
  assert.equal(withheld.repairs,1);
  assert.equal(withheld.retrieved.knowledge.length,8);
  assert.deepEqual(withheld.retrieved.knowledge[0],{kind:'knowledge',ref:'knowledge-0',version:3,date:'2026-11-23T00:00:00Z',preview:true});
@@ -141,11 +143,12 @@ test('thanks with closing wishes stay quiet; a new request after thanks remains 
 });
 
 
-test('a semantic closing recognized by the core stays quiet and creates no clarification case',async()=>{
- const m=model(answer({closing:true,answer:'',team:false,summary:null,substantive:false,identityQuestion:false}));
- const result=await runRetrievalReply(m.generate,input({message:'Perfekt, das trage ich mir so ein. Besten Dank!'}));
- assert.equal(result.action,'antworten');assert.equal(result.rule,'social:acknowledged');assert.equal(result.skipSend,true);
- assert.equal(m.calls.length,1);
+test('a model closure cannot silence a substantive question',async()=>{
+ const closing=answer({closing:true,answer:'',team:false,summary:null,substantive:false,identityQuestion:false});
+ const m=model(closing,closing);
+ const result=await runRetrievalReply(m.generate,input({message:'Danke! Kann ich morgen trotzdem kommen?'}));
+ assert.equal(result.safeFallback,true);assert.ok(result.text);
+ assert.equal(m.calls.length,2);
 });
 
 
@@ -215,4 +218,14 @@ test('unclear input addresses the known parent, never the child; no model or ide
  const fail:Generate=async()=>{throw Error('must not call model');};
  const result=await runRetrievalReply(fail,input({message:'Huhu',chatName:{status:'matched',matchedName:'Leon',question:null},patientSheet:{access:'confirmed',asOf:'2026-11-23T20:00:00Z',context:{schreibendePerson:{rolle:'Elternteil',name:'Alex Beispiel',patient:'Leon Beispiel'}},fields:{}}}));
  assert.match(result.text,/Alex Beispiel/);assert.doesNotMatch(result.text,/Leon|wer schreibt|angemeldet/);assert.equal(result.rule,'conversation:clarify_first');assert.equal(result.skipSend,undefined);
+});
+
+test('external booking discloses only a confirmed chart appointment and attaches the same deadline to the practice task',()=>{
+ const message='Meine Bestätigung von Doctolib ist da. Ist die Buchung bei Ihnen eingetragen?';
+ const deadline={dueAt:'2026-11-24T11:00:00Z',phrase:'heute bis 12 Uhr'};
+ const patientSheet={access:'confirmed' as const,asOf:'2026-11-24T08:00:00Z',context:{nächsterTermin:{date:'2026-11-26',time:'14:30'}},fields:{}};
+ const confirmed=retrievalPreflight(input({message,deadline,patientSheet}));
+ const unconfirmed=retrievalPreflight(input({message,deadline,patientSheet:{...patientSheet,access:'unconfirmed'}}));
+ assert.equal(confirmed?.dueAt,deadline.dueAt);assert.match(confirmed!.text,/26.11.2026 um 14:30 Uhr/);
+ assert.match(unconfirmed!.text,/externe Buchungsbestätigung/);assert.doesNotMatch(unconfirmed!.text,/14:30/);
 });

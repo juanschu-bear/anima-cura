@@ -10,7 +10,7 @@ import {gatewayGenerate,type ModelCall} from '../src/lib/services/animahost-chai
 import type {RetrievalEvidence,RetrievalKind} from '../src/lib/services/animahost-retrieval';
 import type {ModelFailure} from '../src/lib/services/animahost-model-failure';
 
-const [mapPath,draftPath,approvedPath]=process.argv.slice(2);
+const [mapPath,draftPath,approvedPath,foreignDraftPath,foreignApprovedPath]=process.argv.slice(2);
 const reportDate=process.env.ANIMAHOST_ACCEPTANCE_DATE??'2026-11-23';
 const rulebookVersion=Number(process.env.ANIMAHOST_ACCEPTANCE_RULEBOOK??9);
 const codeCommit=process.env.ANIMAHOST_ACCEPTANCE_COMMIT??'cc615c4';
@@ -23,7 +23,7 @@ if(!mapPath||!draftPath||!approvedPath||!process.env.AI_GATEWAY_API_KEY||!review
 const docs='docs/animahost/';
 const refs:Record<string,string>=JSON.parse(readFileSync(mapPath,'utf8'));
 if(Object.keys(refs).length!==239||new Set(Object.values(refs)).size!==239)throw Error('invalid_reference_map');
-const gold=JSON.parse(readFileSync(docs+'goldbeispiele-v1.json','utf8')).beispiele.slice(0,6);
+const gold=JSON.parse(readFileSync(docs+'goldbeispiele-v1.json','utf8')).beispiele;
 const knowledge=JSON.parse(readFileSync(docs+'wissensbasis-kfo-v1.json','utf8')).eintraege.map(
  ({id,titel,inhalt,selbsthilfe,praxis,rezeption,warnzeichen,offen}:Record<string,unknown>)=>({id,titel,inhalt,selbsthilfe,praxis,rezeption,warnzeichen,offen}));
 type Mode='draft_preview'|'approved';
@@ -131,7 +131,8 @@ const summarize=(rows:Row[])=>{
  for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
  const ms=rows.filter(r=>r.answer.trim()).map(r=>r.timing.generationMs).filter((v):v is number=>v!==null).sort((a,b)=>a-b);
  const known=rows.filter(r=>r.patientSheetAccess==='confirmed'||r.patientSheetAccess==='unconfirmed');
- return {counts,answers:ms.length,generationMedianMs:ms.length?(ms[Math.floor((ms.length-1)/2)]+ms[Math.floor(ms.length/2)])/2:null,
+ const intentionalSilence=rows.filter(r=>!r.answer.trim()&&/^(?:sender:|social:|conversation:practice_reply)/.test(r.status)).length;
+ return {counts,answers:ms.length,intentionalSilence,unanswered:rows.length-rows.filter(r=>r.answer.trim()).length-intentionalSilence,generationMedianMs:ms.length?(ms[Math.floor((ms.length-1)/2)]+ms[Math.floor(ms.length/2)])/2:null,
   knownCases:known.length,identityQuestionsForKnown:known.filter(r=>r.identityQuestion&&r.answer.trim()).length,
   markedAnswers:rows.filter(r=>reviews.get(r)?.patterns.length).length};
 };
@@ -141,7 +142,7 @@ const result={runId,completedAt,mode:'draft_preview',knowledge:'Entwurfswissen n
  planned:239,completed:239,complete:true,technicalErrors:(stats.draft_preview.counts.technical_error??0)+(stats.approved.counts.technical_error??0),
  qualityFindings:[...reviews.values()].filter(r=>r.patterns.length).length,stats,costs,cases:publish(draft),approvedCases:publish(approved)};
 const patternGate=rulebookVersion>=10?9:0;
-const validForAcceptance=result.technicalErrors===0&&namesForGate().every(s=>s.markedAnswers<=patternGate&&s.identityQuestionsForKnown===0);
+const validForAcceptance=result.technicalErrors===0&&namesForGate().every(s=>s.markedAnswers<=patternGate&&s.identityQuestionsForKnown===0&&s.unanswered===0);
 function namesForGate(){return Object.values(stats);}
 const names:[Mode,Row[]][]=[['draft_preview',draft],['approved',approved]];
 const causes={
@@ -153,7 +154,21 @@ const causes={
 let report=`# AnimaHost · Abnahme mit Regelbuch ${rulebookVersion}\n\nLauf \`${runId}\` · ${completedAt}. Antwortlogik \`${codeCommit}\`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand.\n\n**${validForAcceptance?'Abnahmefähig nach den Kriterien dieses Laufs.':'Abnahme offen.'}** Technische Fehler ${result.technicalErrors}. Antworten mit alten Mustern ${result.qualityFindings}.\n\n| Status | Entwurf | Freigegeben |\n| --- | ---: | ---: |\n`;
 for(const status of [...new Set(names.flatMap(([mode])=>Object.keys(stats[mode].counts)))].sort())report+=`| ${status} | ${stats.draft_preview.counts[status]??0} | ${stats.approved.counts[status]??0} |\n`;
 report+='\nMedian der Erzeugungszeit nur für vorhandene Antworttexte, ohne Versandzeit oder unbeantwortete Fälle.\n\n';
-for(const [mode] of names)report+=`- \`${mode}\` · ${stats[mode].generationMedianMs??'offen'} ms bei ${stats[mode].answers} Antworten. ${stats[mode].markedAnswers} Antworten mit mindestens einem Muster. Identitätsfragen bei bekannten Patienten ${stats[mode].identityQuestionsForKnown} unter ${stats[mode].knownCases} ausgewerteten bekannten Fällen.\n`;
+for(const [mode] of names)report+=`- \`${mode}\` · ${stats[mode].generationMedianMs??'offen'} ms bei ${stats[mode].answers} Antworten. ${stats[mode].markedAnswers} Antworten mit mindestens einem Muster. ${stats[mode].unanswered} unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und ${stats[mode].intentionalSilence} bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten ${stats[mode].identityQuestionsForKnown} unter ${stats[mode].knownCases} ausgewerteten bekannten Fällen.\n`;
+if(foreignDraftPath&&foreignApprovedPath){
+ const fixtures=JSON.parse(readFileSync('scripts/animahost-multilingual-cases.json','utf8')) as [string,string][];
+ report+='\n## Fremdsprachige Eingänge\n\nVier erfundene Nachrichten je Sprache. Jede vierte Nachricht enthält eingefügten Übersetzertext.\n\n| Wissensstand | Antworten | Richtige Sprache | Technische Fehler | Sichere Ersatzantworten |\n| --- | ---: | ---: | ---: | ---: |\n';
+ for(const [mode,file] of [['draft_preview',foreignDraftPath],['approved',foreignApprovedPath]] as const){
+  const rows=readFileSync(file,'utf8').trim().split('\n').map(line=>JSON.parse(line)).sort((a,b)=>a.id.localeCompare(b.id));
+  if(rows.length!==fixtures.length||rows.some((row,i)=>row.id!=='M'+String(i+1).padStart(2,'0')))throw Error('foreign_acceptance_incomplete');
+  report+=`| ${mode} | ${rows.filter(r=>r.answer.trim()).length} | ${rows.filter((r,i)=>r.language===fixtures[i][0]).length} | ${rows.filter(r=>r.error).length} | ${rows.filter(r=>r.safeFallback).length} |\n`;
+ }
+}
+report+='\n## Zwei offene Praxisfälle\n\n';
+report+='- **07:50 Uhr · `f75607c7-a478-4d1a-a2f4-b10053643166`**. Der Versand ist belegt. Die Telefonnummer war zugeordnet, die Identität noch unbestätigt. Die Doctolib-Bestätigung war nicht prüfbar. Die Rezeption muss die Buchung abgleichen.\n';
+report+='- **08:16 Uhr · letzter Eingang `62cf9186-c0cd-4623-acca-fc617b20039e`**. Zwei Entwürfe wurden durch weitere Nachrichten ersetzt. Der leere, nicht unterstützte Eingang war ein eigener Eintrag. Der letzte Entwurf scheiterte an der Antwortprüfung. Es ging nichts raus. Der Fall bleibt bei der Praxis.\n';
+report+='\nFünf vorhandene Antwortbelege wurden anhand von Mandant und WhatsApp-ID mit der richtigen Eintrags-ID verknüpft. Zwei davon gehören zu versendeten Antworten. Beim leeren Eingang fehlt ein historischer Antwortbeleg.\n';
+
 report+='\n## Modellkosten\n\n';
 report+='Beträge in USD. Für ältere Aufrufe ohne Einzelpreis wurden gemessene Eingabe- und Ausgabetokens zum anhand echter Gateway-Belege geprüften EU-Tarif bewertet. Thinking ist in der SDK-Ausgabetokenzahl enthalten. Fehlende Preisbelege und nicht erfasste abgebrochene Aufrufe können den Rechnungsbetrag erhöhen. Die Redaktion und Zweitbewertung sind separat gekennzeichnet.\n\n';
 report+='| Wissensstand | Erfassung aller Versuche | Ohne Preisbeleg | Zusätzliche Durchläufe über denselben Fall | Hochrechnung je 30 Tage |\n| --- | ---: | ---: | ---: | ---: |\n';

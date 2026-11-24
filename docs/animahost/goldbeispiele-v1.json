@@ -142,6 +142,22 @@
       "antwort": "Okay, ich geb's zu, ich steh auf dem Schlauch. Schreib mir in einem Satz, was du brauchst, und ich leg los.",
       "weitergabe": null,
       "stand": "2026-11-23"
+    },
+    {
+      "id": "gold-fremdsprache-verstanden",
+      "anliegen": "У моего ребёнка отклеился брекет. Что делать?",
+      "kontext": "Elternteil schreibt auf Russisch. Übersetzen und das konkrete Anliegen kurz auf Deutsch beantworten.",
+      "wissen": [],
+      "antwort": "Ich habe Ihre Nachricht verstanden. Heben Sie das gelöste Bracket bitte auf und bringen Sie es mit. Drückt oder sticht gerade etwas?",
+      "weitergabe": null
+    },
+    {
+      "id": "gold-fremdsprache-unlesbar",
+      "anliegen": "%#@~!?",
+      "kontext": "Text ohne lesbare Sprache. Der Patient schreibt normalerweise selbst und wird geduzt.",
+      "wissen": [],
+      "antwort": "Danke für die Nachricht, das kann ich leider nicht lesen. Schreib mir auf Deutsch oder Englisch, dann helfe ich dir sofort.",
+      "weitergabe": null
     }
   ]
 }

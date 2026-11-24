@@ -26,12 +26,12 @@ if(replies.length){try{const settings=await query('zymqxzhjbcxzhzvjqvbv',`select
 const clean=(value:string)=>redactionPending?'[Text bis zur abgeschlossenen Namensprüfung zurückgehalten]':maskBirthDates(anonymizeRetrieval(value??'',tokens)).replace(/\|/g,'\\|');
 const evidence=replies.length?await query('zymqxzhjbcxzhzvjqvbv',`select message_id,architecture,evidence,timings from animahost_reply_evidence where tenant_id=${quoted(tenant)} and message_id in (${replies.map(r=>quoted(r.wamid)).join(',')})`):[];
 const budgetIncidents=await query('zymqxzhjbcxzhzvjqvbv',`select created_at,case_details->'modelFailure'->>'httpStatus' as status
- from animahost_whatsapp_decisions where tenant_id=${quoted(tenant)} and rule_id='chain:guard_rejected'
+ from animahost_whatsapp_decisions where tenant_id=${quoted(tenant)}
  and created_at>=${quoted(new Date(since).toISOString())} and case_details->'modelFailure'->>'code'='model_budget_exhausted' order by created_at`);
 const berlin=(value:string)=>new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',dateStyle:'short',timeStyle:'medium'}).format(new Date(value));
 let report=`# Erste zehn Live-Antworten des neuen Kerns\n\nAktiviert: ${berlin(since)} (Europe/Berlin). Stand: ${berlin(new Date().toISOString())}.\n\nErfasst: **${replies.length}/10 tatsächlich versendete Antworten**. Nur echte Eingänge, keine künstlichen Patientennachrichten. Fehlende Antworten werden nicht durch Probeläufe ersetzt.\n\nProduction: ANIMAHOST_RETRIEVAL_PASSED=true und ANIMALINE_RETRIEVAL_POLICY=1. Keine Nachtpause. Vier Goldbeispiele für unklare Eingänge.\n\n`;
 if(!replies.length)report+='\nNoch kein tatsächlicher Versand seit der Aktivierung beobachtet. Architektur und Patientenblatt sind deshalb noch nicht anhand einer Live-Antwort bestätigt.\n';
-report+=`\n## Eingänge ohne Antwort\n\nModellbudget erschöpft: **${budgetIncidents.length}**.\n`;
+report+=`\n## Modellstörungen\n\nModellbudget erschöpft: **${budgetIncidents.length}**. Der Versand einer Ersatzantwort steht beim jeweiligen Eingang.\n`;
 for(const failure of budgetIncidents)report+=`- ${berlin(failure.created_at)} · Modellbudget erschöpft (HTTP ${failure.status==='402'||failure.status==='429'?failure.status:'unbekannt'})\n`;
 for(const [i,r] of replies.entries()){
  const proof=evidence.find(e=>e.message_id===r.wamid);const sheet=proof?.timings?.patientSheet;

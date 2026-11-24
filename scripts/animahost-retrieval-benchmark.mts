@@ -14,7 +14,8 @@ const {classifyModelFailure}=require('./src/lib/services/animahost-model-failure
 const {replyRegister}=require('./src/lib/services/animahost-reply-voice.ts');
 const {anonymizeRetrieval}=require('./src/lib/services/animahost-retrieval-privacy.ts');
 const {patientIsMinor,maskBirthDates}=require('./src/lib/services/animahost-chat-identity.ts');
-const {teamReplyTime}=require('./src/lib/services/animahost-team-time.ts');
+const {localizeInbound}=require('./src/lib/services/animahost-inbound-language.ts');
+const {teamReplyDeadline,teamReplyTime}=require('./src/lib/services/animahost-team-time.ts');
 const {appointmentLocalDate}=require('./src/lib/services/animahost-appointment-notices.ts');
 const {recentConversation}=require('./src/lib/services/animahost-whatsapp-conversation.ts');
 const {clarificationRound}=require('./src/lib/services/animahost-unclear-input.ts');
@@ -83,11 +84,21 @@ async function evaluate(row:any){
   teamTime:teamReplyTime(at,practice.team_reply_days,practice.closure_periods,'de'),today,doctolibUrl:practice.doctolib_url,
   hasPriorConversation:row.history.length>0,hasPriorReply:priorReply,
   identityAsked:row.history.some((h:any)=>h.direction==='outgoing'&&/welchen Patienten|um wen|Vor- und Nachnamen|Geburtsdatum|welchem Namen/i.test(h.text)),
-  preview:mode==='draft_preview',budgetMs:60_000};
+  preview:mode==='draft_preview',budgetMs:60_000,deadline:teamReplyDeadline(at,practice.team_reply_days,practice.closure_periods)};
  const anrede=replyRegister(base.message,role,priorReply,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text));
  const seed={id:row.id,origin:row.origin,mode,at,input:sanitize(row,base.message),anrede,retrieved:empty(),answer:'',clarificationStage:null,
   sendDelaySeconds:null,sendStatus:'not_sent_dry_run'};
  try{
+  const recovery:any[]=[],calls:any[]=[];
+  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call),{tags:['animahost-acceptance-20261124',mode]});
+  let language;
+  try{language=await localizeInbound(model,base.message);}
+  catch(error){
+   const failure=classifyModelFailure(error,'compose');
+   if(failure.httpStatus===402)blocked=true;
+   Object.assign(base,{translationError:failure});
+  }
+  if(language)Object.assign(base,{message:language.text,translated:language.translation!==null,unreadable:language.unreadable});
   // Read decisions as of the historical input. Only actually delivered clarification
   // text in the frozen history advances the stage.
   const phonePatients=patients.map(p=>({id:p.id,vorname:p.firstName,nachname:p.lastName,geburtsdatum:null,geschlecht:null}));
@@ -99,8 +110,6 @@ async function evaluate(row:any){
   if(prior?.error)throw Error('retrieval_context_failed');
   // Exclude the source chat from similar historical cases to avoid grading the original answer as a prediction.
   const found=preflight?{documents:[]}:await retrieveSources(db,tenant,base.message,history.filter((h:any)=>h.direction==='incoming').map((h:any)=>h.text),base.preview,contentHash(row.jid));
-  const recovery:any[]=[],calls:any[]=[];
-  const model=gatewayGenerate(practice.model,AbortSignal.timeout(65_000),(call:any)=>calls.push(call),{tags:['animahost-acceptance-20261124',mode]});
   const result=await runRetrievalReply(async(call:any)=>{
    for(let attempt=0;;attempt++){
     try{return await model(call);}
@@ -117,7 +126,7 @@ async function evaluate(row:any){
   },{...base,patientSheet,clarificationRound:clarificationRound(prior?.data??[],row.history),documents:found.documents,
    budgetMs:Math.max(1000,60_000-(Date.now()-started))});
   const {text:reply,teamSummary:ignored,error,clarificationStage:stage,...rest}=result;
-  return {...seed,...rest,patientSheetAccess:patientSheet.access,answer:sanitize(row,reply),anrede:result.anrede??anrede,clarificationStage:stage??null,
+  return {...seed,...rest,patientSheetAccess:patientSheet.access,language:language?.translation?.language??null,answer:sanitize(row,reply),anrede:result.anrede??anrede,clarificationStage:stage??null,
    status:error?'technical_error':result.rule,error:error??null,recoveredErrors:recovery,
    timing:{generationMs:result.ms,totalMs:Date.now()-started},calls};
  }catch{
