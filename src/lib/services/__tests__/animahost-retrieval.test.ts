@@ -229,3 +229,12 @@ test('external booking discloses only a confirmed chart appointment and attaches
  assert.equal(confirmed?.dueAt,deadline.dueAt);assert.match(confirmed!.text,/26.11.2026 um 14:30 Uhr/);
  assert.match(unconfirmed!.text,/externe Buchungsbestätigung/);assert.doesNotMatch(unconfirmed!.text,/14:30/);
 });
+
+test('a semantic thank-you is quiet only after its content is independently checked',async()=>{
+ const closing=answer({answer:'',closing:true,team:false,summary:null,substantive:false});
+ const m=model(closing,{closing:'thanks'});
+ const result=await runRetrievalReply(m.generate,input({message:'Vielen Dank für die ausführliche Erklärung und schöne Grüße!'}));
+ assert.equal(result.rule,'social:acknowledged');assert.equal(result.skipSend,true);
+ const agree=model(closing,{closing:'agreement'});
+ assert.equal((await runRetrievalReply(agree.generate,input({message:'Ja, das passt für uns gut.'}))).rule,'conversation:practice_reply');
+});
