@@ -1,47 +1,48 @@
 # AnimaHost · Abnahme mit Regelbuch 10
 
-Lauf `retrieval-v10-e9d2a9bf-86a0-45ef-a2fc-9e143cde8607` · 2026-11-23T23:32:52.554Z. Antwortlogik `4d07534`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand.
+Lauf `retrieval-v10-4ecc3209-e96b-4cc4-8b66-f274376db1f9` · 2026-11-24T08:30:09.130Z. Antwortlogik `cdf967a`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand. Nach der letzten Änderung wurden die von der neuen Prüfung betroffenen Eingänge erneut gerechnet. Der Bericht enthält je Fall das letzte Ergebnis.
 
-**Abnahme offen.** Technische Fehler 0. Antworten mit alten Mustern 141.
+**Abnahme offen.** Technische Fehler 8. Antworten mit alten Mustern 240.
 
 | Status | Entwurf | Freigegeben |
 | --- | ---: | ---: |
 | billing:portal_browser | 3 | 3 |
 | billing:portal_missing | 3 | 3 |
-| chain:guard_rejected | 3 | 12 |
 | conversation:clarify_first | 9 | 9 |
-| conversation:practice_reply | 8 | 8 |
+| conversation:practice_reply | 31 | 29 |
+| conversation:unreadable_language | 4 | 4 |
 | draht-sticht-oder-etwas-tut-weh | 1 | 1 |
-| retrieval:answered | 126 | 115 |
-| sender:non_patient | 3 | 4 |
+| retrieval:answered | 117 | 124 |
+| retrieval:safe_fallback | 32 | 24 |
+| sender:non_patient | 2 | 2 |
 | sender:team | 3 | 3 |
-| social:acknowledged | 72 | 73 |
+| social:acknowledged | 26 | 29 |
 | social:reaction | 2 | 2 |
-| social:unreadable | 6 | 6 |
+| social:unreadable | 2 | 2 |
+| technical_error | 4 | 4 |
 
 Median der Erzeugungszeit nur für vorhandene Antworttexte, ohne Versandzeit oder unbeantwortete Fälle.
 
-- `draft_preview` · 7715.5 ms bei 142 Antworten. 48 Antworten mit mindestens einem Muster. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
-- `approved` · 6775 ms bei 131 Antworten. 93 Antworten mit mindestens einem Muster. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
+- `draft_preview` · 7101 ms bei 173 Antworten. 121 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 66 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
+- `approved` · 7106.5 ms bei 172 Antworten. 119 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 67 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
 
-## Vergleich und Stichproben
+Die gesamte Erzeugungszeit einschließlich Übersetzung, Patientenblatt und Quellensuche lag im Median bei 8,24 s mit Entwurfswissen und 8,16 s mit freigegebenem Wissen. In den acht technischen Fehlerfällen entstand dennoch eine sichere Antwort.
 
-| Maß | Entwurf 23.11. | Entwurf 24.11. | Freigegeben 23.11. | Freigegeben 24.11. |
+## Fremdsprachige Eingänge
+
+Vier erfundene Nachrichten je Sprache. Jede vierte Nachricht enthält eingefügten Übersetzertext.
+
+| Wissensstand | Antworten | Richtige Sprache | Technische Fehler | Sichere Ersatzantworten |
 | --- | ---: | ---: | ---: | ---: |
-| Mit mindestens einer Markierung | 112 von 144 | 48 von 142 | 121 von 143 | 93 von 131 |
-| Durch den Antwortprüfer zurückgehalten | 1 | 3 | 0 | 12 |
-| Ohne Nachricht zur Praxis weitergeführt | 0 | 8 | 0 | 8 |
+| draft_preview | 20 | 20 | 0 | 3 |
+| approved | 20 | 20 | 0 | 5 |
 
-Die Gesamtwertung verfehlt die Vorgabe von weniger als zehn markierten Antworten je Wissensstand. Die Zweitbewertung markiert auch konkrete Aufgaben des Empfangs, etwa wenn bei einer langfristigen Terminanfrage nur die Praxis den Kalender prüfen kann. Die separate Textprüfung fand in beiden Endläufen **0 wörtliche alte Standardübergaben**, **0 Formulierungen „kann ich hier nicht einsehen“ oder die geprüften Varianten** und **0 Standardfragen „Unter welchem Namen“ oder „Für welchen Patienten schreiben Sie“**. Die Tabelle oben verwendet weiterhin die strengere unabhängige Bewertung. Die 143 Fälle je Lauf mit bekannter Zuordnung hatten im eingefrorenen Bestand den Status unconfirmed. Der Schutz für confirmed ist mit eigenen Tests belegt. Frühere Praxisnachrichten zählen nur mit belegter Absenderquelle.
+## Zwei offene Praxisfälle
 
-| Referenz | Ergebnis |
-| --- | --- |
-| L02 | Entwurf mit konkreter Antwort ohne Identitätsfrage. Im freigegebenen Lauf hat die Anredeprüfung die Antwort zurückgehalten. |
-| L06 | In beiden Läufen direkter Hinweis auf Browserzugang und möglichen E-Mail-Versand ohne App-Download. |
-| L08, L09 | In beiden Läufen nennt die Antwort den Rechnungsbereich und die konkrete Prüfung von Freigabe, Kontozuordnung und E-Mail-Versand. In den archivierten Eingängen war keine Identität bestätigt. Persönlicher Rechnungsstatus blieb daher offen. |
-| Jetzt vor Ort oder kurze Verspätung | Kein passender Eingang in den 239 Fällen. Separat mit Treppenhaus, Tür und fünf Minuten Verspätung geprüft, einschließlich wichtiger Meldung und Versandplanung ohne künstliche Wartezeit. |
+- **07:50 Uhr · `f75607c7-a478-4d1a-a2f4-b10053643166`**. Der Versand ist belegt. Die Telefonnummer war zugeordnet, die Identität noch unbestätigt. Die Doctolib-Bestätigung war nicht prüfbar. Die Rezeption muss die Buchung abgleichen.
+- **08:16 Uhr · letzter Eingang `62cf9186-c0cd-4623-acca-fc617b20039e`**. Zwei Entwürfe wurden durch weitere Nachrichten ersetzt. Der leere, nicht unterstützte Eingang war ein eigener Eintrag. Der letzte Entwurf scheiterte an der Antwortprüfung. Es ging nichts raus. Der Fall bleibt bei der Praxis.
 
-Die [offene Frage zum E-Mail-Versand ohne Portalzugang](2026-11-24-portal-versand-offene-frage.json) ist im Praxiswissen erfasst. Für diese Abnahme wurde keine WhatsApp-Nachricht versendet.
+Fünf vorhandene Antwortbelege wurden anhand von Mandant und WhatsApp-ID mit der richtigen Eintrags-ID verknüpft. Zwei davon gehören zu versendeten Antworten. Beim leeren Eingang fehlt ein historischer Antwortbeleg.
 
 ## Modellkosten
 
@@ -49,14 +50,21 @@ Beträge in USD. Für ältere Aufrufe ohne Einzelpreis wurden gemessene Eingabe-
 
 | Wissensstand | Erfassung aller Versuche | Ohne Preisbeleg | Zusätzliche Durchläufe über denselben Fall | Hochrechnung je 30 Tage |
 | --- | ---: | ---: | ---: | ---: |
-| draft_preview | 0.4672 | 0 | 0 | 1.283 |
-| approved | 0.3599 | 0 | 0 | 1.0716 |
+| draft_preview | 0.5877 | 10 | 66 | 1.0614 |
+| approved | 0.4641 | 10 | 65 | 0.8439 |
 
 Hochrechnung für 13 Antworten pro Tag anhand der letzten Ausführung je Fall. Die Hochrechnung enthält keine Annahme über künftige Cache-Treffer.
 
 ## Technische Fehler
 
-Keine terminalen technischen Fehler. Wiederholte und erfolgreich beendete Fehler stehen je Fall im JSON.
+- `draft_preview/A05` · model_timeout (compose, HTTP —)
+- `draft_preview/A06` · model_timeout (compose, HTTP —)
+- `draft_preview/A09` · model_timeout (compose, HTTP —)
+- `draft_preview/A20` · model_timeout (compose, HTTP —)
+- `approved/A05` · model_timeout (compose, HTTP —)
+- `approved/A06` · model_timeout (compose, HTTP —)
+- `approved/A09` · model_timeout (compose, HTTP —)
+- `approved/A20` · model_timeout (compose, HTTP —)
 
 ## Alte Muster und Korrekturansätze
 
@@ -64,144 +72,46 @@ Keine terminalen technischen Fehler. Wiederholte und erfolgreich beendete Fehler
 
 Konkrete Hilfe fehlt vor der Übergabe. Die Antwort zuerst auf das lösbare Anliegen und danach auf die echte Aufgabe fürs Team prüfen.
 
-- `draft_preview` · A01, A16, A17, A26, A30, A84, A86, A88, A92, A93, B15, B18, B19, B21, B51, B68, L14, L27, L28
-- `approved` · A07, A14, A17, A19, A25, A30, A35, A36, A41, A45, A47, A56, A59, A63, A69, A70, A74, A81, A83, A84, A86, A93, A94, A95, A96, A97, A98, A99, B02, B03, B04, B06, B26, B29, B31, B36, B40, B45, B46, B47, B48, B49, B50, B51, B55, B56, B57, B58, B60, B61, B68, B82, B84, B87, B92, B93, B94, L05, L07, L08, L09, L12, L13, L14, L15, L17, L21, L22, L23, L24, L25, L26, L27
+- `draft_preview` · A03, A05, A06, A09, A10, A14, A20, A27, A35, A43, A44, A55, A56, A63, A72, A77, A80, A93, A94, A96, A97, B04, B12, B13, B15, B18, B22, B30, B41, B43, B48, B51, B53, B55, B56, B61, B62, B65, B66, B73, B80, B82, B86, B95, L01, L02, L09, L12, L13, L21, L24
+- `approved` · A03, A05, A06, A09, A10, A15, A20, A26, A27, A29, A30, A35, A36, A44, A45, A55, A69, A72, A80, A86, A87, A88, A93, A94, A95, A97, A99, B02, B03, B04, B06, B08, B12, B15, B22, B25, B40, B47, B48, B49, B51, B55, B57, B61, B62, B66, B73, B75, B88, B91, B93, B94, B96, L07, L08, L09, L21, L22, L24, L25, L27, L30
 
 ### generic_patient_question
 
 Die Identitätsfrage ist losgelöst vom Anliegen. An den konkreten Fall binden und Vorwissen nutzen.
 
-- `draft_preview` · A12, A18, A42, A61, A68, A85, A88, A93, B10, B35, B50, B51, B53, B55, B68, B100
-- `approved` · A12, A61, A68, A85, A97, B35, B40, B53, B70, B76, B88, B92, B94, B100, L28
+- `draft_preview` · A18, A48, A68, A85, B16, B35, L28
+- `approved` · A42, A61, A68, B10, B31, B37, B50, B70, B76, L28
 
 ### portal_access_boilerplate
 
 Eine Systemgrenze wird ohne Hilfestellung beschrieben. Den echten Zugriffspfad oder den konkreten nächsten Schritt nennen.
 
-- `draft_preview` · A98, B25, B29, B49, B58, L08, L09, L10, L17, L21, L32
-- `approved` · A15, A47, A56, A75, A83, A99, B20, B29, B37, B80, B82, B85, L05, L17, L21, L25
+- `draft_preview` · A26, A47, A75, A98, B02, B29, B66, B85, L05, L08, L09, L10, L16, L17, L25
+- `approved` · A74, B02, B29, B36, B45, B53, B58, B66, B85, L05, L12, L17, L25
 
 ### reply_time_boilerplate
 
 Die Rückmeldezeit ist ein Standardsatz. Angeben, was das Team bis dahin tatsächlich klärt.
 
-- `draft_preview` · A35, A86, A97, B27, L13, L21, L23, L25
-- `approved` · A15, A16, A35, A62, B15, B57, B58, B68, B87, B93, L13
+- `draft_preview` · A03, A05, A06, A09, A10, A13, A14, A15, A16, A17, A20, A23, A26, A27, A29, A30, A35, A41, A43, A44, A45, A47, A49, A54, A55, A56, A59, A62, A63, A69, A70, A72, A74, A77, A80, A81, A83, A84, A86, A87, A88, A93, A94, A96, A97, B03, B04, B06, B12, B13, B15, B18, B22, B27, B29, B30, B31, B36, B40, B41, B43, B45, B47, B48, B49, B51, B53, B55, B56, B58, B61, B62, B65, B66, B67, B68, B73, B76, B77, B79, B80, B82, B85, B86, B87, B88, B92, B93, B96, L01, L02, L07, L08, L09, L12, L13, L14, L17, L21, L22, L23, L24, L25, L26, L27, L28, L30, L32
+- `approved` · A03, A04, A05, A06, A07, A09, A10, A15, A17, A20, A23, A26, A27, A29, A30, A35, A36, A43, A44, A45, A55, A56, A59, A62, A63, A69, A70, A72, A74, A75, A77, A80, A83, A84, A86, A87, A88, A92, A93, A94, A95, A96, A97, A98, A99, B02, B03, B04, B06, B08, B12, B15, B16, B17, B19, B20, B21, B22, B23, B25, B27, B29, B30, B33, B36, B40, B45, B46, B47, B48, B49, B51, B52, B55, B58, B60, B61, B62, B66, B68, B73, B75, B77, B84, B88, B91, B92, B93, B94, B96, L07, L08, L09, L12, L13, L14, L17, L21, L22, L23, L24, L25, L26, L27, L30
 
 
 ## Zehn stärkste Antworten
 
-**draft_preview/A10 · 9/10**
-
-Eingang
-
-> Guten Tag,
-> Ich komme am Donnerstag so vorbei und hole sie ab.
-> Danke sehr für Bescheid!
-> Mit freundlichen Grüße [Person]
-
-Antwort
-
-> Guten Tag, vielen Dank für Ihre Nachricht. Am Donnerstag sind wir von 9:00 bis 13:00 Uhr und von 14:00 bis 18:30 Uhr für Sie da.
-
-**draft_preview/A37 · 9/10**
-
-Eingang
-
-> Guten Tag ich habe bei meiner unterem Zahnspange Probleme und kann jetzt nicht mehr zubeißen kann ich zu ihnen kommen?
-
-Antwort
-
-> Das tut mir leid, dass es gerade nicht mehr geht. Bitte bringen Sie die untere Zahnspange mit und versuchen Sie nicht, sie selbst zu befestigen. Wenn Sie starke Schmerzen haben oder etwas drückt oder sticht, rufen Sie bitte direkt an: [Telefon]. Sie können auch spontan zu den Sprechzeiten Dienstag bis Donnerstag vorbeikommen, dann mit Wartezeit, oder wir vereinbaren einen festen Termin. Was ist Ihnen lieber?
-
-**draft_preview/B46 · 9/10**
-
-Eingang
-
-> Sehr geehrte [Person] ,
->
-> Ich hoffe, Sie sind trotz der Hitze wohlauf. :)
->
-> Seit heute Morgen piekt leider eine Seite bei meinem oberen retrainer und ich bleibe hin und wieder mit der Zunge hängen. Ich habe Angst, dass sich erneut etwas löst und wollte fragen, ob Sie ggf in der nächsten Woche einen Termin [Person] hätten.
->
-> Vielen Dank vorab und liebe Grüße [Person]
-
-Antwort
-
-> Das tut mir leid, dass die Seite piekt. Bis zum Termin können Sie die reibende Stelle mit etwas Wachs abdecken, das hilft oft. Der Empfang prüft, ob in der nächsten Woche ein Termin für Ihren oberen Retainer [Person] ist. Falls sich etwas löst oder die Beschwerden stärker werden, rufen Sie bitte direkt unter [Telefon] an. Welcher Tag in der nächsten Woche passt Ihnen am besten?
-
-**draft_preview/B54 · 9/10**
-
-Eingang
-
-> Der Retainer hat sich mittlerweile komplett gelöst. Soll trotzdem ein Termin über Reparatur Retainer gemacht werden?
-> Vielen Dank!
-
-Antwort
-
-> Ja, für die Reparatur ist ein Termin sinnvoll, damit der Retainer wieder befestigt werden kann. Bitte bewahren Sie den gelösten Draht auf und bringen Sie ihn zum Termin mit, kleben Sie ihn aber nicht selbst [Person]. Den Termin können Sie hier über Doctolib buchen: [Link] Ob der Retainer nur befestigt oder komplett ersetzt werden muss, prüft das Team.
-
-**draft_preview/B84 · 9/10**
-
-Eingang
-
-> Hallo liebes Team.  Hier ist [Person] die [Person] von [Person] .  Sie hatte sie kontaktiert da ihre Gummis sich verfärbt haben und sie wollte gern vor dem 30.09 nochmal einen Wechsel haben.
->
-> Das ist nicht möglich?
->
-> Bitte nochmal um [Person] Rückmeldung
->
-> Vielen Dank [Person]
-
-Antwort
-
-> Guten Tag [Person] , das ist möglich, und dafür brauchen Sie keinen Termin. Gummis können Sie während der Sprechzeiten Dienstag bis Donnerstag am Empfang abholen, vormittags von 9 bis 13 Uhr und nachmittags von 14 bis 18:30 Uhr. Bitte bringen Sie möglichst ein Tütchen oder die Packung mit, falls die Größe nicht eindeutig ist. Wenn Sie den Wechsel vor dem 30.09. schaffen möchten, passt das also gut in die Sprechzeiten dieser Woche.
-
-**draft_preview/B93 · 9/10**
+**approved/A19 · 9/10**
 
 Eingang
 
 > Hallo,
-> Heute kann ich leider nicht. Ist es egal wann ich vorbeikomme ob heute oder morgen oder so
+> ich habe heute um 15:30 Uhr einen Termin. Leider hat meine Bahn Ausfall und Verspätung, daher kann es sein, dass ich etwa 10 Minuten später komme.
+> MfG [Person]
 
 Antwort
 
-> Heute ist Dienstag, die [Person] hat bis 18:30 Uhr geöffnet, und morgen Mittwoch ebenfalls. Ohne Termin können Sie während der Sprechzeiten spontan vorbeikommen, dann müssen Sie aber mit einer längeren Wartezeit rechnen. Mit einem festen Termin entfällt das Warten, den können Sie hier buchen: [Link] Worum geht es bei Ihrem Besuch?
+> Vielen Dank für Ihre Info. Kommen Sie bitte trotzdem zu Ihrem Termin heute um 15:30 Uhr, eine Verspätung von etwa 10 Minuten ist kein Problem. Falls es deutlich später wird, rufen Sie bitte an: [Telefon].
 
-**draft_preview/L01 · 9/10**
-
-Eingang
-
-> Okay, bei mir ist ein Attachment abgegangen. Kann ich spontan in der [Person] vorbeikommen?
-
-Antwort
-
-> Das kommt vor und lässt sich gut beheben. Trag die Schiene bis dahin einfach weiter wie gewohnt, das Attachment musst du nicht aufheben, es wird in der [Person] neu angebracht. Du kannst am Dienstag während der Sprechzeiten (9 bis 13 Uhr oder 14 bis 18:30 Uhr) spontan vorbeikommen, dann mit etwas Wartezeit, oder du buchst dir direkt einen festen Termin zur Aligner-Kontrolle: [Link] Wenn etwas drückt oder wehtut, ruf uns sofort an unter [Telefon]. Steht dein nächster Schienenwechsel [Person] bevor? Dann schreib das dazu, damit das Team es gleich mit einplant.
-
-**draft_preview/L02 · 9/10**
-
-Eingang
-
-> Hallo, bei mir ist ein Attachment abgegangen. Kann ich spontan in der [Person] vorbeikommen?
-
-Antwort
-
-> Das kommt vor und lässt sich gut beheben. Trag die Schiene einfach weiter wie gewohnt, das Attachment musst du nicht aufheben, es wird in der [Person] neu angebracht. Du kannst während der Sprechzeiten Dienstag bis Donnerstag spontan vorbeikommen, dann mit etwas Wartezeit, oder du buchst dir direkt einen festen Termin zur Aligner-Kontrolle: [Link] Steht dein nächster Schienenwechsel bald an? Dann schreib das [Person] dazu, damit das Team es gleich mit einplant.
-
-**draft_preview/L26 · 9/10**
-
-Eingang
-
-> Guten Morgen, bei [Person] sei wohl wieder ein Draht abgebrochen....
-> Wäre es möglich, das [Person] donnerstags Nachmittag einen Termin bekommen könnte?
->
-> Mit freundlichen Grüße [Person]
-
-Antwort
-
-> Guten Morgen, das ist ärgerlich. Heben Sie das abgebrochene [Person] bitte auf und bringen Sie es zum Termin mit, scharfe Stellen können Sie bis dahin mit Wachs abdecken. Drückt oder sticht gerade etwas, oder hat [Person] Schmerzen? Dann rufen Sie uns bitte direkt unter [Telefon] an. Sonst haben Sie die Wahl: Während der Sprechzeiten Dienstag bis Donnerstag können Sie spontan vorbeikommen, dann mit etwas Wartezeit, oder Sie nehmen einen festen Termin. Der Empfang prüft, ob am Donnerstagnachmittag ein Termin für [Person] ist.
-
-**approved/A08 · 8/10**
+**draft_preview/A08 · 9/10**
 
 Eingang
 
@@ -209,113 +119,206 @@ Eingang
 
 Antwort
 
-> Gerne helfe ich Ihnen dabei. Einen Sprechtermin bei Dr. [Person] können Sie direkt online buchen: [Link] Falls die Online-Buchung bei Ihnen nicht klappt, erreichen Sie uns telefonisch unter [Telefon].
+> Gerne helfe ich Ihnen dabei. Sie können den Sprechtermin bei Dr. [Person] direkt online über Doctolib buchen: [Link] Worum soll es bei dem Termin gehen, zum Beispiel um eine Kontrolle oder eine Besprechung?
+
+**draft_preview/A19 · 9/10**
+
+Eingang
+
+> Hallo,
+> ich habe heute um 15:30 Uhr einen Termin. Leider hat meine Bahn Ausfall und Verspätung, daher kann es sein, dass ich etwa 10 Minuten später komme.
+> MfG [Person]
+
+Antwort
+
+> Vielen Dank für die Info. Bei etwa 10 Minuten Verspätung kommen Sie einfach zu Ihrem Termin um 15:30 Uhr, eventuell mit ein wenig Wartezeit. Sollte es doch später werden, rufen Sie bitte [Person] unter [Telefon] an, dann können wir schauen, ob der Termin heute noch klappt.
+
+**draft_preview/A89 · 9/10**
+
+Eingang
+
+> Hallo, es tut mir leid, dass ich heute nicht vorbeigekommen bin, um dir die Rate zu geben – ich bin nämlich müde. Aber morgen komme ich vorbei.
+
+Antwort
+
+> Das ist kein Problem, du musst dich nicht entschuldigen. Komm morgen einfach während der Sprechzeiten am Empfang vorbei, Dienstag bis Donnerstag von 9 bis 13 und von 14 bis 18:30 Uhr, und gib die Rate dort ab. Ruh dich heute gut aus.
+
+**draft_preview/B26 · 9/10**
+
+Eingang
+
+> Sehr geehrte Damen und Herren, meine [Person] [Patient] ist bei Ihnen Bestandspatientin. Sie hat auf den neuen Aligner Nr. 26 gewechselt und dieser sitzt zu locker und lässt sich hinten nicht einklicken. Wir haben Nr. 27 probehalber auch probiert, aber dieser sitzt ebenfalls zu locker und lässt sich auch hinten nicht einklicken.
+>
+> Bitte teilen Sie uns mit wie wir weiter verfahren sollen.
+
+Antwort
+
+> Sehr geehrte Damen und Herren, es tut mir leid, dass der Aligner Nr. 26 bei [Person] so locker sitzt und sich hinten nicht einklicken lässt. Bitte tragen Sie bis zur Klärung wieder die vorherige Schiene, die gut gepasst hat, und bewahren Sie alle alten Schienen auf. Mit den Kausticks (Chewies) können Sie die Schiene mehrmals täglich festbeißen. Für die Aligner-Kontrolle können Sie über den Buchungslink einen Termin wählen oder während der Sprechzeiten [Person] bis [Person] spontan mit Wartezeit vorbeikommen, bitte dann alle Schienen mitbringen. Der Empfang gibt an das Team weiter, ob die Aligner Nr. 26 und 27 angepasst oder neu hergestellt werden müssen. Sie hören am Mittwoch, 3. Dezember bis 10 Uhr von uns.
+
+**approved/A01 · 8/10**
+
+Eingang
+
+> [Person] kfo Team, aufgrund von schienenersatzverkehr kommt [Person]. [Person] erst 17:06 bzw 18:06 am bhf an und verspäten sich dadurch um wenige Minuten. Ich bitte um Verständnis. Vg [Person]
+
+Antwort
+
+> Vielen Dank für Ihre Nachricht und dass Sie uns so früh Bescheid geben. Der Schienenersatzverkehr ist ärgerlich, und ein paar Minuten Verspätung sind kein Problem. Bitte kommen Sie einfach zur Anmeldung, sobald Sie da sind. Bei Fragen erreichen Sie uns unter [Telefon].
+
+**approved/A13 · 8/10**
+
+Eingang
+
+> Guten Tag. [Person] hat heute um 14.45 einen Termin. Sie ist aber gerade von der Schule zurück und fühlt sich unwohl-Fieber und Kopfschmerzen. Ich möchte gern den Termin verschieben
+
+Antwort
+
+> Guten Tag, das tut mir leid, dass es [Person] gerade nicht gut geht, und ich wünsche ihr gute Besserung. Der Empfang prüft den heutigen Termin um 14:45 Uhr und sucht einen passenden neuen Termin, sobald es ihr wieder besser geht. Falls sich ihr Zustand verschlechtert oder starke Schmerzen auftreten, rufen Sie bitte sofort unter [Telefon] an. Wann wäre es Ihnen denn recht, damit der Empfang gezielt suchen kann? Sie hören heute bis 17 Uhr von uns.
+
+**approved/A41 · 8/10**
+
+Eingang
+
+> Hallo ,
+>
+> [Person] Frage , wäre es möglich den heutigen Termin zu verschieben , heute Nachmittag vlt? Meine [Person] kann leider nicht kommen. Heute wird alles organisatorisches in der Schule besprochen.
+>
+> Freundliche Grüße [Person]
+
+Antwort
+
+> Guten Tag [Person] , das verstehe ich, heute wird in der Schule viel besprochen. Der Empfang prüft, ob heute am Nachmittag ein Termin für Ihre [Person] ist, und schlägt Ihnen dann eine Zeit vor. Welche Uhrzeit am Nachmittag würde für Sie denn am besten passen? Sie hören heute bis 12 Uhr von uns.
+
+**approved/A47 · 8/10**
+
+Eingang
+
+> Hallo, der noch offene Posten wurde ausgeglichen.  [Person] -> Überweisung erfolgt durch N.[Person] .
+> Lg [Person]
+
+Antwort
+
+> Danke für die Information, dass der offene Betrag ausgeglichen wurde. Der Empfang prüft den Zahlungsstand und ob die Dezember-Rechnung über 102,44 € inzwischen bei Ihnen angekommen ist. Sobald das geklärt ist, melden wir uns mit dem Ergebnis. Sie hören heute bis 12 Uhr von uns.
+
+**approved/B11 · 8/10**
+
+Eingang
+
+> Guten Tag, Dr. [Person]. Ich bin [Person] . Wir kommen mit Verspätung daher der Zug kurzfristig abgesagt wurde.
+> Dankeschön
+
+Antwort
+
+> Guten Tag, danke für die Info zur Verspätung. Das ist kein Problem, kommen Sie bitte sicher an. Wir freuen uns auf Sie.
 
 
 ## Zehn schwächste Antworten
 
-**approved/B57 · 2/10**
+**draft_preview/B62 · 1/10**
 
 Eingang
 
-> Ja die brauch er dann für die Schule . Dann sind wir am 29.9 um 9 uhr da . Soll ich irgendwas bestimmtes mitbringen?
+> Vielen Dank, ich werde am Mittwoch, den 14. Oktober 2026 um 14:15 Uhr dort sein.
 
 Antwort
 
-> Vielen Dank für Ihre Nachricht. Ob der Termin am 29.09. um 9 Uhr bereits eingetragen ist und ob Sie etwas mitbringen sollten, prüft der Empfang gerade und meldet sich dann bei Ihnen. Bei Fragen erreichen Sie uns direkt unter [Telefon].
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 12 Uhr von uns.
 
-**draft_preview/L27 · 2/10**
+**draft_preview/B53 · 1/10**
 
 Eingang
 
-> Hallo guten Morgen.
+> Ich bin auch wieder da, wann darf ich kommen?
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/B51 · 1/10**
+
+Eingang
+
+> Hallo [Person] dr. [Person] schicken sie mir die Bilder 😂☺️😊
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/B48 · 1/10**
+
+Eingang
+
+> Hallo, da hatten Sie mir letztens aber was anderes gesagt, da Sie ja jetzt ein aktuelles Röntgen Bild haben und Fr.  [Person] sich dies angeschaut hat , meinten Sie das der oben liegende Zahlen auch mit raus soll.
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/B22 · 1/10**
+
+Eingang
+
+> Danke sehr! [Person] kommt morgen um 16:30.
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören am Dienstag, 25. [Person] bis 10 Uhr von uns.
+
+**draft_preview/B18 · 1/10**
+
+Eingang
+
+> Hallo, ich kann sie am Montag abholen kommen.
+> Viele Grüße [Person]
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/A97 · 1/10**
+
+Eingang
+
+> [Person] Praxisteam, zu welcher Uhrzeit soll ich am Montag kommen?
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/A94 · 1/10**
+
+Eingang
+
+> 15 Uhr Heute?
+
+Antwort
+
+> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+
+**draft_preview/A77 · 1/10**
+
+Eingang
+
+> Vielen Dank! 🙌🏽
+> Ich war mir unsicher, ob dies die richtige Kontonummer ist, daher habe ich lieber nachgefragt. Ich werde die Überweisung umgehend vornehmen, nochmals vielen Dank!
 >
-> Es tut mir sehr leid, aber ich kann heute leider nicht zur Arbeit kommen, da ich krank bin und mich wirklich sehr schlecht fühle. Ich bitte um Entschuldigung für die kurzfristige Nachricht und hoffe auf dein Verständnis.
->
-> Vielen Dank!
+> Grüße [Person]
 
 Antwort
 
-> Gute Besserung, und danke für die frühe Nachricht. Es ist gut, dass Sie sich zu Hause ausruhen. Der Empfang prüft Ihre Abwesenheit für heute und meldet sich, falls noch etwas zu klären ist.
+> Ich kläre mit der Rezeption, was wir für dich tun können. Du hörst am Dienstag, 27. Oktober bis 10 Uhr von uns.
 
-**draft_preview/L09 · 2/10**
+**draft_preview/A35 · 1/10**
 
 Eingang
 
-> Nein, nicht Abrechnung die Rechnungen, die angeblich in der App zu sehen sein sollten
+> Guten Tag,
+> mein Name ist [Person]. Ich schreibe wegen meiner [Person] [Patient] (geb. [Datum]).
+> Laut der Rechnung [Person] [Datum] sollten 144,11 € ab dem [Datum] automatisch von meinem Konto abgebucht werden. Das Geld wurde bisher jedoch nicht abgebucht. Was soll ich jetzt tun? Wird die Lastschrift noch einmal eingezogen oder soll ich den Betrag selbst überweisen?
+> Außerdem hat meine [Person] [Patient] mit ihrer Zahnspange. Ich habe gesehen, dass die nächsten Termine erst wieder ab [Person] verfügbar sind. Wann könnten wir vorbeikommen?
+> Vielen Dank für Ihre Rückmeldung.
+> Mit freundlichen Grüße [Person]
 
 Antwort
 
-> Öffnen Sie nach dem Login den Bereich „Rechnungen“. Der Empfang prüft, ob der fehlende Beleg für Ihr Konto freigegeben und per E-Mail verschickt wurde.
-
-**draft_preview/A85 · 2/10**
-
-Eingang
-
->
-
-Antwort
-
-> Ich helfe Ihnen gern. Worum geht es?
-
-**approved/B88 · 2/10**
-
-Eingang
-
-> Den Wink mit dem Zaunpfahl habe ich verstanden😅
-
-Antwort
-
-> Das war vielleicht etwas deutlich formuliert, entschuldigen Sie bitte. [Person] Sie noch eine Frage zu Ihrem Termin am Donnerstag, dem 24.9.?
-
-**approved/B35 · 2/10**
-
-Eingang
-
-> ?
-
-Antwort
-
-> Ich helfe Ihnen gern. Worum geht es?
-
-**draft_preview/B59 · 2/10**
-
-Eingang
-
-> We coming now
-
-Antwort
-
-> Thank you for letting us know. Please come to [Person] reception for [Person] 17:00 appointment you mentioned today. If you will be more than 15 minutes late, please call us right away at [Telefon] so [Person] team [Person] check whether it still works today.
-
-**draft_preview/L21 · 3/10**
-
-Eingang
-
-> [Person] Praxisteam, ich wollte mich nochmal erkundigen wegen des Termins morgen. Wann soll ich da sein?
-
-Antwort
-
-> Die genaue Uhrzeit Ihres Termins morgen kann ich hier im Chat nicht einsehen. Der Empfang prüft die Uhrzeit für Sie und nennt sie Ihnen, damit Sie rechtzeitig in der [Person] sind.
-
-**draft_preview/A88 · 3/10**
-
-Eingang
-
-> Sehr geehrte [Person] ,
-> ich möchte mich bei Ihnen entschuldigen, aber leider kann ich heute nicht zur Arbeit kommen, da ich meinen schulischen Verpflichtungen nachkommen muss.
-> Ich bitte um Ihr Verständnis.
-
-Antwort
-
-> Vielen Dank, dass Sie sich rechtzeitig melden. Da Sie heute wegen schulischer Verpflichtungen nicht kommen können, ist das in Ordnung. Der Empfang prüft, ob für Sie ein Ersatztermin [Person] ist, und meldet sich bei Ihnen. Könnten Sie mir bitte [Person] sagen, für welches Kind der Termin gedacht ist, damit wir ihn korrekt zuordnen?
-
-**approved/L13 · 3/10**
-
-Eingang
-
-> Ich hoffe das uns [Person] am Montag antwortet
-
-Antwort
-
-> Das verstehe ich gut. Der Empfang prüft, ob [Person] Termin am Mittwoch auf die Woche ab dem 30.11. ab 15 Uhr verschoben werden kann, und klärt außerdem, wie es mit der Rechnung für den Termin aussieht. Bitte haben Sie noch etwas Geduld, bis die Antwort vorliegt.
+> Ich kläre mit der Rezeption, ob der Termin bei uns eingetragen ist. Sie hören am Dienstag, 21. [Person] bis 10 Uhr von uns.
