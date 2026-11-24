@@ -1,3 +1,5 @@
+import {conversationPhoneProof} from '../animahost-chat-identity';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadPatientSheet,relativeAppointment,selectedConfirmedPatient,sheetLedger} from '../animahost-patient-sheet';
@@ -37,4 +39,21 @@ test('sheet reaches the single system text and the hard boundary check',async()=
  const text='Für Leon steht am Donnerstag, 26.11., um 15:30 Uhr eine Kontrolle an. Wir sehen den Draht dabei mit an.';
  const result=await runRetrievalReply(async call=>{calls.push(call);return call.schema.parse(call.stage==='verify'?{passed:true,hard:[],teamRequired:false,urgent:false,summary:null}:text);},{message:args.message,messageType:'text',jid:args.chatJid,phone:args.phone,practicePhone:null,history:[],dossier:{sender:'unknown',patients:[]},patientSheet:sheet,documents:[],rules:[],teamTime:'heute noch',today:args.today,doctolibUrl:null,hasPriorConversation:true,hasPriorReply:true,identityAsked:false,preview:false,budgetMs:60000});
  assert.equal(result.text,text);assert.equal(calls.length,2);assert.match(calls[0].system,/2026-11-26/);assert.equal(JSON.parse(calls[1].prompt).kontext.PATIENTENBLATT.nächsterTermin.date,'2026-11-26');
+});
+
+test('a provisional identity requires the supplied full name and date on this phone and is scoped to the recent incoming conversation',()=>{
+ const at='2026-11-24T12:00:00Z';
+ const a={id:'a',vorname:'Alex',nachname:'Beispiel',geburtsdatum:'2012-05-24',geschlecht:null};
+ const b={id:'b',vorname:'Charlie',nachname:'Beispiel',geburtsdatum:'2012-05-24',geschlecht:null};
+ const claim='Alex Beispiel, geboren am 24.05.2012.';
+ const history=[{direction:'incoming',text:claim,at:'2026-11-24T11:00:00Z'}];
+ assert.equal(conversationPhoneProof([a,b],claim,[],at)?.id,'a');
+ assert.equal(conversationPhoneProof([a,b],'Was steht in der App?',history,at)?.id,'a');
+ assert.equal(conversationPhoneProof([a,b],'Es geht um Charlies Rechnung.',history,at),null);
+ assert.equal(conversationPhoneProof([a,b],'Alex Beispiel, 25.05.2012.',history,at),null);
+ assert.equal(conversationPhoneProof([b],claim,[],at),null);
+ assert.equal(conversationPhoneProof([a],'Alex, 24.05.2012.',[],at),null);
+ assert.equal(conversationPhoneProof([a],'24.05.2012.',[],at),null);
+ assert.equal(conversationPhoneProof([a],'Was steht in der App?',history,'2026-11-25T12:00:00Z'),null);
+ assert.equal(conversationPhoneProof([a],'Was steht in der App?',history.map(turn=>({...turn,direction:'outgoing'})),at),null);
 });

@@ -11,3 +11,59 @@ test('second hard failure creates a reasoned case without replacement text',asyn
 test('only reactions, plain thanks/ok/corrections and latest human reply within 24 hours are silent',()=>{for(const [message,messageType] of [['Danke!','text'],['Ok','text'],['Hätte*','text'],['👍','reaction']])assert.equal(retrievalPreflight(input({message,messageType}))?.skipSend,true);for(const message of ['Huhu','Ich komme Mittwoch 14:15','Tür aufmachen','12345','https://example.invalid',''])assert.equal(retrievalPreflight(input({message})),null);assert.equal(retrievalPreflight(input({lastOutbound:{source:'practice',at:'2026-11-23T10:15:00Z'}}))?.skipSend,true);assert.equal(retrievalPreflight(input({lastOutbound:{source:'practice',at:'2026-11-23T10:14:59Z'}})),null);assert.equal(retrievalPreflight(input({lastOutbound:{source:'animahost',at:'2026-11-24T10:14:59Z'}})),null);});
 test('context caps knowledge and gold at three and conversation at ten; archived cases are not a style source',()=>{const docs:any[]=[];for(const kind of ['gold','knowledge','rule','history'])for(let i=0;i<6;i++)docs.push({kind,ref:kind+i,version:1,source_at:'2026-11-24',title:kind,content:kind,payload:{question:'q',answer:'a'},draft:false,content_hash:'x'});const c=replyContext(input({documents:docs,history:Array.from({length:20},(_,i)=>({direction:'incoming' as const,text:String(i),at:'2026-11-24T10:00:00Z'}))}));assert.equal(c.selected.gold.length,3);assert.equal(c.selected.knowledge.length,3);assert.equal((c.fields.VERLAUF as unknown[]).length,10);assert.equal(c.retrieved.history.length,0);});
 test('a known-patient identity question is a hard failure; length and tone never add code violations',async()=>{const m=model('Unter welchem Namen sind Sie bei uns angemeldet?',{...valid,passed:false,hard:[{kind:'identity_known',quote:'Unter welchem Namen',reason:'Patient bereits bekannt'}]},'Für Ihren Termin prüft das Team den gewünschten Tag.',valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);});
+
+test('a dueAt-backed callback and a neutral team check survive false findings and still create the team task',async()=>{
+ const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
+ const quote='Ich lasse das gleich vom Team für Alex prüfen';
+ const callback='Sie hören heute bis 17 Uhr von uns';
+ const draft=quote+'. '+callback+'.';
+ const m=model(draft,{...valid,passed:false,hard:[
+  {kind:'invented_appointment_or_cost',quote:callback,reason:'Uhrzeit'},
+  {kind:'confidential_unconfirmed',quote,reason:'Zuordnung'},
+ ]});
+ const result=await runRetrievalReply(m.generate,input({message:'In der App sehe ich für Alex noch keine Rechnung.',deadline}));
+ assert.equal(result.text,draft);
+ assert.equal(result.dueAt,deadline.dueAt);
+ assert.equal(result.action,'klaerfall');
+ assert.equal(m.calls.length,2);
+ assert.match(m.calls[1].prompt,/2026-11-24T16:00:00.000Z/);
+ assert.equal((result.checks?.[0] as {exempted?:unknown[]}).exempted?.length,2);
+});
+
+test('callback exemptions never clear an invented treatment appointment, protected invoice state or forbidden sentence',async()=>{
+ const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
+ const time='17 Uhr';
+ const invoice='Alex hat noch 100 € offen';
+ const forbidden='ich leite weiter';
+ const draft=`Alex hat einen Termin um ${time}. ${invoice}. ${forbidden}. Sie hören heute bis ${time} von uns.`;
+ const m=model(draft,{...valid,passed:false,hard:[
+  {kind:'invented_appointment_or_cost',quote:time,reason:'Unbelegter Termin'},
+  {kind:'confidential_unconfirmed',quote:invoice,reason:'Zahlungsstand'},
+ ]},'Ich kläre, wann die Rechnung in der App sichtbar wird.',valid);
+ const result=await runRetrievalReply(m.generate,input({message:'Was ist mit Alex’ Rechnung?',deadline}));
+ assert.equal(result.repairs,1);
+ const first=result.checks?.[0] as {violations:string[]};
+ assert.equal(first.violations.length,3);
+ assert.match(first.violations.join(','),/forbidden_sentence/);
+ assert.doesNotMatch(result.text,/100 €|17 Uhr/);
+});
+
+test('an incorrect callback time stays a finding while the correct next-working-day deadline is allowed',async()=>{
+ const deadline={dueAt:'2026-11-25T09:00:00.000Z',phrase:'am Mittwoch, 25. November bis 10 Uhr'};
+ const wrong='Sie hören heute bis 17 Uhr von uns';
+ const right='Sie hören am Mittwoch, 25. November bis 10 Uhr von uns';
+ const finding=(quote:string)=>({...valid,passed:false,hard:[{kind:'invented_appointment_or_cost',quote,reason:'Uhrzeit'}]});
+ const m=model(wrong+'.',finding(wrong),right+'.',finding(right));
+ const r=await runRetrievalReply(m.generate,input({deadline}));
+ assert.equal(r.text,right+'.');assert.equal(r.repairs,1);assert.equal(r.dueAt,deadline.dueAt);
+});
+
+test('an unconfirmed sender can hear the general invoice flow and their own reported app view',async()=>{
+ const visibility='Sie sehen die Rechnung noch nicht in der App';
+ const flow='Nach der Freigabe erscheint sie in der App und per E-Mail';
+ const draft=visibility+'. '+flow+'.';
+ const m=model(draft,{...valid,passed:false,hard:[visibility,flow].map(quote=>({kind:'confidential_unconfirmed',quote,reason:'Rechnung'}))});
+ const result=await runRetrievalReply(m.generate,input({message:'Ich sehe in der App keine Rechnung.'}));
+ assert.equal(result.text,draft);
+ assert.equal(result.repairs,0);
+});

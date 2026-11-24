@@ -88,6 +88,41 @@ export function maskBirthDates(text:string){
  return text.replace(/\b(?:\d{1,2}[./]\d{1,2}[./]\d{4}|\d{4}-\d{2}-\d{2})\b/g,'[Datum]');
 }
 
+/**
+ * Proof applies to this conversation only. The supplied candidates must come
+ * directly from the trusted phone lookup, before adding staff or name matches.
+ */
+export function conversationPhoneProof(phones:PhonePatient[],message:string,history:readonly {direction:string;text:string;at:string}[],receivedAt:string){
+ const at=Date.parse(receivedAt);
+ const candidatesFor=(text:string)=>{
+  const dates=Array.from(text.matchAll(/\b(?:\d{1,2}[./]\d{1,2}[./]\d{4}|\d{4}-\d{2}-\d{2})\b/g),match=>parseBirthDate(match[0]));
+  if(dates.length!==1||!dates[0])return [];
+  const candidateText=normalized(maskBirthDates(text).replace('[Datum]',''));
+  const words=new Set(candidateText.split(' '));
+  return phones.filter(p=>{
+   const surname=normalized(p.nachname??'').split(' ').filter(Boolean);
+   const firstname=normalized(p.vorname??'').split(' ').filter(Boolean);
+   return p.geburtsdatum===dates[0]&&surname.length>0&&surname.every(name=>words.has(name))&&firstname.some(name=>words.has(name));
+  });
+ };
+ const present=candidatesFor(message);
+ if(present.length)return present.length===1&&isCurrentSubject(present[0])?present[0]:null;
+ // An explicit new birth-date claim must stand on its own.
+ if(parseBirthDate(message)&&(/\b(?:geb(?:oren|urtsdatum)?\.?|birthday|date of birth)\b/i.test(message)||phones.some(p=>mentionsPatient(message,p))))return null;
+ const proofs=new Map(history.filter(turn=>turn.direction==='incoming'&&Date.parse(turn.at)<=at&&at-Date.parse(turn.at)<=86_400_000).slice(-10)
+  .flatMap(turn=>{const matched=candidatesFor(turn.text);return matched.length===1?[[matched[0].id,matched[0]] as const]:[];}));
+ const eligible=Array.from(proofs.values()).filter(isCurrentSubject);
+ return eligible.length===1?eligible[0]:null;
+
+ function isCurrentSubject(patient:PhonePatient){
+  const current=selectPhonePatient(phones,message);
+  if(current)return current.id===patient.id;
+  if(namedSubject(message))return false;
+  const mentioned=phones.filter(p=>mentionsPatient(message,p));
+  return !mentioned.length;
+ }
+}
+
 export async function identifyByBirthDate(db:Db,text:string,allowed:PhonePatient[],boundId?:string){
  const birthday=parseBirthDate(text);
  if(!birthday)return null;

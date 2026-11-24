@@ -135,3 +135,9 @@ Antwort: `{day,timeZone,anonymized,entries}`. Jeder Eingang des Tages ist enthal
 `answerSent=false` und `sentAt=null` bedeutet: vorhandener Antworttext ist ein Entwurf, kein belegter Versand. `checks` enthält die Prüfung je Entwurf mit ausschließlich harten Grenzen; null bedeutet bei älteren Einträgen, dass kein solches Prüfprotokoll vorliegt. `translation` enthält Sprache und deutsche Übersetzung, falls vorhanden. Quellen bleiben Referenzen mit Version/Datum.
 
 Antwortkern: Systemtext `2026-11-24-systemtext-v1.md` unverändert, nur Platzhalter ersetzt. Der Textentwurf wird nicht nachformatiert. Ein harter Verstoß erlaubt genau einen zweiten Entwurf; ein weiterer Verstoß erzeugt ohne Ersatztext einen Klärfall mit Grund. Reine Kurzabschlüsse/Korrekturen und die letzte menschliche Antwort innerhalb 24 Stunden bleiben still. Bei Modell-/Transportausfall ist kein Text verfügbar: der technische Grund erscheint als Klärfall, keine erfundene Ersatzantwort.
+
+### Prüfgrenzen ab 24.11.2026, 12:15 Uhr
+
+Die Antwortprüfung erhält die aus `dueAt` berechnete Rückmeldefrist in Berliner Zeit. Eine passende Rückmeldezusage wird als Teamaufgabe mit dieser Frist gespeichert. Falsch beanstandete Textstellen bleiben im Beleg unter `timings.checks[].exempted` nachvollziehbar. Die tatsächlich blockierenden Befunde stehen weiterhin unter `hard`.
+
+Eine eindeutige Kombination aus ausgeschriebenem Vor- und Nachnamen und Geburtsdatum muss zu einem Patienten der vertrauenswürdigen WhatsApp-Nummer passen. Für Folgefragen zählt der eingehende Verlauf der letzten zehn Nachrichten innerhalb von 24 Stunden. Eine andere betroffene Person benötigt ihre eigene Zuordnung. Diese Bestätigung wird als `patientSheet.verification = "conversation"` im Beleg vermerkt und erzeugt keine dauerhafte Zuordnung.

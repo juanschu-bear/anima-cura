@@ -5,7 +5,7 @@ import {loadDossier,dossierForModel} from './animahost-dossier';
 import {resolveOpenItemAmount} from '@/lib/open-items';
 export const concernHistorySchema=z.object({complete:z.boolean(),casesComplete:z.boolean().optional(),openCases:z.array(z.object({patientId:z.string().nullable(),at:z.string(),summary:z.string().max(1000)})).max(100).optional(),messages:z.number().int().nonnegative(),from:z.string().nullable(),through:z.string(),concerns:z.array(z.object({topic:z.string().max(80),messages:z.number().int(),days:z.number().int(),first:z.string(),last:z.string(),examples:z.array(z.string().max(500)).max(3)})).max(16)});
 export type ConcernHistory=z.infer<typeof concernHistorySchema>;
-export type PatientSheet={access:'confirmed'|'unconfirmed'|'ambiguous'|'unlinked';asOf:string;patientId?:string;context:Record<string,unknown>;fields:Record<string,'filled'|'empty'|'unavailable'>};
+export type PatientSheet={access:'confirmed'|'unconfirmed'|'ambiguous'|'unlinked';asOf:string;patientId?:string;verification?:'conversation';context:Record<string,unknown>;fields:Record<string,'filled'|'empty'|'unavailable'>};
 type Db=ReturnType<typeof createServerClient>;
 async function read(query:PromiseLike<{data:any;error:any}>){try{const r=await query;return r.error?null:r.data;}catch{return null;}}
 export function selectedConfirmedPatient(patients:PhonePatient[],verified:string[],message:string){
@@ -17,13 +17,15 @@ export function relativeAppointment(date:string,today:string){
  const weekday=new Date(today+'T12:00:00Z').getUTCDay()||7;
  return {date,relative:days===0?'heute':days===1?'morgen':days===-1?'gestern':null,thisWeek:days>=1-weekday&&days<=7-weekday};
 }
-export function sheetLedger(sheet:PatientSheet){return {access:sheet.access,asOf:sheet.asOf,fields:sheet.fields};}
+export function sheetLedger(sheet:PatientSheet){return {access:sheet.access,asOf:sheet.asOf,fields:sheet.fields,...(sheet.verification?{verification:sheet.verification}:{})};}
 /** Read only. Never load an unconfirmed patient's clinical/financial sheet. */
-export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:PhonePatient[];verifiedIds:string[];message:string;today:string;at:string;chatJid:string;phone:string|null;concernHistory?:ConcernHistory}):Promise<PatientSheet>{
- const p=selectedConfirmedPatient(input.patients,input.verifiedIds,input.message);
+export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:PhonePatient[];verifiedIds:string[];message:string;today:string;at:string;chatJid:string;phone:string|null;conversationPatientId?:string;concernHistory?:ConcernHistory}):Promise<PatientSheet>{
+ const provisional=input.patients.find(patient=>patient.id===input.conversationPatientId);
+ const p=provisional??selectedConfirmedPatient(input.patients,input.verifiedIds,input.message);
  const sheet:PatientSheet={access:!input.patients.length?'unlinked':!selectPhonePatient(input.patients,input.message)?'ambiguous':'unconfirmed',asOf:new Date().toISOString(),context:{},fields:{}};
  if(!p)return sheet;
  sheet.access='confirmed';sheet.patientId=p.id;
+ if(provisional&&!input.verifiedIds.includes(p.id))sheet.verification='conversation';
  const [dossier,patient,phases,appointments,open,profiles,memberships,cases,clinicalCases]=await Promise.all([
   loadDossier(db,{patients:[p],verifiedIds:[p.id],today:input.today}),
   read(db.from('patients').select('behandlung,behandlungsart,behandlung_status,guthaben,notizen,telefon,mobiltelefon,versicherter_vorname,versicherter_nachname,versicherter_telefon,eb2_vorname,eb2_nachname,eb2_telefon').eq('id',p.id).single()),
