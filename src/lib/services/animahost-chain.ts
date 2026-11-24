@@ -16,7 +16,7 @@ import type {ApprovedKnowledge} from './animahost-knowledge';
  * Notfälle und der Wunsch, keine Nachrichten mehr zu bekommen, laufen nie durch die Kette.
  * Hier wird nichts gespeichert und nichts verschickt.
  */
-export type Generate=<T>(call:{stage?:'compose'|'verify';reasoning?:'none'|'low';system:string;prompt:string;schema:z.ZodType<T>;maxOutputTokens:number;timeoutMs:number;temperature:number})=>Promise<T>;
+export type Generate=<T>(call:{plainText?:boolean;stage?:'compose'|'verify';reasoning?:'none'|'low';system:string;prompt:string;schema:z.ZodType<T>;maxOutputTokens:number;timeoutMs:number;temperature:number})=>Promise<T>;
 export type ChainInput={
  message:string;language:'de'|'en'|'es';informal:boolean;history:ConversationHistory;dossier:Dossier;rules:WhatsAppRule[];
  practice:{doctolibUrl:string|null;phone:string|null;teamTime:string;today:string;closurePeriods?:unknown;timeZone?:string};

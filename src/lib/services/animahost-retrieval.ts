@@ -1,4 +1,3 @@
-import {unclearInput} from './animahost-unclear-input';
 import {createHash} from 'node:crypto';
 import type {createServerClient} from '@/lib/db/supabase';
 import gold from '../../../docs/animahost/goldbeispiele-v1.json';
@@ -61,7 +60,7 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  const [vector]=await embedRetrieval([query],'query');
  const embedded=Date.now();
  const result=await db.rpc('animahost_retrieval_match',{p_tenant:tenant,p_vector:JSON.stringify(vector),p_model:embeddingModel,p_preview:preview,p_day:new Date().toISOString().slice(0,10),p_exclude_chat:excludeChat??null})
-  .select('kind,ref,version,source_at,title,content,payload,draft,content_hash').abortSignal(AbortSignal.timeout(4000));
+  .select('kind,ref,version,source_at,title,content,payload,draft,content_hash').abortSignal(AbortSignal.timeout(12000));
  if(result.error)throw Error('retrieval_search_unavailable:'+result.error.code+':'+result.error.message);
  // Explicit companion fact for apparatus problems, not a routing/fallback topic.
  let companion:RetrievalDocument|null=null;
@@ -74,11 +73,6 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  }
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));
- if(unclearInput(message,'text')||!message.trim()){
-  const examples=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','gold').eq('active',true).in('ref',['gold-unklar-link-du','gold-unklar-link-sie','gold-unklar-huhu-du','gold-unklar-zweite-runde-du']);
-  if(examples.error)throw Error('retrieval_gold_unavailable');
-  for(const doc of examples.data as RetrievalDocument[]){const i=documents.findIndex(d=>d.kind==='gold'&&d.ref===doc.ref);if(i>=0)documents.splice(i,1);documents.unshift(doc);}
- }
  if(companion){const index=documents.findIndex(d=>d.kind==='knowledge'&&d.ref===companion!.ref);if(index>=0)documents.splice(index,1);documents.unshift(companion);}
  return {documents,timings:{embeddingMs:embedded-start,searchMs:Date.now()-embedded}};
 }

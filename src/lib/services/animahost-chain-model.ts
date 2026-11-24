@@ -44,8 +44,8 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
   try{
    const result=await generateText({model,reasoning,providerOptions:{gateway:{...gatewayOptions.gateway,...(options.tags?.length?{tags:options.tags}:{})}},
     maxRetries:0,...(/^anthropic\/claude-(haiku|sonnet|opus)-5\.5$/.test(model)?{}:{temperature:call.temperature}),maxOutputTokens:call.maxOutputTokens,
-    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(call.timeoutMs)]),output:Output.object({schema:call.schema}),
-    system:cacheableInstructions(model,call.system,options.cacheStatic===true),prompt:call.prompt,
+    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(call.timeoutMs)]),...(call.plainText?{}:{output:Output.object({schema:call.schema})}),
+    ...(call.system?{system:cacheableInstructions(model,call.system,options.cacheStatic===true)}:{}),prompt:call.prompt,
     onStepFinish(step){
      finish=step.finishReason;outputTokens=step.usage.outputTokens??null;inputTokens=step.usage.inputTokens??null;
      reasoningTokens=step.usage.outputTokenDetails?.reasoningTokens??null;textChars=step.text.length;
@@ -54,7 +54,7 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
      costUsd=gatewayDollarAmount(step.providerMetadata?.gateway?.cost);
      parts=step.content.map(part=>part.type).join(',').slice(0,120);
     }});
-   const output=result.output;
+   const output=call.plainText?call.schema.parse(result.text):result.output;
    record(null);
    return output;
   }catch(error){record(modelFailure(error));throw error;}

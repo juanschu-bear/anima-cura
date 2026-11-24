@@ -1,3 +1,4 @@
+import {readDailyReview} from '@/lib/services/animahost-daily-review';
 import acceptanceRun from '../../../../../../../docs/animahost/2026-11-24-acceptance-run.json';
 import {timingSafeEqual} from 'node:crypto';
 import {contentHash,upsertRetrievalDocuments} from '@/lib/services/animahost-retrieval';
@@ -72,6 +73,13 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='daily_review'){
+  const day=request.nextUrl.searchParams.get('day')??new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date());
+  const anonymize=request.nextUrl.searchParams.get('anonymize')??'1';
+  if(!['0','1'].includes(anonymize))return NextResponse.json({code:'review_anonymize_invalid'},{status:400,headers});
+  try{return NextResponse.json(await readDailyReview(db,tenant,day,anonymize==='1',request.headers.get('x-animaline-control')),{headers});}
+  catch(error){const message=error instanceof Error?error.message:'';const code=['review_date_invalid','daily_review_not_configured','daily_review_unavailable','daily_review_invalid','review_anonymization_unavailable'].includes(message)?message:'review_anonymization_unavailable';return NextResponse.json({code},{status:code==='review_date_invalid'?400:503,headers});}
+ }
  if(resource==='acceptance_run')return NextResponse.json(acceptanceRun,{headers});
  if(resource==='usage_month'){
   try{return NextResponse.json(await readUsageMonth(db,tenant),{headers});}

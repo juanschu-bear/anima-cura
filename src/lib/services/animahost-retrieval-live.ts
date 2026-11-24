@@ -7,7 +7,6 @@ import {loadPatientSheet,sheetLedger,type ConcernHistory} from './animahost-pati
 import {localizeInbound} from './animahost-inbound-language';
 import {classifyModelFailure} from './animahost-model-failure';
 import {classifySender} from './animahost-sender-policy';
-import {practiceReplyRule} from './animahost-retrieval-routing';
 import {teamReplyDeadline,teamReplyTime} from './animahost-team-time';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {whatsappRulesSchema} from './animahost-whatsapp';
@@ -19,7 +18,7 @@ type Db=ReturnType<typeof createServerClient>;
 export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;phone?:string|null;messageId:string;text:string|null;messageType:string;receivedAt:string;
  identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;lastOutbound?:OutboundTurn;hasPriorConversation?:boolean;hasPriorReply?:boolean;concernHistory?:ConcernHistory;readOnly?:boolean;handoffOnly?:boolean;practiceHeld?:boolean;entries?:{id:string;text:string}[]},practice:any,signal:AbortSignal,preview=false){
  const started=Date.now();
- const history=recentConversation(input.history??[],input.receivedAt).map(h=>({...h,text:maskBirthDates(h.text)}));
+ const history=(input.history??[]).filter(h=>Date.parse(h.at)<=Date.parse(input.receivedAt)).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)).slice(-10).map(h=>({...h,text:maskBirthDates(h.text)}));
  const phone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
  const calls:ModelCall[]=[];
  const model=gatewayGenerate(practice.model,signal,call=>calls.push(call),{cacheStatic:!input.readOnly&&!preview,tags:['animahost-retrieval']});
@@ -62,21 +61,16 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  }
  const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients,verifiedIds,message:joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory});
  const dossier={sender:'unknown' as const,patients:[]};
- const base:RetrievalInput={message:maskBirthDates(joined),translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
+ const base:RetrievalInput={message:maskBirthDates(input.text??''),translation:language.translation,translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
   history,dossier,patientSheet,chatName,lastOutbound:input.lastOutbound,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
   today:appointmentLocalDate(input.receivedAt),doctolibUrl:practice.doctolib_url,
   hasPriorConversation:input.hasPriorConversation===true||history.length>0,hasPriorReply:input.hasPriorReply===true||history.some(h=>h.direction==='outgoing'),
-  identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,19000-(Date.now()-started)),deadline:teamReplyDeadline(input.receivedAt,practice.team_reply_days,practice.closure_periods,input.readOnly?input.receivedAt:new Date().toISOString())};
+  identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,60000-(Date.now()-started)),deadline:teamReplyDeadline(input.receivedAt,practice.team_reply_days,practice.closure_periods,input.readOnly?input.receivedAt:new Date().toISOString())};
  const preflight=retrievalPreflight(base);
- if(input.handoffOnly&&!preflight?.skipSend){
-  const result:RetrievalResult={action:'klaerfall',rule:input.practiceHeld?practiceReplyRule:'sender:unknown_handoff',text:'',skipSend:true,
-   teamSummary:input.practiceHeld?'Antwort an eure Nachricht':null,substantive:false,identityQuestion:false,retrieved:{gold:[],knowledge:[],rule:[],history:[]},ms:0,repairs:0,violations:[],excluded:false};
-  return {result,calls,...language,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??null,timings:{contextMs:Date.now()-started,totalMs:Date.now()-started}};
- }
  if(preflight)return {result:preflight,calls,...language,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,timings:{contextMs:Date.now()-started,embeddingMs:0,searchMs:0,modelMs:0,totalMs:Date.now()-started}};
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
- const result=await runRetrievalReply(model,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,19000-contextMs)});
+ const result=await runRetrievalReply(model,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
  return {result,calls,...language,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,phoneMatches:chatName?.source==='chat'?undefined:phoneLabels(patients),timings:{contextMs,...retrieved.timings,modelMs:result.ms,totalMs:Date.now()-started}};
 }

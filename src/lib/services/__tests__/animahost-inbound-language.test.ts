@@ -6,7 +6,7 @@ import {teamReplyDeadline} from '../animahost-team-time';
 test('saved metadata gives the language in German and uses the actual concern in a pasted translator output',async()=>{
  const input='Вставляю перевод: «оплата нет» Оригинал: где счёт?';
  const result=await localizeInbound(async call=>{
-  assert.deepEqual(JSON.parse(call.prompt),{nachricht:input});
+  assert.equal(call.system,'');assert.equal(JSON.parse(call.prompt).nachricht,input);
   return call.schema.parse({language:'ru',kind:'pasted',german:'Wo finde ich die Rechnung?'});
  },input);
  assert.equal(result.pasted,true);
