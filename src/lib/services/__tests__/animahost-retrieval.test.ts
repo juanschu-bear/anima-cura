@@ -72,3 +72,18 @@ test('identity_known may improve once but can never suppress the second non-conf
 test('a repeated birthday question is corrected once even if the model checker missed it',async()=>{const m=model('Bitte nennen Sie Ihr Geburtsdatum.',valid,'Danke, Mira, das Team prüft die Vollmacht.',valid);const r=await runRetrievalReply(m.generate,input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]'}));assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);assert.equal(r.text,'Danke, Mira, das Team prüft die Vollmacht.');});
 
 test('a masked birthday remains meaningful input instead of an empty placeholder',async()=>{const m=model('Danke, Ihre Angaben sind angekommen.',valid);await runRetrievalReply(m.generate,input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]'}));assert.match(m.calls[0].prompt,/Antwort auf die Geburtsdatumsfrage/);assert.doesNotMatch(m.calls[0].prompt,/\[Datum\]/);});
+
+const knownSender=()=>input({chatName:{status:'matched',matchedName:'Mira Beispiel',question:null},message:'[Datum]',history:[{direction:'incoming',text:'Mein Name ist Mira Beispiel.',at:'2026-11-24T10:00:00Z'}]});
+test('after correction remove only repeated identity questions and log exact sentences',async()=>{
+ const question='Bitte nennen Sie mir Ihren vollständigen Namen und Ihr Geburtsdatum.';
+ const draft='Danke für Ihre Nachricht.  '+question+'\nDas Team meldet sich am Mittwoch bis 10 Uhr.';
+ const m=model(question,valid,draft,valid);const r=await runRetrievalReply(m.generate,knownSender());
+ assert.equal(m.calls.length,4);assert.equal(r.text,'Danke für Ihre Nachricht.  \nDas Team meldet sich am Mittwoch bis 10 Uhr.');
+ assert.deepEqual((r.checks?.[1] as any).removedIdentityQuestions,[question]);assert.equal((r.checks?.[1] as any).draft,draft);assert.equal(r.skipSend,undefined);
+});
+test('identity-only second draft leaves an empty answer and hands off',async()=>{
+ const q='Können Sie mir bitte Ihr Geburtsdatum nennen?';const m=model(q,valid,q,valid);const r=await runRetrievalReply(m.generate,knownSender());assert.equal(r.skipSend,true);assert.equal(r.text,'');assert.ok(r.violations.includes('empty_model_output'));
+});
+test('removing identity questions does not release confidential information',async()=>{
+ const q='Bitte nennen Sie mir Ihr Geburtsdatum.';const m=model(q,valid,q+' Ihr Befund ist X.',{...valid,passed:false,hard:[{kind:'confidential_unconfirmed',quote:'Ihr Befund ist X.',reason:'Akteninhalt nicht freigegeben'}]});const r=await runRetrievalReply(m.generate,knownSender());assert.equal(r.skipSend,true);assert.match(r.teamSummary!,/Akteninhalt/);
+});
