@@ -11,7 +11,7 @@ test('saved metadata gives the language in German and uses the actual concern in
  },input);
  assert.equal(result.pasted,true);
  assert.deepEqual(result.translation,{language:'ru',languageLabel:'Russisch',text:'Wo finde ich die Rechnung?'});
- const unreadable=await localizeInbound(assert.fail,'%#@~!?');
+ const unreadable=await localizeInbound(async()=>assert.fail(),'%#@~!?');
  assert.equal(unreadable.unreadable,true);
  assert.equal(unreadable.translation,null);
 });

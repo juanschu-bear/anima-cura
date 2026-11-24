@@ -61,7 +61,7 @@ export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:Pho
  if(account&&process.env.INVOICE_ACCESS_WORKER_SECRET){try{
   const response=await fetch('https://anima-leitstand.vercel.app/api/abrechnung/invoice-records',{method:'POST',headers:{'content-type':'application/json','x-invoice-worker-secret':process.env.INVOICE_ACCESS_WORKER_SECRET},body:JSON.stringify({accountId:account,mode:'patient',patientId:p.id}),cache:'no-store',signal:AbortSignal.timeout(5000)});
   if(response.ok){const data=await response.json();
-   if(Array.isArray(data.records))invoices=data.records.filter((r:any)=>r.patientId===p.id).map((r:any)=>({date:r.date,number:r.invoiceNumber,payment:r.payment,delivery:r.delivery,patientVisible:r.patientVisible}));
+   if(Array.isArray(data.records))invoices=data.records.filter((r:any)=>r.patientId===p.id).map((r:any)=>({date:r.date,number:r.invoiceNumber,amountCents:r.amountCents,payment:r.payment,delivery:r.delivery,patientVisible:r.patientVisible}));
    if(Array.isArray(data.unmatchedHistory))unavailableInvoiceSummaries=data.unmatchedHistory.filter((r:any)=>r.patient_id===p.id&&r.reason==='complete_invoice_unavailable').length;
   }
  }catch{/* unavailable is not unpaid, undelivered or absent */}}

@@ -20,11 +20,10 @@ export function lastPracticeReply(history:ConversationHistory,receivedAt:string,
 }
 const followupPattern=new RegExp(String.raw`^(?:[\p{L}][\p{L}\p{M}'’-]*\s*\*|(?:ja|jep|ok(?:ay)?|okey|in ordnung|passt(?: so)?|einverstanden|alles klar|verstanden|yes|sure|vale|sí|de acuerdo)[.!…]*)$`,'iu');
 export const shortPracticeFollowup=(text:string)=>followupPattern.test(text.trim());
-const thanksOnly=(text:string)=>/^(?:(?:ja|ok(?:ay)?|passt)[ ,.!]*\s*)?(?:(?:vielen|lieben|besten) dank|danke(?: schön| sehr)?|thank you|thanks|muchas gracias|gracias)[.!…\s]*$/i.test(text.trim());
 
 export function conversationRouting(message:string,history:ConversationHistory,at:string,social:string|null,register:'du'|'Sie',latestOutbound?:OutboundTurn){
  const text=message.trim();
- if(social==='social:reaction'||social==='social:unreadable'||thanksOnly(text))return null;
+ if(social==='social:reaction'||social==='social:unreadable')return null;
  const arrival=/\b(?:komme|bin)\s+(?:etwa |ca\. ?|ungefähr |heute |leider )*(?:[1-9]|10|fünf|zehn)\s*(?:minuten|min\.?)\s*(?:später|zu spät)\b/i.test(text)&&
   !/\b(?:morgen|übermorgen|nächste[nr]?|nächsten monat)\b/i.test(text);
  const atDoor=/\b(?:steh(?:e)?|bin|warte)\s+(?:schon |gerade |jetzt |noch )*(?:vor (?:der |Ihrer )?Praxis|im Treppenhaus|vor (?:der|eurer|Ihrer) Tür)\b|(?:\b(?:bitte|kannst du|können sie|könnt ihr)[^.!?]{0,40})?\b(?:die )?tür (?:aufmachen|öffnen|aufschließen)\b/i.test(text)&&
@@ -32,7 +31,7 @@ export function conversationRouting(message:string,history:ConversationHistory,a
  if(atDoor||arrival)return {action:'klaerfall' as const,rule:immediateRule,
   text:t('animahost.whatsapp.immediate.'+(atDoor?'door':'late')+'.'+(register==='du'?'du':'sie'),'de',{phone:landline}),
   teamSummary:t('animahost.whatsapp.immediate.'+(atDoor?'door_team':'late_team'),'de')};
- if(lastPracticeReply(history,at,latestOutbound)||shortPracticeFollowup(text))return {action:'klaerfall' as const,rule:practiceReplyRule,text:'',skipSend:true,
+ if(lastPracticeReply(history,at,latestOutbound))return {action:'klaerfall' as const,rule:practiceReplyRule,text:'',skipSend:true,
   teamSummary:t('animahost.whatsapp.practice_reply','de')};
  return null;
 }

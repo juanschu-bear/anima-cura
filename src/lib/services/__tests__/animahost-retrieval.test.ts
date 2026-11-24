@@ -46,21 +46,14 @@ test('previous system answers are not facts and no team time is appended',async(
  assert.doesNotMatch(result.text,/heute noch/);assert.doesNotMatch(m.calls[0].prompt,/UNTRUSTED/);assert.match(m.calls[0].prompt,/keine Uhrzeit/);
  assert.deepEqual(m.calls.map(c=>c.stage),['compose','verify']);
 });
-test('a standard handoff is rewritten and the team interval is available only when asked',async()=>{
- const m=model(answer({answer:'Ich gebe Ihren Wunsch an das Praxisteam weiter.'}),answer(),valid);
+test('soft issues are recorded without discarding a safe reply; unsafe medical content goes to hard review',async()=>{
+ const m=model(answer({answer:'Hallo! Der Empfang prüft, ob ein früherer Termin frei ist.'}),{hard:[],repair:[{issue:'missing_direct_help',quote:'Hallo!'}]});
  const result=await runRetrievalReply(m.generate,input());
- assert.equal(result.repairs,1);assert.doesNotMatch(result.text,/weiter|heute noch/);
- assert.equal(JSON.parse(m.calls[0].prompt).rueckmeldezeit,null);
- const asked=model(answer({answer:'Der Empfang prüft die Terminverfügbarkeit und meldet sich heute noch.'}),valid);
- await runRetrievalReply(asked.generate,input({message:'Wann meldet sich die Praxis wegen meines Termins?'}));
- assert.equal(JSON.parse(asked.calls[0].prompt).rueckmeldezeit,'heute noch');
-});
-test('repairable critique gets exactly one repair; medical and invented booking output never passes',async()=>{
- const m=model(answer({team:false,answer:'Ich gebe Ihren Wunsch ans Team.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Ich gebe Ihren Wunsch ans Team.'}]},answer({answer:'Der Empfang prüft, ob ein früherer Termin frei ist.'}),valid);
- const result=await runRetrievalReply(m.generate,input());assert.equal(result.repairs,1);assert.equal(result.skipSend,undefined);
+ assert.equal(result.repairs,0);assert.ok(result.reviewReasons?.includes('missing_direct_help'));
+ assert.match(result.text,/Das Praxisteam/);
  const bad=model(answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}),answer({answer:'Nehmen Sie 400 mg Ibuprofen.'}));
  const safe=await runRetrievalReply(bad.generate,input());
- assert.equal(safe.safeFallback,true);assert.doesNotMatch(safe.text,/Ibuprofen|400 mg/);
+ assert.equal(safe.rule,'retrieval:hard_review');assert.equal(safe.safeFallback,undefined);assert.doesNotMatch(safe.text,/Ibuprofen|400 mg/);
  assert.ok(hardReplyViolations('Ich habe Ihren Termin gebucht.').includes('booking'));
 });
 test('names and identifiers are removed before indexing; human pairs do not consume later bot answers',()=>{
@@ -79,7 +72,7 @@ test('the source ledger reflects the structured input, including when a checked 
  });
  const documents=[...Array.from({length:51},(_,index)=>document('knowledge',index,true)),
   document('gold',1),document('history',1),document('rule',1)];
- const simulation=model(answer(),{hard:['invented_action'],repair:[]});
+ const simulation=model(answer(),{hard:['invented_action'],repair:[]},answer(),{hard:['invented_action'],repair:[]});
  const withheld=await runRetrievalReply(simulation.generate,input({documents,preview:true}));
  const prompt=JSON.parse(simulation.calls[0].prompt);
  assert.equal(prompt.wissen.length,8);
@@ -87,7 +80,7 @@ test('the source ledger reflects the structured input, including when a checked 
  assert.equal(prompt.regeln.length,1);
  assert.equal(prompt.gold.length,1);
  assert.equal(prompt.praxisfaelle.length,1);
- assert.equal(withheld.safeFallback,true);
+ assert.equal(withheld.rule,'retrieval:hard_review');
  assert.equal(withheld.repairs,1);
  assert.equal(withheld.retrieved.knowledge.length,8);
  assert.deepEqual(withheld.retrieved.knowledge[0],{kind:'knowledge',ref:'knowledge-0',version:3,date:'2026-11-23T00:00:00Z',preview:true});
@@ -104,12 +97,12 @@ test('the source ledger reflects the structured input, including when a checked 
  assert.deepEqual(JSON.parse(live.calls[0].prompt).wissen,[]);
 });
 
-test('a repairable review gets one rewrite without a citation requirement',async()=>{
+test('style diagnostics leave the verified answer usable',async()=>{
  const m=model(answer({team:false,answer:'Das Team meldet sich bei Ihnen.'}),{hard:[],repair:[{issue:'team_handoff',quote:'Das Team meldet sich bei Ihnen.'}]},answer(),valid);
  const result=await runRetrievalReply(m.generate,input());
  assert.equal(result.skipSend,undefined);
- assert.equal(result.repairs,1);
- assert.deepEqual(m.calls.map(call=>call.stage),['compose','verify','compose','verify']);
+ assert.equal(result.repairs,0);
+ assert.deepEqual(m.calls.map(call=>call.stage),['compose','verify']);
  const noModel=model();
  const social=await runRetrievalReply(noModel.generate,input({messageType:'reaction'}));
  assert.equal(noModel.calls.length,0);
@@ -147,7 +140,7 @@ test('a model closure cannot silence a substantive question',async()=>{
  const closing=answer({closing:true,answer:'',team:false,summary:null,substantive:false,identityQuestion:false});
  const m=model(closing,closing);
  const result=await runRetrievalReply(m.generate,input({message:'Danke! Kann ich morgen trotzdem kommen?'}));
- assert.equal(result.safeFallback,true);assert.ok(result.text);
+ assert.equal(result.rule,'conversation:clarify_first');assert.ok(result.text);
  assert.equal(m.calls.length,2);
 });
 
@@ -198,7 +191,7 @@ test('human turn, correction and agreement wait without sending; door and small 
   const result=retrievalPreflight(input({message:msg,receivedAt:at,history:[human]}));
   assert.equal(result?.rule,'conversation:practice_reply');assert.equal(result?.skipSend,true);assert.equal(result?.teamSummary,'Antwort an eure Nachricht');
  }
- assert.equal(retrievalPreflight(input({message:'Danke!',receivedAt:at,history:[human]}))?.rule,'social:acknowledged');
+ assert.equal(retrievalPreflight(input({message:'Danke!',receivedAt:at,history:[human]}))?.rule,'conversation:practice_reply');
  assert.equal(retrievalPreflight(input({message:'Seit gestern.',receivedAt:at,history:[{...human,source:'animahost'}]})),null);
  assert.equal(retrievalPreflight(input({message:'Seit gestern.',receivedAt:at,history:[{...human,at:'2026-11-22T19:59:59Z'}]})),null);
  for(const msg of ['Ich bin im Treppenhaus', 'Komme fünf Minuten später', 'Kannst du die Tür öffnen?']){
@@ -236,5 +229,32 @@ test('a semantic thank-you is quiet only after its content is independently chec
  const result=await runRetrievalReply(m.generate,input({message:'Vielen Dank für die ausführliche Erklärung und schöne Grüße!'}));
  assert.equal(result.rule,'social:acknowledged');assert.equal(result.skipSend,true);
  const agree=model(closing,{closing:'agreement'});
- assert.equal((await runRetrievalReply(agree.generate,input({message:'Ja, das passt für uns gut.'}))).rule,'conversation:practice_reply');
+ assert.equal((await runRetrievalReply(agree.generate,input({message:'Ja, das passt für uns gut.'}))).rule,'conversation:acknowledged');
+});
+
+test('patients can close the conversation without creating a task or changing a booking',()=>{
+ const at='2026-11-23T20:00:00Z';
+ const bot={direction:'outgoing' as const,source:'animahost' as const,text:'Wir sehen uns am Mittwoch um 14:15 Uhr.',at:'2026-11-23T19:00:00Z'};
+ const cases=['Vielen Dank, ich werde am Mittwoch um 14:15 dort sein.','Danke sehr! Er kommt morgen um 16:30.','Hallo, ich kann sie am Montag abholen kommen.','Vielen Dank, ich überweise umgehend.'];
+ for(const message of cases){
+  const automatic=retrievalPreflight(input({message,receivedAt:at,history:[bot]}));
+  assert.equal(automatic?.rule,'conversation:acknowledged');
+  assert.equal(automatic?.teamSummary,undefined);
+  const practice=retrievalPreflight(input({message,receivedAt:at,history:[{...bot,source:'practice'}]}));
+  assert.equal(practice?.rule,'conversation:practice_reply');assert.equal(practice?.skipSend,true);
+ }
+ assert.match(retrievalPreflight(input({message:cases[0],receivedAt:at,history:[bot]}))?.text??'',/Mittwoch um 14:15/);
+ assert.doesNotMatch(retrievalPreflight(input({message:cases[1],receivedAt:at,history:[bot]}))?.text??'',/16:30/);
+ assert.equal(retrievalPreflight(input({message:'15 Uhr heute?',receivedAt:at,history:[bot]})),null);
+});
+
+test('a debit plus appointment answers both matters and uses only an exactly matched confirmed invoice',()=>{
+ const message='Die Lastschrift über 144,11 € wurde nicht abgebucht. Meine Zahnspange hat ein Problem. Wann kann ich zum Termin kommen?';
+ const deadline={dueAt:'2026-11-24T11:00:00Z',phrase:'heute bis 12 Uhr'};
+ const patientSheet={access:'confirmed' as const,asOf:'2026-11-24T08:00:00Z',context:{rechnungsakteMitZustellstand:[{amountCents:14411,payment:{status:'offen'}}]},fields:{}};
+ const reply=retrievalPreflight(input({message,deadline,patientSheet}))!;
+ assert.match(reply.text,/noch als offen.*dienstags bis donnerstags.*erneut eingezogen.*heute bis 12 Uhr/);
+ assert.equal(reply.dueAt,deadline.dueAt);
+ const unauth=retrievalPreflight(input({message,deadline,patientSheet:{...patientSheet,access:'unconfirmed'}}))!;
+ assert.doesNotMatch(unauth.text,/noch als offen/);
 });
