@@ -1,41 +1,159 @@
 # AnimaHost · Abnahme mit Regelbuch 10
 
-Lauf `retrieval-v10-4ecc3209-e96b-4cc4-8b66-f274376db1f9` · 2026-11-24T08:30:09.130Z. Antwortlogik `cdf967a`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand. Nach der letzten Änderung wurden die von der neuen Prüfung betroffenen Eingänge erneut gerechnet. Der Bericht enthält je Fall das letzte Ergebnis.
+Lauf `retrieval-v10-32cefb88-55a0-491d-beca-faf024f58586` · 2026-11-24T10:08:59.727Z. Antwortlogik `4a3c697`, zwei Wissensstände, je 239 archivierte Eingänge. Die Ausführung erlaubt bis zu 60 Sekunden pro Fall für die Wiederholung vorübergehender Provider-Fehler. Im Live-Betrieb gilt das eigene Zeitfenster. Kein Versand. Nach den letzten Korrekturen wurden 30 einschlägige Fälle je Wissensstand erneut gerechnet. Der Bericht enthält je Referenz das letzte Ergebnis.
 
-**Abnahme offen.** Technische Fehler 8. Antworten mit alten Mustern 240.
+**Abnahme offen.** Technische Fehler 0. Antworten mit alten Mustern 146.
 
 | Status | Entwurf | Freigegeben |
 | --- | ---: | ---: |
+| billing:debit_and_appliance | 1 | 1 |
 | billing:portal_browser | 3 | 3 |
 | billing:portal_missing | 3 | 3 |
-| conversation:clarify_first | 9 | 9 |
-| conversation:practice_reply | 31 | 29 |
+| care:clarify_prior_statement | 1 | 1 |
+| conversation:acknowledged | 40 | 44 |
+| conversation:clarify_first | 17 | 22 |
+| conversation:practice_reply | 2 | 2 |
 | conversation:unreadable_language | 4 | 4 |
 | draht-sticht-oder-etwas-tut-weh | 1 | 1 |
-| retrieval:answered | 117 | 124 |
-| retrieval:safe_fallback | 32 | 24 |
-| sender:non_patient | 2 | 2 |
+| retrieval:answered | 121 | 119 |
+| retrieval:hard_review | 5 | 2 |
+| sender:non_patient | 3 | 2 |
 | sender:team | 3 | 3 |
-| social:acknowledged | 26 | 29 |
+| social:acknowledged | 31 | 28 |
 | social:reaction | 2 | 2 |
 | social:unreadable | 2 | 2 |
-| technical_error | 4 | 4 |
 
 Median der Erzeugungszeit nur für vorhandene Antworttexte, ohne Versandzeit oder unbeantwortete Fälle.
 
-- `draft_preview` · 7101 ms bei 173 Antworten. 121 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 66 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
-- `approved` · 7106.5 ms bei 172 Antworten. 119 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 67 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
+- `draft_preview` · 5993 ms bei 196 Antworten. 64 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 43 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
+- `approved` · 4061.5 ms bei 200 Antworten. 82 Antworten mit mindestens einem Muster. 0 unbeantwortete Fälle außerhalb der vorgesehenen Ausnahmen und 39 bewusst stille Eingänge. Identitätsfragen bei bekannten Patienten 0 unter 143 ausgewerteten bekannten Fällen.
 
-Die gesamte Erzeugungszeit einschließlich Übersetzung, Patientenblatt und Quellensuche lag im Median bei 8,24 s mit Entwurfswissen und 8,16 s mit freigegebenem Wissen. In den acht technischen Fehlerfällen entstand dennoch eine sichere Antwort.
+## Ersatzantworten und feste Vergleichsgruppe
 
-## Fremdsprachige Eingänge
+Die Vergleichsgruppe sind die 144 Fälle mit Antworttext im Entwurfslauf vom 23.11. Beide Wissensstände werden anhand derselben Referenzen bewertet. Die gesamte Stichprobe umfasst je 239 Eingänge. Technische Ersatzantworten und Übergaben nach einem harten Sicherheitsbefund werden getrennt gezählt.
 
-Vier erfundene Nachrichten je Sprache. Jede vierte Nachricht enthält eingefügten Übersetzertext.
+| Wissensstand | Vorher / 144 | Vorher / 239 | Jetzt technisch / 144 | Jetzt technisch / 239 | Harte Übergaben / 239 | Alte Muster / 144 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| draft_preview | 17 | 36 | 0 | 0 | 5 | 54 |
+| approved | 12 | 28 | 0 | 0 | 2 | 69 |
 
-| Wissensstand | Antworten | Richtige Sprache | Technische Fehler | Sichere Ersatzantworten |
-| --- | ---: | ---: | ---: | ---: |
-| draft_preview | 20 | 20 | 0 | 3 |
-| approved | 20 | 20 | 0 | 5 |
+Einschließlich der sicheren Antworten nach einem harten Sicherheitsbefund gab es in der Vergleichsgruppe je **2 von 144 (1,39 %)**. Über alle 239 Eingänge waren es **5 von 239 (2,09 %)** mit Entwurfswissen und **2 von 239 (0,84 %)** mit freigegebenem Wissen. Das Sprachziel von weniger als 30 markierten Fällen wurde verfehlt. Die Zweitbewertung markierte vor allem die formelhafte Fristansage und Übergaben mit wenig direkter Hilfe.
+
+### Einzelbefunde des vorherigen Laufs
+
+Pro Referenz ist der letzte protokollierte Ablehnungsgrund angegeben. Für frühere Entwürfe ohne eigenen Prüfbeleg sind keine Gründe ableitbar. Mit † markierte Fälle gehören zur 144er-Vergleichsgruppe.
+
+**draft_preview**
+
+- A03 · emoji
+- A05 · model_timeout (compose)
+- A06 · model_timeout (compose)
+- A09 · model_timeout (compose)
+- A10 · missing_direct_help
+- A20 · model_timeout (compose)
+- A35 † · vague_team_task, missing_direct_help
+- A43 · booking
+- A44 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A55 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A56 † · vague_team_task
+- A72 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A77 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A80 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A94 † · missing_direct_help
+- A96 † · vague_team_task
+- A97 † · vague_team_task, missing_direct_help
+- B04 † · cold_tone
+- B12 · emoji
+- B13 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B18 † · vague_team_task
+- B22 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B30 · vague_team_task
+- B41 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B48 † · vague_team_task
+- B51 † · vague_team_task
+- B53 † · vague_team_task
+- B55 † · vague_team_task
+- B62 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B66 † · Die nötige Identitätsfrage mit dem konkreten Anliegen verbinden, ohne sie anzuhängen.
+- B73 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B82 † · vague_team_task, missing_direct_help
+- B86 † · vague_team_task
+- L01 † · salutation, Durchgängig die Anrede „du“ nutzen. Kein Wechsel zwischen du und Sie, auch nicht aus übernommenen Beispielen.
+- L02 † · salutation, Durchgängig die Anrede „du“ nutzen. Kein Wechsel zwischen du und Sie, auch nicht aus übernommenen Beispielen.
+- L12 † · vague_team_task
+
+**approved**
+
+- A03 · emoji
+- A05 · model_timeout (compose)
+- A06 · model_timeout (compose)
+- A09 · model_timeout (compose)
+- A10 · vague_team_task
+- A15 † · vague_team_task
+- A20 · model_timeout (compose)
+- A29 † · vague_team_task
+- A44 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A45 † · vague_team_task
+- A55 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A69 † · vague_team_task
+- A72 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A80 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- A86 · invented_action
+- A87 † · vague_team_task
+- A88 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B12 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B15 † · vague_team_task
+- B22 · Abschluss ohne bestätigte Einordnung oder leerer Entwurf
+- B51 † · vague_team_task
+- B55 † · Direkt sagen, was die Person tun kann oder was der Empfang konkret prüft. Keine Weitergabeformel und keine Systemgrenze beschreiben.
+- B66 † · Die nötige Identitätsfrage mit dem konkreten Anliegen verbinden, ohne sie anzuhängen.
+- B75 · emoji
+- B88 † · booking, vague_team_task
+- B91 · vague_team_task
+- B96 † · vague_team_task
+- L17 † · vague_team_task
+
+### Gezielte Korrekturen
+
+- B62 und B22: Leere oder nicht bestätigte Abschlussentwürfe galten als fehlende inhaltliche Hilfe. Eindeutige Ankunftsbestätigungen gehen jetzt direkt in die Abschlusslogik.
+- B18: Vage Übergabe, obwohl der Patient nur die Abholung bestätigte. Die Abschlusslogik verhindert die Aufgabe.
+- A97: Vage Aufgabe und fehlende direkte Hilfe. Die Antwort soll die belegte Uhrzeit nennen oder konkret prüfen lassen. Diese Texthinweise blockieren keinen sachlich sicheren Entwurf mehr.
+- A94: Fehlende direkte Hilfe beim kurzen Zeitbezug. Der vorherige Gesprächsgegenstand darf ausgewertet werden, eine unbestätigte Uhrzeit bleibt offen.
+- A77: Leerer oder nicht bestätigter Abschlussentwurf. Eine angekündigte Überweisung nach geklärter Frage wird als Abschluss behandelt.
+
+### Ersatzantworten und harte Übergaben im neuen Lauf
+
+**draft_preview**
+
+- A25 · booking
+- A43 · booking
+- B13 · booking
+- B59 · invented_action
+- L21 · clinical_or_record_mismatch
+
+**approved**
+
+- B57 · invented_action
+- L02 · clinical_or_record_mismatch
+
+### Neue Ergebnisse der genannten Fälle
+
+- **draft_preview/B62** · conversation:acknowledged · Super, dann bis Mittwoch um 14:15 Uhr!
+- **approved/B62** · conversation:acknowledged · Super, dann bis Mittwoch um 14:15 Uhr!
+- **draft_preview/B22** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **approved/B22** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **draft_preview/B18** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **approved/B18** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **draft_preview/A97** · retrieval:answered · Die genaue Uhrzeit für Montag ist mir hier noch nicht bekannt. Das Praxisteam prüft, welche Zeit am Montag [Person] ist, und nennt Ihnen die passende Uhrzeit. Sie hören heute bis 17 Uhr von uns.
+- **approved/A97** · retrieval:answered · Die genaue Uhrzeit für Ihren Montagstermin ist mir hier nicht bekannt. Das Praxisteam prüft, welche Uhrzeit am Montag für Sie [Person] ist, und nennt Ihnen diese. Bei Schmerzen oder Beschwerden bis dahin erreichen Sie die [Person] telefonisch unter [Telefon]. Sie hören heute bis 17 Uhr von uns.
+- **draft_preview/A94** · retrieval:answered · Heute ist Donnerstag, und 15 Uhr liegt innerhalb unserer Sprechzeiten. Das Praxisteam prüft, ob heute um 15 Uhr noch ein Termin [Person] ist. Für Ihre Abholung morgen gilt: Freitags ist die [Person] nur nach gesonderter Vereinbarung geöffnet, bitte stimmen Sie das vorher über den Chat ab. Sie hören heute bis 17 Uhr von uns.
+- **approved/A94** · retrieval:answered · Das Praxisteam prüft, ob heute um 15 Uhr ein Termin [Person] ist. Ob es klappt, wird Ihnen dann mitgeteilt. Sie hören heute bis 17 Uhr von uns.
+- **draft_preview/A77** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **approved/A77** · conversation:acknowledged · Alles klar, danke für die Rückmeldung!
+- **draft_preview/A35** · billing:debit_and_appliance · Dass die Lastschrift eingezogen wurde, kann ich aus dem vorliegenden Stand noch nicht bestätigen. Zur Spangenkontrolle kann [Person] dienstags bis donnerstags während der Sprechzeiten spontan vorbeikommen. Bitte Wartezeit einplanen. Das Praxisteam prüft, ob die Lastschrift erneut eingezogen wird. Sie hören am Dienstag, 21. [Person] bis 10 Uhr von uns.
+- **approved/A35** · billing:debit_and_appliance · Dass die Lastschrift eingezogen wurde, kann ich aus dem vorliegenden Stand noch nicht bestätigen. Zur Spangenkontrolle kann [Person] dienstags bis donnerstags während der Sprechzeiten spontan vorbeikommen. Bitte Wartezeit einplanen. Das Praxisteam prüft, ob die Lastschrift erneut eingezogen wird. Sie hören am Dienstag, 21. [Person] bis 10 Uhr von uns.
+- **draft_preview/B48** · care:clarify_prior_statement · Das ist verständlich, wenn Sie dazu zwei unterschiedliche Aussagen bekommen haben. Das Praxisteam klärt mit der Behandlerin, was bei der letzten Untersuchung besprochen wurde. Sie hören heute bis 17 Uhr von uns.
+- **approved/B48** · care:clarify_prior_statement · Das ist verständlich, wenn Sie dazu zwei unterschiedliche Aussagen bekommen haben. Das Praxisteam klärt mit der Behandlerin, was bei der letzten Untersuchung besprochen wurde. Sie hören heute bis 17 Uhr von uns.
 
 ## Zwei offene Praxisfälle
 
@@ -50,21 +168,14 @@ Beträge in USD. Für ältere Aufrufe ohne Einzelpreis wurden gemessene Eingabe-
 
 | Wissensstand | Erfassung aller Versuche | Ohne Preisbeleg | Zusätzliche Durchläufe über denselben Fall | Hochrechnung je 30 Tage |
 | --- | ---: | ---: | ---: | ---: |
-| draft_preview | 0.5877 | 10 | 66 | 1.0614 |
-| approved | 0.4641 | 10 | 65 | 0.8439 |
+| draft_preview | 0.4399 | 0 | 30 | 0.7668 |
+| approved | 0.3312 | 1 | 30 | 0.5673 |
 
 Hochrechnung für 13 Antworten pro Tag anhand der letzten Ausführung je Fall. Die Hochrechnung enthält keine Annahme über künftige Cache-Treffer.
 
 ## Technische Fehler
 
-- `draft_preview/A05` · model_timeout (compose, HTTP —)
-- `draft_preview/A06` · model_timeout (compose, HTTP —)
-- `draft_preview/A09` · model_timeout (compose, HTTP —)
-- `draft_preview/A20` · model_timeout (compose, HTTP —)
-- `approved/A05` · model_timeout (compose, HTTP —)
-- `approved/A06` · model_timeout (compose, HTTP —)
-- `approved/A09` · model_timeout (compose, HTTP —)
-- `approved/A20` · model_timeout (compose, HTTP —)
+Keine terminalen technischen Fehler. Wiederholte und erfolgreich beendete Fehler stehen je Fall im JSON.
 
 ## Alte Muster und Korrekturansätze
 
@@ -72,54 +183,93 @@ Hochrechnung für 13 Antworten pro Tag anhand der letzten Ausführung je Fall. D
 
 Konkrete Hilfe fehlt vor der Übergabe. Die Antwort zuerst auf das lösbare Anliegen und danach auf die echte Aufgabe fürs Team prüfen.
 
-- `draft_preview` · A03, A05, A06, A09, A10, A14, A20, A27, A35, A43, A44, A55, A56, A63, A72, A77, A80, A93, A94, A96, A97, B04, B12, B13, B15, B18, B22, B30, B41, B43, B48, B51, B53, B55, B56, B61, B62, B65, B66, B73, B80, B82, B86, B95, L01, L02, L09, L12, L13, L21, L24
-- `approved` · A03, A05, A06, A09, A10, A15, A20, A26, A27, A29, A30, A35, A36, A44, A45, A55, A69, A72, A80, A86, A87, A88, A93, A94, A95, A97, A99, B02, B03, B04, B06, B08, B12, B15, B22, B25, B40, B47, B48, B49, B51, B55, B57, B61, B62, B66, B73, B75, B88, B91, B93, B94, B96, L07, L08, L09, L21, L22, L24, L25, L27, L30
+- `draft_preview` · A25, A29, A75, A93, A99, B21, B25, B27, B48, B51, B59, B82, B96, L03, L05
+- `approved` · A08, A15, A18, A27, A29, A56, A63, A86, A93, A97, B15, B19, B20, B21, B25, B31, B45, B48, B51, B52, B53, B57, B58, B61, B68, B93, L01, L02, L21, L22, L23, L24, L27
 
 ### generic_patient_question
 
 Die Identitätsfrage ist losgelöst vom Anliegen. An den konkreten Fall binden und Vorwissen nutzen.
 
-- `draft_preview` · A18, A48, A68, A85, B16, B35, L28
-- `approved` · A42, A61, A68, B10, B31, B37, B50, B70, B76, L28
+- `draft_preview` · A10, A24, A44, A55, A68, A72, A80, B10, B35, B41, B43, B63, B70, B100, L07
+- `approved` · A10, A24, A44, A48, A55, A80, A89, A99, B12, B13, B41, B59, B66, B70, B77, B100
 
 ### portal_access_boilerplate
 
 Eine Systemgrenze wird ohne Hilfestellung beschrieben. Den echten Zugriffspfad oder den konkreten nächsten Schritt nennen.
 
-- `draft_preview` · A26, A47, A75, A98, B02, B29, B66, B85, L05, L08, L09, L10, L16, L17, L25
-- `approved` · A74, B02, B29, B36, B45, B53, B58, B66, B85, L05, L12, L17, L25
+- `draft_preview` · A74, A98, B29, B58, B85, L05, L10, L16
+- `approved` · A56, A83, A98, B29, B82, L25
 
 ### reply_time_boilerplate
 
 Die Rückmeldezeit ist ein Standardsatz. Angeben, was das Team bis dahin tatsächlich klärt.
 
-- `draft_preview` · A03, A05, A06, A09, A10, A13, A14, A15, A16, A17, A20, A23, A26, A27, A29, A30, A35, A41, A43, A44, A45, A47, A49, A54, A55, A56, A59, A62, A63, A69, A70, A72, A74, A77, A80, A81, A83, A84, A86, A87, A88, A93, A94, A96, A97, B03, B04, B06, B12, B13, B15, B18, B22, B27, B29, B30, B31, B36, B40, B41, B43, B45, B47, B48, B49, B51, B53, B55, B56, B58, B61, B62, B65, B66, B67, B68, B73, B76, B77, B79, B80, B82, B85, B86, B87, B88, B92, B93, B96, L01, L02, L07, L08, L09, L12, L13, L14, L17, L21, L22, L23, L24, L25, L26, L27, L28, L30, L32
-- `approved` · A03, A04, A05, A06, A07, A09, A10, A15, A17, A20, A23, A26, A27, A29, A30, A35, A36, A43, A44, A45, A55, A56, A59, A62, A63, A69, A70, A72, A74, A75, A77, A80, A83, A84, A86, A87, A88, A92, A93, A94, A95, A96, A97, A98, A99, B02, B03, B04, B06, B08, B12, B15, B16, B17, B19, B20, B21, B22, B23, B25, B27, B29, B30, B33, B36, B40, B45, B46, B47, B48, B49, B51, B52, B55, B58, B60, B61, B62, B66, B68, B73, B75, B77, B84, B88, B91, B92, B93, B94, B96, L07, L08, L09, L12, L13, L14, L17, L21, L22, L23, L24, L25, L26, L27, L30
+- `draft_preview` · A25, A27, A29, A35, A70, A74, A75, A87, A92, A93, A94, A97, A99, B13, B19, B25, B27, B29, B31, B46, B47, B48, B49, B51, B52, B55, B56, B57, B58, B59, B61, B82, B94, B96, L03, L05, L08, L09, L12, L13, L14, L17, L21, L22
+- `approved` · A12, A13, A17, A18, A19, A26, A27, A29, A35, A36, A45, A56, A59, A63, A69, A70, A72, A74, A75, A81, A83, A86, A88, A93, A94, A97, A98, A99, B15, B17, B19, B20, B21, B25, B40, B45, B47, B48, B53, B57, B58, B60, B61, B66, B68, B82, B84, B94, L01, L02, L07, L08, L09, L12, L21, L22, L23, L25, L30
 
 
 ## Zehn stärkste Antworten
 
-**approved/A19 · 9/10**
+**approved/B01 · 9/10**
 
 Eingang
 
-> Hallo,
-> ich habe heute um 15:30 Uhr einen Termin. Leider hat meine Bahn Ausfall und Verspätung, daher kann es sein, dass ich etwa 10 Minuten später komme.
-> MfG [Person]
+> Morgen 16 Uhr ist leider nicht möglich. Unter was buche ich für [Person] ein Termin? MB Kontrolle würde ich schätzen? Dann buche ich über Doctolib einen Termin - ich hatte schon wieder vergessen das [Person] dort Termine buchen kann. Ich bitte dies zu entschuldigen.
 
 Antwort
 
-> Vielen Dank für Ihre Info. Kommen Sie bitte trotzdem zu Ihrem Termin heute um 15:30 Uhr, eine Verspätung von etwa 10 Minuten ist kein Problem. Falls es deutlich später wird, rufen Sie bitte an: [Telefon].
+> Kein Problem, Sie müssen sich nicht entschuldigen. Bitte wählen Sie bei Doctolib die Terminart „MB-Kontrolle“ für [Person]. Wenn Sie morgen um 16 Uhr nicht können, suchen Sie sich dort einfach einen anderen freien Termin aus.
 
-**draft_preview/A08 · 9/10**
+**approved/B08 · 9/10**
 
 Eingang
 
-> Ich möchte eine Sprechtermin mit die Dr. [Person] machen
+> Vielen Dank für die Nachricht. Kann ich den Termin einfach über Doctolib buchen? Wenn ja, wähle ich dort "Besprechung (Bestandspatienten)" aus?
+> [Person] Grüße [Person]
 
 Antwort
 
-> Gerne helfe ich Ihnen dabei. Sie können den Sprechtermin bei Dr. [Person] direkt online über Doctolib buchen: [Link] Worum soll es bei dem Termin gehen, zum Beispiel um eine Kontrolle oder eine Besprechung?
+> Ja, Sie können den Termin über den Doctolib-Buchungslink der [Person] buchen: [Link] Wählen Sie dort "Besprechung (Bestandspatienten)" aus, das passt für Ihren Fall.
+
+**approved/B95 · 9/10**
+
+Eingang
+
+> Guten Morgen,der Draht sticht [Person] leider innen alles auf. Ich habe Ihnen mal ein Bild gemacht. Denke da müsste dringend doch was gemacht werden weil er schon starke Schmerzen hat. Wann können wir vorbeikommen? [Person] Grüße [Person]
+
+Antwort
+
+> Bitte rufen Sie sofort in der [Person] an: [Telefon]. Bei Atemnot, starker Blutung oder Bewusstlosigkeit wählen Sie die 112.
+
+**approved/L10 · 9/10**
+
+Eingang
+
+> Hallo, ich habe die Benachrichtigung erhalten, dass die aufgeschlüsselt Rechnung in der App verfügbar ist. Dort habe ich auch die Benachrichtigung, die Rechnung ist aber nicht hinterlegt
+
+Antwort
+
+> Sie müssen keine App installieren: Öffnen Sie animacura.io im Browser und melden Sie sich für den Bereich „Rechnungen“ an. Wenn der Versand per E-Mail freigegeben ist, kann die Rechnung auch an Ihre hinterlegte E-Mail-Adresse kommen.
+
+**approved/L16 · 9/10**
+
+Eingang
+
+> Irgendwie kann ich die Rechnungen in der App nicht öffnen
+
+Antwort
+
+> Du musst keine App installieren: Öffne animacura.io im Browser und melde dich für den Bereich „Rechnungen“ an. Wenn der Versand per E-Mail freigegeben ist, kann die Rechnung auch an deine hinterlegte E-Mail-Adresse kommen.
+
+**draft_preview/A01 · 9/10**
+
+Eingang
+
+> [Person] kfo Team, aufgrund von schienenersatzverkehr kommt [Person]. [Person] erst 17:06 bzw 18:06 am bhf an und verspäten sich dadurch um wenige Minuten. Ich bitte um Verständnis. Vg [Person]
+
+Antwort
+
+> Vielen Dank für die Information zur Verspätung durch den Schienenersatzverkehr. Bei einer Verspätung von wenigen Minuten ist das kein Problem, kommen Sie einfach zu Ihrem Termin. Sollte sich die Verspätung auf mehr als 15 Minuten ausweiten, geben Sie dem Praxisteam bitte [Person] Bescheid, dann klärt es, ob der Termin heute noch stattfinden kann.
 
 **draft_preview/A19 · 9/10**
 
@@ -131,194 +281,139 @@ Eingang
 
 Antwort
 
-> Vielen Dank für die Info. Bei etwa 10 Minuten Verspätung kommen Sie einfach zu Ihrem Termin um 15:30 Uhr, eventuell mit ein wenig Wartezeit. Sollte es doch später werden, rufen Sie bitte [Person] unter [Telefon] an, dann können wir schauen, ob der Termin heute noch klappt.
+> Vielen Dank für die Info. Bei etwa 10 Minuten Verspätung kommen Sie einfach zu Ihrem Termin um 15:30 Uhr, eventuell mit etwas Wartezeit. Sollte es doch länger als 15 Minuten dauern, rufen Sie bitte [Person] unter [Telefon] an, dann entscheidet das Team, ob der Termin heute noch klappt.
 
-**draft_preview/A89 · 9/10**
-
-Eingang
-
-> Hallo, es tut mir leid, dass ich heute nicht vorbeigekommen bin, um dir die Rate zu geben – ich bin nämlich müde. Aber morgen komme ich vorbei.
-
-Antwort
-
-> Das ist kein Problem, du musst dich nicht entschuldigen. Komm morgen einfach während der Sprechzeiten am Empfang vorbei, Dienstag bis Donnerstag von 9 bis 13 und von 14 bis 18:30 Uhr, und gib die Rate dort ab. Ruh dich heute gut aus.
-
-**draft_preview/B26 · 9/10**
+**draft_preview/A37 · 9/10**
 
 Eingang
 
-> Sehr geehrte Damen und Herren, meine [Person] [Patient] ist bei Ihnen Bestandspatientin. Sie hat auf den neuen Aligner Nr. 26 gewechselt und dieser sitzt zu locker und lässt sich hinten nicht einklicken. Wir haben Nr. 27 probehalber auch probiert, aber dieser sitzt ebenfalls zu locker und lässt sich auch hinten nicht einklicken.
->
-> Bitte teilen Sie uns mit wie wir weiter verfahren sollen.
+> Guten Tag ich habe bei meiner unterem Zahnspange Probleme und kann jetzt nicht mehr zubeißen kann ich zu ihnen kommen?
 
 Antwort
 
-> Sehr geehrte Damen und Herren, es tut mir leid, dass der Aligner Nr. 26 bei [Person] so locker sitzt und sich hinten nicht einklicken lässt. Bitte tragen Sie bis zur Klärung wieder die vorherige Schiene, die gut gepasst hat, und bewahren Sie alle alten Schienen auf. Mit den Kausticks (Chewies) können Sie die Schiene mehrmals täglich festbeißen. Für die Aligner-Kontrolle können Sie über den Buchungslink einen Termin wählen oder während der Sprechzeiten [Person] bis [Person] spontan mit Wartezeit vorbeikommen, bitte dann alle Schienen mitbringen. Der Empfang gibt an das Team weiter, ob die Aligner Nr. 26 und 27 angepasst oder neu hergestellt werden müssen. Sie hören am Mittwoch, 3. Dezember bis 10 Uhr von uns.
+> Guten Tag, das tut mir leid, dass Sie so eingeschränkt sind. Ja, Sie können zu uns kommen: Während der Sprechzeiten von Dienstag bis Donnerstag können Sie spontan vorbeikommen, dann mit etwas Wartezeit, oder Sie buchen einen festen Termin unter [Link] Bitte bringen Sie die Spange mit. Hat sich etwas gelöst oder drückt etwas, oder haben Sie starke Schmerzen? Dann rufen Sie uns bitte direkt an unter [Telefon].
 
-**approved/A01 · 8/10**
+**draft_preview/A83 · 9/10**
 
 Eingang
 
-> [Person] kfo Team, aufgrund von schienenersatzverkehr kommt [Person]. [Person] erst 17:06 bzw 18:06 am bhf an und verspäten sich dadurch um wenige Minuten. Ich bitte um Verständnis. Vg [Person]
+> Noch eine Bitte,  können Sie mir letzte Rechnung von [Person] mir schicken per watzap . Per Post es ist noch nicht angekommen.
 
 Antwort
 
-> Vielen Dank für Ihre Nachricht und dass Sie uns so früh Bescheid geben. Der Schienenersatzverkehr ist ärgerlich, und ein paar Minuten Verspätung sind kein Problem. Bitte kommen Sie einfach zur Anmeldung, sobald Sie da sind. Bei Fragen erreichen Sie uns unter [Telefon].
+> Das tut mir leid, dass die Rechnung per Post noch nicht angekommen ist. Rechnungen versende ich über diesen Chat nicht, und eine Zustellung per [Person] kann ich Ihnen nicht zusagen. Sie finden Ihre Rechnungen im Patientenportal unter animacura.io, im Browser und ohne App, im Bereich „Rechnungen“, sofern Ihr Zugang freigeschaltet ist. Das Praxisteam prüft, ob die letzte Rechnung vorliegt und wie sie Ihnen zugestellt werden kann. Sie hören heute bis 17 Uhr von uns.
 
-**approved/A13 · 8/10**
+**draft_preview/A96 · 9/10**
 
 Eingang
 
-> Guten Tag. [Person] hat heute um 14.45 einen Termin. Sie ist aber gerade von der Schule zurück und fühlt sich unwohl-Fieber und Kopfschmerzen. Ich möchte gern den Termin verschieben
+> Guten Morgen
+> Ich habe gestern am späten Abend per Mail ein Anhang bekommen wegen den Rechnungen von Einsehen was hat das da auf sich das Geld kommt da aber jetzt nicht aufs Konto richtig.
+> L.G. [Person]
 
 Antwort
 
-> Guten Tag, das tut mir leid, dass es [Person] gerade nicht gut geht, und ich wünsche ihr gute Besserung. Der Empfang prüft den heutigen Termin um 14:45 Uhr und sucht einen passenden neuen Termin, sobald es ihr wieder besser geht. Falls sich ihr Zustand verschlechtert oder starke Schmerzen auftreten, rufen Sie bitte sofort unter [Telefon] an. Wann wäre es Ihnen denn recht, damit der Empfang gezielt suchen kann? Sie hören heute bis 17 Uhr von uns.
-
-**approved/A41 · 8/10**
-
-Eingang
-
-> Hallo ,
->
-> [Person] Frage , wäre es möglich den heutigen Termin zu verschieben , heute Nachmittag vlt? Meine [Person] kann leider nicht kommen. Heute wird alles organisatorisches in der Schule besprochen.
->
-> Freundliche Grüße [Person]
-
-Antwort
-
-> Guten Tag [Person] , das verstehe ich, heute wird in der Schule viel besprochen. Der Empfang prüft, ob heute am Nachmittag ein Termin für Ihre [Person] ist, und schlägt Ihnen dann eine Zeit vor. Welche Uhrzeit am Nachmittag würde für Sie denn am besten passen? Sie hören heute bis 12 Uhr von uns.
-
-**approved/A47 · 8/10**
-
-Eingang
-
-> Hallo, der noch offene Posten wurde ausgeglichen.  [Person] -> Überweisung erfolgt durch N.[Person] .
-> Lg [Person]
-
-Antwort
-
-> Danke für die Information, dass der offene Betrag ausgeglichen wurde. Der Empfang prüft den Zahlungsstand und ob die Dezember-Rechnung über 102,44 € inzwischen bei Ihnen angekommen ist. Sobald das geklärt ist, melden wir uns mit dem Ergebnis. Sie hören heute bis 12 Uhr von uns.
-
-**approved/B11 · 8/10**
-
-Eingang
-
-> Guten Tag, Dr. [Person]. Ich bin [Person] . Wir kommen mit Verspätung daher der Zug kurzfristig abgesagt wurde.
-> Dankeschön
-
-Antwort
-
-> Guten Tag, danke für die Info zur Verspätung. Das ist kein Problem, kommen Sie bitte sicher an. Wir freuen uns auf Sie.
+> Guten Morgen [Person] , Rechnungen, Zahlungen und Dokumente finden Sie im Patientenportal unter animacura.io, das Sie im Browser ohne App öffnen. Dort sehen Sie unter „Rechnungen“ den Stand, den Zugang erhalten Sie mit Patientennummer, Geburtsdatum und hinterlegter E-Mail, den Code bekommen Sie per E-Mail. Passwort oder Code geben Sie bitte nie an die [Person] weiter. Ob die Zahlung bei uns eingegangen ist, prüft das Praxisteam und meldet sich mit dem Stand. Sie hören heute bis 12 Uhr von uns.
 
 
 ## Zehn schwächste Antworten
 
-**draft_preview/B62 · 1/10**
+**approved/B57 · 1/10**
 
 Eingang
 
-> Vielen Dank, ich werde am Mittwoch, den 14. Oktober 2026 um 14:15 Uhr dort sein.
+> Ja die brauch er dann für die Schule . Dann sind wir am 29.9 um 9 uhr da . Soll ich irgendwas bestimmtes mitbringen?
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 12 Uhr von uns.
+> Das Praxisteam prüft, welche Uhrzeit für den Termin eingetragen ist. Sie hören am Montag, 21. September bis 10 Uhr von uns.
 
-**draft_preview/B53 · 1/10**
+**draft_preview/A24 · 1/10**
 
 Eingang
 
-> Ich bin auch wieder da, wann darf ich kommen?
+> [Person] Team wir stecken im Berufsverkehr, wir versuchen in 5-10 Minuten da zu sein. [Person] Grüße [Person]
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Was genau soll ich für Sie klären?
 
-**draft_preview/B51 · 1/10**
+**approved/A24 · 1/10**
 
 Eingang
 
-> Hallo [Person] dr. [Person] schicken sie mir die Bilder 😂☺️😊
+> [Person] Team wir stecken im Berufsverkehr, wir versuchen in 5-10 Minuten da zu sein. [Person] Grüße [Person]
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Was genau soll ich für Sie klären?
 
-**draft_preview/B48 · 1/10**
+**draft_preview/B59 · 2/10**
 
 Eingang
 
-> Hallo, da hatten Sie mir letztens aber was anderes gesagt, da Sie ja jetzt ein aktuelles Röntgen Bild haben und Fr.  [Person] sich dies angeschaut hat , meinten Sie das der oben liegende Zahlen auch mit raus soll.
+> We coming now
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Das Praxisteam prüft, welche Uhrzeit für den Termin eingetragen ist. Sie hören am Freitag, 6. November bis 10 Uhr von uns.
 
-**draft_preview/B22 · 1/10**
+**draft_preview/A25 · 2/10**
 
 Eingang
 
-> Danke sehr! [Person] kommt morgen um 16:30.
+> Hallo. Heute um 18:30 ist in Ordnung. Vielen Dank
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören am Dienstag, 25. [Person] bis 10 Uhr von uns.
+> Das Praxisteam liest im Chat nach, welcher [Person] noch offen ist. Sie hören heute bis 17 Uhr von uns.
 
-**draft_preview/B18 · 1/10**
+**approved/L22 · 2/10**
 
 Eingang
 
-> Hallo, ich kann sie am Montag abholen kommen.
-> Viele Grüße [Person]
+> Es wurde noch keine Uhrzeit vereinbart
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Die Uhrzeit für Ihren Termin am Montag wurde noch nicht vereinbart. Das Praxisteam klärt, welche Uhrzeit für Sie möglich ist, und meldet sich dafür bei Ihnen. Sie hören am Montag, 23. November bis 10 Uhr von uns.
 
-**draft_preview/A97 · 1/10**
+**approved/L21 · 2/10**
 
 Eingang
 
-> [Person] Praxisteam, zu welcher Uhrzeit soll ich am Montag kommen?
+> [Person] Praxisteam, ich wollte mich nochmal erkundigen wegen des Termins morgen. Wann soll ich da sein?
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Das Praxisteam prüft die genaue Uhrzeit Ihres Termins am Montag und nennt Ihnen die Uhrzeit. Bitte haben Sie etwas Geduld, bis die Rückmeldung bei Ihnen eingeht. Sie hören am Montag, 23. November bis 10 Uhr von uns.
 
-**draft_preview/A94 · 1/10**
+**approved/L02 · 2/10**
 
 Eingang
 
-> 15 Uhr Heute?
+> Hallo, bei mir ist ein Attachment abgegangen. Kann ich spontan in der [Person] vorbeikommen?
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für Sie tun können. Sie hören heute bis 17 Uhr von uns.
+> Das Praxisteam prüft, welche Uhrzeit für den Termin eingetragen ist. Du hörst am Montag, 23. November bis 10 Uhr von uns.
 
-**draft_preview/A77 · 1/10**
+**draft_preview/L17 · 2/10**
 
 Eingang
 
-> Vielen Dank! 🙌🏽
-> Ich war mir unsicher, ob dies die richtige Kontonummer ist, daher habe ich lieber nachgefragt. Ich werde die Überweisung umgehend vornehmen, nochmals vielen Dank!
->
-> Grüße [Person]
+> Ja das hab ich schon verstanden aber ich versuche es ja gerade unter Rechnungen zu öffnen aber da kommt eine Fehlermeldung
 
 Antwort
 
-> Ich kläre mit der Rezeption, was wir für dich tun können. Du hörst am Dienstag, 27. Oktober bis 10 Uhr von uns.
+> Das ist ärgerlich, dass beim Öffnen der Rechnungen eine Fehlermeldung kommt. Bitte lass dir im Portal unter „Rechnungen“ nichts anderes anzeigen als den Fehler; einen Code oder dein Passwort musst du der [Person] nicht schicken. Das Praxisteam prüft, woran es hakt, und meldet sich am Montag, 23. November, bei dir. Du hörst am Montag, 23. November bis 10 Uhr von uns.
 
-**draft_preview/A35 · 1/10**
+**draft_preview/A80 · 2/10**
 
 Eingang
 
-> Guten Tag,
-> mein Name ist [Person]. Ich schreibe wegen meiner [Person] [Patient] (geb. [Datum]).
-> Laut der Rechnung [Person] [Datum] sollten 144,11 € ab dem [Datum] automatisch von meinem Konto abgebucht werden. Das Geld wurde bisher jedoch nicht abgebucht. Was soll ich jetzt tun? Wird die Lastschrift noch einmal eingezogen oder soll ich den Betrag selbst überweisen?
-> Außerdem hat meine [Person] [Patient] mit ihrer Zahnspange. Ich habe gesehen, dass die nächsten Termine erst wieder ab [Person] verfügbar sind. Wann könnten wir vorbeikommen?
-> Vielen Dank für Ihre Rückmeldung.
-> Mit freundlichen Grüße [Person]
+> Ich danke Ihnen und ich werde mich so [Person] wie möglich dort melden.  Mit freundlichen Grüße [Person]
 
 Antwort
 
-> Ich kläre mit der Rezeption, ob der Termin bei uns eingetragen ist. Sie hören am Dienstag, 21. [Person] bis 10 Uhr von uns.
+> Was genau soll ich für Sie klären?
