@@ -130,3 +130,7 @@ Die Nullwerte oben beziehen sich auf die automatisch untersuchten Endantworten. 
 | Nachher | C15-20 | 2 | – | invented_appointment_or_cost | 0 |
 | Nachher | C18-23 | 1 | – | forbidden_sentence, repetition | 0 |
 | Nachher | C18-23 | 2 | – | identity_known | 0 |
+
+## Manuelle Ergänzung zu verbotenen Formulierungen
+
+Der automatische Endantwort-Zähler meldet jeweils null, die manuelle Durchsicht findet jedoch die im Systemtext verbotene Weiterleitungsformulierung in **je einer Endantwort**: vorher C03-5, nachher C01-2 (jeweils sinngemäß „Ich gebe … ans Team weiter“). Diese wurden vom Modellprüfer nicht beanstandet. Daher lautet das belastbare Ergebnis für diese manuell gefundenen verbotenen Formulierungen **1 vorher / 1 nachher**, nicht null. Die Tabellen oben geben unverändert die maschinelle Auswertung wieder. Eine Korrektur von Systemtext oder Prüfanweisung wurde nicht in diesen auf den freigegebenen main-Stand bezogenen Vergleich hineingemischt.
