@@ -1,11 +1,12 @@
-import {generateText,NoObjectGeneratedError,Output} from 'ai';
+import {withGatewayRetry} from './animahost-model-failure';
+import {createGateway,generateText,NoObjectGeneratedError,Output} from 'ai';
 import type {SystemModelMessage} from 'ai';
 import {gatewayOptions} from './animahost-whatsapp-conversation';
 import type {Generate} from './animahost-chain';
 
 /** Technische Spur eines Modellaufrufs: Dauer, Ende und Länge. Nie ein Inhalt. */
 export type ModelCall={stage:'compose'|'verify';reasoning:'none'|'low';promptChars:number;systemChars:number;ms:number;finish:string;outputTokens:number|null;reasoningTokens:number|null;textChars:number|null;parts:string|null;inputTokens:number|null;failure:string|null;
- cacheReadTokens:number|null;cacheWriteTokens:number|null;costUsd:number|null};
+ cacheReadTokens:number|null;cacheWriteTokens:number|null;costUsd:number|null;technicalRetries?:number};
 
 export function cacheableInstructions(model:string,system:string,cacheStatic:boolean):string|SystemModelMessage{
  return cacheStatic&&model.startsWith('anthropic/')?{role:'system',content:system,
@@ -37,14 +38,16 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
   // The replay of the previous core retains its original settings.
   const reasoning=call.reasoning??(stage==='verify'?'low':'none');
   const metrics={stage,reasoning,promptChars:call.prompt.length,systemChars:call.system.length};
+  let technicalRetries=0;
+  const callSignal=AbortSignal.any([signal,AbortSignal.timeout(call.timeoutMs)]);
   let finish='none',outputTokens:number|null=null,reasoningTokens:number|null=null,textChars:number|null=null,parts:string|null=null,inputTokens:number|null=null;
   let cacheReadTokens:number|null=null,cacheWriteTokens:number|null=null,costUsd:number|null=null;
   const record=(failure:string|null)=>onCall?.({...metrics,ms:Date.now()-started,finish,outputTokens,reasoningTokens,textChars,parts,inputTokens,
-   cacheReadTokens,cacheWriteTokens,costUsd,failure});
+   cacheReadTokens,cacheWriteTokens,costUsd,failure,technicalRetries});
   try{
-   const result=await generateText({model,reasoning,providerOptions:{gateway:{...gatewayOptions.gateway,...(options.tags?.length?{tags:options.tags}:{})}},
+   const result=await withGatewayRetry(()=>generateText({model,reasoning,providerOptions:{gateway:{...gatewayOptions.gateway,...(options.tags?.length?{tags:options.tags}:{})}},
     maxRetries:0,...(/^anthropic\/claude-(haiku|sonnet|opus)-5\.5$/.test(model)?{}:{temperature:call.temperature}),maxOutputTokens:call.maxOutputTokens,
-    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(call.timeoutMs)]),...(call.plainText?{}:{output:Output.object({schema:call.schema})}),
+    abortSignal:callSignal,...(call.plainText?{}:{output:Output.object({schema:call.schema})}),
     ...(call.system?{system:cacheableInstructions(model,call.system,options.cacheStatic===true)}:{}),prompt:call.prompt,
     onStepFinish(step){
      finish=step.finishReason;outputTokens=step.usage.outputTokens??null;inputTokens=step.usage.inputTokens??null;
@@ -53,6 +56,9 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
      cacheWriteTokens=step.usage.inputTokenDetails?.cacheWriteTokens??null;
      costUsd=gatewayDollarAmount(step.providerMetadata?.gateway?.cost);
      parts=step.content.map(part=>part.type).join(',').slice(0,120);
+    }}),{signal:callSignal,stage,onRetry:()=>{technicalRetries++;},balance:async()=>{
+     const gateway=createGateway({fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.any([callSignal,AbortSignal.timeout(2500)])})});
+     return gatewayDollarAmount((await gateway.getCredits()).balance);
     }});
    const output=call.plainText?call.schema.parse(result.text):result.output;
    record(null);

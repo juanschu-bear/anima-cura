@@ -6,7 +6,7 @@ import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversation
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
 import {loadPatientSheet,sheetLedger,type ConcernHistory} from './animahost-patient-sheet';
 import {localizeInbound} from './animahost-inbound-language';
-import {classifyModelFailure} from './animahost-model-failure';
+import {captureModelFailure,classifyModelFailure} from './animahost-model-failure';
 import {classifySender} from './animahost-sender-policy';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {whatsappRulesSchema} from './animahost-whatsapp';
@@ -85,7 +85,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  if(preflight)return {result:preflight,calls,...language,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,timings:{contextMs:Date.now()-started,embeddingMs:0,searchMs:0,modelMs:0,totalMs:Date.now()-started}};
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
- const result=await runRetrievalReply(model,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
+ const result=await captureModelFailure(model,guarded=>runRetrievalReply(guarded,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)}));
  const providedNames=removeProvidedNameRequests(result.text,[joined,...history.filter(h=>h.direction==='incoming').map(h=>h.text)].join('\n'));
  if(providedNames.removed.length){
   result.text=providedNames.text;result.checks?.push({removedProvidedNameRequests:providedNames.removed});

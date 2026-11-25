@@ -445,7 +445,7 @@
     },
     {
       "file": "src/app/api/practice-notifications/route.ts",
-      "sha256": "faf43ee340b28a9dc9e6d0a9875d0acfc7ea414eee1581c34a8ea40a11394974",
+      "sha256": "e3921c6d9a22926210574bf4d0114130b9a6ceee951b2941cffe077ae4e1c634",
       "proof": "Reviewed client provenance: explicit service client after workspace actor authorization (template/inbox); mail server-only worker. Bell marks use cookie-bound authenticated client and RLS/auth.uid(), never a supplied recipient identity.",
       "calls": [
         {
@@ -617,7 +617,7 @@
     },
     {
       "file": "src/lib/services/animahost-retrieval.ts",
-      "sha256": "ec29dfa5e654e2809a23f1149c79f2bef11584475d29ed418c14fd31b13aafa5",
+      "sha256": "5179a2029f3075d7e3311e96e486b35335a92d77efb45ae0a9c73761ee3f4e09",
       "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
       "calls": [
         {
@@ -724,7 +724,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/route.ts",
-      "sha256": "ac6f748015c5888d0e907f7a263ddeb878e58045c7e9a6057edfebd614a8d65e"
+      "sha256": "e55fd157e853922c7041046d55265984a19b1e60107782775ccb66ce4ebe36fb"
     },
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",
