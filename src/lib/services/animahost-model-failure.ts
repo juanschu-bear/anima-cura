@@ -9,8 +9,8 @@ export function classifyModelFailure(error:unknown,stage:ModelFailure['stage']):
  let timeout=false,invalidJson=false,status:number|undefined;
  for(let level=0;level<8&&candidate&&typeof candidate==='object';level++){
   const value=candidate as {name?:unknown;statusCode?:unknown;status?:unknown;code?:unknown;cause?:unknown;lastError?:unknown;message?:unknown;responseBody?:unknown};
-  // Leeres Guthaben (direkte API: HTTP 400 „credit balance is too low“) und erreichte Testtagesgrenze sind beides erschöpftes Budget.
-  if(value.code==='model_budget_exhausted'||value.code==='test_budget_exhausted')return {code:'model_budget_exhausted',stage};
+  // Leeres Guthaben meldet die direkte API als HTTP 400 „credit balance is too low“.
+  if(value.code==='model_budget_exhausted')return {code:'model_budget_exhausted',stage};
   if(creditExhausted(value))return {code:'model_budget_exhausted',stage,httpStatus:Number(value.statusCode??value.status)};
   const http=value.statusCode??value.status;
   if(http===402)return {code:'model_budget_exhausted',stage,httpStatus:http};

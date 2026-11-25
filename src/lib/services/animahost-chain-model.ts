@@ -2,8 +2,7 @@ import {withGatewayRetry} from './animahost-model-failure';
 import {generateText,NoObjectGeneratedError,Output} from 'ai';
 import type {SystemModelMessage} from 'ai';
 import type {Generate} from './animahost-chain';
-import {animahostLanguageModel,anthropicCostUsd,maxCallCostUsd,type ModelPurpose} from './animahost-model-access';
-import {reserveTestBudget,settleTestBudget,type Reservation} from './animahost-model-budget';
+import {animahostLanguageModel,anthropicCostUsd,type ModelPurpose} from './animahost-model-access';
 
 /** Technische Spur eines Modellaufrufs: Dauer, Ende und Länge. Nie ein Inhalt. */
 export type ModelCall={stage:'compose'|'verify';reasoning:'none'|'low';promptChars:number;systemChars:number;ms:number;finish:string;outputTokens:number|null;reasoningTokens:number|null;textChars:number|null;parts:string|null;inputTokens:number|null;failure:string|null;
@@ -33,7 +32,7 @@ export function modelFailure(error:unknown):string{
 
 /**
  * Modellaufruf für AnimaHost über den direkten Anthropic-Zugang. purpose entscheidet den Schlüssel: 'live' für Patientenantworten,
- * 'test' für Qualitätsläufe, Probelauf und Proben (mit Tagesgrenze, siehe animahost-model-budget).
+ * 'test' für Qualitätsläufe, Probelauf und Proben.
  */
 export function modelGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[];purpose?:ModelPurpose}={}):Generate{
  const purpose=options.purpose??'live';
@@ -49,15 +48,8 @@ export function modelGenerate(model:string,signal:AbortSignal,onCall?:(call:Mode
   let cacheReadTokens:number|null=null,cacheWriteTokens:number|null=null,costUsd:number|null=null,spentUsd=0,priced=true;
   const record=(failure:string|null)=>onCall?.({...metrics,ms:Date.now()-started,finish,outputTokens,reasoningTokens,textChars,parts,inputTokens,
    cacheReadTokens,cacheWriteTokens,costUsd,failure,technicalRetries});
-  let reservation:Reservation|null=null;
   try{
    const languageModel=animahostLanguageModel(model,purpose);
-   if(purpose==='test'){
-    // Je Versuch wird die volle Obergrenze reserviert (1 technische Wiederholung möglich).
-    const ceiling=maxCallCostUsd(model,call.system.length+call.prompt.length,call.maxOutputTokens);
-    if(ceiling==null)throw Object.assign(new Error('test_budget_unpriced_model'),{code:'test_budget_unpriced_model'});
-    reservation=await reserveTestBudget(ceiling*2);
-   }
    const result=await withGatewayRetry(()=>generateText({model:languageModel,reasoning,
     maxRetries:0,...(/^anthropic\/claude-(haiku|sonnet|opus)-5\.5$/.test(model)?{}:{temperature:call.temperature}),maxOutputTokens:call.maxOutputTokens,
     abortSignal:callSignal,...(call.plainText?{}:{output:Output.object({schema:call.schema})}),
@@ -76,11 +68,10 @@ export function modelGenerate(model:string,signal:AbortSignal,onCall?:(call:Mode
    record(null);
    return output;
   }catch(error){record(modelFailure(error));throw error;}
-  finally{if(reservation)await settleTestBudget(reservation,costUsd);}
  };
 }
 
-/** Für Skripte (Qualitätsläufe, Benchmarks, Proben): immer Test-Schlüssel und Tagesgrenze. Patientenantworten nutzen modelGenerate mit 'live'. */
+/** Für Skripte (Qualitätsläufe, Benchmarks, Proben): immer Test-Schlüssel. Patientenantworten nutzen modelGenerate mit 'live'. */
 export function testModelGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[]}={}):Generate{
  return modelGenerate(model,signal,onCall,{...options,purpose:'test'});
 }

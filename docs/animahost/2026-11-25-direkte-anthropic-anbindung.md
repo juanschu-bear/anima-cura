@@ -14,12 +14,9 @@ Kosten je Aufruf aus den Token-Zahlen nach Listenpreis Haiku 5.5 (global): 0,10 
 Leeres Anthropic-Guthaben meldet die API als HTTP 400 „credit balance is too low“; das gilt jetzt als `model_budget_exhausted`.
 Statische Systemanweisungen werden jetzt auch im Probelauf gecacht.
 
-## Testbudget (2 USD pro Berliner Kalendertag)
-Jeder Testaufruf reserviert vor dem Senden seine Kostenobergrenze (doppelt, wegen 1 technischer Wiederholung) atomar in der Datenbank und rechnet danach die echten Kosten ab. Reicht der Rest nicht, wird nicht gesendet; das gilt auch für parallele Aufrufe aus verschiedenen Instanzen. Unbekannte Kosten zählen mit der vollen Reservierung.
-Die Tabelle und die beiden Funktionen kommen mit Migration 107. Bis Juan sie freigibt und sie eingespielt ist, laufen keine Testaufrufe (`test_budget_not_ready`). Live ist davon nie betroffen.
+## Testbudget
+Am 25.11.2026 um 18:46 von Juan verworfen: keine Tagesgrenze, Testläufe laufen frei über den Test-Schlüssel.
 
 ## Offen
-- Migration 107 freigeben und einspielen, danach Budget-Code aktivieren (liegt fertig vor).
 - Warnung bei weniger als 3 USD Live-Guthaben: Die direkte API hat keinen Guthaben-Abruf. Das Vercel-Guthaben gehört nicht mehr zu AnimaHost und wird deshalb nicht mehr angezeigt.
 - Wiederverwendung unveränderter Replay-Fälle und Zweitbewertung nur bei Unsicherheit: betrifft die Replay-Skripte, noch nicht umgesetzt.
-- Verbrauch seit 24.11. nach Projekt: braucht Zugriff auf die Vercel-Verbrauchsdaten.

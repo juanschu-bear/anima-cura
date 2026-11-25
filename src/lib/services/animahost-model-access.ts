@@ -54,12 +54,6 @@ export function anthropicCostUsd(model:string,usage:TokenUsage):number|null{
  return Math.round(usd*1e9)/1e9;
 }
 
-/** Obergrenze für einen Aufruf vor dem Senden, für die Testbudget-Reservierung. Großzügig: 1 Token je 2 Zeichen, voller Ausgaberahmen. */
-export function maxCallCostUsd(model:string,chars:number,maxOutputTokens:number):number|null{
- const tokens=Math.ceil(chars/2)+64;
- return anthropicCostUsd(model,{inputTokens:tokens,noCacheTokens:tokens,outputTokens:maxOutputTokens});
-}
-
 /** Leeres Guthaben meldet die direkte API als HTTP 400 mit „credit balance is too low“, nicht als 402. */
 export function creditExhausted(value:{statusCode?:unknown;status?:unknown;message?:unknown;responseBody?:unknown}):boolean{
  const http=value.statusCode??value.status;
