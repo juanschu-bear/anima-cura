@@ -74,3 +74,40 @@ test('identity-only second draft leaves an empty answer and hands off',async()=>
 test('removing identity questions does not release confidential information',async()=>{
  const q='Bitte nennen Sie mir Ihr Geburtsdatum.';const m=model(q,valid,q+' Ihr Befund ist X.',{...valid,passed:false,hard:[{kind:'confidential_unconfirmed',quote:'Ihr Befund ist X.',reason:'Akteninhalt nicht freigegeben'}]});const r=await runRetrievalReply(m.generate,knownSender());assert.equal(r.skipSend,true);assert.match(r.teamSummary!,/Akteninhalt/);
 });
+
+test('an unresolved delay does not inherit a booking-link requirement from a keyword rule',async()=>{
+ const question='Wie viele Minuten nach Ihrem vereinbarten Termin kommen Sie ungefähr an?';
+ const m=model(question,{...valid,lateness:'clarify'});
+ const r=await runRetrievalReply(m.generate,input({message:'Ich schaffe meinen Termin vielleicht nicht rechtzeitig.',doctolibUrl:'https://www.doctolib.de/test',rules:[{id:'termin-absagen',topic:'Absage',keywords:['termin'],action:'antworten',patientText:'Termin verschieben: {doctolib_link}'}]}));
+ assert.equal(r.text,question);assert.equal(r.teamKind,'info');assert.equal(r.repairs,0);assert.equal(r.skipSend,undefined);
+});
+test('a premature delay link is retried and never sent even when the checker passes the text',async()=>{
+ const text='Verschieben Sie hier: {doctolib_link}';const review={...valid,lateness:'clarify'};
+ const m=model(text,review,text,review);const r=await runRetrievalReply(m.generate,input({message:'Der Wettkampf endet vielleicht um 15:20.',doctolibUrl:'https://www.doctolib.de/test'}));
+ assert.equal(r.skipSend,true);assert.equal(r.text,'');assert.match(r.violations.join(' '),/appointment_flow/);
+});
+test('a wrong appointment step is corrected once before delivery',async()=>{
+ const wrong='Kommen Sie einfach vorbei.';const question='Wie viele Minuten später kommen Sie ungefähr an?';
+ const m=model(wrong,{...valid,passed:false,lateness:'clarify',hard:[{kind:'appointment_flow',quote:wrong,reason:'Verspätung noch unbekannt'}]},question,{...valid,lateness:'clarify'});
+ const r=await runRetrievalReply(m.generate,input({message:'Wir kommen zu spät.'}));assert.equal(r.text,question);assert.equal(r.repairs,1);assert.equal(r.teamKind,'info');
+});
+test('a delay above tolerance requires the configured link and stays information-only',async()=>{
+ const m=model('Bitte verschieben Sie den bestehenden Termin.',{...valid,lateness:'reschedule'},'Bitte verschieben Sie den bestehenden Termin in Ihrem eigenen Konto: {doctolib_link}',{...valid,lateness:'reschedule',teamRequired:true});
+ const r=await runRetrievalReply(m.generate,input({message:'Etwa 20 Minuten.',doctolibUrl:'https://www.doctolib.de/test'}));
+ assert.equal(r.repairs,1);assert.match(r.text,/https:\/\/www.doctolib.de\/test/);assert.equal(r.teamKind,'info');assert.equal(r.action,'antworten');assert.equal(r.dueAt,undefined);
+});
+test('an exception request requires team action even if a broad appointment rule matched',async()=>{
+ const m=model('Das Team prüft, ob es ausnahmsweise noch passt.',{...valid,lateness:'exception'});
+ const r=await runRetrievalReply(m.generate,input({message:'Termin: Wir kommen 25 Minuten später nach einer Stunde Anfahrt. Geht es trotzdem?',doctolibUrl:'https://www.doctolib.de/test',rules:[{id:'termin-verschieben',topic:'Termin',keywords:['termin'],action:'antworten',patientText:'{doctolib_link}'}]}));
+ assert.equal(r.teamKind,'act');assert.equal(r.action,'klaerfall');assert.doesNotMatch(r.text,/https:/);assert.equal(r.dueAt,undefined);
+});
+test('a checker statement explicitly denying an appointment-flow violation cannot block a valid exception review',async()=>{
+ const text='Das Team entscheidet, ob es trotz 25 Minuten Verspätung noch passt.';
+ const m=model(text,{...valid,passed:false,lateness:'exception',hard:[{kind:'appointment_flow',quote:text,reason:'Der appointment_flow-Befund ist nicht nachweisbar falsch.'}]});
+ const r=await runRetrievalReply(m.generate,input({message:'Wir kommen 25 Minuten später nach langer Anfahrt. Geht es trotzdem?'}));
+ assert.equal(r.text,text);assert.equal(r.teamKind,'act');assert.equal(r.repairs,0);assert.equal((r.checks?.[0] as any).dismissedFlow.length,1);
+});
+test('lateness-flow findings do not apply to unrelated appointment changes',async()=>{
+ const text='Was möchten Sie am Termin ändern?';const m=model(text,{...valid,passed:false,lateness:'none',hard:[{kind:'appointment_flow',quote:text,reason:'Keine Minutenfrage'}]});
+ const r=await runRetrievalReply(m.generate,input({message:'Ich habe eine Frage zu meinem Termin.'}));assert.equal(r.text,text);assert.equal(r.skipSend,undefined);
+});

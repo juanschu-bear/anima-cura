@@ -50,3 +50,27 @@ test('a stored first-name-only provisional link cannot be reused on a follow-up'
  const result=await resolveChatName(db as any,{tenant:'t',chat:'c',phone:'p',message:'Und was ist mit der Mail?',readOnly:true});
  assert.equal(result.context.status,'unmatched');assert.equal(writes,0);
 });
+
+test('child subjects find shortened and compound names without changing sender matching',async()=>{
+ const {subjectNameText,matchSubjectNames,subjectNameResolution}=await import('../animahost-name-match');
+ const rows=[{id:'short',vorname:'Leo',nachname:'Navarro',geburtsdatum:'2014-05-07'},{id:'long',vorname:'Leo Daniel',nachname:'Navarro Torres',geburtsdatum:'2014-05-07'},{id:'wrong',vorname:'Leo',nachname:'Anders'}];
+ const text='Guten Morgen, mein Sohn Leo Daniel Navarro hat heute einen Termin.';
+ assert.equal(subjectNameText(text),'Leo Daniel Navarro');assert.equal(matchChatNames(text,rows).length,0);
+ assert.deepEqual(matchSubjectNames(text,rows).map(m=>m.patient.id),['short','long']);
+ const known=subjectNameResolution(text,rows,['long']);assert.equal(known?.context.patientId,'long');assert.equal(known?.context.confirmed,true);assert.equal(known?.context.role,'subject');
+ const duplicate=subjectNameResolution(text,rows);assert.equal(duplicate?.context.status,'ambiguous');assert.equal(duplicate?.context.possibleDuplicate,true);assert.equal(duplicate?.patient,null);assert.doesNotMatch(duplicate!.context.question!,/Geburtsdatum/);
+ assert.equal(subjectNameResolution('Mein Sohn Leo hat einen Termin.',rows),null);
+});
+test('partial surname alone cannot select an unverified record and DOB separates distinct children',async()=>{
+ const {subjectNameResolution}=await import('../animahost-name-match');
+ const rows=[{id:'one',vorname:'Leo Daniel',nachname:'Navarro Torres',geburtsdatum:'2014-05-07'},{id:'two',vorname:'Leo',nachname:'Navarro',geburtsdatum:'2012-05-07'}];
+ assert.equal(subjectNameResolution('Mein Sohn Leo Navarro hat einen Termin.',[rows[0]])?.context.status,'ambiguous');
+ assert.equal(subjectNameResolution('Mein Sohn Leo Navarro, geboren 07.05.2012.',rows)?.context.patientId,'two');
+ assert.equal(subjectNameResolution('Mein Sohn Leo Anders hat einen Termin.',rows),null);
+});
+test('a treatment date is not a birth-date filter and two verified candidates stay unresolved',async()=>{
+ const {subjectNameResolution}=await import('../animahost-name-match');
+ const p={id:'one',vorname:'Leo Daniel',nachname:'Navarro',geburtsdatum:'2014-05-07'};
+ assert.equal(subjectNameResolution('Mein Sohn Leo Navarro hat am 25.11.2026 einen Termin.',[p])?.context.patientId,'one');
+ assert.equal(subjectNameResolution('Mein Sohn Leo Navarro kommt später.',[p,{...p,id:'two'}],['one','two'])?.context.status,'ambiguous');
+});

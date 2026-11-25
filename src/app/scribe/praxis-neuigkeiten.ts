@@ -171,4 +171,22 @@ const ANIMAHOST_OHNE_FRISTEN: Entwurf = {
  kurzEn: "No clock times, today or tomorrow promises for your team's response.",
  textEn: "AnimaHost announces necessary team reviews without promising a response time. It confirms received invoice emails using documented dispatch and refers to the protected link in the existing email. It does not offer another delivery or create an unnecessary team task for this. Invoices are not sent over WhatsApp.",
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_OHNE_FRISTEN,ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_FRAGT_NACH: Entwurf = {
+ slug: "2026-11-25-animahost-fragt-nach", art: "neuerung", bestaetigen: false,
+ titel: "AnimaHost fragt passend nach",
+ kurz: "Bei unklarer Verspätung klärt AnimaHost zuerst, wie viele Minuten gemeint sind.",
+ text: "Der freundliche Einstieg bleibt. Fehlt eine entscheidende Angabe, stellt AnimaHost eine passende Frage und berücksichtigt die Antwort. Bis zu 15 Minuten gilt die übliche Toleranz. Bei längerer Verspätung erklärt es den vollen Terminplan und verweist auf das Verschieben des bestehenden Termins im eigenen Doctolib-Konto, damit genug Behandlungszeit bleibt. Rückmeldefristen werden nicht versprochen.",
+ titelEn: "AnimaHost asks the right follow-up question",
+ kurzEn: "When a delay is unclear, AnimaHost first asks how many minutes late the patient expects to arrive.",
+ textEn: "The warm opening stays. When a key detail is missing, AnimaHost asks a relevant question and uses the answer. The usual tolerance applies up to 15 minutes. For longer delays, it explains the full schedule and directs patients to reschedule their existing appointment in their own Doctolib account so there is enough treatment time. No response deadlines are promised.",
+};
+const ANIMAHOST_KIND_ZUORDNUNG: Entwurf = {
+ slug: "2026-11-25-animahost-kind-zuordnung", art: "neuerung", bestaetigen: false,
+ titel: "AnimaHost findet genannte Kinder zuverlässiger",
+ kurz: "Der Name des Kindes bleibt erhalten, auch wenn ein Elternteil schreibt.",
+ text: "AnimaHost unterscheidet die schreibende Person vom betroffenen Kind. Zusätzliche Vor- oder Nachnamen verhindern nicht mehr, dass passende Akten gefunden werden. Eine bereits bestätigte Verknüpfung hilft bei der Auswahl der richtigen Akte. Mehrdeutige Einträge werden zur Klärung markiert und nicht automatisch zusammengeführt. Ein Vorname allein bestätigt weiterhin keine Identität.",
+ titelEn: "AnimaHost finds named children more reliably",
+ kurzEn: "A child's name remains available even when a parent sends the message.",
+ textEn: "AnimaHost distinguishes the sender from the child concerned. Additional given names or surnames no longer prevent candidate records from being found. An existing confirmed link helps select the correct record. Ambiguous records are flagged for review and are not automatically merged. A given name alone still does not confirm identity.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_KIND_ZUORDNUNG,ANIMAHOST_FRAGT_NACH,ANIMAHOST_OHNE_FRISTEN,ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

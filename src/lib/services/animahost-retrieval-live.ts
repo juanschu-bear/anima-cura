@@ -1,5 +1,5 @@
 import {clarificationRound} from './animahost-unclear-input';
-import {senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
+import {subjectNameText,subjectNameResolution,senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
 import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversationPhoneProof,mentionsPatient} from './animahost-chat-identity';
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
@@ -54,13 +54,16 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  let chatName:ChatNameContext|undefined;
  // Resolve the sender against the phone-linked family before searching the entire practice.
  const linked=phone?await linkedNamePatients(db,patients.map(p=>p.id)):[];
- const family=linkedSenderMatch(joined,linked,verifiedIds);
+ const subject=subjectNameText(joined);
+ const child=subject?subjectNameResolution(joined,linked,verifiedIds):null;
+ const family=subject?null:linkedSenderMatch(joined,linked,verifiedIds);
  const senderText=selfNameClaim(joined)??senderNameText(joined);
- const phoneSubject=senderDeclaration(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])?null:selectPhonePatient(patients,senderText));
- if(family)chatName=family.context;
+ const phoneSubject=subject||senderDeclaration(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])?null:selectPhonePatient(patients,senderText));
+ if(child)chatName=child.context;
+ else if(family)chatName=family.context;
  else if(phoneSubject)chatName={status:'matched',source:'phone',matchedName:[phoneSubject.vorname,phoneSubject.nachname].join(' '),patientId:phoneSubject.id,confirmed:Boolean(provisional)||verifiedIds.includes(phoneSubject.id),question:null};
  else if(phone){
-  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly});
+  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly,verifiedIds});
   chatName=matched.context;
   if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
  }

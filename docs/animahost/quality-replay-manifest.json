@@ -1,21 +1,21 @@
 {
-  "report": "docs/animahost/2026-11-25-no-deadlines-quality-replay.md",
+  "report": "docs/animahost/2026-11-25-dialogue-quality-replay.md",
   "chats": 20,
   "before": {
-    "sourceHash": "d99beca2bc85b30c9815a100bbe2e1fa98d91f96c8f3f9c1e41ab66234fb9e86",
+    "sourceHash": "d3c628c630923cd622d6e5cd76d8a84a70c0c2768efbcb872c57e24ae26b6d4e",
     "inputHash": "13900be413756d5a2240be323f7427312c183a0cecceec3eecac2d2b61e3a54a",
-    "startedAt": "2026-11-25T09:12:57.476Z",
-    "completedAt": "2026-11-25T09:14:54.211Z",
+    "startedAt": "2026-11-25T09:51:55.567Z",
+    "completedAt": "2026-11-25T09:54:06.039Z",
     "turns": 25,
     "rechecks": [],
     "sendCount": 0,
     "technicalErrors": 0
   },
   "after": {
-    "sourceHash": "d3c628c630923cd622d6e5cd76d8a84a70c0c2768efbcb872c57e24ae26b6d4e",
+    "sourceHash": "e3ddaa87318e0b1c727ba58c5cf69accd4ca916dc42d464bd05a0d0b31382cce",
     "inputHash": "13900be413756d5a2240be323f7427312c183a0cecceec3eecac2d2b61e3a54a",
-    "startedAt": "2026-11-25T09:16:52.818Z",
-    "completedAt": "2026-11-25T09:19:24.971Z",
+    "startedAt": "2026-11-25T10:00:42.746Z",
+    "completedAt": "2026-11-25T10:02:59.257Z",
     "turns": 25,
     "rechecks": [],
     "sendCount": 0,

@@ -10,3 +10,13 @@ test('appointment, opening and recorded invoice-dispatch times are preserved',()
 test('remove the whole callback sentence without leaving a date fragment',()=>{
  assert.equal(withoutCallbackDeadlines('Das Team prüft Ihr Anliegen. Sie hören bis Mittwoch, 25. November, 10 Uhr von uns.').text,'Das Team prüft Ihr Anliegen.');
 });
+test('reported delay minutes are not a callback promise, but a separate response duration still is',()=>{
+ const allowed='Ob wir bei 25 Minuten Verspätung noch dazwischennehmen können, entscheidet das Team, und das prüft die Frage jetzt.';
+ assert.deepEqual(callbackDeadlineSentences(allowed),[]);
+ assert.equal(callbackDeadlineSentences('Wir melden uns in 20 Minuten wegen Ihrer 25 Minuten Verspätung.').length,1);
+});
+test('conditional clock promises with inverted word order are removed too',()=>{
+ const promise='Sollten Sie bis heute Abend nichts davon bekommen, schreiben Sie mir kurz, dann schicken wir Ihnen die Bestätigung selbst.';
+ assert.equal(callbackDeadlineSentences(promise).length,1);
+ assert.equal(withoutCallbackDeadlines('Die Bestätigung kann ich nicht einsehen. '+promise).text,'Die Bestätigung kann ich nicht einsehen.');
+});
