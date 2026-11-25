@@ -243,7 +243,7 @@ export async function POST(request:NextRequest){
   }
   const model=await db.from('animahost_whatsapp_settings').select('model').eq('tenant_id',tenant).single();
   if(model.error)return unavailable();
-  try{names.push(...await remainingPersonNames([input.question,input.answer,input.context].map(text=>anonymizeRetrieval(text,names)),model.data.model,AbortSignal.timeout(25000)));}
+  try{names.push(...await remainingPersonNames([input.question,input.answer,input.context].map(text=>anonymizeRetrieval(text,names)),model.data.model,AbortSignal.timeout(25000),undefined,'live'));}
   catch{return NextResponse.json({code:'gold_anonymization_unavailable'},{status:503,headers});}
   const result=await db.rpc('animahost_mark_gold',{p_tenant:tenant,p_actor:input.actorId,p_ref:'practice-'+contentHash(input.sourceRef).slice(0,32),
    p_question:anonymizeRetrieval(input.question,names),p_answer:anonymizeRetrieval(input.answer,names),p_context:anonymizeRetrieval(input.context,names),p_at:input.sourceAt});

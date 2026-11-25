@@ -32,7 +32,8 @@ import {applicableMessageRules,practiceMessageHandoff,personRequest,personReques
 import {classifySender,quietSenderRule,unknownSenderDecision} from '@/lib/services/animahost-sender-policy';
 import {silentSocialRule,socialReply} from '@/lib/services/animahost-conversation-signals';
 import {runChain} from '@/lib/services/animahost-chain';
-import {gatewayGenerate} from '@/lib/services/animahost-chain-model';
+import {modelGenerate} from '@/lib/services/animahost-chain-model';
+import {animahostLanguageModel} from '@/lib/services/animahost-model-access';
 import {loadDossier} from '@/lib/services/animahost-dossier';
 import {retrievalAnswer} from '@/lib/services/animahost-retrieval-live';
 import {activeKnowledge} from '@/lib/services/animahost-knowledge';
@@ -361,7 +362,7 @@ export async function POST(request:NextRequest){
     const verifiedIds=(confirmed.data??[]).map(row=>row.patient_id);
     if(input.identity?.phone===trustedPhone)verifiedIds.push(input.identity.patientId);
     const dossier=await loadDossier(db,{patients:candidates,verifiedIds,today});
-    const result=await runChain(gatewayGenerate(practice.model,request.signal),{message:maskBirthDates(input.text),language,informal:false,
+    const result=await runChain(modelGenerate(practice.model,request.signal),{message:maskBirthDates(input.text),language,informal:false,
      history,dossier,rules:rules.data,approvedKnowledge:knowledge.entries,
      practice:{doctolibUrl:practice.doctolib_url,phone:practice.practice_phone,today,teamTime:teamTime(),closurePeriods:practice.closure_periods},
      baseline:null,budgetMs:Math.max(0,deadline-Date.now())});
@@ -430,7 +431,7 @@ export async function POST(request:NextRequest){
         },
        }:null;
        const chosen: z.infer<typeof classificationSchema>=choseArrival??(await generateText({
-        model:practice.model,maxRetries:0,temperature:0,
+        model:animahostLanguageModel(practice.model,'live'),maxRetries:0,...(/^anthropic\/claude-(haiku|sonnet|opus)-5\.5$/.test(practice.model)?{}:{temperature:0}),
         abortSignal:AbortSignal.any([request.signal,AbortSignal.timeout(10_500)]),
         output:Output.object({schema:classificationSchema}),
         system:[

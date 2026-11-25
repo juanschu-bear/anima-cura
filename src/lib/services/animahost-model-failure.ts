@@ -1,4 +1,5 @@
 import type {Generate} from './animahost-chain';
+import {creditExhausted} from './animahost-model-access';
 export type ModelFailureCode='model_budget_exhausted'|'model_timeout'|'model_invalid_json'|'model_provider_error';
 export type ModelFailure={code:ModelFailureCode;stage:'compose'|'verify';httpStatus?:number};
 
@@ -7,8 +8,10 @@ export function classifyModelFailure(error:unknown,stage:ModelFailure['stage']):
  let candidate=error;
  let timeout=false,invalidJson=false,status:number|undefined;
  for(let level=0;level<8&&candidate&&typeof candidate==='object';level++){
-  const value=candidate as {name?:unknown;statusCode?:unknown;status?:unknown;code?:unknown;cause?:unknown;lastError?:unknown};
-  if(value.code==='model_budget_exhausted')return {code:'model_budget_exhausted',stage};
+  const value=candidate as {name?:unknown;statusCode?:unknown;status?:unknown;code?:unknown;cause?:unknown;lastError?:unknown;message?:unknown;responseBody?:unknown};
+  // Leeres Guthaben (direkte API: HTTP 400 „credit balance is too low“) und erreichte Testtagesgrenze sind beides erschöpftes Budget.
+  if(value.code==='model_budget_exhausted'||value.code==='test_budget_exhausted')return {code:'model_budget_exhausted',stage};
+  if(creditExhausted(value))return {code:'model_budget_exhausted',stage,httpStatus:Number(value.statusCode??value.status)};
   const http=value.statusCode??value.status;
   if(http===402)return {code:'model_budget_exhausted',stage,httpStatus:http};
   if(typeof http==='number'&&http>=400&&http<=599)status??=http;

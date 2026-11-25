@@ -10,7 +10,7 @@ import {captureModelFailure,classifyModelFailure} from './animahost-model-failur
 import {classifySender} from './animahost-sender-policy';
 import {appointmentLocalDate} from './animahost-appointment-notices';
 import {whatsappRulesSchema} from './animahost-whatsapp';
-import {gatewayGenerate,type ModelCall} from './animahost-chain-model';
+import {modelGenerate,type ModelCall} from './animahost-chain-model';
 import {retrieveSources} from './animahost-retrieval';
 import {runRetrievalReply,retrievalPreflight,type RetrievalInput,type RetrievalResult} from './animahost-retrieval-core';
 import type {OutboundTurn} from './animahost-retrieval-routing';
@@ -21,7 +21,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const history=(input.history??[]).filter(h=>Date.parse(h.at)<=Date.parse(input.receivedAt)).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)).slice(-20).map(h=>({...h,text:maskBirthDates(h.text)}));
  const phone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
  const calls:ModelCall[]=[];
- const model=gatewayGenerate(practice.model,signal,call=>calls.push(call),{cacheStatic:!input.readOnly&&!preview,tags:['animahost-retrieval']});
+ const model=modelGenerate(practice.model,signal,call=>calls.push(call),{cacheStatic:true,tags:['animahost-retrieval'],purpose:input.readOnly||preview?'test':'live'});
  const sender=classifySender({jid:input.from,trustedPhone:phone,hasPatient:false,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES});
  const translate=!['team','group','non_patient'].includes(sender)&&input.messageType!=='reaction';

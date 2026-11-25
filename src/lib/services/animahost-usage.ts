@@ -1,4 +1,3 @@
-import {createGateway} from 'ai';
 import type {createServerClient} from '@/lib/db/supabase';
 import {gatewayDollarAmount,type ModelCall} from './animahost-chain-model';
 
@@ -52,13 +51,11 @@ export function summarizeReplyUsage(rows:{timings?:{usage?:ReplyUsage}}[],answer
  };
 }
 
-async function readGatewayBalance(){
- try{
-  const gateway=createGateway({fetch:(input,init)=>fetch(input,{...init,cache:'no-store',signal:AbortSignal.timeout(2500)})});
-  const credits=await gateway.getCredits();
-  return gatewayDollarAmount(credits.balance);
- }catch{return null;}
-}
+/**
+ * Seit 25.11.2026 läuft AnimaHost direkt über Anthropic. Die direkte API hat keinen Abruf für das Guthaben,
+ * das Vercel-Guthaben gehört nicht mehr zu AnimaHost. Deshalb kein Guthabenwert, statt eines falschen.
+ */
+async function readCreditBalance():Promise<number|null>{return null;}
 
 export async function readUsageMonth(db:Db,tenant:string,now=new Date()){
  const period=usageMonthWindow(now);
@@ -76,8 +73,8 @@ export async function readUsageMonth(db:Db,tenant:string,now=new Date()){
    if(page.data.length<500)return rows;
   }
  };
- const [answers,rows,creditBalanceUsd]=await Promise.all([count,evidence(),readGatewayBalance()]);
+ const [answers,rows,creditBalanceUsd]=await Promise.all([count,evidence(),readCreditBalance()]);
  if(answers.error||answers.count===null)throw Error('animahost_usage_unavailable');
  return {...period,currency:'USD' as const,...summarizeReplyUsage(rows,answers.count),creditBalanceUsd,
-  creditScope:creditBalanceUsd===null?null:'gateway_team' as const};
+  creditScope:null};
 }

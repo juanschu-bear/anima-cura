@@ -1,3 +1,4 @@
+import {animahostLanguageModel} from './animahost-model-access';
 import {generateText,Output} from 'ai';
 import {z} from 'zod';
 import {t} from '@/lib/i18n';
@@ -7,6 +8,7 @@ export const conversationHistorySchema=z.array(z.strictObject({
  direction:z.enum(['incoming','outgoing']),text:z.string().max(1200),at:z.string().datetime({offset:true}),source:z.enum(['practice','animahost']).optional(),
 })).max(20);
 export type ConversationHistory=z.infer<typeof conversationHistorySchema>;
+/** Frühere Vercel-Gateway-Vorgabe (EU, ohne Speicherung). Seit 25.11.2026 läuft AnimaHost direkt über Anthropic, siehe animahost-model-access. */
 export const gatewayOptions={gateway:{inferenceRegion:{scope:'zone' as const,geoRegion:'eu'},zeroDataRetention:true}};
 
 export function recentConversation(history:ConversationHistory,receivedAt:string):ConversationHistory {
@@ -87,14 +89,14 @@ export async function formulateConversationReply(input:{
  const facts={approved:decision.text,rule:decision.rule,action:decision.action,patientMessage:input.text,
   history:input.history,language:input.language,addressMode:input.informal?'Du':'Sie',verifiedIdentity:input.verifiedIdentity};
  try{
-  const drafted=await generateText({model,providerOptions:gatewayOptions,maxRetries:0,maxOutputTokens:440,
+  const drafted=await generateText({model:animahostLanguageModel(model,'live'),maxRetries:0,maxOutputTokens:440,
    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(Math.max(1,Math.min(4_000,input.deadline-Date.now()-900)))]),
    output:Output.object({schema:z.object({reply:z.string().min(1).max(1500)})}),
    system:`Formuliere anhand der freigegebenen Antwort eine natürliche kurze WhatsApp-Antwort in der Sprache des Patienten, freundlich und konsequent in der angegebenen Anredeform. Greife dessen Anliegen oder Einwand in höchstens drei kurzen Sätzen auf. Das Thema ergibt sich nur aus der neuesten Nachricht. Der Verlauf erklärt ausschließlich Bezüge. Erkenne berechtigte Korrekturen an und beantworte dann die korrigierte Frage. Fasse mehrere aktuelle Anliegen zu einer widerspruchsfreien Antwort zusammen. Beginne direkt mit der Antwort. Vermeide Anrede, Abschiedsgruß, Wiederholungen und unpassende Wünsche. Die freigegebene Antwort ist eine Faktenvorlage. Formuliere eigenständig und passe die Satzstruktur an den Verlauf an. Die ausdrücklich erlaubte Information darf sehr knapp, aber vollständig sein. Behalte sämtliche Fakten, Schritte und Grenzen bei. ${guard}`,
    prompt:JSON.stringify(facts)});
   const candidate=drafted.output.reply.trim();
   if(candidate===decision.text||!withinReplyBounds(candidate,decision.text)||input.deadline-Date.now()<500)return decision;
-  const checked=await generateText({model,providerOptions:gatewayOptions,maxRetries:0,maxOutputTokens:350,
+  const checked=await generateText({model:animahostLanguageModel(model,'live'),maxRetries:0,maxOutputTokens:350,
    abortSignal:AbortSignal.any([signal,AbortSignal.timeout(Math.max(1,Math.min(3_200,input.deadline-Date.now())))]),
    output:Output.object({schema:z.object({violations:z.array(z.enum([
     'extra_commitment','missing_instruction','unsafe_advice','private_data','wrong_fact','wrong_language','unrelated_topic',

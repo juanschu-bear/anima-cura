@@ -4,7 +4,7 @@ import {z} from 'zod';
 import {createServerClient} from '@/lib/db/supabase';
 import {whatsappRulesSchema} from '@/lib/services/animahost-whatsapp';
 import {maskBirthDates} from '@/lib/services/animahost-chat-identity';
-import {gatewayGenerate,type ModelCall} from '@/lib/services/animahost-chain-model';
+import {modelGenerate,type ModelCall} from '@/lib/services/animahost-chain-model';
 import {assignPairs,bundleTopics,describeTopic,voicePairSchema} from '@/lib/services/animahost-practice-voice';
 
 export const runtime='nodejs';
@@ -46,7 +46,7 @@ export async function POST(request:NextRequest){
   const version=await db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',tenant).eq('version',settings.data.active_rulebook_version).single();
   const rules=whatsappRulesSchema.safeParse(version.data?.rules);
   if(version.error||!rules.success)return NextResponse.json({code:'rulebook_unavailable'},{status:503,headers});
-  const generate=gatewayGenerate(settings.data.model,request.signal,call=>calls.push(call));
+  const generate=modelGenerate(settings.data.model,request.signal,call=>calls.push(call));
   const done=(result:unknown)=>NextResponse.json({result,calls,ms:Date.now()-started},{headers});
   if(input.mode==='assign')return done(await assignPairs(generate,input.pairs.map(pair=>({id:pair.id,frage:maskBirthDates(pair.frage),antwort:maskBirthDates(pair.antwort)})),rules.data,STEP_MS));
   if(input.mode==='bundle')return done(await bundleTopics(generate,input.topics,STEP_MS));

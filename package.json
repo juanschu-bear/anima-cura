@@ -60,6 +60,7 @@
     "check:animahost-quality": "node scripts/check-animahost-quality.mjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.108",
     "@ai-sdk/gateway": "^4.0.150",
     "@anthropic-ai/sdk": "^0.26.0",
     "@documenso/embed-react": "^0.6.1",

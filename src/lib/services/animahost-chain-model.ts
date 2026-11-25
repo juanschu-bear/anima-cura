@@ -1,8 +1,9 @@
 import {withGatewayRetry} from './animahost-model-failure';
-import {createGateway,generateText,NoObjectGeneratedError,Output} from 'ai';
+import {generateText,NoObjectGeneratedError,Output} from 'ai';
 import type {SystemModelMessage} from 'ai';
-import {gatewayOptions} from './animahost-whatsapp-conversation';
 import type {Generate} from './animahost-chain';
+import {animahostLanguageModel,anthropicCostUsd,maxCallCostUsd,type ModelPurpose} from './animahost-model-access';
+import {reserveTestBudget,settleTestBudget,type Reservation} from './animahost-model-budget';
 
 /** Technische Spur eines Modellaufrufs: Dauer, Ende und Länge. Nie ein Inhalt. */
 export type ModelCall={stage:'compose'|'verify';reasoning:'none'|'low';promptChars:number;systemChars:number;ms:number;finish:string;outputTokens:number|null;reasoningTokens:number|null;textChars:number|null;parts:string|null;inputTokens:number|null;failure:string|null;
@@ -30,8 +31,12 @@ export function modelFailure(error:unknown):string{
  return ((error instanceof Error?error.name:'unknown')+http).slice(0,80);
 }
 
-/** Die Kette spricht mit demselben Modellzugang wie der Rest von AnimaHost: Verarbeitung in der EU, ohne Speicherung beim Anbieter. */
-export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[]}={}):Generate{
+/**
+ * Modellaufruf für AnimaHost über den direkten Anthropic-Zugang. purpose entscheidet den Schlüssel: 'live' für Patientenantworten,
+ * 'test' für Qualitätsläufe, Probelauf und Proben (mit Tagesgrenze, siehe animahost-model-budget).
+ */
+export function modelGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[];purpose?:ModelPurpose}={}):Generate{
+ const purpose=options.purpose??'live';
  return async call=>{
   const started=Date.now();
   const stage=call.stage??'compose';
@@ -41,11 +46,19 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
   let technicalRetries=0;
   const callSignal=AbortSignal.any([signal,AbortSignal.timeout(call.timeoutMs)]);
   let finish='none',outputTokens:number|null=null,reasoningTokens:number|null=null,textChars:number|null=null,parts:string|null=null,inputTokens:number|null=null;
-  let cacheReadTokens:number|null=null,cacheWriteTokens:number|null=null,costUsd:number|null=null;
+  let cacheReadTokens:number|null=null,cacheWriteTokens:number|null=null,costUsd:number|null=null,spentUsd=0,priced=true;
   const record=(failure:string|null)=>onCall?.({...metrics,ms:Date.now()-started,finish,outputTokens,reasoningTokens,textChars,parts,inputTokens,
    cacheReadTokens,cacheWriteTokens,costUsd,failure,technicalRetries});
+  let reservation:Reservation|null=null;
   try{
-   const result=await withGatewayRetry(()=>generateText({model,reasoning,providerOptions:{gateway:{...gatewayOptions.gateway,...(options.tags?.length?{tags:options.tags}:{})}},
+   const languageModel=animahostLanguageModel(model,purpose);
+   if(purpose==='test'){
+    // Je Versuch wird die volle Obergrenze reserviert (1 technische Wiederholung möglich).
+    const ceiling=maxCallCostUsd(model,call.system.length+call.prompt.length,call.maxOutputTokens);
+    if(ceiling==null)throw Object.assign(new Error('test_budget_unpriced_model'),{code:'test_budget_unpriced_model'});
+    reservation=await reserveTestBudget(ceiling*2);
+   }
+   const result=await withGatewayRetry(()=>generateText({model:languageModel,reasoning,
     maxRetries:0,...(/^anthropic\/claude-(haiku|sonnet|opus)-5\.5$/.test(model)?{}:{temperature:call.temperature}),maxOutputTokens:call.maxOutputTokens,
     abortSignal:callSignal,...(call.plainText?{}:{output:Output.object({schema:call.schema})}),
     ...(call.system?{system:cacheableInstructions(model,call.system,options.cacheStatic===true)}:{}),prompt:call.prompt,
@@ -54,15 +67,22 @@ export function gatewayGenerate(model:string,signal:AbortSignal,onCall?:(call:Mo
      reasoningTokens=step.usage.outputTokenDetails?.reasoningTokens??null;textChars=step.text.length;
      cacheReadTokens=step.usage.inputTokenDetails?.cacheReadTokens??null;
      cacheWriteTokens=step.usage.inputTokenDetails?.cacheWriteTokens??null;
-     costUsd=gatewayDollarAmount(step.providerMetadata?.gateway?.cost);
+     const stepCost=anthropicCostUsd(model,{inputTokens,outputTokens,cacheReadTokens,cacheWriteTokens,noCacheTokens:step.usage.inputTokenDetails?.noCacheTokens??null});
+     if(stepCost==null)priced=false;else spentUsd+=stepCost;
+     costUsd=priced?Math.round(spentUsd*1e9)/1e9:null;
      parts=step.content.map(part=>part.type).join(',').slice(0,120);
-    }}),{signal:callSignal,stage,onRetry:()=>{technicalRetries++;},balance:async()=>{
-     const gateway=createGateway({fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.any([callSignal,AbortSignal.timeout(2500)])})});
-     return gatewayDollarAmount((await gateway.getCredits()).balance);
-    }});
+    }}),{signal:callSignal,stage,onRetry:()=>{technicalRetries++;}});
    const output=call.plainText?call.schema.parse(result.text):result.output;
    record(null);
    return output;
   }catch(error){record(modelFailure(error));throw error;}
+  finally{if(reservation)await settleTestBudget(reservation,costUsd);}
  };
 }
+
+/** Für Skripte (Qualitätsläufe, Benchmarks, Proben): immer Test-Schlüssel und Tagesgrenze. Patientenantworten nutzen modelGenerate mit 'live'. */
+export function testModelGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[]}={}):Generate{
+ return modelGenerate(model,signal,onCall,{...options,purpose:'test'});
+}
+/** Früherer Name, von den Skripten noch verwendet. Läuft ausschließlich als Test. */
+export const gatewayGenerate=testModelGenerate;
