@@ -1,5 +1,6 @@
+import {removeProvidedNameRequests} from './animahost-provided-name-question';
 import {clarificationRound} from './animahost-unclear-input';
-import {subjectNameText,subjectNameResolution,senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
+import {removeInferredParentSalutation,identityMessageForTurn,subjectNameText,subjectNameResolution,senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
 import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversationPhoneProof,mentionsPatient} from './animahost-chat-identity';
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
@@ -54,8 +55,9 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  let chatName:ChatNameContext|undefined;
  // Resolve the sender against the phone-linked family before searching the entire practice.
  const linked=phone?await linkedNamePatients(db,patients.map(p=>p.id)):[];
- const subject=subjectNameText(joined);
- const child=subject?subjectNameResolution(joined,linked,verifiedIds):null;
+ const identityText=identityMessageForTurn(joined,input.history??[],input.receivedAt);
+ const subject=subjectNameText(identityText);
+ const child=subject?subjectNameResolution(identityText,linked,verifiedIds):null;
  const family=subject?null:linkedSenderMatch(joined,linked,verifiedIds);
  const senderText=selfNameClaim(joined)??senderNameText(joined);
  const phoneSubject=subject||senderDeclaration(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])?null:selectPhonePatient(patients,senderText));
@@ -63,7 +65,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  else if(family)chatName=family.context;
  else if(phoneSubject)chatName={status:'matched',source:'phone',matchedName:[phoneSubject.vorname,phoneSubject.nachname].join(' '),patientId:phoneSubject.id,confirmed:Boolean(provisional)||verifiedIds.includes(phoneSubject.id),question:null};
  else if(phone){
-  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly,verifiedIds});
+  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:identityText,readOnly:input.readOnly,verifiedIds});
   chatName=matched.context;
   if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
  }
@@ -84,5 +86,18 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
  const result=await runRetrievalReply(model,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)});
+ const providedNames=removeProvidedNameRequests(result.text,[joined,...history.filter(h=>h.direction==='incoming').map(h=>h.text)].join('\n'));
+ if(providedNames.removed.length){
+  result.text=providedNames.text;result.checks?.push({removedProvidedNameRequests:providedNames.removed});
+ }
+ if(chatName?.role==='subject'){
+  const salutation=removeInferredParentSalutation(result.text,identityText,selected[0]);
+  if(salutation.removed.length){result.text=salutation.text;result.checks?.push({removedInferredParentSalutations:salutation.removed});}
+ }
+ if(!result.text.trim()&&!result.skipSend){
+  result.skipSend=true;result.action='klaerfall';result.rule='chain:guard_rejected';
+  result.violations.push('empty_after_identity_cleanup');result.reviewReasons=result.violations;result.teamSummary=result.violations.join('; ');
+  delete result.teamKind;delete result.disposition;
+ }
  return {result,calls,...language,patientSheet:sheetLedger(patientSheet),chatName,selectedPatientId:patientSheet.patientId??chatName?.patientId??null,phoneMatches:chatName?.source==='chat'?undefined:phoneLabels(patients),timings:{contextMs,...retrieved.timings,modelMs:result.ms,totalMs:Date.now()-started}};
 }

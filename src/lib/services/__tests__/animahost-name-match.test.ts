@@ -74,3 +74,45 @@ test('a treatment date is not a birth-date filter and two verified candidates st
  assert.equal(subjectNameResolution('Mein Sohn Leo Navarro hat am 25.11.2026 einen Termin.',[p])?.context.patientId,'one');
  assert.equal(subjectNameResolution('Mein Sohn Leo Navarro kommt später.',[p,{...p,id:'two'}],['one','two'])?.context.status,'ambiguous');
 });
+test('compound surnames, inverted names, particles and grandchildren are recognized',async()=>{
+ const {subjectNameResolution,subjectNameText}=await import('../animahost-name-match');
+ const p={id:'a',vorname:'Mira Elena',nachname:'de la Cruz-Muster'};
+ for(const text of ['Meine Tochter Mira Elena de la Cruz-Muster kommt später.','Mein Enkel: de la Cruz-Muster, Mira Elena kommt später.','Unser Kind Cruz-Muster, Mira Elena hat einen Termin.']){
+  assert.equal(subjectNameResolution(text,[p],['a'])?.context.patientId,'a',text);
+ }
+ assert.equal(subjectNameText('Mein Bruder Leon Muster darf mit Ihnen kommunizieren.'),null);
+ assert.equal(subjectNameText('Es geht um einen Termin für meine Mutter Nora Beispiel.'),'Nora Beispiel');
+});
+test('one spelling error finds candidates but never proves a name, including a previously linked ID',async()=>{
+ const {subjectNameResolution}=await import('../animahost-name-match');const p={id:'a',vorname:'Mira',nachname:'Beispiel'};
+ for(const text of ['Meine Tochter Mira Beispeil hat einen Termin.','Meine Tochter Mira Beispel hat einen Termin.']){
+  const r=subjectNameResolution(text,[p],['a']);assert.equal(r?.context.status,'ambiguous');assert.equal(r?.patient,null);
+ }
+ assert.equal(subjectNameResolution('Meine Tochter Mara Beispiele hat einen Termin.',[p]),null);
+});
+test('short sequential answers preserve the named child but explicit switches and stale history do not',async()=>{
+ const {identityMessageForTurn,subjectNameResolution}=await import('../animahost-name-match');
+ const patients=[{id:'a',vorname:'Leo',nachname:'Navarro'},{id:'b',vorname:'Mira',nachname:'Navarro'}];
+ const history=[{direction:'incoming',text:'Mein Sohn Leo Navarro kommt zu spät.',at:'2026-11-25T09:00:00Z'},{direction:'outgoing',text:'Wie viele Minuten später?',at:'2026-11-25T09:01:00Z'}];
+ const message=identityMessageForTurn('Etwa 20 Minuten.',history,'2026-11-25T09:02:00Z');assert.equal(subjectNameResolution(message,patients,['a','b'])?.context.patientId,'a');
+ const switched=identityMessageForTurn('Meine Tochter Mira Navarro kommt auch.',history,'2026-11-25T09:03:00Z');assert.equal(subjectNameResolution(switched,patients,['a','b'])?.context.patientId,'b');
+ for(const text of ['Es geht jetzt um mich. Für mich brauche ich einen Termin.','Mein Name ist Nora Muster.','Meine Tochter Mira kommt später.'])assert.equal(identityMessageForTurn(text,history,'2026-11-25T09:03:00Z'),text);
+ assert.equal(identityMessageForTurn('20 Minuten',history,'2026-11-27T09:03:00Z'),'20 Minuten');
+});
+test('shared surname particles alone never create a matching candidate',async()=>{
+ const {subjectNameResolution}=await import('../animahost-name-match');
+ const p={id:'a',vorname:'Mira',nachname:'de la Cruz'};
+ assert.equal(subjectNameResolution('Meine Tochter Mira de la Torre kommt.',[p],['a']),null);
+ assert.equal(subjectNameResolution('Meine Tochter Mira Cruz kommt.',[p],['a'])?.context.patientId,'a');
+});
+test('explicit birth date is selected independently of an earlier treatment date',async()=>{
+ const {subjectNameResolution}=await import('../animahost-name-match');
+ const p={id:'a',vorname:'Leo',nachname:'Navarro',geburtsdatum:'2014-05-07'};
+ assert.equal(subjectNameResolution('Mein Sohn Leo Navarro hat am 25.11.2026 einen Termin, geboren am 07.05.2014.',[p],['a'])?.context.patientId,'a');
+});
+test('a child surname never becomes an unsupported parent salutation',async()=>{
+ const {removeInferredParentSalutation}=await import('../animahost-name-match');const p={id:'a',vorname:'Leo',nachname:'Navarro'};
+ assert.equal(removeInferredParentSalutation('Danke, Frau Navarro! Wie viel später kommt Leo?','Mein Sohn Leo Navarro kommt später.',p).text,'Danke! Wie viel später kommt Leo?');
+ assert.equal(removeInferredParentSalutation('Danke, Frau Navarro!','Mein Sohn Leo Navarro kommt später. Grüße Mira Navarro',p).removed.length,0);
+ assert.equal(removeInferredParentSalutation('Danke, Frau Navarro!','Termin für meine Mutter Mira Navarro.',p).removed.length,0);
+});

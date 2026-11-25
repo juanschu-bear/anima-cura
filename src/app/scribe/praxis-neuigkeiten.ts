@@ -189,4 +189,13 @@ const ANIMAHOST_KIND_ZUORDNUNG: Entwurf = {
  kurzEn: "A child's name remains available even when a parent sends the message.",
  textEn: "AnimaHost distinguishes the sender from the child concerned. Additional given names or surnames no longer prevent candidate records from being found. An existing confirmed link helps select the correct record. Ambiguous records are flagged for review and are not automatically merged. A given name alone still does not confirm identity.",
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_KIND_ZUORDNUNG,ANIMAHOST_FRAGT_NACH,ANIMAHOST_OHNE_FRISTEN,ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_ZUVERLAESSIGE_GESPRAECHE: Entwurf = {
+ slug: "2026-11-25-animahost-zuverlaessige-gespraeche", art: "neuerung", bestaetigen: false,
+ titel: "AnimaHost nutzt den Gesprächsverlauf besser",
+ kurz: "Weniger unnötige Rückfragen und keine behaupteten Erledigungen ohne Nachweis.",
+ text: "AnimaHost berücksichtigt bereits genannte Angaben und behält bei kurzen Folgeantworten das genannte Kind im Blick. Bei einem Personenwechsel wird neu zugeordnet. Weitere Namensvarianten und mögliche Schreibfehler liefern Kandidaten, bestätigen aber keine Identität. Widersprüchliche Antwortprüfungen werden erneut geprüft. Dass ein Termin geändert oder etwas weitergegeben wurde, darf AnimaHost nur mit passendem Ausführungsnachweis behaupten.",
+ titelEn: "AnimaHost makes better use of the conversation",
+ kurzEn: "Fewer unnecessary questions and no unsupported claims that an action is complete.",
+ textEn: "AnimaHost uses details already provided and keeps the named child in context during short follow-up answers. It reassesses the patient when the subject changes. Additional name variants and possible typos produce candidates but do not confirm identity. Contradictory reply reviews are checked again. AnimaHost may claim an appointment was changed or information forwarded only with matching evidence of completion.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ZUVERLAESSIGE_GESPRAECHE,ANIMAHOST_KIND_ZUORDNUNG,ANIMAHOST_FRAGT_NACH,ANIMAHOST_OHNE_FRISTEN,ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

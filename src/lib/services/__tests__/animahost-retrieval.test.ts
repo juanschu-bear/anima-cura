@@ -20,7 +20,7 @@ test('even a previously approved deadline is forbidden in the first reply and ab
  assert.doesNotMatch(m.calls[0].system,/2026-11-24T16:00:00/);assert.equal((replyContext(input({deadline})).fields.JETZT as any).rueckmeldefristErlaubt,false);
 });
 
-test('confidential invoice state blocks; other findings are improvement hints',async()=>{
+test('unconfirmed invoice facts, invented appointments and unsupported handoffs block the draft',async()=>{
  const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
  const time='17 Uhr';
  const invoice='Alex hat noch 100 € offen';
@@ -33,7 +33,7 @@ test('confidential invoice state blocks; other findings are improvement hints',a
  const result=await runRetrievalReply(m.generate,input({message:'Was ist mit Alex’ Rechnung?',deadline}));
  assert.equal(result.repairs,1);
  const first=result.checks?.[0] as {violations:string[]};
- assert.equal(first.violations.length,1);
+ assert.ok(first.violations.some(v=>v.startsWith('invented_appointment_or_cost')));assert.ok(first.violations.some(v=>v.startsWith('unsupported_action')));
  assert.match(first.violations.join(','),/confidential_unconfirmed/);
  assert.doesNotMatch(result.text,/100 €|17 Uhr/);
 });
@@ -103,11 +103,43 @@ test('an exception request requires team action even if a broad appointment rule
 });
 test('a checker statement explicitly denying an appointment-flow violation cannot block a valid exception review',async()=>{
  const text='Das Team entscheidet, ob es trotz 25 Minuten Verspätung noch passt.';
- const m=model(text,{...valid,passed:false,lateness:'exception',hard:[{kind:'appointment_flow',quote:text,reason:'Der appointment_flow-Befund ist nicht nachweisbar falsch.'}]});
+ const m=model(text,{...valid,passed:false,lateness:'exception',hard:[{kind:'appointment_flow',quote:text,reason:'Der appointment_flow-Befund ist nicht nachweisbar falsch.'}]},{...valid,lateness:'exception'});
  const r=await runRetrievalReply(m.generate,input({message:'Wir kommen 25 Minuten später nach langer Anfahrt. Geht es trotzdem?'}));
- assert.equal(r.text,text);assert.equal(r.teamKind,'act');assert.equal(r.repairs,0);assert.equal((r.checks?.[0] as any).dismissedFlow.length,1);
+ assert.equal(r.text,text);assert.equal(r.teamKind,'act');assert.equal(r.repairs,0);assert.equal((r.checks?.[0] as any).reviewRechecked,true);
 });
 test('lateness-flow findings do not apply to unrelated appointment changes',async()=>{
  const text='Was möchten Sie am Termin ändern?';const m=model(text,{...valid,passed:false,lateness:'none',hard:[{kind:'appointment_flow',quote:text,reason:'Keine Minutenfrage'}]});
  const r=await runRetrievalReply(m.generate,input({message:'Ich habe eine Frage zu meinem Termin.'}));assert.equal(r.text,text);assert.equal(r.skipSend,undefined);
+});
+test('contradictory confidentiality review is rechecked without discarding a real privacy violation',async()=>{
+ const text='Sie haben 300 Euro offen.';
+ const contradictory={...valid,passed:false,hard:[{kind:'confidential_unconfirmed',quote:text,reason:'Die Aussage ist zulässig; kein tatsächlicher Verstoß.'}]};
+ const bad={...valid,passed:false,hard:[{kind:'confidential_unconfirmed',quote:text,reason:'Betrag aus nicht freigegebener Akte.'}]};
+ const m=model(text,contradictory,bad,'Das Team prüft Ihren Zahlungsstand.',valid);
+ const r=await runRetrievalReply(m.generate,input());assert.equal(r.text,'Das Team prüft Ihren Zahlungsstand.');assert.equal(m.calls.length,5);assert.equal(r.repairs,1);
+});
+test('a persistent contradictory review does not become permission to disclose',async()=>{
+ const text='Sie haben 300 Euro offen.',bad={...valid,passed:true,hard:[{kind:'confidential_unconfirmed',quote:text,reason:'Betrag ohne Freigabe'}]};
+ const m=model(text,bad,bad,text,bad,bad);const r=await runRetrievalReply(m.generate,input());assert.equal(r.skipSend,true);assert.ok(r.violations.includes('inconsistent_review'));
+});
+test('unsupported completion is retried even when the model checker accepts it',async()=>{
+ const m=model('Ich habe den Termin verschoben.',valid,'Bitte verschieben Sie den bestehenden Termin in Ihrem Konto.',valid);
+ const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.equal(r.text,'Bitte verschieben Sie den bestehenden Termin in Ihrem Konto.');
+});
+test('persistent unsupported completion cannot be sent',async()=>{
+ const m=model('Ich habe den Termin verschoben.',valid,'Wir haben den Termin angepasst.',valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.skipSend,true);assert.ok(r.violations.includes('empty_model_output'));assert.equal((r.checks?.[1] as any).removedUnsupportedActions.length,1);
+});
+test('a masked DOB is not treated as a missing patient entry, including an indirect repeat request',async()=>{
+ const bad='Bei Ihrem Datum ist noch [Datum] stehen geblieben. Schreiben Sie es mir bitte noch einmal. Das Team prüft den Fall.';
+ const m=model(bad,valid,bad,valid);const r=await runRetrievalReply(m.generate,input({message:'[Datum]'}));
+ assert.equal(r.repairs,1);assert.doesNotMatch(r.text,/\[Datum\]|noch einmal/);assert.match(r.text,/Das Team prüft/);
+});
+test('remove a repeated unsupported completion sentence but preserve the substantive second answer',async()=>{
+ const bad='Ich habe Ihre Angaben notiert. Das Team prüft Ihren Wunsch.';const m=model(bad,valid,bad,valid);
+ const r=await runRetrievalReply(m.generate,input());assert.equal(r.skipSend,undefined);assert.equal(r.text.trim(),'Das Team prüft Ihren Wunsch.');assert.equal((r.checks?.[1] as any).removedUnsupportedActions.length,1);
+});
+test('model appointment-style criticism cannot veto a valid self-reschedule',async()=>{
+ const text='Verschieben Sie den bestehenden Termin im eigenen Konto: {doctolib_link}';
+ const finding={...valid,passed:false,lateness:'reschedule',hard:[{kind:'appointment_flow',quote:text,reason:'Eine weitere Teamprüfung wäre besser.'}]};
+ const m=model(text,finding,text,finding);const r=await runRetrievalReply(m.generate,input({message:'20 Minuten.',doctolibUrl:'https://www.doctolib.de/test'}));assert.match(r.text,/https:/);assert.equal(r.skipSend,undefined);
 });
