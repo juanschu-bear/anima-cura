@@ -53,3 +53,7 @@ github.com/juanschu-bear/anima-cura
 - Der erste ausführbare Block prüft die Projektidentität anhand eines projektspezifischen Datenbankmerkmals und bricht im falschen Projekt mit einem klaren deutschen Fehler ab. Ein bloßer Kommentar ist keine Prüfung.
 - Die letzte Abfrage liefert genau eine Ergebniszeile mit Dateiname und `eingespielt`.
 - Bereits ausgeführte SQL-Dateien und ihre Prüfsummen nicht stillschweigend ändern. Bei Umbenennung nach Kollision den installierten Stand erkennen und einen erneuten Lauf ohne doppelte Anlage sicher machen.
+
+## AnimaHost: Systemtext nur mit echtem Vorher-/Nachher-Test
+
+Vor Änderungen an Systemtext oder Prüfanweisung 20 echte Chats der letzten sieben Tage ohne Versand einfrieren und mit dem bisherigen Text beantworten. Danach dieselben Eingänge erneut prüfen und Wiederholungen, verbotene Sätze, Regel und Link je Antwort berichten. Vorgehen: `docs/animahost/quality-replay.md`. Der Build-Check darf nicht durch manuelles Umschreiben des Replay-Hashs umgangen werden. Patientendaten bleiben außerhalb von Git.

@@ -5,7 +5,7 @@
   "description": "Anima Curo \u2013 Automated rate management, bank reconciliation & dunning for medical practices, powered by AI.",
   "scripts": {
     "dev": "next dev",
-    "build": "node --import tsx scripts/prepare-animahost-model.mts && next build",
+    "build": "npm run check:animahost-quality && node --import tsx scripts/prepare-animahost-model.mts && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -56,7 +56,8 @@
     "cron:dunning": "tsx src/lib/services/dunning-engine.ts",
     "cron:reports": "tsx src/lib/services/report-generator.ts",
     "test:scribe-workspace": "tsx --test src/lib/services/__tests__/scribe-workspace.test.ts",
-    "test:patient-portal-ui": "node scripts/test-patient-portal-ui.mjs"
+    "test:patient-portal-ui": "node scripts/test-patient-portal-ui.mjs",
+    "check:animahost-quality": "node scripts/check-animahost-quality.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.150",

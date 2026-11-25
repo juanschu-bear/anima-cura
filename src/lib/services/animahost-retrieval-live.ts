@@ -18,7 +18,7 @@ type Db=ReturnType<typeof createServerClient>;
 export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;phone?:string|null;messageId:string;text:string|null;messageType:string;receivedAt:string;
  identity?:{patientId:string;phone:string};staffPatientIds?:string[];history?:ConversationHistory;lastOutbound?:OutboundTurn;hasPriorConversation?:boolean;hasPriorReply?:boolean;concernHistory?:ConcernHistory;readOnly?:boolean;handoffOnly?:boolean;practiceHeld?:boolean;entries?:{id:string;text:string}[]},practice:any,signal:AbortSignal,preview=false){
  const started=Date.now();
- const history=(input.history??[]).filter(h=>Date.parse(h.at)<=Date.parse(input.receivedAt)).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)).slice(-10).map(h=>({...h,text:maskBirthDates(h.text)}));
+ const history=(input.history??[]).filter(h=>Date.parse(h.at)<=Date.parse(input.receivedAt)).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at)).slice(-20).map(h=>({...h,text:maskBirthDates(h.text)}));
  const phone=input.phone&&(input.from.endsWith('@lid')||input.from===`${input.phone}@s.whatsapp.net`)?input.phone:null;
  const calls:ModelCall[]=[];
  const model=gatewayGenerate(practice.model,signal,call=>calls.push(call),{cacheStatic:!input.readOnly&&!preview,tags:['animahost-retrieval']});
@@ -35,7 +35,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
   phone?phonePatients(db,phone).then(p=>p??[]):Promise.resolve([]),
   phone?db.from('animahost_whatsapp_verified_patients').select('patient_id').eq('tenant_id',input.tenantId).eq('chat_jid',input.from).eq('phone',phone).lte('verified_at',input.receivedAt):Promise.resolve({data:[],error:null}),
   db.from('animahost_whatsapp_decisions').select('case_details,rule_id,patient_text').eq('tenant_id',input.tenantId).eq('sender_jid',input.from).lte('created_at',input.receivedAt).order('created_at',{ascending:false}).limit(100),
-  db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',input.tenantId).eq('version',practice.active_rulebook_version).single(),
+  db.from('animahost_whatsapp_rulebook_versions').select('rules,created_at').eq('tenant_id',input.tenantId).eq('version',practice.active_rulebook_version).single(),
   localization,
  ]);
  if(confirmed.error||prior.error||version.error)throw Error('retrieval_context_unavailable');
@@ -66,7 +66,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),translation:language.translation,translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
-  history,dossier,patientSheet,chatName,lastOutbound:input.lastOutbound,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
+  history,dossier,patientSheet,chatName,lastOutbound:input.lastOutbound,clarificationRound:clarificationRound(prior.data,input.history??[]),receivedAt:input.receivedAt,documents:[],rules:whatsappRulesSchema.parse(version.data.rules),rulebookVersion:practice.active_rulebook_version,rulebookCreatedAt:version.data.created_at,teamTime:teamReplyTime(input.receivedAt,practice.team_reply_days,practice.closure_periods,'de'),
   today:appointmentLocalDate(input.receivedAt),doctolibUrl:practice.doctolib_url,
   hasPriorConversation:input.hasPriorConversation===true||history.length>0,hasPriorReply:input.hasPriorReply===true||history.some(h=>h.direction==='outgoing'),
   identityAsked:prior.data.some(r=>r.case_details?.identityQuestion===true&&(!chatName||r.case_details?.chatName?.status===chatName.status)),preview,budgetMs:Math.max(1000,60000-(Date.now()-started)),deadline:teamReplyDeadline(input.receivedAt,practice.team_reply_days,practice.closure_periods,input.readOnly?input.receivedAt:new Date().toISOString())};

@@ -1,0 +1,34 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {dirname,resolve} from 'node:path';
+import {createRequire} from 'node:module';
+import {repeatedReplySentences,matchedReplyRules,isNeutralDoctorReferral} from '../src/lib/services/animahost-reply-quality';
+import {hardReplyViolations} from '../src/lib/services/animahost-retrieval-core';
+const require=createRequire(import.meta.url);require('@next/env').loadEnvConfig(process.cwd(),false,{info(){},error(){}});
+const {createServerClient}=require('../src/lib/db/supabase.ts');
+const [inputPath,beforePath,afterPath,reportPath]=process.argv.slice(2);
+const fixture=JSON.parse(readFileSync(inputPath,'utf8')),before=JSON.parse(readFileSync(beforePath,'utf8')),after=afterPath==='-'?null:JSON.parse(readFileSync(afterPath,'utf8'));
+if(after&&before.inputHash!==after.inputHash)throw Error('Different replay inputs');
+const db=createServerClient();const {data:settings,error}=await db.from('animahost_whatsapp_settings').select('active_rulebook_version,doctolib_url').eq('tenant_id',fixture.tenant).single();if(error)throw error;
+const version=await db.from('animahost_whatsapp_rulebook_versions').select('rules').eq('tenant_id',fixture.tenant).eq('version',settings.active_rulebook_version).single();if(version.error)throw version.error;
+function analyze(run:any){return fixture.rows.map((row:any)=>{const output=run.rows.find((r:any)=>r.case===row.case),result=output?.answer?.result,text=result?.text??'';
+ const repeats=repeatedReplySentences(text,row.input.history,row.input.text);
+ const expected=matchedReplyRules(row.input.text,version.data.rules,row.input.history).map(r=>r.id);
+ const used=(result?.retrieved?.rule??[]).map((r:any)=>r.ref);
+ return {case:row.case,at:row.input.receivedAt,answered:Boolean(text),structured:/^\s*[\[{]/.test(text)||/prüferHinweis|PATIENTENBLATT/.test(text),error:(!output?'not_run':null)??output?.error??(result?.rule==='chain:guard_rejected'?'guard_rejected':null),repeats:[...new Set(repeats.map(r=>r.kind))],forbidden:hardReplyViolations(text),expected,used,applied:result?.usedRuleIds??[],missing:expected.filter(id=>!used.includes(id)),link:(text.match(/https?:\/\/[^\s)]+/g)??[]).map((url:string)=>url.replace(/[.,;!]$/,'')===settings.doctolib_url?'configured':new URL(url).hostname),referralFalsePositives:(result?.checks??[]).flatMap((c:any)=>c.improvements??[]).filter((v:any)=>v.kind==='medical_advice'&&isNeutralDoctorReferral(v.quote)).length,teamKind:result?.teamKind??null};});}
+const b=analyze(before),a=after?analyze(after):null;
+const totals=(rows:any[])=>({turns:rows.length,answered:rows.filter(r=>r.answered).length,errors:rows.filter(r=>r.error).length,structuredReplies:rows.filter(r=>r.structured).length,repeatedReplies:rows.filter(r=>r.repeats.length).length,forbiddenReplies:rows.filter(r=>r.forbidden.length).length,missingRuleReplies:rows.filter(r=>r.missing.length).length,referralFalsePositives:rows.reduce((n,r)=>n+r.referralFalsePositives,0),configuredLinks:rows.filter(r=>r.link.includes('configured')).length});
+const reportDay=(after?.startedAt??before.startedAt).slice(0,10),dates=fixture.rows.map((r:any)=>r.input.receivedAt.slice(0,10)).sort();
+let md=`# AnimaHost – Qualitätsvergleich ${reportDay}\n\n${new Set(fixture.rows.map((r:any)=>r.input.from)).size} echte Chats, ${fixture.rows.length} historische Eingänge vom ${dates[0]} bis ${dates.at(-1)}. Kein Versand, keine Speicherung von Entscheidungen oder Praxisaufgaben. Private Eingaben und Antworttexte liegen außerhalb des Repositories.\n\n`;
+md+='Die Historie endet jeweils vor dem Eingang; spätere Nachrichten werden nicht als Kontext verwendet. Patientenblatt und Wissensbasis werden beim Lauf lesend geladen und sind kein historischer Datenbank-Snapshot. Wiederholungen werden gegen tatsächlich vorhandene historische AnimaHost-Antworten geprüft, nicht gegen simulierte Antworten des vorigen Testfalls.\n\n';
+md+='Hinterlegte Buchungsadresse: '+settings.doctolib_url+'\n\n';
+if(a){const previous=totals(b),current=totals(a);md+='| Prüfung | Vorher | Nachher |\n|---|---:|---:|\n';for(const [key,label] of [['answered','Antworten'],['errors','Zurückgehalten / Fehler'],['repeatedReplies','Antworten mit erkannten Wiederholungen'],['forbiddenReplies','Antworten mit verbotenen Satzbausteinen'],['missingRuleReplies','Eingänge mit fehlenden passenden Regeln im Kontext'],['structuredReplies','Antworten mit JSON / internen Feldern'],['configuredLinks','Antworten mit hinterlegtem Buchungslink']] as const)md+=`| ${label} | ${previous[key]} | ${current[key]} |\n`;md+='\nEin zurückgehaltener Entwurf ist kein technischer Fehler. Regelverwendung stammt aus dem Prüfschritt; bereitgestellte Regeln allein belegen noch keine Verwendung. „configured“ bezeichnet ausschließlich die unten genannte hinterlegte Adresse.\n\n';}
+md+='Eingabe-SHA256: `'+before.inputHash+'`\n\n';
+for(const [label,run,rows] of [['Vorher',before,b],['Nachher',after,a]] as const){if(!run||!rows)continue;if(run.rechecks?.length)md+='Gezielte Nachprüfungen zurückgehaltener Entwürfe nach Codekorrektur: '+run.rechecks.map((r:any)=>r.case+' ('+r.at+')').join(', ')+'. Die übrigen Antworten stammen aus dem vollständigen Lauf mit unverändertem Systemtext.\n\n';md+=`## ${label}\n\nSystemtext/Core-SHA256: \`${run.sourceHash}\`; Laufbeginn: ${run.startedAt}.\n\n\`${JSON.stringify(totals(rows))}\`\n\n| Fall | Eingang (Berlin) | Antwort | Wiederholungen | Verbotene Sätze | Passende Regeln | Regeln im Kontext | Genutzte Regeln laut Prüfer | Link | Team |\n|---|---|---|---|---|---|---|---|---|---|\n`;for(const r of rows)md+=`| ${r.case} | ${new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',dateStyle:'short',timeStyle:'medium'}).format(new Date(r.at))} | ${r.error??(r.answered?'ja':'bewusst still')} | ${r.repeats.join(', ')||'–'} | ${r.forbidden.join(', ')||'–'} | ${r.expected.join(', ')||'–'} | ${r.used.join(', ')||'–'} | ${r.applied.join(', ')||'nicht ausgewiesen'} | ${r.link.join(', ')||'–'} | ${r.teamKind??'–'} |\n`;}
+writeFileSync(reportPath,md);console.log(JSON.stringify({before:totals(b),after:a?totals(a):null}));
+
+if(after){
+ if(before.rows.length!==fixture.rows.length||after.rows.length!==fixture.rows.length)throw Error('Replay incomplete');
+ const entry=(run:any)=>({sourceHash:run.sourceHash,inputHash:run.inputHash,startedAt:run.startedAt,completedAt:run.updatedAt,turns:run.rows.length,rechecks:run.rechecks??[],sendCount:run.sendCount,technicalErrors:run.rows.filter((r:any)=>r.error||r.answer?.result?.violations?.some((v:string)=>v.startsWith('technical_failure'))).length});
+ const manifest={report:reportPath,chats:new Set(fixture.rows.map((r:any)=>r.input.from)).size,before:entry(before),after:entry(after)};
+ if(resolve(dirname(reportPath))===resolve('docs/animahost'))writeFileSync('docs/animahost/quality-replay-manifest.json',JSON.stringify(manifest,null,2)+'\n');
+}

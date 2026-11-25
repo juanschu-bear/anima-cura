@@ -137,4 +137,11 @@ const ANIMAHOST_ANLIEGEN: Entwurf = {
  titelEn:'WhatsApp: handle requests and names more carefully',kurzEn:'Appointment and invoice requests stay together; personal messages reach the team in full.',
  textEn:'AnimaHost no longer prefixes replies with generic name statements. With siblings, the explicitly named child determines the subject. Unmatched names and messages addressed personally to staff are passed to the team with all details. Appointment and invoice requests are handled together; a greeting cannot replace a concrete request.'
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_ANTWORTQUALITAET: Entwurf = {
+ slug: "2026-11-25-animahost-antwortqualitaet", art: "hinweis", bestaetigen: false,
+ titel: "Passende Antworten im Gespräch", kurz: "Weniger Wiederholungen und klare Hinweise bei Terminwünschen.",
+ text: "AnimaHost berücksichtigt seine bisherigen Antworten im Chat. Rückmeldefristen nennt er nur zu Beginn eines Anliegens. Bei Absagen und Verschiebewünschen verwendet er eure hinterlegte Regel und euren Buchungslink; ihr erhaltet dazu eine Information. Verweise an die Kinder- oder Hausarztpraxis sind ohne Diagnose möglich.",
+ titelEn: "Replies that follow the conversation", kurzEn: "Fewer repetitions and clearer appointment guidance.",
+ textEn: "AnimaHost considers its earlier replies in the chat. Response deadlines are stated only at the start of an issue. For cancellations and rescheduling requests, it uses your configured rule and booking link and sends your team an informational note. Referrals to a pediatrician or GP without a diagnosis are permitted.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

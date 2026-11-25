@@ -76,7 +76,7 @@ function authorized(header:string|null){
 async function notifyPractice(db:ReturnType<typeof createServerClient>,
  tenantId:string,messageId:string,decision:WhatsAppDecision,details?:ChatDetails|null){
  if(decision.rule.startsWith('late_arrival:')&&decision.action==='klaerfall')return;
- const notice=decision.action==='notfall'?null:appointmentNoticeFromDecision(decision)||
+ const notice=decision.action==='notfall'?null:(details?.teamKind==='info'?{kind:decision.rule.includes('termin-verschieben')?'reschedule':decision.rule.includes('termin-absagen')?'cancel':'missed',urgent:false}:null)||appointmentNoticeFromDecision(decision)||
   (/^late_arrival:(accept|wait)$/.test(decision.rule)?{kind:'late',urgent:false}:null);
  const certificate=decision.rule==='attendance_certificate_issued';
  const budgetFailure=details?.modelFailure?.code==='model_budget_exhausted';
@@ -99,7 +99,7 @@ async function notifyPractice(db:ReturnType<typeof createServerClient>,
 
 function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'template',
  phoneMatches?:ReturnType<typeof phoneLabels>,details?:ChatDetails|null,replySchedule?:{teamReplyDays:unknown;closurePeriods:unknown}) {
- const note=(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
+ const note=details?.teamKind==='info'||(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
  return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'||decision.rule===practiceReplyRule?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
@@ -152,7 +152,7 @@ export async function POST(request:NextRequest){
    const answer=await retrievalAnswer(db,input,practice,request.signal);
    const result=answer.result;
    const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.error?.code??result.rule,modelFailure:result.error,
-    eventId:input.eventId,translation:answer.translation,translations:answer.translations,dueAt:'dueAt' in result?result.dueAt:undefined,safeFallback:'safeFallback' in result?result.safeFallback:undefined,
+    teamKind:result.teamKind,usedRuleIds:result.usedRuleIds,eventId:input.eventId,translation:answer.translation,translations:answer.translations,dueAt:'dueAt' in result?result.dueAt:undefined,safeFallback:'safeFallback' in result?result.safeFallback:undefined,
     practiceSummary:result.error?.code==='model_budget_exhausted'?t('animahost.whatsapp.model_budget.body','de'):result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1',systemTextVersion:'2026-11-24-systemtext-v1',checks:result.checks};
    const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
     sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
@@ -165,7 +165,7 @@ export async function POST(request:NextRequest){
      await notifyPractice(db,input.tenantId,input.messageId,savedDecision,duplicate.data.case_details);
     return decisionResponse(savedDecision,undefined,undefined,duplicate.data.case_details);
    }
-   if(result.action!=='antworten')await notifyPractice(db,input.tenantId,input.messageId,result,details);
+   if(result.action!=='antworten'||result.teamKind==='info')await notifyPractice(db,input.tenantId,input.messageId,result,details);
    const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,
     eventId:input.eventId,systemTextVersion:'2026-11-24-systemtext-v1',checks:result.checks,translation:answer.translation,modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null,
     usage:measureReplyUsage(practice.model,answer.calls,Boolean(result.text)&&!result.skipSend)}});

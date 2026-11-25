@@ -1,0 +1,16 @@
+# Qualitätsprüfung vor Änderungen an AnimaHost
+
+Vor jeder Änderung am Systemtext oder an der Prüfanweisung in `runRetrievalReply`:
+
+1. 20 echte Chats der letzten sieben Tage lesend auswählen. Pro Chat mindestens einen beantwortbaren Eingang wählen; problematische Gesprächsfolgen mit mehreren Eingängen erhalten. Zeit, Text, Nachrichtenart, Zuordnung und die tatsächlich gesendete Historie **vor** dem Eingang einfrieren. Keine späteren Antworten als Kontext verwenden. Private JSON-Datei außerhalb des Repositories mit Dateimodus 0600 ablegen. Format: `{tenant, rows:[{case, input}]}`, `input` entspricht dem Eingabeparameter von `retrievalAnswer` mit `readOnly:true`.
+2. **Vor der Textänderung** `node --import tsx scripts/animahost-quality-replay.mts PRIVATE_INPUT PRIVATE_BEFORE` ausführen. Der Pfad ruft ausschließlich den lesenden Antwortgenerator auf; keine Versandroute, keine Entscheidungen oder Praxisbenachrichtigungen. Zwei parallele Modellabfragen, maximal zwei Entwürfe pro Antwort. Wiederaufnahme nur bei identischem Quell- und Eingabehash. Technische Fehler müssen vor dem Vergleich geklärt werden.
+3. Erst dann den Text ändern und gezielte Tests ausführen.
+4. Dieselbe Eingabedatei mit `PRIVATE_AFTER` wiederholen. Anschließend `node --import tsx scripts/animahost-quality-report.mts PRIVATE_INPUT PRIVATE_BEFORE PRIVATE_AFTER docs/animahost/2026-11-25-quality-replay.md` ausführen. Der Bericht enthält ausschließlich Fallnummern, Zeitstempel, Wiederholungskategorien, verbotene Satzbausteine, Regelreferenzen und Linkbewertung. Keine Namen, Telefonnummern, Patiententexte oder JIDs versionieren.
+5. Alle Antworten und Prüfschritte privat durchsehen; Grenzen und auffällige Fälle im anonymisierten Bericht erklären. Modellvariabilität beachten: Ein einzelner Lauf ist kein Beweis für fehlerfreie Antworten in allen Chats. Der Patientenblatt-Lader liest den aktuellen Datenbestand; nur die Gesprächshistorie ist eingefroren.
+6. Der Berichtsgenerator schreibt das Manifest für `npm run check:animahost-quality`. Der Build prüft Quellhash, identische Eingaben, 20 Chats, vollständige Läufe ohne technische Fehler und null Versand. Ohne passenden Nachher-Lauf schlägt der Build fehl. Nicht durch manuelles Umschreiben des Hashs umgehen.
+
+Das Zählen von Wiederholungen kombiniert feste Kategorien mit exakten Sätzen. Sinngemäße Wiederholungen prüft zusätzlich der Modellprüfer gegen den Verlauf. Der automatische Bericht allein ersetzt daher nicht das Lesen der privaten Antworttexte. Er unterscheidet passende Regeln, tatsächlich im Kontext bereitgestellte Regeln und vom Prüfer ausgewiesene genutzte Regeln.
+
+Ein Produktiv-Deploy verändert zukünftige Antworten. Der Testlauf selbst versendet nie Nachrichten und veröffentlicht keine Praxisneuigkeit.
+
+Zurückgehaltene Entwürfe können nach einer gezielten Codekorrektur mit `--retry-guard` erneut geprüft werden. Der Lauf protokolliert Fall und Zeitpunkt in `rechecks`; der Bericht weist diese Nachprüfungen aus. Änderungen an Systemtext oder Prüfanweisung benötigen weiterhin einen neuen vollständigen Lauf. Der Systemtext/Core-Hash umfasst die beiden Anweisungsquellen; die übrigen Codeänderungen sind zusätzlich durch Regressionstests und den Git-Commit belegt.
