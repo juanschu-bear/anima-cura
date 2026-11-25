@@ -1,3 +1,4 @@
+import {notifyHostPractice} from '@/lib/services/animahost-practice-notifications';
 import {timingSafeEqual} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
 import {generateText,Output} from 'ai';
@@ -74,27 +75,8 @@ function authorized(header:string|null){
 }
 
 async function notifyPractice(db:ReturnType<typeof createServerClient>,
- tenantId:string,messageId:string,decision:WhatsAppDecision,details?:ChatDetails|null){
- if(decision.rule.startsWith('late_arrival:')&&decision.action==='klaerfall')return;
- const notice=decision.action==='notfall'?null:(details?.teamKind==='info'?{kind:decision.rule.includes('termin-verschieben')?'reschedule':decision.rule.includes('termin-absagen')?'cancel':'missed',urgent:false}:null)||appointmentNoticeFromDecision(decision)||
-  (/^late_arrival:(accept|wait)$/.test(decision.rule)?{kind:'late',urgent:false}:null);
- const certificate=decision.rule==='attendance_certificate_issued';
- const budgetFailure=details?.modelFailure?.code==='model_budget_exhausted';
- const important=budgetFailure||decision.rule===immediateRule||/^(?:quality:complaint|quality:late_review)$/.test(decision.rule);
- if(decision.action==='antworten'&&!notice&&!certificate&&!important)return;
- const urgent=decision.action==='notfall'||notice?.urgent||important;
- const key=decision.action==='notfall'?'emergency':'clarify';
- const sourceKey=`animahost:${tenantId}:${messageId}:${notice||certificate?'vermerk':decision.action}`;
- const notices=['admin','verwaltung'].map(role=>({recipient_role:role,kind:urgent?'wichtig':'antwort',
-  title:t(budgetFailure?'animahost.whatsapp.model_budget.title':notice?`animahost.whatsapp.notice.${notice.kind}.title`:certificate?'animahost.whatsapp.attendance.title':`animahost.whatsapp.${key}.title`,'de'),
-  body:details?.practiceSummary??t(notice?'animahost.whatsapp.notice.body':certificate?'animahost.whatsapp.attendance.recorded':`animahost.whatsapp.${key}.body`,'de'),
-  link:'/praxis',source_key:sourceKey}));
- for(let attempt=0;attempt<2;attempt++){
-  const saved=await db.from('practice_notifications').upsert(notices,
-   {onConflict:'source_key,recipient_role',ignoreDuplicates:true});
-  if(!saved.error)return;
- }
- console.error('animahost_practice_notification_failed', {tenantId,messageId,urgent:Boolean(urgent)});
+ input:{tenantId:string;messageId:string;from:string;phone?:string|null;text?:string|null;history?:z.infer<typeof conversationHistorySchema>},decision:WhatsAppDecision,details?:ChatDetails|null){
+ try{await notifyHostPractice(db,input,decision,details);}catch{console.error('animahost_practice_notification_failed',{messageId:input.messageId});}
 }
 
 function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'template',
@@ -146,13 +128,13 @@ export async function POST(request:NextRequest){
    if(existing.data){
     const saved=existing.data;
     if(saved.case_details?.modelFailure?.code==='model_budget_exhausted')
-     await notifyPractice(db,input.tenantId,input.messageId,{action:saved.action,text:saved.patient_text,rule:saved.rule_id},saved.case_details);
+     await notifyPractice(db,input,{action:saved.action,text:saved.patient_text,rule:saved.rule_id},saved.case_details);
     return decisionResponse({action:saved.action,text:saved.patient_text,rule:saved.rule_id},undefined,undefined,saved.case_details);
    }
    const answer=await retrievalAnswer(db,input,practice,request.signal);
    const result=answer.result;
    const details={patientId:answer.selectedPatientId,firstName:null,lastName:null,invoiceDate:null,cause:result.error?.code??result.rule,modelFailure:result.error,
-    teamKind:result.teamKind,usedRuleIds:result.usedRuleIds,eventId:input.eventId,translation:answer.translation,translations:answer.translations,dueAt:'dueAt' in result?result.dueAt:undefined,safeFallback:'safeFallback' in result?result.safeFallback:undefined,
+    teamKind:result.teamKind??(result.action==='klaerfall'||result.action==='notfall'?'act' as const:undefined),usedRuleIds:result.usedRuleIds,eventId:input.eventId,translation:answer.translation,translations:answer.translations,dueAt:'dueAt' in result?result.dueAt:undefined,safeFallback:'safeFallback' in result?result.safeFallback:undefined,
     practiceSummary:result.error?.code==='model_budget_exhausted'?t('animahost.whatsapp.model_budget.body','de'):result.teamSummary??undefined,identityQuestion:result.identityQuestion,answerEvidence:result.retrieved,chatName:answer.chatName,patientSheet:'patientSheet' in answer?answer.patientSheet:null,architecture:'retrieval-v1',systemTextVersion:'2026-11-24-systemtext-v1',checks:result.checks};
    const saved=await db.from('animahost_whatsapp_decisions').insert({tenant_id:input.tenantId,message_id:input.messageId,
     sender_jid:input.from,action:result.action,patient_text:result.text,rule_id:result.rule,rulebook_version:practice.active_rulebook_version,case_details:details});
@@ -162,10 +144,10 @@ export async function POST(request:NextRequest){
     if(duplicate.error)throw Error('decision_read_failed');
     const savedDecision={action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id};
     if(duplicate.data.case_details?.modelFailure?.code==='model_budget_exhausted')
-     await notifyPractice(db,input.tenantId,input.messageId,savedDecision,duplicate.data.case_details);
+     await notifyPractice(db,input,savedDecision,duplicate.data.case_details);
     return decisionResponse(savedDecision,undefined,undefined,duplicate.data.case_details);
    }
-   if(result.action!=='antworten'||result.teamKind==='info')await notifyPractice(db,input.tenantId,input.messageId,result,details);
+   if(result.action!=='antworten'||result.teamKind==='info')await notifyPractice(db,input,result,details);
    const recorded=await db.from('animahost_reply_evidence').insert({tenant_id:input.tenantId,message_id:input.messageId,evidence:result.retrieved,timings:{...answer.timings,
     eventId:input.eventId,systemTextVersion:'2026-11-24-systemtext-v1',checks:result.checks,translation:answer.translation,modelFailure:result.error,patientSheet:'patientSheet' in answer?answer.patientSheet:null,
     usage:measureReplyUsage(practice.model,answer.calls,Boolean(result.text)&&!result.skipSend)}});
@@ -194,7 +176,7 @@ export async function POST(request:NextRequest){
    if(quiet)return decisionResponse({action:'klaerfall',text:'',rule:`sender:${earlySender}`});
    const saved=existing.data as unknown as StoredDecision;
    const decision={action:saved.action,text:saved.patient_text,rule:saved.rule_id};
-   await notifyPractice(db,input.tenantId,input.messageId,decision,saved.case_details);
+   await notifyPractice(db,input,decision,saved.case_details);
    return decisionResponse(decision,undefined,patientMatches?phoneLabels(patientMatches):undefined,saved.case_details,replySchedule);
   }
   if(quiet||input.senderPolicy===1&&!(patientMatches?.length||input.staffPatientIds?.length||input.identity)){
@@ -212,7 +194,7 @@ export async function POST(request:NextRequest){
     sender_jid:input.from,action:decision.action,patient_text:decision.text,rule_id:decision.rule,
     rulebook_version:practice.active_rulebook_version,...(qualityAvailable?{case_details:details}:{})});
    if(saved.error&&saved.error.code!=='23505')throw Error('decision_store_failed');
-   await notifyPractice(db,input.tenantId,input.messageId,decision,details);
+   await notifyPractice(db,input,decision,details);
    return decisionResponse(decision,'template',undefined,details,replySchedule);
   }
   const tolerance=appointmentToleranceSchema.safeParse(practice.appointment_tolerance);
@@ -655,7 +637,7 @@ export async function POST(request:NextRequest){
    if(duplicate.error)throw Error('decision_read_failed');
    decision={action:duplicate.data.action,text:duplicate.data.patient_text,rule:duplicate.data.rule_id};
   }
-  await notifyPractice(db,input.tenantId,input.messageId,decision,details);
+  await notifyPractice(db,input,decision,details);
   return decisionResponse(decision,replyStyle,patientMatches?phoneLabels(patientMatches):undefined,details,replySchedule);
  }catch{
   return NextResponse.json({code:'answer_unavailable'},{status:503});

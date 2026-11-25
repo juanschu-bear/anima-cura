@@ -144,4 +144,13 @@ const ANIMAHOST_ANTWORTQUALITAET: Entwurf = {
  titelEn: "Replies that follow the conversation", kurzEn: "Fewer repetitions and clearer appointment guidance.",
  textEn: "AnimaHost considers its earlier replies in the chat. Response deadlines are stated only at the start of an issue. For cancellations and rescheduling requests, it uses your configured rule and booking link and sends your team an informational note. Referrals to a pediatrician or GP without a diagnosis are permitted.",
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_GLOCKE: Entwurf = {
+  slug: "2026-11-25-animahost-glocke", art: "neuerung", bestaetigen: false,
+  titel: "AnimaHost zeigt, wer euch braucht",
+  kurz: "Die Glocke nennt Person, Anliegen und den bisherigen Antwortstand. Ein Tipp öffnet das Gespräch.",
+  text: "Nur Anliegen, bei denen ihr handeln müsst, erscheinen in der Glocke. Reine Informationen bleiben in den Nachrichten. Mehrere Anliegen desselben Chats innerhalb von 30 Minuten stehen in einem Eintrag. Ihr seht den Namen oder die Telefonnummer, das Anliegen und ob eine Antwort vorbereitet oder ein Link bereits geschickt wurde. Ein Tipp führt direkt zum Gespräch in AnimaDesk.",
+  titelEn: "AnimaHost shows who needs your help",
+  kurzEn: "The bell shows the person, concern and reply status. Tap to open the conversation.",
+  textEn: "Only cases requiring your action appear in the bell. Information-only cases remain in Messages. Multiple cases from the same chat within 30 minutes share one entry. You see the name or phone number, the concern and whether a reply is prepared or a link has already been sent. Tap to open the conversation in AnimaDesk.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

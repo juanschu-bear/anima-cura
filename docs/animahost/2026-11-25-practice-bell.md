@@ -1,0 +1,15 @@
+# AnimaHost-Glocke – 25.11.2026
+
+Nur ausdrücklich als `teamKind=act` gespeicherte Chatfälle erzeugen eine Glocke. Retrieval-Notfälle und zurückgehaltene Klärfälle erhalten beim Speichern explizit `act`, sofern der Antwortgenerator keine Teamart liefert. `info` erzeugt keinen Eintrag. Die bestehenden Nachrichteneinträge und deren Teamzuordnung bleiben bestehen.
+
+Die Glocke zeigt Nachname, Vorname (verifizierte Namensnennung, ausgewählter Patient oder eindeutiger Telefonnummerntreffer), andernfalls die tatsächliche Telefonnummer. Eine WhatsApp-LID wird nicht als Telefonnummer ausgegeben. Ist auch keine Telefonnummer vorhanden, lautet die Anzeige „Unbekannte Nummer“.
+
+Pro Mandant und Chat werden Fälle in einem 30-Minuten-Fenster ab dem ersten Fall gebündelt, jeweils für admin und verwaltung. Verschiedene Chats bleiben getrennt, damit jeder Link genau ein Gespräch öffnet. Der Titel enthält den neuesten Fall und die Anzahl weiterer Fälle; der Text enthält alle Fälle. Keine Rückmeldefrist und keine feste Uhrzeit. Die vorhandenen eindeutigen Quellschlüssel und bedingte Updates auf den alten Body verhindern verlorene parallele Ergänzungen. Wiederholungen derselben Nachrichten-ID erzeugen keinen neuen Eintrag. Neue Fälle setzen den Eintrag wieder auf ungelesen; ausgelaufene Bündel bleiben lesbar archiviert. Keine Migration erforderlich.
+
+Der Antwortgenerator läuft vor dem tatsächlichen WhatsApp-Versand. Deshalb heißt es zunächst „Antwort erstellt“, „Rückfrage vorbereitet“ oder „Doctolib-Link vorbereitet“. „Doctolib-Link geschickt“ wird nur verwendet, wenn die übergebene Historie bereits einen tatsächlich gesendeten AnimaHost-Link belegt. Es wird kein Versand allein aufgrund eines Entwurfs behauptet.
+
+Speicherformat: `practice_notifications`, `kind=antwort`, `source_key=animahost:bell:<tenant>:<chat>:active` (nach Ablauf UUID statt active), Body als versioniertes JSON `animahost_act_v1`. Die API liefert daraus weiterhin `{title,text,link}` in DE/EN. Fremde Inbox-Antworten behalten ihren bisherigen lokalisierten Titel; ältere AnimaHost-Titel werden nicht mehr überschrieben. Vorhandene alte Info-Benachrichtigungen werden nicht rückwirkend gelöscht. Die separaten fachlichen Benachrichtigungen bei bestätigten Rechnungsempfängern oder abgelehnter Kontaktzuordnung bleiben unverändert.
+
+Der gespeicherte lokale Link erfüllt die bestehende Tabellenconstraint. Die API übersetzt ihn für die Glocke in `https://anima-leitstand.vercel.app/?chat=<chatJid>`. Scribe erlaubt hierfür ausschließlich diese Adresse mit gültiger Chatkennung. AnimaDesk öffnet die Nachrichten und den angegebenen Chat; eine erforderliche Anmeldung behält dieses Ziel. Alle bisherigen Sitzungs- und API-Berechtigungen bleiben wirksam.
+
+Prüfung: SQL-basierte Aggregationstests mit parallelen Fällen, Duplikaten, Fenstergrenze, getrennten Chats/Mandanten; Namen/Nummern; Info-Unterdrückung; Titelübersetzung; erlaubte Linkziele und sichere Anmeldung. Kein Versand und keine Testglocken in der Praxis. Eine Praxisabnahme durch tatsächlichen Klick ist davon getrennt.

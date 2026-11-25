@@ -1,3 +1,4 @@
+import {notifyHostPractice} from './animahost-practice-notifications';
 import {renderWhatsAppRuleText} from './animahost-whatsapp';
 import {t} from '@/lib/i18n';
 import type {createServerClient} from '@/lib/db/supabase';
@@ -21,21 +22,21 @@ export function appointmentCaseView(row:Omit<CaseRow,'language'|'patient_reply'>
   finishedAt:row.finished_at};
 }
 
-async function alert(db:DB,tenant:string,id:string,reminder=false){
- const result=await db.from('practice_notifications').upsert(['admin','verwaltung'].map(role=>({
-  recipient_role:role,kind:'wichtig',title:t(reminder?'animahost.late.reminder.title':'animahost.late.notice.title','de'),
-  body:t('animahost.late.notice.body','de'),link:'/praxis',
-  source_key:`animahost:${tenant}:arrival:${id}:${reminder?'reminder':'case'}`,
- })),{onConflict:'source_key,recipient_role',ignoreDuplicates:true});
+async function alert(db:DB,tenant:string,id:string,_reminder=false,origin?:{phone?:string;text?:string|null}){
+ const result=await db.from(table).select('chat_jid,message_id,status,patient_reply').eq('tenant_id',tenant).eq('id',id).maybeSingle();
  if(result.error)throw Error('appointment_notice_unavailable');
+ if(!result.data||result.data.status!=='pending')return;
+ await notifyHostPractice(db,{tenantId:tenant,messageId:'arrival:'+id,from:result.data.chat_jid,phone:origin?.phone,text:origin?.text??'Verspätung'},
+  {action:'klaerfall',rule:'late_arrival:review',text:result.data.patient_reply??''},
+  {teamKind:'act',patientId:null,firstName:null,lastName:null,invoiceDate:null,cause:'late_arrival:review'});
 }
 
-export async function openAppointmentCase(db:DB,input:{tenantId:string;messageId:string;from:string},state:LateState,language:Language,now=new Date()){
+export async function openAppointmentCase(db:DB,input:{tenantId:string;messageId:string;from:string;phone?:string;text?:string|null},state:LateState,language:Language,now=new Date()){
  if(!state.originalTime||!state.arrivalTime||!state.appointmentDate||!state.delayMinutes)return null;
  const existing=await db.from(table).select(caseColumns).eq('tenant_id',input.tenantId).eq('message_id',input.messageId).maybeSingle();
  if(existing.error)throw Error('appointment_case_unavailable');
  if(existing.data){
-  if(existing.data.status==='pending')await alert(db,input.tenantId,existing.data.id).catch(()=>undefined);
+  if(existing.data.status==='pending')await alert(db,input.tenantId,existing.data.id,false,input).catch(()=>undefined);
   return appointmentCaseView(existing.data);
  }
  const stored=await db.from(table).insert({tenant_id:input.tenantId,message_id:input.messageId,chat_jid:input.from,
@@ -56,7 +57,7 @@ export async function openAppointmentCase(db:DB,input:{tenantId:string;messageId
   }
  }
  if(stored.error||!stored.data)throw Error('appointment_case_unavailable');
- await alert(db,input.tenantId,stored.data.id).catch(()=>console.error('animahost_appointment_case_notice_failed'));
+ await alert(db,input.tenantId,stored.data.id,false,input).catch(()=>console.error('animahost_appointment_case_notice_failed'));
  return appointmentCaseView(stored.data as CaseRow);
 }
 

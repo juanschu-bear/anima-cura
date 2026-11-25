@@ -9,6 +9,22 @@ import { treatmentTranslations } from './treatment-i18n';
 import { referenceTranslations } from './practice-reference-i18n';
 const translations: Record<string, { de: string; en: string; es?: string }> = {
   ...referenceTranslations,
+  "animahost.bell.unknown": {de:"Unbekannte Nummer",en:"Unknown number"},
+  "animahost.bell.more": {de:"+{n} weitere",en:"+{n} more"},
+  "animahost.bell.concern.late": {de:"Verspätung",en:"Late arrival"},
+  "animahost.bell.concern.reschedule": {de:"Termin verschieben",en:"Reschedule appointment"},
+  "animahost.bell.concern.cancel": {de:"Termin absagen",en:"Cancel appointment"},
+  "animahost.bell.concern.permission": {de:"Berechtigung klären",en:"Check authorization"},
+  "animahost.bell.concern.invoice": {de:"Rechnung klären",en:"Check invoice"},
+  "animahost.bell.concern.appointment": {de:"Termin klären",en:"Check appointment"},
+  "animahost.bell.concern.treatment": {de:"Behandlungsfrage",en:"Treatment question"},
+  "animahost.bell.concern.clarify": {de:"Anliegen klären",en:"Review request"},
+  "animahost.bell.done.link_sent": {de:"Doctolib-Link geschickt",en:"Doctolib link sent"},
+  "animahost.bell.done.link_prepared": {de:"Doctolib-Link vorbereitet",en:"Doctolib link prepared"},
+  "animahost.bell.done.question_prepared": {de:"Rückfrage vorbereitet",en:"Follow-up question prepared"},
+  "animahost.bell.done.reply_prepared": {de:"Antwort erstellt",en:"Reply prepared"},
+  "animahost.bell.done.review_requested": {de:"Praxisprüfung angefragt",en:"Practice review requested"},
+
   'invoiceRecord.unmatched': {de:'Diese Kurzfassungen sind keine vollständigen Rechnungen. Die Zuordnung zum vollständigen Beleg ist noch offen.',en:'These summaries are not complete invoices. Their association with the complete invoice is still unresolved.'},
   'invoiceRecord.history': {de:'Frühere Fassungen',en:'Previous versions'},
   'invoiceRecord.summary': {de:'Frühere Kurzfassung öffnen',en:'Open previous summary'},

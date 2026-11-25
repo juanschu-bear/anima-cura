@@ -1,4 +1,5 @@
 "use client";
+import {hostBellTarget} from '@/lib/animahost-notification-view';
 
 import { AlertTriangle, Bell, CheckCircle2, MessageCircle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -138,6 +139,8 @@ export default function ScribeGlocke() {
 
   async function oeffnen(n: Meldung) {
     if (!n.readAt) void gelesen(n.id);
+    const chat = hostBellTarget(n.link);
+    if (chat) { window.location.assign(chat); return; }
     const ziel = linkZiel(n.link);
     if (ziel.update) {
       void neuerungZeigen(ziel.update);

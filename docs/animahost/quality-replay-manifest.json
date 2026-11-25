@@ -1,34 +1,23 @@
 {
-  "report": "docs/animahost/2026-11-25-quality-replay.md",
+  "report": "docs/animahost/2026-11-25-lateness-quality-replay.md",
   "chats": 20,
   "before": {
-    "sourceHash": "50711cd961d1791f984a714acfba2e7f1b880978ddc183f53c6061ccb6fd866d",
+    "sourceHash": "c4eb5f9bab592373572fb9b4d78fd9f601aa622b4a249f1bde27e78a642ae396",
     "inputHash": "f598ca4ae7c6b52f9c4dcf6e9c04ea96262e280a38082ff187a6027e603999de",
-    "startedAt": "2026-11-25T07:27:04.431Z",
-    "completedAt": "2026-11-25T07:28:40.816Z",
+    "startedAt": "2026-11-25T08:07:13.237Z",
+    "completedAt": "2026-11-25T08:09:22.364Z",
     "turns": 25,
     "rechecks": [],
     "sendCount": 0,
     "technicalErrors": 0
   },
   "after": {
-    "sourceHash": "c4eb5f9bab592373572fb9b4d78fd9f601aa622b4a249f1bde27e78a642ae396",
+    "sourceHash": "d99beca2bc85b30c9815a100bbe2e1fa98d91f96c8f3f9c1e41ab66234fb9e86",
     "inputHash": "f598ca4ae7c6b52f9c4dcf6e9c04ea96262e280a38082ff187a6027e603999de",
-    "startedAt": "2026-11-25T07:50:47.511Z",
-    "completedAt": "2026-11-25T07:54:03.634Z",
+    "startedAt": "2026-11-25T08:10:02.485Z",
+    "completedAt": "2026-11-25T08:11:50.131Z",
     "turns": 25,
-    "rechecks": [
-      {
-        "case": "C03-7",
-        "at": "2026-11-25T07:53:51.910Z",
-        "reason": "targeted_guard_regression"
-      },
-      {
-        "case": "C13-18",
-        "at": "2026-11-25T07:53:51.917Z",
-        "reason": "targeted_guard_regression"
-      }
-    ],
+    "rechecks": [],
     "sendCount": 0,
     "technicalErrors": 0
   }

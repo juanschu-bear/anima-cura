@@ -1,4 +1,4 @@
-import {t} from "@/lib/i18n";
+import {practiceNotificationText} from '@/lib/animahost-notification-view';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerComponentClient} from '@/lib/db/supabase-server';
@@ -7,7 +7,6 @@ export const dynamic='force-dynamic';
 export async function GET(r:NextRequest){try{
  const actor=await workspaceActor();const db=createServerComponentClient();
  const lang=r.nextUrl.searchParams.get('lang')==='en'?'en':'de';
- const statusKeys:Record<string,string>={bestaetigt:'recorded',untersucht:'looking',fix_in_arbeit:'working',bereitgestellt:'ready',praxis_bestaetigt:'done'};
  const offset=Number(r.nextUrl.searchParams.get('offset')??0);
  if(!Number.isSafeInteger(offset)||offset<0)throw new ScribeWorkspaceError('input_invalid');
  // RLS restricts both notifications and receipts to this user. PostgREST nested
@@ -17,7 +16,7 @@ export async function GET(r:NextRequest){try{
   q().order('created_at',{ascending:false}).order('id').range(offset,offset+49),
   db.from('practice_notifications').select('id,practice_notification_reads!left(notification_id)',{count:'exact',head:true}).is('practice_notification_reads',null)]);
  if(list.error)storageError(list.error);if(unread.error)storageError(unread.error);
- return NextResponse.json({notifications:(list.data??[]).map(n=>({id:n.id,kind:n.kind,title:n.kind==='wunsch_status'?t('scribe.bell.status',lang):n.kind==='antwort'?t('scribe.bell.reply',lang):n.title,text:n.kind==='wunsch_status'?t('scribe.inbox.status.'+(statusKeys[n.body]??'recorded'),lang):n.body,link:n.link,createdAt:n.created_at,readAt:n.practice_notification_reads?.[0]?.read_at??null})),unreadCount:unread.count,total:list.count,nextOffset:offset+50<(list.count??0)?offset+50:null,currentUserId:actor.id},{headers:{'Cache-Control':'private, no-store'}});
+ return NextResponse.json({notifications:(list.data??[]).map(n=>({id:n.id,kind:n.kind,...practiceNotificationText(n,lang),createdAt:n.created_at,readAt:n.practice_notification_reads?.[0]?.read_at??null})),unreadCount:unread.count,total:list.count,nextOffset:offset+50<(list.count??0)?offset+50:null,currentUserId:actor.id},{headers:{'Cache-Control':'private, no-store'}});
 }catch(e){return workspaceError(e);}}
 export async function PATCH(r:NextRequest){try{
  await workspaceActor();
