@@ -5,7 +5,7 @@
   "description": "Anima Curo \u2013 Automated rate management, bank reconciliation & dunning for medical practices, powered by AI.",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:animahost-quality && node --import tsx scripts/prepare-animahost-model.mts && next build",
+    "build": "node scripts/animahost-direct-key-check.mjs && npm run check:animahost-quality && node --import tsx scripts/prepare-animahost-model.mts && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
