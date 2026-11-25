@@ -62,10 +62,11 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  const result=await db.rpc('animahost_retrieval_match',{p_tenant:tenant,p_vector:JSON.stringify(vector),p_model:embeddingModel,p_preview:preview,p_day:new Date().toISOString().slice(0,10),p_exclude_chat:excludeChat??null})
   .select('kind,ref,version,source_at,title,content,payload,draft,content_hash').abortSignal(AbortSignal.timeout(12000));
  if(result.error)throw Error('retrieval_search_unavailable:'+result.error.code+':'+result.error.message);
- // Explicit companion fact for apparatus problems, not a routing/fallback topic.
+ // Explicit relevant practice facts, not a routing/fallback answer.
  let companion:RetrievalDocument|null=null;
- if(/draht|spange|schiene|aligner|bracket|attachment|apparatur/i.test(message)){
-  const versions=await db.from('animahost_knowledge_versions').select('id,version,approved_at,active,valid_from').eq('tenant_id',tenant).eq('external_id','ablauf-spontan').lte('valid_from',new Date().toISOString().slice(0,10)).order('version',{ascending:false});
+ const companionId=/rechnung/i.test(message)&&/e.?mail|absender|link|von (?:ihnen|euch|uns)/i.test(message)?'ablauf-rechnung-mail-ohne-portal':/draht|spange|schiene|aligner|bracket|attachment|apparatur/i.test(message)?'ablauf-spontan':null;
+ if(companionId){
+  const versions=await db.from('animahost_knowledge_versions').select('id,version,approved_at,active,valid_from').eq('tenant_id',tenant).eq('external_id',companionId).lte('valid_from',new Date().toISOString().slice(0,10)).order('version',{ascending:false});
   if(versions.error)throw Error('retrieval_companion_unavailable');
   const row=versions.data.find(r=>r.approved_at&&r.active||preview&&!r.approved_at);
   if(row){const doc=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','knowledge').eq('ref',row.id).eq('version',row.version).maybeSingle();

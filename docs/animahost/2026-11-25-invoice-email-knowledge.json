@@ -1,0 +1,7 @@
+{
+  "area": "praxisablauf",
+  "title": "Rechnungen per E-Mail",
+  "content": "Seit dem 24.11.2026 verschickt die Praxis Rechnungen per E-Mail vom Absender „Praxis Dr. Schubert - Anima Cura“. Die E-Mail enthält einen Link zur Rechnung. Die Rechnung lässt sich darüber im Browser öffnen; eine App ist dafür nicht nötig. Ob eine konkrete Rechnungs-Mail von der Praxis versandt wurde, zeigt der belegte Rechnungsversand im bestätigten Patientenblatt. Wenn dort ein Versand verzeichnet ist, darf AnimaHost diesen bestätigen, etwa „Ja, die Rechnungs-Mail ist von uns.“ Ein unbekannter Öffnungsstatus bedeutet nicht, dass die Mail ungeöffnet ist. Ein allgemeiner Absendername allein beweist nicht die Herkunft einer beliebigen E-Mail.",
+  "source": "praxis",
+  "validFrom": "2026-11-24"
+}

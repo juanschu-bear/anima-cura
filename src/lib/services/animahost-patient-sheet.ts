@@ -19,9 +19,10 @@ export function relativeAppointment(date:string,today:string){
 }
 export function sheetLedger(sheet:PatientSheet){return {access:sheet.access,asOf:sheet.asOf,fields:sheet.fields,...(sheet.verification?{verification:sheet.verification}:{})};}
 /** Read only. Never load an unconfirmed patient's clinical/financial sheet. */
-export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:PhonePatient[];verifiedIds:string[];message:string;today:string;at:string;chatJid:string;phone:string|null;conversationPatientId?:string;concernHistory?:ConcernHistory}):Promise<PatientSheet>{
+export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:PhonePatient[];verifiedIds:string[];message:string;today:string;at:string;chatJid:string;phone:string|null;conversationPatientId?:string;confirmedPatientId?:string;chatPatientCount?:number;senderRelative?:{name:string;role:string};concernHistory?:ConcernHistory}):Promise<PatientSheet>{
  const provisional=input.patients.find(patient=>patient.id===input.conversationPatientId);
- const p=provisional??selectedConfirmedPatient(input.patients,input.verifiedIds,input.message);
+ const explicit=input.patients.find(patient=>patient.id===input.confirmedPatientId&&input.verifiedIds.includes(patient.id));
+ const p=explicit??provisional??selectedConfirmedPatient(input.patients,input.verifiedIds,input.message);
  const sheet:PatientSheet={access:!input.patients.length?'unlinked':!selectPhonePatient(input.patients,input.message)?'ambiguous':'unconfirmed',asOf:new Date().toISOString(),context:{},fields:{}};
  if(!p)return sheet;
  sheet.access='confirmed';sheet.patientId=p.id;
@@ -41,7 +42,7 @@ export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:Pho
  const normalize=(v:unknown)=>String(v??'').replace(/\D/g,'').replace(/^00/,'').replace(/^0/,'49');
  const parent=patient&&input.phone?[['versicherter',patient.versicherter_telefon],['eb2',patient.eb2_telefon]].find(([,phone])=>phone&&normalize(phone)===normalize(input.phone)):null;
  const ownPhone=patient&&input.phone&&[patient.telefon,patient.mobiltelefon].some(phone=>phone&&normalize(phone)===normalize(input.phone));
- put('schreibendePerson',{rolle:parent?'Elternteil':ownPhone||dossier.sender==='patient'?'Patient':'Zuordnung als Elternteil nicht belegt',name:parent?[patient[parent[0]+'_vorname'],patient[parent[0]+'_nachname']].filter(Boolean).join(' '):null,patient:p.vorname+' '+p.nachname});
+ put('schreibendePerson',input.senderRelative?{rolle:input.senderRelative.role==='recipient'?'Rechnungsempfänger':'Sorgeberechtigte/Hauptversicherte',name:input.senderRelative.name,patient:p.vorname+' '+p.nachname}:{rolle:parent?'Elternteil':ownPhone||dossier.sender==='patient'?'Patient':'Zuordnung als Elternteil nicht belegt',name:parent?[patient[parent[0]+'_vorname'],patient[parent[0]+'_nachname']].filter(Boolean).join(' '):null,patient:p.vorname+' '+p.nachname});
  put('akte',dossierForModel(dossier).akte);
  put('apparatur',patient?.behandlung||null);put('behandlungsart',patient?.behandlungsart||null);put('behandlungsphasen',phases);
  const planned=appointments?.filter((r:any)=>['geplant','erwartet','eingecheckt','in_behandlung'].includes(r.status)&&r.datum>=input.today).sort((a:any,b:any)=>(a.datum+' '+a.uhrzeit).localeCompare(b.datum+' '+b.uhrzeit));
@@ -52,8 +53,8 @@ export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:Pho
  put('guthaben',patient?.guthaben==null?null:{amountEuro:Number(patient.guthaben),source:'patients.guthaben'});
  put('teamnotizen',patient?.notizen??null);put('offeneKlärfälle',clinicalCases);
  // Chat-scoped cases may concern siblings. Expose only with a single linked patient.
- put('offeneTerminKlärfälle',input.patients.length===1?cases:null);
- put('offeneChatKlärfälle',input.concernHistory?.openCases?.filter(c=>c.patientId===p.id||!c.patientId&&input.patients.length===1).map(c=>({at:c.at,summary:maskBirthDates(c.summary)}))??null);
+ put('offeneTerminKlärfälle',(input.chatPatientCount??input.patients.length)===1?cases:null);
+ put('offeneChatKlärfälle',input.concernHistory?.openCases?.filter(c=>c.patientId===p.id||!c.patientId&&(input.chatPatientCount??input.patients.length)===1).map(c=>({at:c.at,summary:maskBirthDates(c.summary)}))??null);
  put('bisherigeAnliegen',input.concernHistory?{complete:input.concernHistory.complete,messages:input.concernHistory.messages,from:input.concernHistory.from,through:input.concernHistory.through,scope:'gesamter Chat, Zuordnung einzelner Anliegen zu Kindern nicht gesichert',concerns:input.concernHistory.concerns.map(c=>({...c,examples:c.examples.map(maskBirthDates)}))}:null);
  put('offeneRechnungen',open?.filter((r:any)=>resolveOpenItemAmount(r)>0).map((r:any)=>({date:r.rechnung_datum,number:r.rechnung_nr,openEuro:resolveOpenItemAmount(r),status:r.status,delivery:'unbekannt',source:'offene_posten'}))??null);
  const account=profiles?.[0]?.id??memberships?.[0]?.user_id;
@@ -63,11 +64,32 @@ export async function loadPatientSheet(db:Db,input:{tenantId:string;patients:Pho
  if(account&&process.env.INVOICE_ACCESS_WORKER_SECRET){try{
   const response=await fetch('https://anima-leitstand.vercel.app/api/abrechnung/invoice-records',{method:'POST',headers:{'content-type':'application/json','x-invoice-worker-secret':process.env.INVOICE_ACCESS_WORKER_SECRET},body:JSON.stringify({accountId:account,mode:'patient',patientId:p.id}),cache:'no-store',signal:AbortSignal.timeout(5000)});
   if(response.ok){const data=await response.json();
-   if(Array.isArray(data.records))invoices=data.records.filter((r:any)=>r.patientId===p.id).map((r:any)=>({date:r.date,number:r.invoiceNumber,amountCents:r.amountCents,payment:r.payment,delivery:r.delivery,patientVisible:r.patientVisible}));
+   if(Array.isArray(data.records))invoices=data.records.filter((r:any)=>r.patientId===p.id).map((r:any)=>({quarter:r.quarter,date:r.date,number:r.invoiceNumber,amountCents:r.amountCents,payment:r.payment,delivery:r.delivery,patientVisible:r.patientVisible}));
    if(Array.isArray(data.unmatchedHistory))unavailableInvoiceSummaries=data.unmatchedHistory.filter((r:any)=>r.patient_id===p.id&&r.reason==='complete_invoice_unavailable').length;
   }
  }catch{/* unavailable is not unpaid, undelivered or absent */}}
  put('rechnungsakteMitZustellstand',invoices);
+ // Delivery is independent of having an app/portal account. The scoped endpoint returns no PDFs or clinical fields.
+ let dispatch:unknown[]|null=null;
+ if(process.env.INVOICE_ACCESS_WORKER_SECRET){try{
+  const response=await fetch('https://anima-leitstand.vercel.app/api/abrechnung/invoice-dispatch',{method:'POST',headers:{'content-type':'application/json','x-invoice-worker-secret':process.env.INVOICE_ACCESS_WORKER_SECRET},body:JSON.stringify({patientId:p.id}),cache:'no-store',signal:AbortSignal.timeout(8000)});
+  if(response.ok){const data=await response.json();if(data.contractVersion==='invoice-dispatch-v1'&&data.patientId===p.id&&Array.isArray(data.records)){
+   dispatch=data.records.map((record:any)=>invoiceDispatchFact(record,input.at));
+   if(typeof data.portalAccessActive==='boolean')put('portalzugang',data.portalAccessActive);
+  }}
+ }catch{/* Unknown is never a statement that no invoice mail was sent. */}}
+ put('rechnungsversand',dispatch??invoices?.map(invoice=>invoiceDispatchFact(invoice,input.at))??null);
  put('vollständigeRechnungImPortalNochNichtVerfügbar',unavailableInvoiceSummaries);
  return sheet;
+}
+
+/** Accepted is a sent-mail record, not proof of delivery. Unknown opening is not 'unopened'. */
+export function invoiceDispatchFact(invoice:{quarter?:string;number?:string;delivery?:{kind:string;at:string;version?:string}[]},asOf:string){
+ const events=(invoice.delivery??[]).filter(e=>e.version!=='history'&&Date.parse(e.at)<=Date.parse(asOf));
+ const times=(kind:string)=>events.filter(e=>e.kind===kind).map(e=>e.at).sort((a,b)=>Date.parse(a)-Date.parse(b));
+ return {quartal:invoice.quarter??null,rechnungsnummer:invoice.number??null,rechnungsMailAm:times('mail_accepted').at(-1)??null,
+  rechnungGeöffnetAm:times('invoice_opened').at(-1)??times('pdf_retrieved').at(-1)??null,pdfAbgerufenAm:times('pdf_retrieved').at(-1)??null,
+  zugestelltAm:times('mail_delivered').at(-1)??null,mailGeöffnetAm:times('mail_opened').at(-1)??null,
+  geöffnet:times('mail_opened').length>0?true:null,öffnungHinweis:times('mail_opened').length?'belegt':'nicht erfasst oder unbekannt',
+  vonDerPraxisVersandt:times('mail_accepted').length>0,quelle:'invoice-record-v1'};
 }

@@ -153,4 +153,13 @@ const ANIMAHOST_GLOCKE: Entwurf = {
   kurzEn: "The bell shows the person, concern and reply status. Tap to open the conversation.",
   textEn: "Only cases requiring your action appear in the bell. Information-only cases remain in Messages. Multiple cases from the same chat within 30 minutes share one entry. You see the name or phone number, the concern and whether a reply is prepared or a link has already been sent. Tap to open the conversation in AnimaDesk.",
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_ANGEHOERIGE: Entwurf = {
+ slug: "2026-11-25-animahost-angehoerige", art: "neuerung", bestaetigen: false,
+ titel: "AnimaHost erkennt Angehörige zuverlässiger",
+ kurz: "Unterschriften werden zuerst mit den Angehörigen der verknüpften Patienten abgeglichen.",
+ text: "Ein Vorname allein reicht nicht mehr für eine Namenszuordnung. Schreibt eine hinterlegte Angehörige über eine bestätigte Nummer, nutzt AnimaHost das Patientenblatt des zugehörigen Patienten. Darin sieht AnimaHost auch den belegten Rechnungsversand. Eine versandte Rechnungs-Mail kann dadurch bestätigt werden, ohne dass ihr nachsehen müsst. Unbekannte Öffnungsstände bleiben als unbekannt erkennbar.",
+ titelEn: "AnimaHost identifies relatives more reliably",
+ kurzEn: "Signatures are first checked against relatives of linked patients.",
+ textEn: "A first name alone no longer establishes a name match. When a recorded relative writes from a confirmed number, AnimaHost uses the linked patient's record, including documented invoice email dispatch. This allows it to confirm an invoice email without asking your team to investigate. Unknown opening status remains explicitly unknown.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

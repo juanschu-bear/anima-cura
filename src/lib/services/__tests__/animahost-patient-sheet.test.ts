@@ -2,7 +2,7 @@ import {conversationPhoneProof} from '../animahost-chat-identity';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {loadPatientSheet,relativeAppointment,selectedConfirmedPatient,sheetLedger} from '../animahost-patient-sheet';
+import {invoiceDispatchFact,loadPatientSheet,relativeAppointment,selectedConfirmedPatient,sheetLedger} from '../animahost-patient-sheet';
 import {patientTextViolations} from '../animahost-patient-text';
 import {runRetrievalReply} from '../animahost-retrieval-core';
 const child={id:'child-a',vorname:'Leon',nachname:'Beispiel',geburtsdatum:'2014-05-01',geschlecht:'m'};
@@ -56,4 +56,25 @@ test('a provisional identity requires the supplied full name and date on this ph
  assert.equal(conversationPhoneProof([a],'24.05.2012.',[],at),null);
  assert.equal(conversationPhoneProof([a],'Was steht in der App?',history,'2026-11-25T12:00:00Z'),null);
  assert.equal(conversationPhoneProof([a],'Was steht in der App?',history.map(turn=>({...turn,direction:'outgoing'})),at),null);
+});
+
+test('mail evidence distinguishes sent, delivered and unknown opening; excludes future and historic-document events',()=>{
+ const fact=invoiceDispatchFact({quarter:'2026-Q3',number:'TEST',delivery:[{kind:'mail_accepted',at:'2026-11-24T10:00:00Z'},{kind:'mail_opened',at:'2026-11-25T12:00:00Z'},{kind:'mail_opened',at:'2026-11-24T11:00:00Z',version:'history'}]},'2026-11-25T08:32:24Z');
+ assert.equal(fact.vonDerPraxisVersandt,true);assert.equal(fact.quartal,'2026-Q3');assert.equal(fact.geöffnet,null);assert.equal(fact.zugestelltAm,null);
+ assert.equal(invoiceDispatchFact({delivery:[{kind:'mail_opened',at:'2026-11-24T12:00:00Z'}]},'2026-11-25T08:32:24Z').geöffnet,true);
+});
+test('a verified relative selects exactly the linked patient and is named as the sender',async()=>{
+ const {db}=database();const sheet=await loadPatientSheet(db,{...args,message:'LG Nora Anders',confirmedPatientId:child.id,senderRelative:{name:'Nora Anders',role:'parent'}});
+ assert.equal(sheet.access,'confirmed');assert.equal(sheet.patientId,child.id);assert.equal((sheet.context.schreibendePerson as any).name,'Nora Anders');
+ const denied=database();const unverified=await loadPatientSheet(denied.db,{...args,verifiedIds:[],confirmedPatientId:child.id});assert.equal(unverified.access,'unconfirmed');assert.deepEqual(denied.calls,[]);
+});
+
+test('an invoice open is not misrepresented as a tracked email open',()=>{
+ const fact=invoiceDispatchFact({delivery:[{kind:'invoice_opened',at:'2026-11-24T10:00:00Z'}]},'2026-11-25T08:32:24Z');
+ assert.equal(fact.rechnungGeöffnetAm,'2026-11-24T10:00:00Z');assert.equal(fact.mailGeöffnetAm,null);
+});
+
+test('selecting one confirmed child does not expose unassigned cases from a multi-child chat',async()=>{
+ const {db}=database();const sheet=await loadPatientSheet(db,{...args,chatPatientCount:2,concernHistory:{complete:true,messages:1,from:at,through:at,concerns:[],openCases:[{patientId:null,at,summary:'Unknown child'},{patientId:child.id,at,summary:'Selected child'}]}});
+ assert.equal(sheet.context.offeneTerminKlärfälle,'unbekannt');assert.equal((sheet.context.offeneChatKlärfälle as any[]).length,1);
 });

@@ -1,5 +1,5 @@
 import {clarificationRound} from './animahost-unclear-input';
-import {resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
+import {senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
 import type {createServerClient} from '@/lib/db/supabase';
 import {phonePatients,phoneLabels,maskBirthDates,selectPhonePatient,conversationPhoneProof,mentionsPatient} from './animahost-chat-identity';
 import {recentConversation,type ConversationHistory} from './animahost-whatsapp-conversation';
@@ -53,15 +53,22 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const translations=Object.fromEntries(localized.filter(entry=>entry.id&&entry.translation).map(entry=>[entry.id,entry.translation]));
  const language={translation:localized.at(-1)?.translation??null,translations,translated};
  let chatName:ChatNameContext|undefined;
+ // Resolve the sender against the phone-linked family before searching the entire practice.
+ const linked=phone?await linkedNamePatients(db,patients.map(p=>p.id)):[];
+ const family=linkedSenderMatch(joined,linked,verifiedIds);
  const senderText=selfNameClaim(joined)??senderNameText(joined);
- const phoneSubject=selfNameClaim(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])&&!selfNameClaim(joined)?null:selectPhonePatient(patients,senderText));
- if(phoneSubject)chatName={status:'matched',matchedName:phoneSubject.vorname,patientId:phoneSubject.id,confirmed:Boolean(provisional)||verifiedIds.includes(phoneSubject.id),question:null};
- if(phone&&!phoneSubject){
-  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly,candidateIds:prior.data.find(r=>r.case_details?.chatName?.candidateIds?.length)?.case_details.chatName.candidateIds});
+ const phoneSubject=senderDeclaration(joined)?null:provisional??(senderText!==joined&&patients.length===1&&mentionsPatient(joined,patients[0])?null:selectPhonePatient(patients,senderText));
+ if(family)chatName=family.context;
+ else if(phoneSubject)chatName={status:'matched',source:'phone',matchedName:[phoneSubject.vorname,phoneSubject.nachname].join(' '),patientId:phoneSubject.id,confirmed:Boolean(provisional)||verifiedIds.includes(phoneSubject.id),question:null};
+ else if(phone){
+  const matched=await resolveChatName(db,{tenant:input.tenantId,chat:input.from,phone,message:joined,readOnly:input.readOnly});
   chatName=matched.context;
   if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
  }
- const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients,verifiedIds,conversationPatientId:provisional?.id,message:selfNameClaim(joined)??joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory});
+ // A sender resolution must not be silently replaced by a different patient during sheet selection.
+ const selected=chatName?.status==='matched'?patients.filter(p=>p.id===chatName.patientId):[];
+ const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients:selected,verifiedIds,chatPatientCount:patients.length,confirmedPatientId:chatName?.confirmed?chatName.patientId:undefined,conversationPatientId:provisional?.id,message:selfNameClaim(joined)??joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory,
+  senderRelative:chatName?.source==='linked_relative'?{name:chatName.matchedName!,role:chatName.role!}:undefined});
  if(chatName?.status==='matched'&&patientSheet.access!=='confirmed')patientSheet.access='unconfirmed';
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),translation:language.translation,translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
