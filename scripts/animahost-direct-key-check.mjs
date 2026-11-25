@@ -10,8 +10,10 @@ export async function checkDirectKeys(env,request=fetch){
     method:'GET',headers:{'x-api-key':key,'anthropic-version':'2023-06-01'},
     signal:AbortSignal.timeout(10000),redirect:'error',cache:'no-store',
    });
-   const body=response.ok?await response.json():null;
-   results.push({scope,present:true,status:response.status,haikuModels:Array.isArray(body?.data)?body.data
+   const body=await response.json().catch(()=>null);
+   const message=typeof body?.error?.message==='string'?body.error.message.toLowerCase():'';
+   const errorKind=response.ok?null:/credit|balance|billing/.test(message)?'billing':/api.?key|authentication/.test(message)?'authentication':/disabled|suspend/.test(message)?'account_disabled':/limit|parameter|query/.test(message)?'request_parameter':'other';
+   results.push({scope,present:true,status:response.status,errorKind,keyFormat:/^sk-ant-/.test(key),haikuModels:Array.isArray(body?.data)?body.data
     .filter(model=>typeof model.id==='string'&&/^claude-haiku-[a-z0-9.-]+$/.test(model.id)).map(model=>model.id):[]});
   }catch{results.push({scope,present:true,status:'unavailable'});}
  }
