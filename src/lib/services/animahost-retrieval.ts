@@ -75,5 +75,10 @@ export async function retrieveSources(db:Db,tenant:string,message:string,patient
  // Never send vectors, origin identifiers or raw archive identifiers to the language model/client.
  const documents=(result.data as RetrievalDocument[]).map(({kind,ref,version,source_at,title,content,payload,draft,content_hash})=>({kind,ref,version,source_at,title,content,payload,draft,content_hash}));
  if(companion){const index=documents.findIndex(d=>d.kind==='knowledge'&&d.ref===companion!.ref);if(index>=0)documents.splice(index,1);documents.unshift(companion);}
+ if(companionId==='ablauf-rechnung-mail-ohne-portal'){
+  const approved=await db.from('animahost_retrieval_documents').select('kind,ref,version,source_at,title,content,payload,draft,content_hash').eq('tenant_id',tenant).eq('kind','gold').eq('ref','practice-invoice-mail-confirmed').eq('active',true).eq('draft',false).order('version',{ascending:false}).limit(1).maybeSingle();
+  if(approved.error)throw Error('retrieval_companion_unavailable');
+  if(approved.data){const ref=approved.data.ref;const index=documents.findIndex(d=>d.kind==='gold'&&d.ref===ref);if(index>=0)documents.splice(index,1);documents.unshift(approved.data as RetrievalDocument);}
+ }
  return {documents,timings:{embeddingMs:embedded-start,searchMs:Date.now()-embedded}};
 }

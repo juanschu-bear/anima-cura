@@ -162,4 +162,13 @@ const ANIMAHOST_ANGEHOERIGE: Entwurf = {
  kurzEn: "Signatures are first checked against relatives of linked patients.",
  textEn: "A first name alone no longer establishes a name match. When a recorded relative writes from a confirmed number, AnimaHost uses the linked patient's record, including documented invoice email dispatch. This allows it to confirm an invoice email without asking your team to investigate. Unknown opening status remains explicitly unknown.",
 };
-export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];
+const ANIMAHOST_OHNE_FRISTEN: Entwurf = {
+ slug: "2026-11-25-animahost-ohne-fristen", art: "neuerung", bestaetigen: false,
+ titel: "AnimaHost verspricht keine Rückmeldefristen mehr",
+ kurz: "Keine Uhrzeit und kein „heute“ oder „morgen“ für eure Rückmeldung.",
+ text: "AnimaHost kündigt notwendige Teamprüfungen ohne Zeitversprechen an. Bereits erhaltene Rechnungs-Mails bestätigt es anhand des belegten Versands und verweist auf den geschützten Link in dieser Mail. Dafür bietet es weder einen erneuten Versand an noch legt es unnötig eine Teamaufgabe an. Rechnungen werden nicht über WhatsApp verschickt.",
+ titelEn: "AnimaHost no longer promises response deadlines",
+ kurzEn: "No clock times, today or tomorrow promises for your team's response.",
+ textEn: "AnimaHost announces necessary team reviews without promising a response time. It confirms received invoice emails using documented dispatch and refers to the protected link in the existing email. It does not offer another delivery or create an unnecessary team task for this. Invoices are not sent over WhatsApp.",
+};
+export const VORBEREITETE_NEUIGKEITEN: Entwurf[] = [ANIMAHOST_OHNE_FRISTEN,ANIMAHOST_ANGEHOERIGE,ANIMAHOST_GLOCKE,ANIMAHOST_ANTWORTQUALITAET,ANIMAHOST_ANLIEGEN,ZEITMASCHINE_ABSICHERUNG, NICHTS_GEHT_VERLOREN, BAUSTEINE_GLOCKE_INFOBOX];

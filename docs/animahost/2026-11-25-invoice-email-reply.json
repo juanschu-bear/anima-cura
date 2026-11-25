@@ -1,0 +1,6 @@
+{
+  "ref": "practice-invoice-mail-confirmed",
+  "question": "Ich habe eine E-Mail mit einer Rechnung erhalten. Ist die von Ihnen und können Sie mir die Rechnung hier zuschicken?",
+  "context": "Bestätigte Zuordnung und belegter Rechnungs-Mail-Versand. Die vorhandene Mail enthält bereits den geschützten Rechnungslink. Kein weiterer Versand und keine Teamaufgabe für die reine Herkunftsfrage. Freigabe: Juan, 25.11.2026.",
+  "answer": "Guten Morgen, ja, die Rechnungs-Mail ist von uns. Unsere Rechnungs-Mails kommen mit dem Absender „Praxis Dr. Schubert - Anima Cura“. Über den geschützten Link in der bereits erhaltenen E-Mail können Sie Ihre Rechnung im Browser öffnen; eine App benötigen Sie dafür nicht. Zum Schutz Ihrer Patientendaten verschicken wir Rechnungen nicht über WhatsApp."
+}

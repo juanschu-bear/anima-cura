@@ -12,22 +12,12 @@ test('only reactions, plain thanks/ok/corrections and latest human reply within 
 test('context caps knowledge and gold at three and conversation at ten; archived cases are not a style source',()=>{const docs:any[]=[];for(const kind of ['gold','knowledge','rule','history'])for(let i=0;i<6;i++)docs.push({kind,ref:kind+i,version:1,source_at:'2026-11-24',title:kind,content:kind,payload:{question:'q',answer:'a'},draft:false,content_hash:'x'});const c=replyContext(input({documents:docs,history:Array.from({length:20},(_,i)=>({direction:'incoming' as const,text:String(i),at:'2026-11-24T10:00:00Z'}))}));assert.equal(c.selected.gold.length,3);assert.equal(c.selected.knowledge.length,3);assert.equal((c.fields.VERLAUF as unknown[]).length,10);assert.equal(c.retrieved.history.length,0);});
 test('a known-patient identity question prompts one improvement; length and tone never block',async()=>{const m=model('Unter welchem Namen sind Sie bei uns angemeldet?',{...valid,passed:false,hard:[{kind:'identity_known',quote:'Unter welchem Namen',reason:'Patient bereits bekannt'}]},'Für Ihren Termin prüft das Team den gewünschten Tag.',valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);});
 
-test('a dueAt-backed callback and a neutral team check survive false findings and still create the team task',async()=>{
+test('even a previously approved deadline is forbidden in the first reply and absent from model context',async()=>{
  const deadline={dueAt:'2026-11-24T16:00:00.000Z',phrase:'heute bis 17 Uhr'};
- const quote='Ich lasse das gleich vom Team für Alex prüfen';
- const callback='Sie hören heute bis 17 Uhr von uns';
- const draft=quote+'. '+callback+'.';
- const m=model(draft,{...valid,passed:false,hard:[
-  {kind:'invented_appointment_or_cost',quote:callback,reason:'Uhrzeit'},
-  {kind:'confidential_unconfirmed',quote,reason:'Zuordnung'},
- ]});
- const result=await runRetrievalReply(m.generate,input({message:'In der App sehe ich für Alex noch keine Rechnung.',deadline}));
- assert.equal(result.text,draft);
- assert.equal(result.dueAt,deadline.dueAt);
- assert.equal(result.action,'klaerfall');
- assert.equal(m.calls.length,2);
- assert.match(m.calls[1].prompt,/2026-11-24T16:00:00.000Z/);
- assert.equal((result.checks?.[0] as {exempted?:unknown[]}).exempted?.length,2);
+ const m=model('Das Team prüft das. Sie hören heute bis 17 Uhr von uns.',{...valid,teamRequired:true},'Das Team prüft das und meldet sich bei Ihnen.',{...valid,teamRequired:true});
+ const result=await runRetrievalReply(m.generate,input({message:'Meine Rechnung fehlt.',deadline}));
+ assert.equal(result.text,'Das Team prüft das und meldet sich bei Ihnen.');assert.equal(result.dueAt,undefined);assert.equal(result.action,'klaerfall');assert.equal(m.calls.length,4);
+ assert.doesNotMatch(m.calls[0].system,/2026-11-24T16:00:00/);assert.equal((replyContext(input({deadline})).fields.JETZT as any).rueckmeldefristErlaubt,false);
 });
 
 test('confidential invoice state blocks; other findings are improvement hints',async()=>{
@@ -48,14 +38,11 @@ test('confidential invoice state blocks; other findings are improvement hints',a
  assert.doesNotMatch(result.text,/100 €|17 Uhr/);
 });
 
-test('an incorrect callback time stays a finding while the correct next-working-day deadline is allowed',async()=>{
- const deadline={dueAt:'2026-11-25T09:00:00.000Z',phrase:'am Mittwoch, 25. November bis 10 Uhr'};
- const wrong='Sie hören heute bis 17 Uhr von uns';
- const right='Sie hören am Mittwoch, 25. November bis 10 Uhr von uns';
- const finding=(quote:string)=>({...valid,passed:false,hard:[{kind:'invented_appointment_or_cost',quote,reason:'Uhrzeit'}]});
- const m=model(wrong+'.',finding(wrong),right+'.',finding(right));
- const r=await runRetrievalReply(m.generate,input({deadline}));
- assert.equal(r.text,right+'.');assert.equal(r.repairs,1);assert.equal(r.dueAt,deadline.dueAt);
+test('a second draft cannot reintroduce a callback deadline even when the checker passes it',async()=>{
+ const draft='Das Team prüft das. Sie hören am Mittwoch, 25. November bis 10 Uhr von uns.';
+ const m=model(draft,valid,draft,valid);const r=await runRetrievalReply(m.generate,input());
+ assert.equal(r.text,'Das Team prüft das.');assert.equal(r.repairs,1);assert.equal(r.dueAt,undefined);
+ assert.equal((r.checks?.[1] as any).removedCallbackDeadlines.length,1);
 });
 
 test('an unconfirmed sender can hear the general invoice flow and their own reported app view',async()=>{
@@ -78,7 +65,7 @@ test('after correction remove only repeated identity questions and log exact sen
  const question='Bitte nennen Sie mir Ihren vollständigen Namen und Ihr Geburtsdatum.';
  const draft='Danke für Ihre Nachricht.  '+question+'\nDas Team meldet sich am Mittwoch bis 10 Uhr.';
  const m=model(question,valid,draft,valid);const r=await runRetrievalReply(m.generate,knownSender());
- assert.equal(m.calls.length,4);assert.equal(r.text,'Danke für Ihre Nachricht.  \nDas Team meldet sich am Mittwoch bis 10 Uhr.');
+ assert.equal(m.calls.length,4);assert.equal(r.text,'Danke für Ihre Nachricht.');
  assert.deepEqual((r.checks?.[1] as any).removedIdentityQuestions,[question]);assert.equal((r.checks?.[1] as any).draft,draft);assert.equal(r.skipSend,undefined);
 });
 test('identity-only second draft leaves an empty answer and hands off',async()=>{

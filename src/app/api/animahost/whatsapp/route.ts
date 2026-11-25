@@ -1,3 +1,4 @@
+import {withoutCallbackDeadlines} from '@/lib/services/animahost-no-deadlines';
 import {notifyHostPractice} from '@/lib/services/animahost-practice-notifications';
 import {timingSafeEqual} from 'node:crypto';
 import {NextRequest,NextResponse} from 'next/server';
@@ -81,10 +82,11 @@ async function notifyPractice(db:ReturnType<typeof createServerClient>,
 
 function decisionResponse(decision: WhatsAppDecision,replyStyle?:'formulated'|'template',
  phoneMatches?:ReturnType<typeof phoneLabels>,details?:ChatDetails|null,replySchedule?:{teamReplyDays:unknown;closurePeriods:unknown}) {
+ decision={...decision,text:withoutCallbackDeadlines(decision.text).text};
  const note=details?.teamKind==='info'||(decision.action==='antworten'&&decision.rule.startsWith('invoice_portal:'))||appointmentNoticeFromDecision(decision)||/^late_arrival:(accept|wait)$/.test(decision.rule)||[
   'attendance_certificate_issued','invoice_recipient_applied','invoice_recipient_confirmation_sent','contact_change_applied',
  ].includes(decision.rule);
- return NextResponse.json({...decision,...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'||decision.rule===practiceReplyRule?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
+ return NextResponse.json({...decision,...(!decision.text.trim()?{skipSend:true}:{}),...(quietSenderRule.test(decision.rule)||silentSocialRule.test(decision.rule)||decision.rule==='chain:guard_rejected'||decision.rule===practiceReplyRule?{skipSend:true}:{}),...(phoneMatches?{phoneMatches}:{}),...(replySchedule?{replySchedule}:{}),...(details?{details}:{}),...(replyStyle?{replyStyle}:{}),optOut:decision.rule==='opt_out',
   ...(note?{disposition:'vermerk'}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 

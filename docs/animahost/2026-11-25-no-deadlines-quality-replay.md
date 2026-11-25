@@ -1,0 +1,110 @@
+# AnimaHost – Qualitätsvergleich 2026-11-25
+
+20 echte Chats, 25 historische Eingänge vom 2026-11-23 bis 2026-11-25. Kein Versand, keine Speicherung von Entscheidungen oder Praxisaufgaben. Private Eingaben und Antworttexte liegen außerhalb des Repositories.
+
+Die Historie endet jeweils vor dem Eingang; spätere Nachrichten werden nicht als Kontext verwendet. Patientenblatt und Wissensbasis werden beim Lauf lesend geladen und sind kein historischer Datenbank-Snapshot. Wiederholungen werden gegen tatsächlich vorhandene historische AnimaHost-Antworten geprüft, nicht gegen simulierte Antworten des vorigen Testfalls.
+
+Hinterlegte Buchungsadresse: https://www.doctolib.de/kieferorthopadie/leipzig/maria-elena-schubert
+
+| Prüfung | Vorher | Nachher |
+|---|---:|---:|
+| Antworten | 24 | 21 |
+| Zurückgehalten / Fehler | 1 | 4 |
+| Antworten mit erkannten Wiederholungen | 0 | 0 |
+| Antworten mit verbotenen Satzbausteinen | 0 | 0 |
+| Eingänge mit fehlenden passenden Regeln im Kontext | 0 | 0 |
+| Antworten mit JSON / internen Feldern | 0 | 0 |
+| Antworten mit hinterlegtem Buchungslink | 6 | 5 |
+
+Ein zurückgehaltener Entwurf ist kein technischer Fehler. Regelverwendung stammt aus dem Prüfschritt; bereitgestellte Regeln allein belegen noch keine Verwendung. „configured“ bezeichnet ausschließlich die unten genannte hinterlegte Adresse.
+
+Eingabe-SHA256: `13900be413756d5a2240be323f7427312c183a0cecceec3eecac2d2b61e3a54a`
+
+## Vorher
+
+Systemtext/Core-SHA256: `d99beca2bc85b30c9815a100bbe2e1fa98d91f96c8f3f9c1e41ab66234fb9e86`; Laufbeginn: 2026-11-25T09:12:57.476Z.
+
+`{"turns":25,"answered":24,"errors":1,"structuredReplies":0,"repeatedReplies":0,"forbiddenReplies":0,"missingRuleReplies":0,"referralFalsePositives":0,"configuredLinks":6}`
+
+| Fall | Eingang (Berlin) | Antwort | Wiederholungen | Verbotene Sätze | Passende Regeln | Regeln im Kontext | Genutzte Regeln laut Prüfer | Link | Team |
+|---|---|---|---|---|---|---|---|---|---|
+| C01-1 | 25.11.26, 07:12:21 | ja | – | – | termin-absagen, termin-verschieben | mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, weiss-noch-nicht-wann-ich-zeit-habe, beschwerde, termin-absagen, zweitmeinung, termin-verschieben | termin-verschieben | configured | info |
+| C01-2 | 25.11.26, 07:15:16 | ja | – | – | dank-und-lob | mit-einem-menschen-sprechen, beschwerde, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, ratenzahlung-gewuenscht, medizinische-frage-zu-medikamenten-schmerzen-ode, lieferanten-labor-und-dienstleister, dank-und-lob | nicht ausgewiesen | – | – |
+| C02-3 | 24.11.26, 16:21:24 | ja | – | – | – | urlaub-feiertage-und-brueckentage, unterlagen-roentgenbilder-oder-praxiswechsel, spange-schiene-oder-aligner-verloren, mit-einem-menschen-sprechen, zugang-klappt-trotz-anleitung-nicht, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | – |
+| C02-4 | 24.11.26, 16:25:22 | ja | – | – | – | spange-schiene-oder-aligner-verloren, urlaub-feiertage-und-brueckentage, unterlagen-roentgenbilder-oder-praxiswechsel, zugang-klappt-trotz-anleitung-nicht, ratenzahlung-gewuenscht, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | – |
+| C03-5 | 24.11.26, 15:01:07 | ja | – | – | – | beschwerde, zugang-klappt-trotz-anleitung-nicht, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, unterlagen-roentgenbilder-oder-praxiswechsel | nicht ausgewiesen | – | act |
+| C03-6 | 24.11.26, 16:29:05 | ja | – | – | erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | zahlung-ist-erledigt, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, termin-absagen, erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | nicht ausgewiesen | – | act |
+| C03-7 | 24.11.26, 16:29:52 | ja | – | – | erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | zahlung-ist-erledigt, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, beschwerde, erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | nicht ausgewiesen | – | act |
+| C03-8 | 24.11.26, 17:38:15 | ja | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, zahlung-ist-erledigt, termin-absagen, beschwerde, termin-verpasst-oder-vergessen, termin-verschieben | nicht ausgewiesen | – | act |
+| C04-9 | 24.11.26, 14:22:13 | ja | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, termin-verpasst-oder-vergessen, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, weiss-noch-nicht-wann-ich-zeit-habe | nicht ausgewiesen | – | act |
+| C05-10 | 23.11.26, 12:42:44 | ja | – | – | dank-und-lob, termin-besprechung | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, wann-ist-mein-termin, termin-absagen, beschwerde, mit-einem-menschen-sprechen, lieferanten-labor-und-dienstleister, dank-und-lob, termin-besprechung | termin-besprechung | configured | act |
+| C06-11 | 23.11.26, 12:05:21 | ja | – | – | was-kostet-die-behandlung | fehler-in-der-rechnung, was-muss-ich-zum-termin-mitbringen, zahlung-ist-erledigt, zugang-klappt-trotz-anleitung-nicht, sportmundschutz-oder-zahnschutz, ratenzahlung-gewuenscht, was-kostet-die-behandlung | was-kostet-die-behandlung | configured | – |
+| C07-12 | 24.11.26, 17:00:25 | ja | – | – | wo-finde-ich-meine-rechnung, rechnung-bei-versicherung-oder-beihilfe-einreich | fehler-in-der-rechnung, medizinische-frage-zu-medikamenten-schmerzen-ode, was-muss-ich-zum-termin-mitbringen, zugang-klappt-trotz-anleitung-nicht, mit-einem-menschen-sprechen, lieferanten-labor-und-dienstleister, wo-finde-ich-meine-rechnung, rechnung-bei-versicherung-oder-beihilfe-einreich | wo-finde-ich-meine-rechnung, rechnung-bei-versicherung-oder-beihilfe-einreich | animacura.io | act |
+| C08-13 | 24.11.26, 19:31:11 | ja | – | – | – | termin-verpasst-oder-vergessen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, beschwerde, termin-verschieben, medizinische-frage-zu-medikamenten-schmerzen-ode | nicht ausgewiesen | – | act |
+| C09-14 | 24.11.26, 16:08:09 | ja | – | – | wo-finde-ich-meine-rechnung | fehler-in-der-rechnung, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, spange-schiene-oder-aligner-verloren, zugang-klappt-trotz-anleitung-nicht, wo-finde-ich-meine-rechnung | wo-finde-ich-meine-rechnung | – | act |
+| C10-15 | 24.11.26, 15:18:45 | ja | – | – | termin-absagen | beschwerde, mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, medizinische-frage-zu-medikamenten-schmerzen-ode, termin-absagen, lieferanten-labor-und-dienstleister | termin-absagen | configured | info |
+| C11-16 | 24.11.26, 14:28:44 | ja | – | – | wo-finde-ich-meine-rechnung, zahlung-ist-erledigt | zahlung-ist-erledigt, fehler-in-der-rechnung, rechnung-an-eine-andere-person-oder-adresse, doppelt-bezahlt-oder-guthaben, ratenzahlung-oder-spaeterer-zahlungstermin, krankenkasse-oder-versicherung-gewechselt, wo-finde-ich-meine-rechnung | nicht ausgewiesen | – | act |
+| C12-17 | 24.11.26, 12:04:22 | ja | – | – | – | beschwerde, fehler-in-der-rechnung, neue-adresse-telefonnummer-oder-e-mail, rueckruf-gewuenscht, spange-schiene-oder-aligner-verloren, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | act |
+| C13-18 | 24.11.26, 09:35:55 | guard_rejected | – | – | wo-finde-ich-meine-rechnung, erstattung-durch-krankenkasse-oder-versicherung, spontan-vorbeikommen, guthaben-zurueckueberweisen | rechnung-auf-papier-gewuenscht, ratenzahlung-gewuenscht, fehler-in-der-rechnung, krankenkasse-oder-versicherung-gewechselt, zahlung-ist-erledigt, wo-finde-ich-meine-rechnung, erstattung-durch-krankenkasse-oder-versicherung, spontan-vorbeikommen, guthaben-zurueckueberweisen | nicht ausgewiesen | – | – |
+| C14-19 | 24.11.26, 08:17:39 | ja | – | – | etwas-in-der-praxis-vergessen | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, spange-schiene-oder-aligner-verloren, zahlung-ist-erledigt, etwas-in-der-praxis-vergessen | nicht ausgewiesen | – | – |
+| C15-20 | 24.11.26, 07:50:19 | ja | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, weiss-noch-nicht-wann-ich-zeit-habe, termin-verschieben, termin-verpasst-oder-vergessen, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | act |
+| C16-21 | 23.11.26, 15:52:23 | ja | – | – | termin-verschieben | mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, termin-verschieben | termin-verschieben | configured | info |
+| C17-22 | 23.11.26, 09:28:30 | ja | – | – | dank-und-lob | dank-und-lob, begruessung-ohne-anliegen, urlaub-feiertage-und-brueckentage, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, fehler-in-der-rechnung, ratenzahlung-gewuenscht | nicht ausgewiesen | – | – |
+| C18-23 | 23.11.26, 11:23:18 | ja | – | – | – | mit-einem-menschen-sprechen, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, medizinische-frage-zu-medikamenten-schmerzen-ode, verspaetung-zum-termin | nicht ausgewiesen | – | act |
+| C19-24 | 23.11.26, 13:47:04 | ja | – | – | – | ratenzahlung-gewuenscht, geschwisterkind-anmelden, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, herausnehmbare-spange-passt-nicht-oder-drueckt, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze | nicht ausgewiesen | configured | act |
+| C20-25 | 25.11.26, 09:32:24 | ja | – | – | wo-finde-ich-meine-rechnung | krankenkasse-oder-versicherung-gewechselt, fehler-in-der-rechnung, spange-schiene-oder-aligner-verloren, urlaub-feiertage-und-brueckentage, ratenzahlung-gewuenscht, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, wo-finde-ich-meine-rechnung | wo-finde-ich-meine-rechnung | – | – |
+## Nachher
+
+Systemtext/Core-SHA256: `d3c628c630923cd622d6e5cd76d8a84a70c0c2768efbcb872c57e24ae26b6d4e`; Laufbeginn: 2026-11-25T09:16:52.818Z.
+
+`{"turns":25,"answered":21,"errors":4,"structuredReplies":0,"repeatedReplies":0,"forbiddenReplies":0,"missingRuleReplies":0,"referralFalsePositives":0,"configuredLinks":5}`
+
+| Fall | Eingang (Berlin) | Antwort | Wiederholungen | Verbotene Sätze | Passende Regeln | Regeln im Kontext | Genutzte Regeln laut Prüfer | Link | Team |
+|---|---|---|---|---|---|---|---|---|---|
+| C01-1 | 25.11.26, 07:12:21 | ja | – | – | termin-absagen, termin-verschieben | mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, weiss-noch-nicht-wann-ich-zeit-habe, beschwerde, termin-absagen, zweitmeinung, termin-verschieben | termin-verschieben | configured | info |
+| C01-2 | 25.11.26, 07:15:16 | ja | – | – | dank-und-lob | mit-einem-menschen-sprechen, beschwerde, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, ratenzahlung-gewuenscht, medizinische-frage-zu-medikamenten-schmerzen-ode, lieferanten-labor-und-dienstleister, dank-und-lob | nicht ausgewiesen | – | act |
+| C02-3 | 24.11.26, 16:21:24 | ja | – | – | – | urlaub-feiertage-und-brueckentage, unterlagen-roentgenbilder-oder-praxiswechsel, spange-schiene-oder-aligner-verloren, mit-einem-menschen-sprechen, zugang-klappt-trotz-anleitung-nicht, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | – |
+| C02-4 | 24.11.26, 16:25:22 | ja | – | – | – | spange-schiene-oder-aligner-verloren, urlaub-feiertage-und-brueckentage, unterlagen-roentgenbilder-oder-praxiswechsel, zugang-klappt-trotz-anleitung-nicht, ratenzahlung-gewuenscht, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | act |
+| C03-5 | 24.11.26, 15:01:07 | ja | – | – | – | beschwerde, zugang-klappt-trotz-anleitung-nicht, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, unterlagen-roentgenbilder-oder-praxiswechsel | nicht ausgewiesen | – | act |
+| C03-6 | 24.11.26, 16:29:05 | ja | – | – | erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | zahlung-ist-erledigt, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, termin-absagen, erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | nicht ausgewiesen | – | act |
+| C03-7 | 24.11.26, 16:29:52 | ja | – | – | erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | zahlung-ist-erledigt, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, beschwerde, erstattung-durch-krankenkasse-oder-versicherung, dank-und-lob | nicht ausgewiesen | – | act |
+| C03-8 | 24.11.26, 17:38:15 | ja | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, zahlung-ist-erledigt, termin-absagen, beschwerde, termin-verpasst-oder-vergessen, termin-verschieben | nicht ausgewiesen | – | act |
+| C04-9 | 24.11.26, 14:22:13 | guard_rejected | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, termin-verpasst-oder-vergessen, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, weiss-noch-nicht-wann-ich-zeit-habe | nicht ausgewiesen | – | – |
+| C05-10 | 23.11.26, 12:42:44 | ja | – | – | dank-und-lob, termin-besprechung | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, wann-ist-mein-termin, termin-absagen, beschwerde, mit-einem-menschen-sprechen, lieferanten-labor-und-dienstleister, dank-und-lob, termin-besprechung | termin-besprechung | configured | act |
+| C06-11 | 23.11.26, 12:05:21 | ja | – | – | was-kostet-die-behandlung | fehler-in-der-rechnung, was-muss-ich-zum-termin-mitbringen, zahlung-ist-erledigt, zugang-klappt-trotz-anleitung-nicht, sportmundschutz-oder-zahnschutz, ratenzahlung-gewuenscht, was-kostet-die-behandlung | was-kostet-die-behandlung | – | act |
+| C07-12 | 24.11.26, 17:00:25 | guard_rejected | – | – | wo-finde-ich-meine-rechnung, rechnung-bei-versicherung-oder-beihilfe-einreich | fehler-in-der-rechnung, medizinische-frage-zu-medikamenten-schmerzen-ode, was-muss-ich-zum-termin-mitbringen, zugang-klappt-trotz-anleitung-nicht, mit-einem-menschen-sprechen, lieferanten-labor-und-dienstleister, wo-finde-ich-meine-rechnung, rechnung-bei-versicherung-oder-beihilfe-einreich | nicht ausgewiesen | – | – |
+| C08-13 | 24.11.26, 19:31:11 | ja | – | – | – | termin-verpasst-oder-vergessen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, beschwerde, termin-verschieben, medizinische-frage-zu-medikamenten-schmerzen-ode | nicht ausgewiesen | – | act |
+| C09-14 | 24.11.26, 16:08:09 | ja | – | – | wo-finde-ich-meine-rechnung | fehler-in-der-rechnung, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, spange-schiene-oder-aligner-verloren, zugang-klappt-trotz-anleitung-nicht, wo-finde-ich-meine-rechnung | nicht ausgewiesen | – | act |
+| C10-15 | 24.11.26, 15:18:45 | ja | – | – | termin-absagen | beschwerde, mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, medizinische-frage-zu-medikamenten-schmerzen-ode, termin-absagen, lieferanten-labor-und-dienstleister | termin-absagen | configured | info |
+| C11-16 | 24.11.26, 14:28:44 | ja | – | – | wo-finde-ich-meine-rechnung, zahlung-ist-erledigt | zahlung-ist-erledigt, fehler-in-der-rechnung, rechnung-an-eine-andere-person-oder-adresse, doppelt-bezahlt-oder-guthaben, ratenzahlung-oder-spaeterer-zahlungstermin, krankenkasse-oder-versicherung-gewechselt, wo-finde-ich-meine-rechnung | nicht ausgewiesen | – | act |
+| C12-17 | 24.11.26, 12:04:22 | ja | – | – | – | beschwerde, fehler-in-der-rechnung, neue-adresse-telefonnummer-oder-e-mail, rueckruf-gewuenscht, spange-schiene-oder-aligner-verloren, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | act |
+| C13-18 | 24.11.26, 09:35:55 | guard_rejected | – | – | wo-finde-ich-meine-rechnung, erstattung-durch-krankenkasse-oder-versicherung, spontan-vorbeikommen, guthaben-zurueckueberweisen | rechnung-auf-papier-gewuenscht, ratenzahlung-gewuenscht, fehler-in-der-rechnung, krankenkasse-oder-versicherung-gewechselt, zahlung-ist-erledigt, wo-finde-ich-meine-rechnung, erstattung-durch-krankenkasse-oder-versicherung, spontan-vorbeikommen, guthaben-zurueckueberweisen | nicht ausgewiesen | – | – |
+| C14-19 | 24.11.26, 08:17:39 | ja | – | – | etwas-in-der-praxis-vergessen | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, spange-schiene-oder-aligner-verloren, zahlung-ist-erledigt, etwas-in-der-praxis-vergessen | nicht ausgewiesen | – | – |
+| C15-20 | 24.11.26, 07:50:19 | ja | – | – | – | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, termin-absagen, weiss-noch-nicht-wann-ich-zeit-habe, termin-verschieben, termin-verpasst-oder-vergessen, lieferanten-labor-und-dienstleister | nicht ausgewiesen | – | – |
+| C16-21 | 23.11.26, 15:52:23 | guard_rejected | – | – | termin-verschieben | mit-einem-menschen-sprechen, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, ratenzahlung-gewuenscht, termin-verschieben | nicht ausgewiesen | – | – |
+| C17-22 | 23.11.26, 09:28:30 | ja | – | – | dank-und-lob | dank-und-lob, begruessung-ohne-anliegen, urlaub-feiertage-und-brueckentage, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, fehler-in-der-rechnung, ratenzahlung-gewuenscht | nicht ausgewiesen | configured | – |
+| C18-23 | 23.11.26, 11:23:18 | ja | – | – | – | mit-einem-menschen-sprechen, beschwerde, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, medizinische-frage-zu-medikamenten-schmerzen-ode, verspaetung-zum-termin | nicht ausgewiesen | – | act |
+| C19-24 | 23.11.26, 13:47:04 | ja | – | – | – | ratenzahlung-gewuenscht, geschwisterkind-anmelden, lieferanten-labor-und-dienstleister, nachricht-von-einer-anderen-praxis, herausnehmbare-spange-passt-nicht-oder-drueckt, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze | verspaetung-von-mehr-als-15-minuten-oder-ohne-ze | configured | – |
+| C20-25 | 25.11.26, 09:32:24 | ja | – | – | wo-finde-ich-meine-rechnung | krankenkasse-oder-versicherung-gewechselt, fehler-in-der-rechnung, spange-schiene-oder-aligner-verloren, urlaub-feiertage-und-brueckentage, ratenzahlung-gewuenscht, verspaetung-von-mehr-als-15-minuten-oder-ohne-ze, wo-finde-ich-meine-rechnung | wo-finde-ich-meine-rechnung | – | – |
+
+## Auftrag und Ergebnis
+
+Vorher: Commit `9e4ecc3`, vor Änderungen an Systemtext und Prüfanweisung. Nachher: Rückmeldefristen sind unabhängig von Gesprächsstand oder Anliegen untersagt. Der aktive Antwortpfad berechnet keine Frist mehr; der Modellkontext enthält keine Frist, `dueAt` wird nicht gesetzt. Der Prüfer fordert einen zweiten Entwurf ohne Frist an; verbliebene Fristsätze werden auch bei dessen Freigabe entfernt. Der gemeinsame Antwortausgang schützt zusätzlich ältere gespeicherte und klassische Antworten. Belegte Behandlungstermine, Öffnungszeiten und Versanddaten bleiben Fakten und werden nicht pauschal entfernt.
+
+**Rückmeldefristen in Endantworten: 6 vorher, 0 nachher.** Vorher betroffen: C03-5, C05-10, C07-12, C09-14, C17-22, C19-24. Das gilt für die hier getesteten Formulierungen; die Regel und der deterministische Filter wurden zusätzlich gegen erste Antworten, Folgeantworten, wieder eingefügte Fristen im zweiten Entwurf, Wochentage, Uhrzeiten, „bald“, „zeitnah“ und englische Rückmeldezusagen getestet.
+
+Die 20 Chats umfassen weiterhin die geforderten mehrteiligen Fälle C01 bis C03. C20 wurde durch den Rechnungs-Mail-Eingang vom 25.11., 09:32 Uhr ersetzt. Seine Rechnungsversanddaten stammen aus der im Zuordnungsbericht dokumentierten lesenden Produktionsabfrage und wurden für beide lokalen Läufe identisch eingefroren; die übrigen Patientendaten werden weiterhin lesend geladen. Kein Patiententext oder Name wird hier versioniert.
+
+C20 nachher: Herkunft bestätigt, benannter Praxisabsender, geschützter Link in vorhandener E-Mail, Browser ohne App, kein Rechnungsversand über WhatsApp. Keine erneute Zusendung angeboten, keine Rückmeldefrist, keine Teamaufgabe (`action=antworten`, kein `teamKind=act`), erster Entwurf freigegeben. Ein allgemeiner Absendername allein gilt weiterhin nicht als Herkunftsnachweis; der konkrete Versand ist belegt.
+
+Das freigegebene Antwortmuster ist als `practice-invoice-mail-confirmed` in der Gold-Ablage veröffentlicht und indexiert; anonymisierter Wortlaut: `2026-11-25-invoice-email-reply.json`. Wissen `ablauf-rechnung-mail-ohne-portal` ist jetzt Version 5; deren Inhalt liegt separat in `2026-11-25-invoice-email-knowledge-v5.json`. Version 3 und ihr damaliger Bericht bleiben nachvollziehbar.
+
+## Grenzen des Qualitätslaufs
+
+Beide Läufe vollständig, keine technischen Laufabbrüche, kein Versand. Vorher 24 Antworten und ein zurückgehaltener Entwurf, nachher 21 Antworten und vier zurückgehaltene Entwürfe. Das ist **kein pauschal fehlerfreier Qualitätsnachweis**. Die zusätzlichen Zurückhaltungen werden nicht durch selektives Wiederholen verdeckt:
+
+- C04-9: zweimal leere Modellausgabe.
+- C07-12 und C13-18: `confidential_unconfirmed`; der Prüfer beschreibt selbst sinngemäß, dass eigentlich kein harter Verstoß vorliegt. Bekannte widersprüchliche Prüferentscheidung, nicht durch die Fristenentfernung gelöst. C13-18 war schon vorher zurückgehalten.
+- C16-21: geforderter Buchungslink fehlt auch im zweiten Entwurf; Schutz `booking_link_contract` hält die Antwort zurück.
+
+Alle Endantworten und Prüfschritte wurden privat gelesen. Die automatischen Nullwerte bei verbotenen Satzbausteinen sind keine vollständige sprachliche Prüfung: vorher enthalten C15-20/C18-23 weiterhin Weiterleitungsformulierungen; nachher bestehen unter anderem eine unnötige Datumsfrage zu einem maskierten Platzhalter (C08-13) und eine nicht unabhängig belegte Terminbestätigung (C15-20). Diese unabhängigen Befunde sind dokumentiert; für sie wurde die geforderte Korrektur nicht durch weitere Systemtextänderungen erweitert.
