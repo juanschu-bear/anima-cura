@@ -1,3 +1,4 @@
+import {senderAddress,removeChildSalutation} from './animahost-sender-address';
 import {removeProvidedNameRequests} from './animahost-provided-name-question';
 import {clarificationRound} from './animahost-unclear-input';
 import {removeInferredParentSalutation,identityMessageForTurn,subjectNameText,subjectNameResolution,senderDeclaration,linkedNamePatients,linkedSenderMatch,resolveChatName,senderNameText,selfNameClaim,type ChatNameContext} from './animahost-name-match';
@@ -70,10 +71,16 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
   if(matched.patient){if(!patients.some(p=>p.id===matched.patient!.id))patients.push({...matched.patient,geburtsdatum:matched.patient.geburtsdatum??null,geschlecht:matched.patient.geschlecht??null});if(chatName.confirmed)verifiedIds.push(matched.patient.id);}
  }
  // A sender resolution must not be silently replaced by a different patient during sheet selection.
- const selected=chatName?.status==='matched'?patients.filter(p=>p.id===chatName.patientId):[];
+ const selected=chatName?.status==='matched'?patients.filter(p=>p.id===chatName?.patientId):[];
+ const address=senderAddress(chatName,selected[0],joined,input.history??[],input.receivedAt);
+ chatName=address.context;
  const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients:selected,verifiedIds,chatPatientCount:patients.length,confirmedPatientId:chatName?.confirmed?chatName.patientId:undefined,conversationPatientId:provisional?.id,message:selfNameClaim(joined)??joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory,
   senderRelative:chatName?.source==='linked_relative'?{name:chatName.matchedName!,role:chatName.role!}:undefined});
  if(chatName?.status==='matched'&&patientSheet.access!=='confirmed')patientSheet.access='unconfirmed';
+ if(address.avoidPatientSalutation&&chatName?.role==='subject'){
+  patientSheet.context.schreibendePerson={rolle:'unbekannt',name:null,patient:chatName.matchedName,minderjährig:address.minor,anrede:'neutral; Patientenname ist nicht der Name der schreibenden Person'};
+  patientSheet.fields.schreibendePerson='filled';
+ }
  const dossier={sender:'unknown' as const,patients:[]};
  const base:RetrievalInput={message:maskBirthDates(input.text??''),translation:language.translation,translated,unreadable:localized.every(entry=>entry.unreadable),translationError:localized.find(entry=>entry.error)?.error,messageType:input.messageType,jid:input.from,phone,practicePhone:practice.practice_phone,
   teamPhones:process.env.ANIMAHOST_TEAM_PHONES,nonPatientPhones:process.env.ANIMAHOST_NON_PATIENT_PHONES,
@@ -86,6 +93,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
  const result=await captureModelFailure(model,guarded=>runRetrievalReply(guarded,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)}));
+ if(selected[0]){const addressed=removeChildSalutation(result.text,selected[0],address.avoidPatientSalutation,chatName?.source==='linked_relative'||['parent','recipient'].includes(chatName?.role??'')?chatName?.matchedName:undefined);result.text=addressed.text;result.checks?.push({senderAddress:{minor:address.minor,role:chatName?.role??'unknown',avoidPatientSalutation:address.avoidPatientSalutation},removedChildSalutations:addressed.removed});}
  const providedNames=removeProvidedNameRequests(result.text,[joined,...history.filter(h=>h.direction==='incoming').map(h=>h.text)].join('\n'));
  if(providedNames.removed.length){
   result.text=providedNames.text;result.checks?.push({removedProvidedNameRequests:providedNames.removed});
