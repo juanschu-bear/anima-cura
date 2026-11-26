@@ -76,3 +76,5 @@ Prüfsummen siehe zugehörige `.sha256`-Dateien. Keine echten Patiententexte im 
 ### Geschützter Betriebsaufruf
 
 `POST /api/animahost/whatsapp/internal/learning/run` mit dem bestehenden AnimaLine-Geheimnis verarbeitet bis zu drei bereits gespeicherte Quellen. Kein Patienteneingang, keine Freigabe und kein Nachrichtenversand. Antwort `{processed, failed}`, bei technischem Abbruch 503 mit inhaltsfreiem Fehlercode. Der reguläre Cron führt Index-Abgleich und Lernverarbeitung unabhängig voneinander aus. Der Betriebsaufruf dient der gezielten Wiederaufnahme und Betriebsprüfung; keine Browser-Schnittstelle.
+
+Der geleaste AnimaLine-Daemon stößt den geschützten Betriebsaufruf zusätzlich alle fünf Minuten unabhängig vom Nachrichtentransport an. Parallel laufende Aufrufe reservieren verschiedene Quellen über die Datenbank-Lease. Datenbankzugriffe der Lernstrecke verwenden ausdrücklich `cache: no-store`; reservierte Aufträge und Bearbeitungsstände dürfen nicht aus einem Fetch-Cache wiederholt werden.

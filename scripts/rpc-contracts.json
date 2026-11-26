@@ -481,7 +481,7 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "092351ce5d8c586a6fc4370748781bf8af17e1b8b8a10c1f25285bc668b5a1f3",
+      "sha256": "6d77d92d20ab14b6927b0e4288b0deadb1721944b2361e2cc1ab2a2641e75d3a",
       "proof": "The shared control secret and configured practice scope are checked before creating the server service client. Learning decisions additionally require an admin profile at the service boundary and inside the review RPC.",
       "calls": [
         {
@@ -656,8 +656,8 @@
     },
     {
       "file": "src/lib/services/animahost-learning.ts",
-      "sha256": "8af472a8158f61a7c1909337d0605f08b5119d3ea6a868e2d2c37a8ed67dee11",
-      "proof": "Injected server service client only. Processing is called from CRON_SECRET-authenticated retrieval cron with configured tenant. Control edits use the shared secret plus verified admin actor. Anonymous ingestion does not call these RPCs.",
+      "sha256": "7318dfbed5898aec2fd003313feb6eb5cb9e8d57a45f13bafff906d0c18bb0ad",
+      "proof": "Injected server service client only, with no-store fetch for leases. Processing is called from the CRON_SECRET-authenticated cron or ANIMAHOST_LINE_SECRET-authenticated operational drain with configured tenant. Control edits require the shared control secret plus verified admin actor. Ingestion has no approval capability.",
       "calls": [
         {
           "name": "animahost_claim_learning",
@@ -732,7 +732,7 @@
     },
     {
       "file": "src/lib/db/supabase.ts",
-      "sha256": "83ced00465b5907c1bc92403b4ae81dd2b99653af5c169cd5ebf72a0b9a21581"
+      "sha256": "4ee2ca73f5c9fdd0d8c86fc109abb8e5fdc9326afe4e3c8561dc49f55fbf3c0a"
     },
     {
       "file": "src/lib/services/animasign-local-patient-link.ts",
@@ -764,11 +764,15 @@
     },
     {
       "file": "src/app/api/cron/animahost-retrieval/route.ts",
-      "sha256": "3c61cb31e4bda4c3ad417087fdbd1d1f62f42fe9ef4360a1dec5d23391ed2e21"
+      "sha256": "2533eb2549a9153b3b3daf8c66daab2c499855a69e0b396e5e5a16452abd9611"
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/learning/route.ts",
-      "sha256": "be1eca6b89f667b423f43a36c37b46987810342bd5c36fc26db8120297f57650"
+      "sha256": "4ef70a4d1b175762f93c4c2fdead6c3bd25ffcdc7ba1870f19d9ef33c3838141"
+    },
+    {
+      "file": "src/app/api/animahost/whatsapp/internal/learning/run/route.ts",
+      "sha256": "6c184468b6524ab364fa554ac675c3c13de356ab66390b671482e7ee84d8c175"
     }
   ],
   "boundaries": [
