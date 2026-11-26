@@ -56,3 +56,16 @@ test('send uses stored recipient, scopes the link, keeps receipt and never resen
  assert.equal((await sendAppAccess(db,'staff',c,deliver)).state,'accepted');assert.equal((await sendAppAccess(db,'staff',c,deliver)).state,'accepted');assert.equal(sends,1);assert.deepEqual(links[0].patient_ids,[patient.id]);assert.equal(requests[0].actor_id,'staff');
  await assert.rejects(sendAppAccess(db,'staff',{...c,expectedEmail:'attacker@example.com'},deliver),/recipient_changed/);assert.equal(sends,1);
 });
+
+test('existing-account merge scopes the grant and checks persistence instead of trusting directory pagination',async()=>{
+ const {mergeInvoiceAccess}=await import('../invoice-contact-access');
+ for(const failGrant of [false,true]){
+ const grants:any[]=[];let consumed=false;const db:any={auth:{admin:{getUserById:async(id:string)=>({data:{user:{id,email:'parent@example.com'}},error:null})}},from(table:string){let updating=false;const result=()=>{
+  if(table==='invoice_access_links')return {data:updating?(consumed=true,{id:'link'}):{id:'link',contact_id:'contact',patient_ids:['child'],next_path:'/patient/portal',expires_at:'2099-01-01',consumed_at:null},error:null};
+  if(table==='invoice_access_contacts')return {data:{email:'parent@example.com'},error:null};
+  if(table==='patients')return {data:[{id:'child',geburtsdatum:'2015-01-01'}],error:null};
+  return {data:[],error:updating&&failGrant?{code:'failure'}:null};
+ };const q:any={select(){return q},eq(){return q},is(){return q},gt(){return q},in(_k:string,ids:string[]){assert.deepEqual(ids,['child']);return q},update(){updating=true;return q},upsert(rows:any[]){grants.push(...rows);updating=true;return q},single:async()=>result(),maybeSingle:async()=>result(),then(a:any,b:any){return Promise.resolve(result()).then(a,b)}};return q;}};
+ const r=await mergeInvoiceAccess({token:'token',birthDate:'2015-01-01',userId:'existing-user'},db);assert.equal(r.ok,!failGrant);assert.equal(consumed,!failGrant);assert.deepEqual(grants.map(g=>g.patient_id),['child']);
+ }
+});
