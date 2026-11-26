@@ -143,3 +143,25 @@ test('model appointment-style criticism cannot veto a valid self-reschedule',asy
  const finding={...valid,passed:false,lateness:'reschedule',hard:[{kind:'appointment_flow',quote:text,reason:'Eine weitere Teamprüfung wäre besser.'}]};
  const m=model(text,finding,text,finding);const r=await runRetrievalReply(m.generate,input({message:'20 Minuten.',doctolibUrl:'https://www.doctolib.de/test'}));assert.match(r.text,/https:/);assert.equal(r.skipSend,undefined);
 });
+
+test('practice call invitation gets one repair then only offending sentence is removed',async()=>{
+ const bad='Gute Besserung! Rufen Sie bitte in der Praxis an. Das Team prüft Ihren Wunsch.';
+ const m=model(bad,valid,bad,valid);const r=await runRetrievalReply(m.generate,input({message:'Darf ich anrufen?'}));
+ assert.equal(r.repairs,1);assert.equal(r.skipSend,undefined);assert.doesNotMatch(r.text,/Rufen Sie/);assert.match(r.text,/Gute Besserung/);assert.match(r.text,/Das Team prüft/);
+ assert.deepEqual((r.checks?.[1] as any).removedPracticeCallInvitations,['Rufen Sie bitte in der Praxis an.']);
+});
+test('only a forbidden practice call sentence leaves team handoff instead of an empty send',async()=>{
+ const text='Rufen Sie uns bitte an.';const m=model(text,valid,text,valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.skipSend,true);assert.equal(r.text,'');
+});
+test('external emergency call and untimed team callback remain allowed',async()=>{
+ for(const text of ['Bei akuter Atemnot rufen Sie 112 an.','Das Team meldet sich telefonisch bei Ihnen.']){
+  const m=model(text,valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.text,text);assert.equal(r.repairs,0);
+ }
+});
+test('unverified hours are not sourced from old rules and removed after correction',async()=>{
+ const text='Unsere Sprechzeiten sind Dienstag bis Donnerstag bis 18:30 Uhr. Das Team prüft Ihren Wunsch.';
+ const m=model(text,valid,text,valid);const r=await runRetrievalReply(m.generate,input());assert.equal(r.repairs,1);assert.doesNotMatch(r.text,/18:30/);assert.match(r.text,/Team prüft/);
+ assert.equal((r.checks?.[1] as any).removedUnconfirmedHours.length,1);
+ const context=replyContext(input({rules:[{id:'old-hours',topic:'Sprechzeiten',keywords:['offen'],action:'antworten',patientText:'Sprechzeiten bis 18:30 Uhr.'}]}));
+ assert.equal((context.fields.JETZT as any).sprechzeitenHeute,null);
+});

@@ -9,7 +9,7 @@ export function removeProvidedNameRequests(text:string,supplied:string){
  const childSupplied=full(subjectNameText(supplied));
  let result=text;
  for(const sentence of replySentences(text)){
-  if(!/\b(?:nenn\w*|schreib\w*|mitteil\w*|wie heißt|wie heisst|wie heißen|wie heissen|unter welchem)\b/i.test(sentence)||!/(?:\bNamen?\b|wie hei(?:ß|ss))/.test(sentence))continue;
+  if(!/\b(?:nenn\w*|schreib\w*|mitteil\w*|wie heißt|wie heisst|wie heißen|wie heissen|unter welchem)\b/i.test(sentence)||!/(?:\bNamen?\b|wie hei(?:ß|ss))/i.test(sentence))continue;
   const named=Array.from(sentence.matchAll(new RegExp(String.raw`\b(?:von|für)\s+([\p{Lu}][\p{L}'’‑-]+(?:\s+[\p{Lu}][\p{L}'’‑-]+){1,3})\b`,'gu')),m=>m[1]);
   // The complete name must already occur in a patient-supplied message, not only in model history.
   const direct=senderSupplied&&/(?:Ihren?|deinen?|wie hei(?:ß|ss)|unter welchem Namen)/i.test(sentence);

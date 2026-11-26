@@ -27,5 +27,6 @@ test('a supplied full sender or child name removes generic name requests but pre
  const text='Gute Besserung! Bitte nennen Sie mir Ihren vollständigen Namen. Das Team prüft den Terminwunsch.';
  assert.equal(removeProvidedNameRequests(text,'Hallo, hier ist Manuel Schubert.').text,'Gute Besserung!  Das Team prüft den Terminwunsch.');
  assert.equal(removeProvidedNameRequests('Bitte nennen Sie den vollständigen Namen Ihres Kindes.','Hier ist die Mama von Carlo Schubert.').text,'');
+ assert.equal(removeProvidedNameRequests('Wie heißen Sie?','Mein Name ist Martin Beispiel.').text,'');
  assert.equal(removeProvidedNameRequests('Wie lautet das Geburtsdatum Ihres Kindes?','Hier ist die Mama von Carlo Schubert.').removed.length,0);
 });
