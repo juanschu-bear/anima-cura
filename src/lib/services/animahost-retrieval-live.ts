@@ -72,13 +72,15 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  }
  // A sender resolution must not be silently replaced by a different patient during sheet selection.
  const selected=chatName?.status==='matched'?patients.filter(p=>p.id===chatName?.patientId):[];
+ const parentName=subject&&/(?:Mama|Papa|Mutter|Vater|Elternteil)\s+von|(?:mein|unser)(?:e[mnr]?)?\s+(?:Sohn|Tochter|Kind)/i.test(identityText)?senderDeclaration(identityText):null;
+ if(chatName?.role==='subject'&&parentName)chatName={...chatName,senderName:parentName,senderRole:'parent'};
  const address=senderAddress(chatName,selected[0],joined,input.history??[],input.receivedAt);
  chatName=address.context;
  const patientSheet=await loadPatientSheet(db,{tenantId:input.tenantId,patients:selected,verifiedIds,chatPatientCount:patients.length,confirmedPatientId:chatName?.confirmed?chatName.patientId:undefined,conversationPatientId:provisional?.id,message:selfNameClaim(joined)??joined,today:appointmentLocalDate(input.receivedAt),at:input.receivedAt,chatJid:input.from,phone,concernHistory:input.concernHistory,
   senderRelative:chatName?.source==='linked_relative'?{name:chatName.matchedName!,role:chatName.role!}:undefined});
  if(chatName?.status==='matched'&&patientSheet.access!=='confirmed')patientSheet.access='unconfirmed';
  if(address.avoidPatientSalutation&&chatName?.role==='subject'){
-  patientSheet.context.schreibendePerson={rolle:'unbekannt',name:null,patient:chatName.matchedName,minderjährig:address.minor,anrede:'neutral; Patientenname ist nicht der Name der schreibenden Person'};
+  patientSheet.context.schreibendePerson={rolle:chatName.senderRole??'unbekannt',name:chatName.senderName??null,patient:chatName.matchedName,minderjährig:address.minor,anrede:chatName.senderName?'Elternteil mit selbst genanntem Namen ansprechen; Kind ist die betroffene Person':'neutral; Patientenname ist nicht der Name der schreibenden Person'};
   patientSheet.fields.schreibendePerson='filled';
  }
  const dossier={sender:'unknown' as const,patients:[]};
@@ -93,7 +95,7 @@ export async function retrievalAnswer(db:Db,input:{tenantId:string;from:string;p
  const retrieved=await retrieveSources(db,input.tenantId,base.message,history.filter(h=>h.direction==='incoming').map(h=>h.text),preview);
  const contextMs=Date.now()-started;
  const result=await captureModelFailure(model,guarded=>runRetrievalReply(guarded,{...base,documents:retrieved.documents,budgetMs:Math.max(1000,60000-contextMs)}));
- if(selected[0]){const addressed=removeChildSalutation(result.text,selected[0],address.avoidPatientSalutation,chatName?.source==='linked_relative'||['parent','recipient'].includes(chatName?.role??'')?chatName?.matchedName:undefined);result.text=addressed.text;result.checks?.push({senderAddress:{minor:address.minor,role:chatName?.role??'unknown',avoidPatientSalutation:address.avoidPatientSalutation},removedChildSalutations:addressed.removed});}
+ if(selected[0]){const addressed=removeChildSalutation(result.text,selected[0],address.avoidPatientSalutation,chatName?.senderName??(chatName?.source==='linked_relative'||['parent','recipient'].includes(chatName?.role??'')?chatName?.matchedName:undefined));result.text=addressed.text;result.checks?.push({senderAddress:{minor:address.minor,role:chatName?.role??'unknown',avoidPatientSalutation:address.avoidPatientSalutation},removedChildSalutations:addressed.removed});}
  const providedNames=removeProvidedNameRequests(result.text,[joined,...history.filter(h=>h.direction==='incoming').map(h=>h.text)].join('\n'));
  if(providedNames.removed.length){
   result.text=providedNames.text;result.checks?.push({removedProvidedNameRequests:providedNames.removed});

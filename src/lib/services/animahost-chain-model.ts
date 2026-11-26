@@ -1,3 +1,4 @@
+import {remoteTestGenerate} from './animahost-test-transport';
 import {withGatewayRetry} from './animahost-model-failure';
 import {generateText,NoObjectGeneratedError,Output} from 'ai';
 import type {SystemModelMessage} from 'ai';
@@ -36,6 +37,7 @@ export function modelFailure(error:unknown):string{
  */
 export function modelGenerate(model:string,signal:AbortSignal,onCall?:(call:ModelCall)=>void,options:{cacheStatic?:boolean;tags?:string[];purpose?:ModelPurpose}={}):Generate{
  const purpose=options.purpose??'live';
+ if(purpose==='test'&&process.env.ANIMAHOST_TEST_TRANSPORT_SECRET)return remoteTestGenerate(process.env.ANIMAHOST_TEST_TRANSPORT_SECRET,signal);
  return async call=>{
   const started=Date.now();
   const stage=call.stage??'compose';

@@ -1,13 +1,16 @@
 import {parseBirthDate,namedSubject} from './animahost-chat-identity';
 import type {createServerClient} from '@/lib/db/supabase';
 export type NamePatient={id:string;vorname:string;nachname:string;geburtsdatum?:string|null;geschlecht?:string|null;versicherter_vorname?:string|null;versicherter_nachname?:string|null;eb2_vorname?:string|null;eb2_nachname?:string|null;versicherter_geburtsdatum?:string|null;recipients?:string[]};
-const words=(value:string)=>value.toLocaleLowerCase('de').replace(/ß/g,'ss').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u').normalize('NFD').replace(new RegExp('\\p{M}','gu'),'').match(new RegExp('\\p{L}+','gu'))??[];
+const words=(value:string):string[]=>value.toLocaleLowerCase('de').replace(/ß/g,'ss').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u').normalize('NFD').replace(new RegExp('\\p{M}','gu'),'').match(new RegExp('\\p{L}+','gu'))??[];
 const ordinary=new Set('hallo guten tag morgen abend danke viele grusse liebe herr frau ich mein meine sohn tochter kind termin montag dienstag mittwoch donnerstag freitag samstag sonntag mai juni juli'.split(' '));
 const nameParticles=new Set('de del da di dos van von der den la le'.split(' '));
 const surnameWords=(value:string)=>{const parts=words(value);return parts.length>1?parts.filter(w=>!nameParticles.has(w)):parts;};
 /** Subject mentions (consent, relatives, children) are not sender declarations. */
 export function senderNameText(message:string){return message.replace(/\b(?:mein(?:e[mnr]?)?|unser(?:e[mnr]?)?)\s+(?:Bruder|Mutter|Vater|Sohn|Tochter|Schwester|Kind|Mann|Frau|Partner(?:in)?|Enkel(?:in)?)\b[^.!?\n]*(?:[.!?]|$)/gi,' ');}
-export function selfNameClaim(message:string){return /(?:mein Name ist|ich heiße|ich heisse|ich bin|hier ist)\s+([^.!?,\n]+)/i.exec(senderNameText(message))?.[1]??null;}
+export function selfNameClaim(message:string){
+ const claim=/(?:mein Name ist|ich heiße|ich heisse|ich bin|hier ist)\s+([^.!?,\n]+)/i.exec(senderNameText(message))?.[1]?.trim();
+ return claim&&!/^(?:(?:der|die|das|ein|eine)\s+)?(?:Mama|Papa|Mutter|Vater|Elternteil|Oma|Opa)\b/i.test(claim)?claim:null;
+}
 export function senderDeclaration(message:string){return selfNameClaim(message)??/(?:\b(?:lg|vg|mfg)\b|(?:freundlichen?|lieben?|vielen?|besten?)?\s*grü(?:ß|ss)(?:e|en)|gruss)[,\s]+([^.!?\n]+)\s*$/i.exec(senderNameText(message))?.[1]??null;}
 /** Name matching establishes a provisional conversational link, NEVER proof of identity. */
 export function matchChatNames(message:string,patients:NamePatient[]){
@@ -34,6 +37,8 @@ export function matchChatNames(message:string,patients:NamePatient[]){
 export function subjectNameText(message:string):string|null{
  const name="[\\p{Lu}][\\p{L}’'‑-]*";
  const particle='(?:de|del|da|di|dos|van|von|der|den|la|le)';
+ const parent=new RegExp(`(?:[Mm]ama|[Pp]apa|[Mm]utter|[Vv]ater|[Ee]lternteil|[Oo]ma|[Oo]pa)\\s+von\\s+((?:${particle}\\s+)*${name}(?:(?:\\s+|,\\s*)(?:${name}|${particle})){0,7})`,'u').exec(message);
+ if(parent)return parent[1];
  const pattern=new RegExp(`(?:[Mm]ein(?:e[mnr]?)?|[Uu]nser(?:e[mnr]?)?)\\s+(Sohn|Tochter|Kind|Enkel|Enkelin|Mutter|Vater|Bruder|Schwester|Partner|Partnerin)\\s*:?\\s*((?:${particle}\\s+)*${name}(?:(?:\\s+|,\\s*)(?:${name}|${particle})){1,7})`,'u');
  const match=pattern.exec(message);if(!match)return null;
  const child=/^(?:Sohn|Tochter|Kind|Enkel|Enkelin)$/.test(match[1]);
@@ -73,14 +78,17 @@ export function matchSubjectNames(message:string,patients:NamePatient[]){
  });
 }
 export function subjectNameResolution(message:string,patients:NamePatient[],verifiedIds:string[]=[]){
- const matches=matchSubjectNames(message,patients);if(!matches.length)return null;
+ let matches=matchSubjectNames(message,patients);
+ const subject=subjectNameText(message),parts=subject?words(subject):[];
+ if(!matches.length&&parts.length===1){matches=patients.filter(p=>verifiedIds.includes(p.id)&&words(p.vorname).includes(parts[0])).map(patient=>({patient,matchedName:[patient.vorname,patient.nachname].join(' '),role:'subject',spellingExact:true,exact:false}));}
+ if(!matches.length)return null;
  const verified=matches.filter(m=>verifiedIds.includes(m.patient.id)&&m.spellingExact);
  const chosen=verified.length===1?verified[0]:matches.length===1&&matches[0].exact?matches[0]:null;
  if(chosen)return {context:{status:'matched',matchedName:chosen.matchedName,patientId:chosen.patient.id,role:'subject',source:verified.length===1?'phone':'chat',confirmed:verified.length===1,question:null} as ChatNameContext,patient:chosen.patient};
  const sameBirth=matches.length>1&&!!matches[0].patient.geburtsdatum&&matches.every(m=>m.patient.geburtsdatum===matches[0].patient.geburtsdatum);
- return {context:{status:'ambiguous',role:'subject',candidateIds:matches.map(m=>m.patient.id),possibleDuplicate:sameBirth,question:sameBirth?'Der Name ist vorhanden, aber mehrere passende Einträge lassen sich nicht sicher unterscheiden. Das Team muss die richtige Akte zuordnen.':parseBirthDate(message)?'Bitte nennen Sie den vollständigen Namen des Kindes.':'Wie lautet der vollständige Name und das Geburtsdatum Ihres Kindes?'} as ChatNameContext,patient:null};
+ return {context:{status:'ambiguous',role:'subject',candidateIds:matches.map(m=>m.patient.id),possibleDuplicate:sameBirth,question:sameBirth?'Der Name ist vorhanden, aber mehrere passende Einträge lassen sich nicht sicher unterscheiden. Das Team muss die richtige Akte zuordnen.':parseBirthDate(message)?'Bitte nennen Sie den vollständigen Namen des Kindes.':subjectNameText(message)&&words(subjectNameText(message)!).length>=2?'Wie lautet das Geburtsdatum Ihres Kindes?':'Wie lautet der vollständige Name Ihres Kindes?'} as ChatNameContext,patient:null};
 }
-export type ChatNameContext={status:'matched'|'ambiguous'|'unmatched';matchedName?:string;patientId?:string;question:string|null;source?:'chat'|'phone'|'linked_relative';role?:string;confirmed?:boolean;candidateIds?:string[];possibleDuplicate?:boolean};
+export type ChatNameContext={status:'matched'|'ambiguous'|'unmatched';matchedName?:string;patientId?:string;question:string|null;senderName?:string;senderRole?:'parent';source?:'chat'|'phone'|'linked_relative';role?:string;confirmed?:boolean;candidateIds?:string[];possibleDuplicate?:boolean};
 const nameColumns='id,vorname,nachname,geburtsdatum,geschlecht,versicherter_vorname,versicherter_nachname,versicherter_geburtsdatum,eb2_vorname,eb2_nachname';
 /** Read relations only for patients already connected to this trusted phone/chat. */
 export async function linkedNamePatients(db:ReturnType<typeof createServerClient>,ids:string[]):Promise<NamePatient[]>{
