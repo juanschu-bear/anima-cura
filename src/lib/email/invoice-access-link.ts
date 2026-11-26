@@ -8,14 +8,15 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({
  * Mail mit einem frischen persönlichen Zugangslink zu den Rechnungen (nach „Neuen Link schicken“).
  * Gleiche Bildsprache wie die übrigen Patientenmails von Anima Cura. Keine Beträge, keine Patientendaten.
  */
-export function buildInvoiceAccessLinkEmail(url: string, locale: string = "de") {
+export function buildInvoiceAccessLinkEmail(url: string, locale: string = "de", purpose: "invoice" | "app" = "invoice") {
   const l = locale === "en" || locale === "es" ? "en" : "de";
   if (!/^https:\/\/animacura\.io\/patient\/invoice-access\/continue\?/.test(url)) throw new Error("invoice_access_link_url_invalid");
-  const subject = t("invoiceAccess.mailSubject", l);
-  const title = t("invoiceAccess.mailTitle", l);
-  const intro = t("invoiceAccess.mailIntro", l);
-  const button = t("invoiceAccess.mailButton", l);
-  const validity = t("invoiceAccess.mailValidity", l);
+  const prefix = purpose === "app" ? "appAccess" : "invoiceAccess";
+  const subject = t(`${prefix}.mailSubject`, l);
+  const title = t(`${prefix}.mailTitle`, l);
+  const intro = t(`${prefix}.mailIntro`, l);
+  const button = t(`${prefix}.mailButton`, l);
+  const validity = t(`${prefix}.mailValidity`, l);
   const warning = t("invoiceAccess.mailWarning", l);
   const signature = t("patientRecovery.emailSignature", l);
   const text = [title, intro, `${button}: ${url}`, validity, warning, signature].join("\n\n");
