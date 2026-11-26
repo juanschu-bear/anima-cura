@@ -19,7 +19,7 @@ test('scoped invitation never inherits legacy siblings and fails on incomplete p
  assert.equal(scopedAccessRedirect({patient_ids:['child'],next_path:'/patient/portal'}),'/patient/portal');assert.equal(scopedAccessRedirect({next_path:'https://evil.invalid'}),'/patient/portal?section=rechnungen');
 });
 test('app invitation has no invoice prerequisite and escapes its URL',()=>{
- const mail=buildInvoiceAccessLinkEmail('https://animacura.io/patient/invoice-access/continue?token=example&lang=de','de','app');assert.match(mail.text,/keine Rechnung/);assert.match(mail.text,/Home-Bildschirm/);assert.doesNotMatch(mail.subject,/Rechnungen/);assert.match(mail.html,/&amp;lang/);
+ const mail=buildInvoiceAccessLinkEmail('https://animacura.io/patient/invoice-access/continue?token=example&lang=de','de','app');assert.match(mail.text,/keine Rechnung/);assert.match(mail.text,/Home-Bildschirm/);assert.doesNotMatch(mail.subject,/Rechnungen/);assert.match(mail.html,/&amp;lang/);assert.doesNotMatch(mail.html,/Deine Rechnungen|Your invoices/);
 });
 test('migration isolates staff send receipts and enforces idempotency and explicit confirmation',async()=>{
  const db=new PGlite();await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE TABLE patients(id uuid PRIMARY KEY); CREATE TABLE patient_access_memberships(id int); CREATE TABLE animahost_knowledge_versions(id int); CREATE TABLE invoice_access_links(id uuid);");
