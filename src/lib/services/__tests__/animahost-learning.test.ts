@@ -45,3 +45,14 @@ test('extraction failures retain safe stage diagnostics without patient or provi
  assert.equal(learningFailureCode('evidence',new Error('learning_evidence_invalid')),'learning_evidence_invalid');
  assert.equal(learningFailureCode('source',Object.assign(new Error('private value'),{name:'ZodError'})),'learning_source_ZodError');
 });
+
+test('operational learning drain rejects missing and wrong producer secrets before database access',async()=>{
+ const {POST}=await import('../../../app/api/animahost/whatsapp/internal/learning/run/route');
+ const previous=process.env.ANIMAHOST_LINE_SECRET;
+ try{
+  delete process.env.ANIMAHOST_LINE_SECRET;
+  assert.equal((await POST(new Request('https://example.test/run',{method:'POST'}) as any)).status,401);
+  process.env.ANIMAHOST_LINE_SECRET='synthetic-producer-secret';
+  assert.equal((await POST(new Request('https://example.test/run',{method:'POST',headers:{authorization:'Bearer wrong'}}) as any)).status,401);
+ }finally{if(previous===undefined)delete process.env.ANIMAHOST_LINE_SECRET;else process.env.ANIMAHOST_LINE_SECRET=previous;}
+});

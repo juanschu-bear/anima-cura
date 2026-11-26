@@ -72,3 +72,7 @@ Freigabe erzeugt atomar einen versionierten Wissenseintrag (`knowledge_id`) mit 
 Anima Cura: `107_animahost_conversation_learning.sql`, Projekt zymqxzhjbcxzhzvjqvbv. AnimaLine: `20261126110000_learning_outbox.sql`, Projekt yucpobkmfvjsuuwtffvr. RLS; keine öffentlichen Leserechte. Interne Aufnahme unter `POST /api/animahost/whatsapp/internal/learning` ausschließlich mit bestehendem AnimaLine-Geheimnis und festem Praxis-Mandanten. Endpunkte sind keine Oberfläche; Claude baut deren Darstellung.
 
 Prüfsummen siehe zugehörige `.sha256`-Dateien. Keine echten Patiententexte im Repository. Keine automatische Freigabe und kein automatisches Trainieren der Modellgewichte.
+
+### Geschützter Betriebsaufruf
+
+`POST /api/animahost/whatsapp/internal/learning/run` mit dem bestehenden AnimaLine-Geheimnis verarbeitet bis zu drei bereits gespeicherte Quellen. Kein Patienteneingang, keine Freigabe und kein Nachrichtenversand. Antwort `{processed, failed}`, bei technischem Abbruch 503 mit inhaltsfreiem Fehlercode. Der reguläre Cron führt Index-Abgleich und Lernverarbeitung unabhängig voneinander aus. Der Betriebsaufruf dient der gezielten Wiederaufnahme und Betriebsprüfung; keine Browser-Schnittstelle.

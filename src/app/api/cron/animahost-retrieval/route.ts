@@ -11,6 +11,10 @@ export async function GET(request:NextRequest){
   return NextResponse.json({code:'not_authenticated'},{status:401});
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'not_configured'},{status:503});
- try{const db=createServerClient();const retrieval=await syncRetrievalSources(db,tenant);let learning;try{learning=await processLearning(db,tenant);}catch(error){learning={error:learningFailureCode('worker',error)};}console.info('animahost_learning_run',learning);return NextResponse.json({...retrieval,learning});}
- catch{return NextResponse.json({code:'retrieval_sync_failed'},{status:503});}
+ const db=createServerClient();
+ console.info('animahost_learning_start');
+ const [retrieval,learning]=await Promise.allSettled([syncRetrievalSources(db,tenant),processLearning(db,tenant)]);
+ const learningResult=learning.status==='fulfilled'?learning.value:{error:learningFailureCode('worker',learning.reason)};
+ console.info('animahost_learning_run',learningResult);
+ return NextResponse.json({...(retrieval.status==='fulfilled'?retrieval.value:{code:'retrieval_sync_failed'}),learning:learningResult},{status:retrieval.status==='fulfilled'?200:503});
 }

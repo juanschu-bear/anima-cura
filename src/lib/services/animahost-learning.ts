@@ -30,7 +30,7 @@ export async function redactLearningEdit(db:Db,entry:z.infer<typeof learningEdit
  return learningEdit.parse({title:maskBirthDates(anonymizeRetrieval(entry.title,names)),content:maskBirthDates(anonymizeRetrieval(entry.content,names))});
 }
 export function learningFailureCode(stage:string,error:unknown){
- const known=['learning_names_unavailable','learning_settings_unavailable','learning_target_missing','learning_evidence_invalid','learning_human_evidence_required','learning_patient_evidence_required','learning_save_failed'];
+ const known=['learning_claim_failed','learning_finish_failed','learning_names_unavailable','learning_settings_unavailable','learning_target_missing','learning_evidence_invalid','learning_human_evidence_required','learning_patient_evidence_required','learning_save_failed'];
  if(error instanceof Error&&known.includes(error.message))return error.message;
  const status=(error as {statusCode?:unknown})?.statusCode;
  const type=error instanceof Error&&['TimeoutError','AbortError','ZodError','ModelAccessError','AI_NoObjectGeneratedError'].includes(error.name)?error.name:'failed';
@@ -39,7 +39,7 @@ export function learningFailureCode(stage:string,error:unknown){
 export async function processLearning(db:Db,tenant:string){
  const result={processed:0,failed:0};
  for(let batch=0;batch<3;batch++){
-  const claimed=await db.rpc('animahost_claim_learning',{p_tenant:tenant});if(claimed.error)throw Error('learning_claim_failed');const src=claimed.data?.[0];if(!src)break;
+  const claimed=await db.rpc('animahost_claim_learning',{p_tenant:tenant});if(claimed.error){console.error('learning_claim_failed',{code:claimed.error.code});throw Error('learning_claim_failed');}const src=claimed.data?.[0];if(!src)break;
   let stage='names';
   try{
    const names=await learningNames(db);const settings=await db.from('animahost_whatsapp_settings').select('model').eq('tenant_id',tenant).single();if(settings.error)throw Error('learning_settings_unavailable');
