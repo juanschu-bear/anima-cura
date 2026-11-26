@@ -11,7 +11,7 @@ export async function GET(request:NextRequest){
   return NextResponse.json({code:'not_authenticated'},{status:401});
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'not_configured'},{status:503});
- const db=createServerClient();
+ const db=createServerClient({noStore:true});
  console.info('animahost_learning_start');
  const [retrieval,learning]=await Promise.allSettled([syncRetrievalSources(db,tenant),processLearning(db,tenant)]);
  const learningResult=learning.status==='fulfilled'?learning.value:{error:learningFailureCode('worker',learning.reason)};

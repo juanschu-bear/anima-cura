@@ -75,7 +75,7 @@ export async function GET(request:NextRequest){
   return NextResponse.json({code:'not_authenticated'},{status:401,headers});
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
- const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ const db=createServerClient({noStore:true}),resource=request.nextUrl.searchParams.get('resource');
  if(resource==='conversation_learning'){
   const params=request.nextUrl.searchParams;
   const filter=z.object({id:z.string().uuid().optional(),page:z.coerce.number().int().min(0).max(100000),state:z.enum(['draft','approved','rejected']).optional(),kind:z.enum(learningKinds).optional(),topic:z.enum(learningTopics).optional()}).safeParse({id:params.get('id')??undefined,page:params.get('page')??0,state:params.get('state')??undefined,kind:params.get('kind')??undefined,topic:params.get('topic')??undefined});
@@ -247,7 +247,7 @@ export async function POST(request:NextRequest){
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
- const db=createServerClient(),input=parsed.data;
+ const db=createServerClient({noStore:true}),input=parsed.data;
  if(input.action==='review_learning'||input.action==='retry_learning_source'){
   const actor=await db.from('user_profiles').select('role').eq('id',input.actorId).single();
   if(actor.error||actor.data.role!=='admin')return NextResponse.json({code:'learning_actor_forbidden'},{status:403,headers});

@@ -56,3 +56,15 @@ test('operational learning drain rejects missing and wrong producer secrets befo
   assert.equal((await POST(new Request('https://example.test/run',{method:'POST',headers:{authorization:'Bearer wrong'}}) as any)).status,401);
  }finally{if(previous===undefined)delete process.env.ANIMAHOST_LINE_SECRET;else process.env.ANIMAHOST_LINE_SECRET=previous;}
 });
+
+test('learning database calls explicitly bypass Next fetch cache for leases and fresh review state',async()=>{
+ const {createServerClient}=await import('../../db/supabase');
+ const originalFetch=globalThis.fetch,previousUrl=process.env.NEXT_PUBLIC_SUPABASE_URL,previousKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
+ const policies:(RequestCache|undefined)[]=[];
+ try{
+  process.env.NEXT_PUBLIC_SUPABASE_URL='https://synthetic.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic';
+  globalThis.fetch=async(_input,init)=>{policies.push(init?.cache);return new Response('[]',{status:200,headers:{'content-type':'application/json'}});};
+  const db=createServerClient({noStore:true});await db.rpc('animahost_claim_learning',{p_tenant:tenant});await db.rpc('animahost_claim_learning',{p_tenant:tenant});
+  assert.deepEqual(policies,['no-store','no-store']);
+ }finally{globalThis.fetch=originalFetch;if(previousUrl===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=previousUrl;if(previousKey===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=previousKey;}
+});

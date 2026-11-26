@@ -9,6 +9,6 @@ export async function POST(request:NextRequest){
  const secret=process.env.ANIMAHOST_LINE_SECRET,token=request.headers.get('authorization')?.replace(/^Bearer /,'');
  if(!secret||!token||Buffer.byteLength(secret)!==Buffer.byteLength(token)||!timingSafeEqual(Buffer.from(secret),Buffer.from(token)))return NextResponse.json({code:'not_authorized'},{status:401});
  const tenant=process.env.ANIMAHOST_TENANT_ID;if(!tenant)return NextResponse.json({code:'not_configured'},{status:503});
- try{return NextResponse.json(await processLearning(createServerClient(),tenant));}
+ try{return NextResponse.json(await processLearning(createServerClient({noStore:true}),tenant));}
  catch(error){return NextResponse.json({code:learningFailureCode('worker',error)},{status:503});}
 }
