@@ -13,6 +13,8 @@
  *   POST /api/patient/invoice-access/merge   { token, birthDate }  angemeldet; hängt die Kinder an einen bestehenden Zugang
  *   POST /api/patient/invoice-access/request { email, next? } → immer { ok: true }
  *   POST /api/patient/invoice-access/resend  { token } → immer { ok: true }, neuer Link an dieselbe Adresse
+ *   Einladung der Praxis (Codex, 26.11.2026): next=/patient/portal. Derselbe Ablauf, aber ohne Rechnungsbezug; Ziel ist die App.
+ *        Ein abgelaufener Praxis-Link wird nie von hier neu verschickt: resend liefert 409 practice_invitation_required → „Bitte schreib der Praxis“.
  *   Fehlercodes: access_link_invalid, access_link_expired, birth_date_mismatch, password_invalid, access_exists,
  *                access_merge_requires_same_email, invalid_request, rate_limited, not_authenticated, access_unavailable
  * Der Link enthält keine Mailadresse und keine Patientendaten. Eingaben bleiben bei jedem Fehler stehen.
@@ -31,7 +33,9 @@ type Zustand =
   | { art: "fertig"; ziel: string; kinder: string[]; angemeldet: boolean }
   | { art: "vorhanden" }
   | { art: "link"; grund: "access_link_invalid" | "access_link_expired" | "kein_token" };
-type Nachschub = "bereit" | "sendet" | "unterwegs" | "adresse" | "adresse_sendet" | "adresse_unterwegs";
+type Nachschub = "bereit" | "sendet" | "unterwegs" | "adresse" | "adresse_sendet" | "adresse_unterwegs" | "praxis";
+// Texte, die bei einer Einladung der Praxis ohne Rechnungsbezug lauten.
+const APP_TEXTE: Record<string, string> = { tag: "appAccess.screenTag", title: "appAccess.title", intro: "appAccess.intro", birthDate: "appAccess.birthDate", birthDateMissing: "appAccess.birthDateMissing", foot: "appAccess.foot", doneText: "appAccess.doneText", doneChildren: "appAccess.doneChildren", toInvoices: "appAccess.toApp", existsText: "appAccess.existsText", existsSubmit: "appAccess.existsSubmit", emailHelp: "appAccess.emailHelp" };
 
 const MINDESTLAENGE = 8; // dieselbe Regel wie bei „Passwort vergessen“ und „Zugang herstellen“
 
@@ -50,7 +54,12 @@ export default function InvoiceAccessContinue() {
   const token = params.get("token") || "";
   const ziel = safePatientTarget(params.get("next") || "/patient/portal?section=rechnungen");
   const locale = params.get("lang") === "en" ? "en" : "de";
-  const t = (key: string, vars?: Record<string, string | number>) => translate(key, locale, vars);
+  // Einladung der Praxis: führt in die App, nicht in den Rechnungsbereich.
+  const istApp = ziel === "/patient/portal";
+  const t = (key: string, vars?: Record<string, string | number>) => {
+    const name = key.startsWith("invoiceAccess.") ? key.slice("invoiceAccess.".length) : "";
+    return translate(istApp && APP_TEXTE[name] ? APP_TEXTE[name] : key, locale, vars);
+  };
 
   const [zustand, setZustand] = useState<Zustand>(token ? { art: "formular" } : { art: "link", grund: "kein_token" });
   const [geburtsdatum, setGeburtsdatum] = useState("");
@@ -176,6 +185,8 @@ export default function InvoiceAccessContinue() {
         cache: "no-store",
         body: JSON.stringify({ token }),
       });
+      // Einladung der Praxis: Hier wird nichts neu verschickt, auch nicht über die Mailadresse.
+      if (r.status === 409 && codeVon(await jsonVon(r)) === "practice_invitation_required") { setNachschub("praxis"); return; }
       // Gibt es den Weg über den alten Link nicht, reicht die Mailadresse.
       setNachschub(r.ok ? "unterwegs" : "adresse");
     } catch {
@@ -214,6 +225,8 @@ export default function InvoiceAccessContinue() {
   const amPasswort = fehler === "password_length" || fehler === "password_invalid";
   const anWiederholung = fehler === "password_mismatch";
   const allgemein = fehler === "rate_limited" || fehler === "access_unavailable";
+  // Abgelaufene oder ungültige Einladung der Praxis: kein Knopf, kein Adressfeld, nur der Weg über die Praxis.
+  const praxisLink = nachschub === "praxis" || (istApp && zustand.art === "link" && zustand.grund !== "kein_token");
 
   return (
     <div className="iac-root">
@@ -335,15 +348,15 @@ export default function InvoiceAccessContinue() {
             <h1 className="iac-title">
               {zustand.grund === "access_link_expired" ? t("invoiceAccess.linkExpiredTitle") : zustand.grund === "kein_token" ? t("invoiceAccess.noLinkTitle") : t("invoiceAccess.linkInvalidTitle")}
             </h1>
-            <p className="iac-sub">{zustand.grund === "kein_token" ? t("invoiceAccess.noLinkText") : t("invoiceAccess.linkText")}</p>
+            <p className="iac-sub">{zustand.grund === "kein_token" ? t("invoiceAccess.noLinkText") : praxisLink ? t("appAccess.practiceLinkText") : t("invoiceAccess.linkText")}</p>
 
-            {(nachschub === "bereit" || nachschub === "sendet") && (
+            {!praxisLink && (nachschub === "bereit" || nachschub === "sendet") && (
               <button type="button" className="iac-submit" onClick={() => void neuerLinkPerToken()} disabled={nachschub === "sendet"}>
                 {nachschub === "sendet" ? <><Loader2 size={18} className="iac-spin" aria-hidden="true" />{t("invoiceAccess.sending")}</> : t("invoiceAccess.sendNewLink")}
               </button>
             )}
 
-            {(nachschub === "adresse" || nachschub === "adresse_sendet") && (
+            {!praxisLink && (nachschub === "adresse" || nachschub === "adresse_sendet") && (
               <form onSubmit={neuerLinkPerAdresse} noValidate>
                 <div className="iac-field">
                   <label htmlFor="iac-mail" className="iac-label">{t("invoiceAccess.email")}</label>
