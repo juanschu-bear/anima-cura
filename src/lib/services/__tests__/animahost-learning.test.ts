@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import{readFileSync}from'node:fs';import{PGlite}from'@electric-sql/pglite';
-import{validateLearningEvidence,learningOutput,learningSource}from'../animahost-learning';
+import{learningFailureCode,validateLearningEvidence,learningOutput,learningSource}from'../animahost-learning';
 const tenant='00000000-0000-4000-8000-000000000001',admin='00000000-0000-4000-8000-000000000002',staff='00000000-0000-4000-8000-000000000003',source='00000000-0000-4000-8000-000000000004';
 const draft={topic:'communication',kind:'communication',title:'Kurze Nachfrage',content:'Bei unklarem Anliegen eine konkrete Rückfrage stellen.',occasion:'Unklare Nachricht',observation:'Team fragt nach dem Anliegen.',interpretation:null,medical:false,evidence:[{ref:'M1',quote:'Worum geht es?'}]};
 test('suggestions require real exact evidence from the appropriate speaker',()=>{
@@ -37,4 +37,11 @@ test('learning queue is idempotent, leased and approval is admin-only with audit
  await db.exec('RESET ROLE;SET ROLE authenticated');await assert.rejects(db.query('SELECT * FROM animahost_learning_sources'),/permission denied/);
  await assert.rejects(review(admin,4,'approve'),/permission denied/);
  }finally{await db.close();}
+});
+
+test('extraction failures retain safe stage diagnostics without patient or provider text',()=>{
+ assert.equal(learningFailureCode('redaction',Object.assign(new Error('private patient text'),{statusCode:400})),'learning_redaction_http_400');
+ assert.equal(learningFailureCode('extraction',new Error('private patient text')),'learning_extraction_failed');
+ assert.equal(learningFailureCode('evidence',new Error('learning_evidence_invalid')),'learning_evidence_invalid');
+ assert.equal(learningFailureCode('source',Object.assign(new Error('private value'),{name:'ZodError'})),'learning_source_ZodError');
 });
