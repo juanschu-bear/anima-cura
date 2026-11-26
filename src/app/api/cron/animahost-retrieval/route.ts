@@ -1,3 +1,4 @@
+import {processLearning} from '@/lib/services/animahost-learning';
 import {NextRequest,NextResponse} from 'next/server';
 import {timingSafeEqual} from 'node:crypto';
 import {createServerClient} from '@/lib/db/supabase';
@@ -10,6 +11,6 @@ export async function GET(request:NextRequest){
   return NextResponse.json({code:'not_authenticated'},{status:401});
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'not_configured'},{status:503});
- try{return NextResponse.json(await syncRetrievalSources(createServerClient(),tenant));}
+ try{const db=createServerClient();const retrieval=await syncRetrievalSources(db,tenant);let learning;try{learning=await processLearning(db,tenant);}catch{learning={error:'learning_unavailable'};}return NextResponse.json({...retrieval,learning});}
  catch{return NextResponse.json({code:'retrieval_sync_failed'},{status:503});}
 }

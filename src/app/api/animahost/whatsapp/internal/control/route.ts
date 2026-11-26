@@ -1,3 +1,4 @@
+import {learningEdit,learningKinds,learningTopics,redactLearningEdit} from '@/lib/services/animahost-learning';
 import {readDailyReview} from '@/lib/services/animahost-daily-review';
 import acceptanceRun from '../../../../../../../docs/animahost/2026-11-24-acceptance-run.json';
 import {timingSafeEqual} from 'node:crypto';
@@ -34,6 +35,8 @@ const settingsSchema=z.strictObject({
  closurePeriods:closurePeriodsSchema.optional(),appointmentTolerance:appointmentToleranceSchema.optional(),teamReplyDays:teamReplyDaysSchema.optional(),
 });
 const bodySchema=z.discriminatedUnion('action',[
+ z.strictObject({action:z.literal('review_learning'),actorId:z.string().uuid(),id:z.string().uuid(),expectedVersion:z.number().int().positive(),decision:z.enum(['edit','approve','reject']),entry:learningEdit.optional()}),
+ z.strictObject({action:z.literal('retry_learning_source'),actorId:z.string().uuid(),id:z.string().uuid()}),
  z.strictObject({action:z.literal('decide_chat_identity'),actorId:z.string().uuid(),linkId:z.string().uuid(),confirm:z.boolean()}),
  z.strictObject({action:z.literal('publish_rules'),actorId:z.string().uuid(),expectedVersion:z.number().int().positive().nullable(),rules:whatsappRulesSchema}),
  z.strictObject({action:z.literal('update_settings'),actorId:z.string().uuid(),settings:settingsSchema}),
@@ -73,6 +76,19 @@ export async function GET(request:NextRequest){
  const tenant=process.env.ANIMAHOST_TENANT_ID;
  if(!tenant)return NextResponse.json({code:'animahost_not_configured'},{status:503,headers});
  const db=createServerClient(),resource=request.nextUrl.searchParams.get('resource');
+ if(resource==='conversation_learning'){
+  const params=request.nextUrl.searchParams;
+  const filter=z.object({id:z.string().uuid().optional(),page:z.coerce.number().int().min(0).max(100000),state:z.enum(['draft','approved','rejected']).optional(),kind:z.enum(learningKinds).optional(),topic:z.enum(learningTopics).optional()}).safeParse({id:params.get('id')??undefined,page:params.get('page')??0,state:params.get('state')??undefined,kind:params.get('kind')??undefined,topic:params.get('topic')??undefined});
+  if(!filter.success)return NextResponse.json({code:'learning_filter_invalid'},{status:400,headers});
+  const f=filter.data;let q=db.from('animahost_learning_suggestions').select('*',{count:'exact'}).eq('tenant_id',tenant);
+  if(f.id)q=q.eq('id',f.id);if(f.state)q=q.eq('state',f.state);if(f.kind)q=q.eq('kind',f.kind);if(f.topic)q=q.eq('topic',f.topic);
+  const [rows,summary]=await Promise.all([q.order('created_at',{ascending:false}).order('id').range(f.page*50,f.page*50+49),db.rpc('animahost_learning_summary',{p_tenant:tenant})]);
+  if(rows.error||summary.error)return unavailable();
+  const sourceIds=Array.from(new Set(rows.data.map(r=>r.source_id)));const sources=sourceIds.length?await db.from('animahost_learning_sources').select('id,source,source_at,chat_jid').eq('tenant_id',tenant).in('id',sourceIds):{data:[],error:null};if(sources.error)return unavailable();
+  const audit=f.id?await db.from('animahost_learning_audit').select('version,actor_id,action,before_value,after_value,created_at').eq('tenant_id',tenant).eq('suggestion_id',f.id).order('version'):{data:[],error:null};if(audit.error)return unavailable();
+  const failed=await db.from('animahost_learning_sources').select('id,source,source_at,last_error,attempts').eq('tenant_id',tenant).eq('state','error').order('source_at').limit(50);if(failed.error)return unavailable();
+  return NextResponse.json({failedSources:failed.data,origin:'conversation',items:rows.data.map(r=>({...r,origin:'conversation',source:sources.data?.find(source=>source.id===r.source_id)})),total:rows.count,nextPage:(rows.count??0)>(f.page+1)*50?f.page+1:null,summary:summary.data,audit:audit.data},{headers});
+ }
  if(resource==='daily_review'){
   const day=request.nextUrl.searchParams.get('day')??new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date());
   const anonymize=request.nextUrl.searchParams.get('anonymize')??'1';
@@ -133,6 +149,10 @@ export async function GET(request:NextRequest){
   const start=page.data*100;
   let query=db.from('animahost_knowledge_versions').select('*').eq('tenant_id',tenant);
   if(id.data)query=query.eq('id',id.data);
+  const origin=search.get('origin');
+  if(origin&&!['practice','conversation'].includes(origin))return NextResponse.json({code:'knowledge_filter_invalid'},{status:400,headers});
+  if(origin==='conversation')query=query.eq('metadata->>origin','conversation');
+  if(origin==='practice')query=query.or('metadata->>origin.is.null,metadata->>origin.neq.conversation');
   const result=await query.order('id').order('version',{ascending:false}).range(start,start+100);
   if(['42P01','PGRST205'].includes(result.error?.code??''))
    return NextResponse.json({knowledgeAvailable:false,versions:[],effective:[],nextPage:null},{headers});
@@ -228,6 +248,19 @@ export async function POST(request:NextRequest){
  const parsed=bodySchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({code:'control_invalid'},{status:400,headers});
  const db=createServerClient(),input=parsed.data;
+ if(input.action==='review_learning'||input.action==='retry_learning_source'){
+  const actor=await db.from('user_profiles').select('role').eq('id',input.actorId).single();
+  if(actor.error||actor.data.role!=='admin')return NextResponse.json({code:'learning_actor_forbidden'},{status:403,headers});
+  if(input.action==='retry_learning_source'){
+   const r=await db.from('animahost_learning_sources').update({state:'queued',attempts:0,available_at:new Date().toISOString(),last_error:null,lease:null}).eq('tenant_id',tenant).eq('id',input.id).eq('state','error').select('id');
+   return r.error?unavailable():NextResponse.json({queued:Boolean(r.data?.length)},{headers});
+  }
+  if((input.decision==='edit')!==Boolean(input.entry))return NextResponse.json({code:'learning_invalid'},{status:400,headers});
+  let entry;try{entry=input.entry?await redactLearningEdit(db,input.entry):null;}catch{return NextResponse.json({code:'learning_anonymization_unavailable'},{status:503,headers});}
+  const r=await db.rpc('animahost_review_learning',{p_tenant:tenant,p_id:input.id,p_expected:input.expectedVersion,p_actor:input.actorId,p_action:input.decision,p_payload:entry});
+  if(r.error)return NextResponse.json({code:['42501','40001','P0002','22023'].includes(r.error.code)?r.error.message:'learning_review_failed'},{status:({'42501':403,'40001':409,'P0002':404,'22023':422} as Record<string,number>)[r.error.code]??503,headers});
+  return NextResponse.json({item:r.data,indexing:input.decision==='approve'?'scheduled':'not_required'},{headers});
+ }
  if(input.action==='decide_chat_identity'){
   const result=await db.rpc('animahost_decide_chat_identity',{p_tenant:tenant,p_link:input.linkId,p_actor:input.actorId,p_confirm:input.confirm});
   return result.error?unavailable():NextResponse.json({ok:true,status:input.confirm?'confirmed':'released'},{headers});

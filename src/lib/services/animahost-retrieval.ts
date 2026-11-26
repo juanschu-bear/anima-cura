@@ -39,7 +39,7 @@ export async function syncRetrievalSources(db:Db,tenant:string){
  if(version.error)throw Error('retrieval_rules_unavailable');
  const docs:RetrievalDocument[]=bundledGoldDocuments();
  for(const row of knowledge.data){
-  const payload={content:row.content,guidance:row.metadata?.guidance??{},sources:row.metadata?.sources??[],externalId:row.external_id};
+  const payload={origin:row.metadata?.origin==='conversation'?'conversation':'practice',learningSuggestionId:row.metadata?.learningSuggestionId??null,content:row.content,guidance:row.metadata?.guidance??{},sources:row.metadata?.sources??[],externalId:row.external_id};
   const content=[row.title,row.content,...Object.values(row.metadata?.guidance??{})].join('\n');
   docs.push({kind:'knowledge',ref:row.id,version:row.version,source_at:row.approved_at??row.created_at,title:row.title,content,payload,draft:!row.approved_at,active:row.approved_at?row.active:true,content_hash:contentHash(content)});
  }

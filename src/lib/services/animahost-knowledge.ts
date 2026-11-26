@@ -28,7 +28,7 @@ export async function activeKnowledge(db:ReturnType<typeof createServerClient>,t
 
 export function knowledgeRecord(row:Record<string,unknown>){
  const metadata=(row.metadata??{}) as Record<string,unknown>;
- return {id:row.id,version:row.version,area:row.area,title:row.title,content:row.content,source:row.source,
+ return {origin:metadata.origin==='conversation'?'conversation':'practice',learningSuggestionId:metadata.learningSuggestionId??null,id:row.id,version:row.version,area:row.area,title:row.title,content:row.content,source:row.source,
   active:row.active,status:row.approved_at?(row.active?'approved':'deactivated'):'draft',
   validFrom:row.valid_from,approvedAt:row.approved_at,approvedBy:row.approved_by,
   createdAt:row.created_at,createdBy:row.created_by,externalId:row.external_id??null,sources:metadata.sources??[],

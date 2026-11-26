@@ -481,8 +481,8 @@
     },
     {
       "file": "src/app/api/animahost/whatsapp/internal/control/route.ts",
-      "sha256": "197c60c729bf17f883ff8e9ba1b7e9bcbd11553c520e45da172a9d9273b0c5a2",
-      "proof": "The shared control secret and configured practice scope are checked before creating the server service client.",
+      "sha256": "092351ce5d8c586a6fc4370748781bf8af17e1b8b8a10c1f25285bc668b5a1f3",
+      "proof": "The shared control secret and configured practice scope are checked before creating the server service client. Learning decisions additionally require an admin profile at the service boundary and inside the review RPC.",
       "calls": [
         {
           "name": "animahost_decide_chat_identity",
@@ -517,6 +517,16 @@
         {
           "name": "animahost_change_knowledge",
           "signature": "public.animahost_change_knowledge(p_tenant uuid, p_id uuid, p_expected integer, p_actor uuid, p_action text, p_entry jsonb)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_learning_summary",
+          "signature": "public.animahost_learning_summary(p_tenant uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_review_learning",
+          "signature": "public.animahost_review_learning(p_tenant uuid, p_id uuid, p_expected integer, p_actor uuid, p_action text, p_payload jsonb)",
           "role": "service_role"
         }
       ]
@@ -617,7 +627,7 @@
     },
     {
       "file": "src/lib/services/animahost-retrieval.ts",
-      "sha256": "5179a2029f3075d7e3311e96e486b35335a92d77efb45ae0a9c73761ee3f4e09",
+      "sha256": "9ce1fa0f145de23f0a2661771999feaaae8370ba371bb2411c3d2007917bbb29",
       "proof": "Injected createServerClient service client only: retrievalAnswer from authenticated internal/live route, sync from CRON_SECRET protected route, and private CLI. No user-session client. Tenant comes from authenticated server context.",
       "calls": [
         {
@@ -629,7 +639,7 @@
     },
     {
       "file": "src/lib/services/animahost-knowledge.ts",
-      "sha256": "ed7617102c145016631742745eeb56406ffcee252475345c1a605b6facd01601",
+      "sha256": "ca9b8097c13f31e001096dfa156dc5f15e924c4cd77d7a45ba256a747b7a9559",
       "proof": "Reviewed injected createServerClient service client from authenticated AnimaHost routes; detailed knowledge RPC introduced by migration 104, with existing service-only fallback.",
       "calls": [
         {
@@ -640,6 +650,28 @@
         {
           "name": "animahost_active_knowledge",
           "signature": "public.animahost_active_knowledge(p_tenant uuid, p_day date)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
+      "file": "src/lib/services/animahost-learning.ts",
+      "sha256": "8af472a8158f61a7c1909337d0605f08b5119d3ea6a868e2d2c37a8ed67dee11",
+      "proof": "Injected server service client only. Processing is called from CRON_SECRET-authenticated retrieval cron with configured tenant. Control edits use the shared secret plus verified admin actor. Anonymous ingestion does not call these RPCs.",
+      "calls": [
+        {
+          "name": "animahost_claim_learning",
+          "signature": "public.animahost_claim_learning(p_tenant uuid)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_finish_learning",
+          "signature": "public.animahost_finish_learning(p_tenant uuid, p_source uuid, p_lease uuid, p_suggestions jsonb, p_error text)",
+          "role": "service_role"
+        },
+        {
+          "name": "animahost_finish_learning",
+          "signature": "public.animahost_finish_learning(p_tenant uuid, p_source uuid, p_lease uuid, p_suggestions jsonb, p_error text)",
           "role": "service_role"
         }
       ]
@@ -729,6 +761,14 @@
     {
       "file": "scripts/animahost-quality-v3-acceptance.cjs",
       "sha256": "1d58730c05502e3aab4cc6b2eec89b4939a600fdf5f6d9f0ab70435e2d8bf1b1"
+    },
+    {
+      "file": "src/app/api/cron/animahost-retrieval/route.ts",
+      "sha256": "3c61cb31e4bda4c3ad417087fdbd1d1f62f42fe9ef4360a1dec5d23391ed2e21"
+    },
+    {
+      "file": "src/app/api/animahost/whatsapp/internal/learning/route.ts",
+      "sha256": "be1eca6b89f667b423f43a36c37b46987810342bd5c36fc26db8120297f57650"
     }
   ],
   "boundaries": [
@@ -745,6 +785,8 @@
     "resolvePatientInvoicePdf",
     "issueAttendanceFromChat",
     "changeChatInvoiceRecipient",
-    "changeChatPatientContact"
+    "changeChatPatientContact",
+    "processLearning",
+    "redactLearningEdit"
   ]
 }
