@@ -123,6 +123,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const [rechnungSeite, setRechnungSeite] = useState(0);
   // Mehrere Kinder an einem Zugang (Codex, 12.11.2026): Rechnungen tragen patientId, die Auswahl passiert hier in der Oberfläche.
   const [kinder, setKinder] = useState<{ patientId: string; firstName: string }[]>([]);
+  const [kinderGeladen, setKinderGeladen] = useState(false);
   const [kindFilter, setKindFilter] = useState<string | null>(null);
   const [showAllPays, setShowAllPays] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -308,7 +309,8 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
     fetch("/api/patient/invoice-access/children", { cache: "no-store" })
       .then(r => (r.ok ? r.json() : null))
       .then(j => { if (aktiv && j && Array.isArray(j.children)) setKinder((j.children as { patientId?: unknown; firstName?: unknown }[]).filter(k => typeof k.patientId === "string").map(k => ({ patientId: String(k.patientId), firstName: typeof k.firstName === "string" ? k.firstName : "" }))); })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => { if (aktiv) setKinderGeladen(true); });
     return () => { aktiv = false; };
   }, []);
   const mehrereKinder = kinder.length > 1;
@@ -886,6 +888,90 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
   const hasExistingFinancialData = patientHasFinancialData({reportedFinancialData:hasFinancialData,paymentCount:pays.length,invoiceCount:rechnungen.length,invoiceHistoryCount:rechnungsverlauf.length});
   const isNewPatient = !loading && phasen.length === 0 && !hasExistingFinancialData && (!rp || !rp.plan);
 
+  // Dokumente und Telefonzeile der Startansicht: einmal gebaut, von beiden Startansichten genutzt.
+  const WelcomeDocs = docs.length > 0 ? (
+        <div style={{ padding: "0 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
+            {lang === "en" ? "Your documents" : lang === "es" ? "Tus documentos" : "Deine Dokumente"}
+          </div>
+          {docs.map(d => (
+            <div key={d.id} onClick={() => { setDocDrawer(d); hapticLight(); }} style={{ ...card, margin: "0 0 10px", display: "flex", gap: 14, alignItems: "center", cursor: "pointer" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)", display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>{docIcon(d)}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", marginTop: 2 }}>{docLabel(d)} · {fmtDateL(d.hochgeladen_am, lang)}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: muted, paddingLeft: 2 }}>
+            {lang === "en" ? "All documents are also available under the \"More\" tab." : lang === "es" ? "Todos los documentos tambi\u00e9n est\u00e1n disponibles en \"M\u00e1s\"." : "Alle Dokumente findest du auch jederzeit unter dem Men\u00fcpunkt \u201eMehr\u201c."}
+          </div>
+        </div>
+  ) : null;
+  const WelcomeFoot = (
+      <div style={{ textAlign: "center", color: dk ? "rgba(255,255,255,0.2)" : "#b0a99e", fontSize: 11, padding: "10px 20px 20px" }}>
+        {lang === "en" ? "Questions? Call 0341 246 67 40" : lang === "es" ? "\u00bfPreguntas? Llama al 0341 246 67 40" : "Bei Fragen: 0341 246 67 40"}
+      </div>
+  );
+
+  // ═══ START OHNE INHALTE, ZUGANG ÜBER EINEN LINK DER PRAXIS (Einladung oder Rechnungsmail) ═══
+  // Diese Konten kommen nicht aus der Neuaufnahme. Ein leerer Bereich ist hier kein Fehler und keine laufende Einrichtung:
+  // Nicht zu jeder Behandlung gibt es eine Rechnung oder einen Ratenplan. Deshalb keine Schritte „in Bearbeitung“ und keine Fristen.
+  // Bis feststeht, über welchen Weg das Konto entstand, nur die Begrüßung: keine Ansicht, die gleich wieder wechselt.
+  const StartKopf = (
+    <div>
+      {Header}
+      <div style={{ padding: "16px 20px 0" }}>
+        <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
+        <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
+      </div>
+    </div>
+  );
+  const zugangFuer = kinder.map(k => k.firstName).filter(Boolean).join(", ");
+  const AccessStart = (
+    <div>
+      {Header}
+      <div style={{ padding: "16px 20px 0" }}>
+        <p style={{ fontSize: 13, color: muted }}>{t("home.welcome", lang)}</p>
+        <h1 style={{ ...hd, fontSize: 24, fontWeight: 800, color: fg }}>{t("home.hello", lang)} {firstName}</h1>
+      </div>
+      <div style={{ ...card, margin: "16px 20px 14px", border: "1.5px solid " + (dk ? "rgba(34,197,94,0.3)" : "rgba(46,122,90,0.25)") }}>
+        <div style={{ ...hd, fontSize: 19, fontWeight: 800, color: fg, marginBottom: 8 }}>
+          {lang === "en" ? "Your access is active" : lang === "es" ? "Tu acceso está activo" : "Dein Zugang ist aktiv"}
+        </div>
+        <div style={{ fontSize: 14, lineHeight: 1.65, color: soft }}>
+          {lang === "en" ? "Everything the practice shares with you appears here. Right now there is nothing yet. That is not an error: not every treatment comes with an invoice or an instalment plan."
+            : lang === "es" ? "Aquí aparece todo lo que la clínica comparte contigo. Por ahora no hay nada. No es un error: no todos los tratamientos tienen factura o plan de cuotas."
+            : "Hier erscheint alles, was die Praxis für dich bereitstellt. Im Moment liegt noch nichts vor. Das ist kein Fehler: Nicht zu jeder Behandlung gibt es eine Rechnung oder einen Ratenplan."}
+        </div>
+        {zugangFuer && (
+          <div style={{ fontSize: 13, color: muted, marginTop: 10 }}>
+            {lang === "en" ? "This access is for: " : lang === "es" ? "Este acceso es para: " : "Dieser Zugang gilt für: "}<b style={{ color: fg, fontWeight: 600 }}>{zugangFuer}</b>
+          </div>
+        )}
+      </div>
+      <div style={{ padding: "0 20px", marginBottom: 14, display: "grid", gap: 10 }}>
+        {[
+          { title: lang === "en" ? "Treatment" : lang === "es" ? "Tratamiento" : "Behandlung", desc: lang === "en" ? "Appears as soon as the practice shares it with you." : lang === "es" ? "Aparece en cuanto la clínica lo comparta contigo." : "Erscheint, sobald die Praxis sie für dich freigibt." },
+          { title: lang === "en" ? "Invoices" : lang === "es" ? "Facturas" : "Rechnungen", desc: lang === "en" ? "Only appear if there is an invoice for you. We'll email you when one arrives." : lang === "es" ? "Solo aparecen si hay una factura para ti. Te avisamos por correo cuando llegue." : "Erscheinen nur, wenn es für dich eine Rechnung gibt. Dann bekommst du eine Mail." },
+          { title: lang === "en" ? "Documents and messages" : lang === "es" ? "Documentos y mensajes" : "Dokumente und Nachrichten", desc: lang === "en" ? "You'll find them under \"More\" at any time." : lang === "es" ? "Los encuentras en \"Más\" en cualquier momento." : "Findest du jederzeit unter „Mehr“." },
+        ].map(row => (
+          <div key={row.title} style={{ ...card, margin: 0, padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: fg, marginBottom: 3 }}>{row.title}</div>
+            <div style={{ fontSize: 12.5, color: soft, lineHeight: 1.55 }}>{row.desc}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ margin: "0 20px 14px", fontSize: 12.5, lineHeight: 1.6, color: muted }}>
+        {lang === "en" ? "Tip: add Anima Cura to your home screen via your browser menu. On iPhone you'll find it in Safari's share menu."
+          : lang === "es" ? "Consejo: añade Anima Cura a tu pantalla de inicio desde el menú del navegador. En iPhone está en el menú Compartir de Safari."
+          : "Tipp: Leg dir Anima Cura über das Browsermenü auf den Startbildschirm. Auf dem iPhone findest du das im Teilen-Menü von Safari."}
+      </div>
+      {WelcomeDocs}
+      {WelcomeFoot}
+    </div>
+  );
+
   // ═══ WELCOME TIMELINE (shown when no treatment data yet) ═══
   const WelcomeTimeline = (
     <div>
@@ -955,30 +1041,9 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         ))}
       </div>
 
-      {/* Documents section */}
-      {docs.length > 0 && (
-        <div style={{ padding: "0 20px", marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
-            {lang === "en" ? "Your documents" : lang === "es" ? "Tus documentos" : "Deine Dokumente"}
-          </div>
-          {docs.map(d => (
-            <div key={d.id} onClick={() => { setDocDrawer(d); hapticLight(); }} style={{ ...card, margin: "0 0 10px", display: "flex", gap: 14, alignItems: "center", cursor: "pointer" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: dk ? "rgba(34,197,94,0.1)" : "rgba(46,122,90,0.06)", display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>{docIcon(d)}</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: dk ? "rgba(255,255,255,0.25)" : "#b0a99e", marginTop: 2 }}>{docLabel(d)} · {fmtDateL(d.hochgeladen_am, lang)}</div>
-              </div>
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: muted, paddingLeft: 2 }}>
-            {lang === "en" ? "All documents are also available under the \"More\" tab." : lang === "es" ? "Todos los documentos tambi\u00e9n est\u00e1n disponibles en \"M\u00e1s\"." : "Alle Dokumente findest du auch jederzeit unter dem Men\u00fcpunkt \u201eMehr\u201c."}
-          </div>
-        </div>
-      )}
+      {WelcomeDocs}
 
-      <div style={{ textAlign: "center", color: dk ? "rgba(255,255,255,0.2)" : "#b0a99e", fontSize: 11, padding: "10px 20px 20px" }}>
-        {lang === "en" ? "Questions? Call 0341 246 67 40" : lang === "es" ? "\u00bfPreguntas? Llama al 0341 246 67 40" : "Bei Fragen: 0341 246 67 40"}
-      </div>
+      {WelcomeFoot}
 
       <style>
         {`
@@ -1893,7 +1958,7 @@ export default function PatientPortalShell({ patientName, patientId }: Props) {
         />
       </div>
       <div className="portal-content" style={{ position: "relative", zIndex: 1, paddingBottom: 100 }}>
-        {tab === "home" && (isNewPatient ? WelcomeTimeline : HomeTab)}
+        {tab === "home" && (!isNewPatient ? HomeTab : !kinderGeladen ? StartKopf : kinder.length > 0 ? AccessStart : WelcomeTimeline)}
         {tab === "journey" && JourneyTab}
         {tab === "progress" && (balanceView ? BalanceTab : ProgressTab)}
         {tab === "chat" && ChatTab}
