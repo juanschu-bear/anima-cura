@@ -573,6 +573,18 @@
       ]
     },
     {
+      "file": "src/lib/services/invoice-contact-email-intake.ts",
+      "sha256": "2ed1c195a64b12dbd8552a57bf4627c6353eebe95e3db454ca78b1b8face93f3",
+      "proof": "Only the ANIMAHOST_LINE_SECRET-authenticated internal WhatsApp route can invoke this service. It constructs the server service-role client and the RPC is explicitly granted only to service_role; patient scope and eligible 2026 invoice documents are revalidated inside the security-definer function.",
+      "calls": [
+        {
+          "name": "prepare_invoice_contact_email",
+          "signature": "public.prepare_invoice_contact_email(p_request uuid, p_tenant uuid, p_campaign text, p_chat text, p_message text, p_received timestamp with time zone, p_email text, p_patients uuid[], p_actor uuid)",
+          "role": "service_role"
+        }
+      ]
+    },
+    {
       "file": "src/lib/services/animahost-attendance.ts",
       "sha256": "85a1a159a4d13b9ad247008b2ae1b896247b264dda4116976c4d01128986bcf5",
       "proof": "Only the authenticated WhatsApp route supplies its server service client. The service checks practice, patient, visit evidence and private PDF upload before publication.",
